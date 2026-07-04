@@ -11,6 +11,7 @@ import '../../widgets/test_mode_banner.dart';
 import '../history/history_screen.dart';
 import '../live/live_screen.dart';
 import '../settings/settings_screen.dart';
+import 'stage_quick_settings.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -229,7 +230,9 @@ class _GoLiveCard extends ConsumerWidget {
                   suffixText: currency.toUpperCase(),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              const StageQuickSettings(),
+              const SizedBox(height: 8),
               FilledButton.icon(
                 onPressed: onStart,
                 icon: const Icon(Icons.sensors_rounded),
