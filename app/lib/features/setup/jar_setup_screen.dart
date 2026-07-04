@@ -8,6 +8,7 @@ import '../../data/stripe/stripe_client.dart';
 import '../../domain/tip_jar.dart';
 import '../../state/providers.dart';
 import '../../widgets/qr_card.dart';
+import '../settings/stage_preview_screen.dart';
 
 /// Creates the artist's tip jar (Product + pay-what-you-want Price +
 /// Payment Link) in their Stripe account.
@@ -221,6 +222,14 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
         FilledButton(
           onPressed: _finish,
           child: const Text('Continue'),
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const StagePreviewScreen(),
+          )),
+          icon: const Icon(Icons.theater_comedy_rounded),
+          label: const Text('Choose your stage look'),
         ),
       ],
     );

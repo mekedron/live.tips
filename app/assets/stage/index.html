@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>live.tips stage</title>
+<style>
+  /* The page paints its own full-bleed background (kStageBlack → theme
+     gradient): WebView background transparency is not available on every
+     platform, so we never rely on it. The theme vars are set by the library. */
+  :root { --bg0: #0d0e12; --bg1: #191b24; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #0d0e12;
+    touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background:
+      radial-gradient(120% 90% at 50% 12%, var(--bg1) 0%, var(--bg0) 58%, #05060a 100%);
+  }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="stage.js"></script>
+</body>
+</html>

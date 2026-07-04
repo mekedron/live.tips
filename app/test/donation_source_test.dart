@@ -19,6 +19,7 @@ class FakeRequests extends StripeRequests {
 
   final List<DonationEventsPage> pages;
   final List<String?> endingBeforeCalls = [];
+  final List<int?> createdGteCalls = [];
   int _next = 0;
 
   @override
@@ -28,6 +29,7 @@ class FakeRequests extends StripeRequests {
     int limit = 100,
   }) async {
     endingBeforeCalls.add(endingBefore);
+    createdGteCalls.add(createdGte);
     if (_next >= pages.length) {
       return const DonationEventsPage(events: [], hasMore: false);
     }
@@ -56,6 +58,37 @@ void main() {
     expect(none, isEmpty);
     expect(source.cursor, 'evt_anchor');
     expect(requests.endingBeforeCalls.last, 'evt_anchor');
+  });
+
+  test(
+      'prime with backfill re-reads the whole session window instead of '
+      'anchoring on the newest event (tips from while the app was dead)',
+      () async {
+    final requests = FakeRequests([
+      DonationEventsPage(
+        events: [
+          DonationEvent(
+              id: 'evt_missed',
+              created: 1751500100,
+              session: paidSession('cs_missed')),
+        ],
+        hasMore: false,
+      ),
+    ]);
+    final source =
+        StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+    final startedAt =
+        DateTime.fromMillisecondsSinceEpoch(1751500000 * 1000, isUtc: true);
+    await source.prime(startedAt, backfill: true);
+    // no anchor request was made — the single fake page is still unread
+    expect(requests.endingBeforeCalls, isEmpty);
+
+    final fresh = await source.pollNew();
+    expect(fresh.map((d) => d.id), ['cs_missed'],
+        reason: 'the tip that arrived while the app was dead is recovered');
+    // the window starts a safety margin before the session start
+    expect(requests.createdGteCalls.first, 1751500000 - 60);
+    expect(source.cursor, 'evt_missed');
   });
 
   test('pollNew returns fresh donations chronologically and advances cursor',

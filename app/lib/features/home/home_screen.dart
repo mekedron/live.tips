@@ -22,9 +22,24 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final TextEditingController _goalController;
 
+  /// Dev convenience: `flutter run --dart-define=AUTO_RESUME=1` jumps
+  /// straight back into a stored session — no clicking through the UI.
+  static const _autoResume =
+      bool.fromEnvironment('AUTO_RESUME', defaultValue: false);
+
   @override
   void initState() {
     super.initState();
+    if (_autoResume) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final controller = ref.read(liveSessionProvider.notifier);
+        if (ref.read(liveSessionProvider) == null &&
+            controller.hasStoredSession) {
+          final resumed = await controller.resumeStored();
+          if (resumed && mounted) _openLive();
+        }
+      });
+    }
     final app = ref.read(appStateProvider);
     _goalController = TextEditingController(
       text: formatMajorPlain(

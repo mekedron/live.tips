@@ -64,13 +64,44 @@ platform keychain/keystore via `flutter_secure_storage`.
 ```
 lib/
 ├── core/        # money/currency helpers, theme, onboarding constants
-├── domain/      # Donation, LiveSession, TipJar, AppSettings (pure Dart)
+├── domain/      # Donation, LiveSession, TipJar, AppSettings, StageSettings,
+│                # JarTipAttribution (pure Dart)
 ├── data/        # StripeClient (REST), StripeRequests (typed ops),
 │                # DonationSource (stripe poller + demo), stores
 ├── state/       # Riverpod providers, LiveSessionController
 ├── features/    # onboarding / setup / home / live / lock / history / settings
+│                # live/stage/ = the stage visualizations (see below)
 └── widgets/     # QR blocks, donation tiles, banners
 ```
+
+## The stage (live-screen visualization)
+
+The live screen renders through one seam — `JarStageView` — with three
+user-selectable styles (`AppSettings.stage`, settings → "Stage look"):
+
+- **classic** — the original numbers-first screen (native, works everywhere;
+  also the terminal fallback).
+- **jar2d / jar3d** — a glass tip jar that fills with coins toward the goal,
+  spills over past 100%, and at 200% retires the full jar to a trophy shelf
+  while a fresh one takes its place. Both are renderers inside ONE embedded
+  JS "stage library" (`/renderer` at the repo root, built into
+  `app/assets/stage/` — see `renderer/README.md`), hosted in a
+  `webview_flutter` WebView and driven exclusively over a JSON bridge
+  (`renderer/PROTOCOL.md`). jar3d is three.js with 11 vessels and 6 backdrop
+  scenes; jar2d is a lightweight Canvas twin for weak tablets.
+
+Money truth never leaves Dart. `LiveSession` banks rollovers **eagerly**
+(`bankedMinor`/`bankedJars`: every full `2 × goal` in the current jar retires
+immediately and persists), and each donation is attributed at receipt
+(`JarTipAttribution`: fill delta, absolute fill after, rollovers) — the
+renderer only choreographs what it is told, so a WebView crash can never lose
+or invent a cent. All HUD text (session total, "this jar: X of Y", trophy
+line) is native Flutter on top of the WebView.
+
+Runtime resilience lives in `stage_resolver.dart` + `web_stage.dart`: a
+handshake (`hello → init → ready`) with an 8-second deadline, a perf heartbeat
+watchdog, one silent reload, then graceful fallback jar3d → jar2d → classic —
+the persisted preference is never mutated by a fallback.
 
 ## Stage lock — honest threat model
 

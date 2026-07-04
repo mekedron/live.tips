@@ -1,7 +1,9 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:live_tips/features/live/stage/web_stage/web_stage.dart';
 import 'package:live_tips/main.dart' as app;
 
 /// End-to-end demo flow on a real device/simulator:
@@ -11,6 +13,9 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   Future<void> shoot(String name) async {
+    // integration_test screenshots are mobile-only; desktop runs verify
+    // behavior, not pixels (grab those manually if needed).
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     if (Platform.isAndroid) {
       await binding.convertFlutterSurfaceToImage();
     }
@@ -36,15 +41,34 @@ void main() {
     await shoot('01_home_demo');
 
     await tester.tap(find.text('Start live session'));
-    // Don't pumpAndSettle: the live screen has repeating timers + confetti.
+    // Don't pumpAndSettle: the live screen has repeating timers + confetti
+    // (and in jar styles a continuously-rendering WebView).
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 300));
     }
 
-    // First demo poll fires immediately and always tips.
-    expect(find.textContaining('tips'), findsWidgets);
-    expect(find.textContaining('goal'), findsWidgets);
+    // First demo poll fires immediately and always tips. The default stage
+    // style is the 3D jar (native HUD says "this jar: …"); platforms without
+    // WebView fall back to the classic screen ("of … goal").
+    final jarHud = find.textContaining('this jar');
+    final classicGoal = find.textContaining('goal');
+    expect(jarHud.evaluate().isNotEmpty || classicGoal.evaluate().isNotEmpty,
+        isTrue);
     await shoot('02_live_session');
+
+    // On WebView platforms the 3D stage must actually come up: handshake
+    // done (poster spinner gone) and no fallback to classic happened.
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+      for (var i = 0;
+          i < 40 && find.byType(CircularProgressIndicator).evaluate().isNotEmpty;
+          i++) {
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+      expect(find.byType(WebStage), findsOneWidget,
+          reason: 'jar3d should not have fallen back');
+      expect(find.byType(CircularProgressIndicator), findsNothing,
+          reason: 'renderer must reach ready (first frame drawn)');
+    }
 
     // Let a couple more donations roll in (demo polls every ~4s).
     for (var i = 0; i < 30; i++) {

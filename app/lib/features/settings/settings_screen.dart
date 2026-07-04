@@ -6,6 +6,7 @@ import '../../core/stripe_onboarding.dart';
 import '../../state/providers.dart';
 import '../lock/lock_service.dart';
 import '../setup/jar_setup_screen.dart';
+import 'stage_settings_section.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -191,6 +192,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       )
                     : null,
               ),
+              const SizedBox(height: 8),
+              _SectionHeader('Stage look'),
+              const StageSettingsSection(),
               const SizedBox(height: 8),
               _SectionHeader('Live session'),
               ListTile(

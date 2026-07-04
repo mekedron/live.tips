@@ -2,6 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// Copy the tip link — the desktop-friendly path (nobody scans a QR code on
+/// the machine that displays it).
+Future<void> copyTipLink(BuildContext context, String url) async {
+  await Clipboard.setData(ClipboardData(text: url));
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Link copied')),
+    );
+  }
+}
+
+/// Open the tip link in the default browser.
+Future<void> openTipLink(String url) =>
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 
 /// White-backed QR block for the tip link — scannable from a dark screen.
 class QrBlock extends StatelessWidget {
@@ -72,14 +88,7 @@ class TipLinkCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 TextButton.icon(
-                  onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: url));
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Link copied')),
-                      );
-                    }
-                  },
+                  onPressed: () => copyTipLink(context, url),
                   icon: const Icon(Icons.copy_rounded, size: 18),
                   label: const Text('Copy'),
                 ),
@@ -119,6 +128,23 @@ void showFullscreenQr(BuildContext context, String url) {
             const Text(
               'Scan to tip 💛',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: () => copyTipLink(context, url),
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('Copy link'),
+                ),
+                const SizedBox(width: 10),
+                FilledButton.tonalIcon(
+                  onPressed: () => openTipLink(url),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                  label: const Text('Open'),
+                ),
+              ],
             ),
           ],
         ),

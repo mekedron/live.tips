@@ -8,7 +8,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// the Stripe restricted key and the (salted, hashed) stage-lock PIN.
 class SecureStore {
   SecureStore([FlutterSecureStorage? storage])
-      : _storage = storage ?? const FlutterSecureStorage();
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              // The data-protection keychain needs a keychain-access-groups
+              // entitlement, which requires a real signing team — with the
+              // local ad-hoc signature the app is killed at launch. The login
+              // keychain works for everyone building from source.
+              mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+            );
 
   final FlutterSecureStorage _storage;
 

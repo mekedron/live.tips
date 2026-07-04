@@ -200,8 +200,9 @@ class _SessionsTab extends ConsumerWidget {
             ),
             subtitle: Text(
               '$date · ${session.count} tips · ${formatDuration(session.elapsed(session.endedAt))} · '
-              'goal ${(session.progress * 100).round()}%'
-              '${session.goalReached ? ' 🎉' : ''}',
+              'goal ${session.goalMinor <= 0 ? 0 : (session.totalMinor / session.goalMinor * 100).round()}%'
+              '${session.goalReached ? ' 🎉' : ''}'
+              '${session.bankedJars > 0 ? ' · 🏆 ${session.bankedJars}' : ''}',
             ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => _showSessionDetail(context, session),

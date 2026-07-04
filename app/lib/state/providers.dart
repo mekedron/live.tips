@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/donation_source.dart';
 import '../data/local_store.dart';
 import '../data/secure_store.dart';
 import '../data/stripe/stripe_client.dart';
@@ -104,11 +105,37 @@ class AppStateNotifier extends Notifier<AppState> {
 final appStateProvider =
     NotifierProvider<AppStateNotifier, AppState>(AppStateNotifier.new);
 
-/// Live Stripe API surface, or null when in demo mode / signed out.
+/// Builds the donation feed for a session — a seam so controller tests can
+/// inject a scripted source instead of the demo/Stripe pollers. The Stripe
+/// source constructs and OWNS its HTTP client (closed in dispose): sharing
+/// [stripeRequestsProvider]'s client killed every session — any AppState
+/// change rebuilt the provider and closed the client mid-poll.
+typedef DonationSourceFactory = DonationSource Function({
+  required bool demo,
+  required String? apiKey,
+  required TipJar jar,
+});
+
+final donationSourceFactoryProvider = Provider<DonationSourceFactory>(
+  (ref) => ({required demo, required apiKey, required jar}) {
+    if (demo || apiKey == null) return DemoDonationSource();
+    final client = StripeClient(apiKey);
+    return StripeDonationSource(
+      StripeRequests(client),
+      paymentLinkId: jar.paymentLinkId,
+      onDispose: client.close,
+    );
+  },
+);
+
+/// Live Stripe API surface for one-off calls (recent tips, jar setup), or
+/// null when in demo mode / signed out. Depends ONLY on the key — settings
+/// or jar changes must not tear down a client somebody may be awaiting.
 final stripeRequestsProvider = Provider<StripeRequests?>((ref) {
-  final app = ref.watch(appStateProvider);
-  if (app.demo || app.apiKey == null) return null;
-  final client = StripeClient(app.apiKey!);
+  final apiKey =
+      ref.watch(appStateProvider.select((s) => s.demo ? null : s.apiKey));
+  if (apiKey == null) return null;
+  final client = StripeClient(apiKey);
   ref.onDispose(client.close);
   return StripeRequests(client);
 });

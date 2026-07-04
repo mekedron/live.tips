@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/donation_source.dart';
 import '../data/stripe/stripe_client.dart';
 import '../domain/donation.dart';
 import '../domain/live_session.dart';
+import '../domain/rollover_math.dart';
 import 'providers.dart';
 
 enum PollHealth { connecting, ok, error }
@@ -18,6 +20,7 @@ class LiveState {
     this.locked = false,
     this.lastDonation,
     this.confettiTick = 0,
+    this.newTips = const [],
   });
 
   final LiveSession session;
@@ -29,7 +32,14 @@ class LiveState {
   final Donation? lastDonation;
 
   /// Increases once per newly arrived donation — UI listens and fires 🎉.
+  /// Doubles as the serial for [newTips]: consumers act on the batch only
+  /// when this advanced (the batch is CARRIED by later copyWith calls, so
+  /// non-emptiness alone means nothing).
   final int confettiTick;
+
+  /// Every donation added in the latest poll tick, with its jar attribution
+  /// (fill delta, rollovers) — the stage renderers pour exactly this.
+  final List<JarTipAttribution> newTips;
 
   LiveState copyWith({
     LiveSession? session,
@@ -39,6 +49,7 @@ class LiveState {
     bool? locked,
     Donation? lastDonation,
     int? confettiTick,
+    List<JarTipAttribution>? newTips,
   }) =>
       LiveState(
         session: session ?? this.session,
@@ -47,6 +58,7 @@ class LiveState {
         locked: locked ?? this.locked,
         lastDonation: lastDonation ?? this.lastDonation,
         confettiTick: confettiTick ?? this.confettiTick,
+        newTips: newTips ?? this.newTips,
       );
 }
 
@@ -90,27 +102,30 @@ class LiveSessionController extends Notifier<LiveState?> {
     final local = ref.read(localStoreProvider);
     final stored = local.readActiveSession();
     if (stored == null) return false;
-    await _begin(stored, resumeCursor: local.readActiveCursor());
+    await _begin(stored,
+        resumeCursor: local.readActiveCursor(), resumed: true);
     return true;
   }
 
   Future<void> discardStored() =>
       ref.read(localStoreProvider).clearActiveSession();
 
-  Future<void> _begin(LiveSession session, {String? resumeCursor}) async {
+  Future<void> _begin(LiveSession session,
+      {String? resumeCursor, bool resumed = false}) async {
     _teardown();
     final app = ref.read(appStateProvider);
-    final requests = ref.read(stripeRequestsProvider);
     final jar = app.effectiveTipJar!;
-    _source = (app.demo || requests == null)
-        ? DemoDonationSource()
-        : StripeDonationSource(requests, paymentLinkId: jar.paymentLinkId);
+    _source = ref.read(donationSourceFactoryProvider)(
+        demo: app.demo, apiKey: app.apiKey, jar: jar);
+    // A restored session may owe rollovers (goal edits, older builds).
+    session.applyRollovers();
 
     state = LiveState(session: session);
     await ref.read(localStoreProvider).saveActiveSession(session, resumeCursor);
 
     try {
-      await _source!.prime(session.startedAt, resumeCursor: resumeCursor);
+      await _source!.prime(session.startedAt,
+          resumeCursor: resumeCursor, backfill: resumed);
       state = state?.copyWith(health: PollHealth.ok, clearError: true);
     } catch (e) {
       _reportError(e);
@@ -138,19 +153,19 @@ class LiveSessionController extends Notifier<LiveState?> {
         }
         return;
       }
-      var added = 0;
-      Donation? newest;
+      final tips = <JarTipAttribution>[];
       for (final donation in fresh) {
-        if (current.session.addDonation(donation)) {
-          added++;
-          newest = donation;
-        }
+        final tip = current.session.addDonationAttributed(donation);
+        if (tip != null) tips.add(tip);
       }
+      debugPrint('live poll: +${tips.length} donation(s), '
+          'total ${current.session.totalMinor}');
       state = current.copyWith(
         health: PollHealth.ok,
         clearError: true,
-        lastDonation: newest ?? current.lastDonation,
-        confettiTick: current.confettiTick + added,
+        lastDonation: tips.isEmpty ? current.lastDonation : tips.last.donation,
+        confettiTick: current.confettiTick + tips.length,
+        newTips: tips,
       );
       await ref
           .read(localStoreProvider)
@@ -164,6 +179,7 @@ class LiveSessionController extends Notifier<LiveState?> {
   }
 
   void _reportError(Object e) {
+    debugPrint('live poll error: $e');
     final message = switch (e) {
       StripeApiException(:final friendlyMessage) => friendlyMessage,
       StripeNetworkException() => 'No connection — retrying…',
@@ -176,6 +192,8 @@ class LiveSessionController extends Notifier<LiveState?> {
     final current = state;
     if (current == null || goalMinor <= 0) return;
     current.session.goalMinor = goalMinor;
+    // Lowering the goal can instantly owe rollovers (total ≥ 2× new goal).
+    current.session.applyRollovers();
     state = current.copyWith(session: current.session);
     unawaited(ref
         .read(localStoreProvider)

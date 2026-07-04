@@ -7,8 +7,12 @@ import 'stripe/stripe_requests.dart';
 /// calls [pollNew] on a timer; the source keeps its own cursor.
 abstract class DonationSource {
   /// Prepares the cursor. [resumeCursor] restores a session after an app
-  /// restart so donations made in between are still picked up.
-  Future<void> prime(DateTime sessionStart, {String? resumeCursor});
+  /// restart so donations made in between are still picked up. [backfill]
+  /// (resumed sessions only) means: even without a cursor, everything since
+  /// [sessionStart] must be re-fetched — tips that arrived while the app was
+  /// dead or the machine slept belong to the session; the caller dedupes.
+  Future<void> prime(DateTime sessionStart,
+      {String? resumeCursor, bool backfill = false});
 
   /// Returns only donations not seen before (chronological order).
   Future<List<Donation>> pollNew();
@@ -23,10 +27,20 @@ abstract class DonationSource {
 /// webhook alternative, which is what lets this app run on a tablet on a
 /// stage with no server anywhere.
 class StripeDonationSource extends DonationSource {
-  StripeDonationSource(this._requests, {required this.paymentLinkId});
+  StripeDonationSource(this._requests,
+      {required this.paymentLinkId, this.onDispose});
 
   final StripeRequests _requests;
   final String paymentLinkId;
+
+  /// Owns-its-client hook: the session source must NEVER share an HTTP
+  /// client with rebuildable providers (a provider rebuild used to close
+  /// the client mid-session → every poll failed with "Client is already
+  /// closed" until the session ended).
+  final void Function()? onDispose;
+
+  @override
+  void dispose() => onDispose?.call();
 
   String? _cursor;
   int? _createdGte;
@@ -36,14 +50,24 @@ class StripeDonationSource extends DonationSource {
   String? get cursor => _cursor;
 
   @override
-  Future<void> prime(DateTime sessionStart, {String? resumeCursor}) async {
+  Future<void> prime(DateTime sessionStart,
+      {String? resumeCursor, bool backfill = false}) async {
     if (resumeCursor != null) {
       _cursor = resumeCursor;
       return;
     }
-    // Anchor on the newest existing event so we only see what happens after
-    // "Start". Falls back to a server-time window when the account has no
-    // recent events (device clocks can drift, hence the safety margin).
+    if (backfill) {
+      // Resumed session without a cursor: re-read the whole session window.
+      // Duplicates are cheap (the session dedupes by donation id); losing a
+      // tip that arrived while the app was dead is not.
+      _createdGte =
+          sessionStart.toUtc().millisecondsSinceEpoch ~/ 1000 - 60;
+      return;
+    }
+    // Fresh start: anchor on the newest existing event so we only see what
+    // happens after "Start". Falls back to a server-time window when the
+    // account has no recent events (device clocks can drift, hence the
+    // safety margin).
     final page = await _requests.listDonationEvents(limit: 1);
     if (page.events.isNotEmpty) {
       _cursor = page.events.first.id;
@@ -113,7 +137,8 @@ class DemoDonationSource extends DonationSource {
   String? get cursor => null;
 
   @override
-  Future<void> prime(DateTime sessionStart, {String? resumeCursor}) async {}
+  Future<void> prime(DateTime sessionStart,
+      {String? resumeCursor, bool backfill = false}) async {}
 
   @override
   Future<List<Donation>> pollNew() async {

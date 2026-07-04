@@ -10,11 +10,15 @@ import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../domain/donation.dart';
 import '../../domain/live_session.dart';
+import '../../domain/stage_settings.dart';
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
-import '../../widgets/donation_tile.dart';
 import '../../widgets/qr_card.dart';
 import '../lock/lock_service.dart';
+import '../settings/stage_settings_section.dart';
+import 'stage/jar_stage_view.dart';
+import 'stage/stage_resolver.dart';
+import 'stage/stage_types.dart';
 
 /// The stage screen: big total, goal progress, live donation feed, confetti.
 /// Designed to be readable from a distance on a dark stage, to keep the
@@ -37,6 +41,11 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     );
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // every session gets a fresh chance at the 3D stage (post-frame:
+    // providers must not change while the tree is building)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(stageHealthProvider.notifier).reset();
+    });
   }
 
   @override
@@ -133,6 +142,27 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     }
   }
 
+  /// Restyle the stage mid-show: scene/theme/vessel apply live over the
+  /// bridge, a style switch swaps the stage widget — the session, timers and
+  /// totals are untouched underneath.
+  void _openStageLook() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.only(bottom: 24),
+          children: const [StageSettingsSection()],
+        ),
+      ),
+    );
+  }
+
   Future<void> _editGoal() async {
     final live = ref.read(liveSessionProvider);
     if (live == null) return;
@@ -218,13 +248,21 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   @override
   Widget build(BuildContext context) {
     final live = ref.watch(liveSessionProvider);
-    final jar = ref.watch(appStateProvider).effectiveTipJar;
+    final app = ref.watch(appStateProvider);
+    final jar = app.effectiveTipJar;
+    final stageConfig = app.settings.stage;
+    final effectiveStyle = resolveEffectiveStyle(
+      stageConfig.style,
+      webViewSupported: ref.watch(stageCapabilityProvider),
+      health: ref.watch(stageHealthProvider),
+    );
 
     ref.listen<LiveState?>(liveSessionProvider, (previous, next) {
       if (previous != null &&
           next != null &&
           next.confettiTick > previous.confettiTick) {
-        _confetti.play();
+        // jar stages celebrate in-scene — screen confetti is classic-only
+        if (effectiveStyle == StageStyle.classic) _confetti.play();
         HapticFeedback.mediumImpact();
       }
     });
@@ -257,6 +295,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                           qrUrl: jar.url,
                           onStop: _confirmStop,
                           onEditGoal: _editGoal,
+                          onStageLook: _openStageLook,
                           onLock: _lock,
                         ),
                         const SizedBox(height: 8),
@@ -264,11 +303,24 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(child: _MainColumn(live: live)),
+                              Expanded(
+                                child: JarStageView(
+                                  snapshot: StageSnapshot.fromState(live),
+                                  tips: live.newTips,
+                                  tipSerial: live.confettiTick,
+                                  config: stageConfig,
+                                ),
+                              ),
                               if (wide) ...[
                                 const SizedBox(width: 24),
                                 _QrPanel(
-                                    url: jar.url, name: jar.displayName),
+                                  url: jar.url,
+                                  name: jar.displayName,
+                                  messages: live.session.donations.reversed
+                                      .where((d) => d.hasMessage)
+                                      .take(3)
+                                      .toList(),
+                                ),
                               ],
                             ],
                           ),
@@ -313,6 +365,7 @@ class _TopBar extends StatelessWidget {
     required this.qrUrl,
     required this.onStop,
     required this.onEditGoal,
+    required this.onStageLook,
     required this.onLock,
   });
 
@@ -321,6 +374,7 @@ class _TopBar extends StatelessWidget {
   final String qrUrl;
   final VoidCallback onStop;
   final VoidCallback onEditGoal;
+  final VoidCallback onStageLook;
   final VoidCallback onLock;
 
   @override
@@ -350,6 +404,12 @@ class _TopBar extends StatelessWidget {
           tooltip: 'Adjust goal',
           onPressed: onEditGoal,
           icon: const Icon(Icons.flag_rounded),
+          iconSize: 26,
+        ),
+        IconButton(
+          tooltip: 'Stage look',
+          onPressed: onStageLook,
+          icon: const Icon(Icons.palette_rounded),
           iconSize: 26,
         ),
         IconButton(
@@ -444,224 +504,24 @@ String formatDuration(Duration duration) {
       : '${two(minutes)}:${two(seconds)}';
 }
 
-class _MainColumn extends StatelessWidget {
-  const _MainColumn({required this.live});
-
-  final LiveState live;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final session = live.session;
-    final donations = session.donations.reversed.take(14).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 8),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            formatAmount(session.totalMinor, session.currency),
-            style: const TextStyle(
-              fontSize: 96,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              height: 1.0,
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'of ${formatAmount(session.goalMinor, session.currency)} goal · '
-          '${(session.progress * 100).round()}%',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium?.copyWith(color: Colors.white60),
-        ),
-        const SizedBox(height: 14),
-        _GoalProgressBar(
-          progress: session.progress,
-          reached: session.goalReached,
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _StatChip(
-              icon: Icons.favorite_rounded,
-              label: '${session.count} tips',
-            ),
-            if (session.biggest != null) ...[
-              const SizedBox(width: 10),
-              _StatChip(
-                icon: Icons.emoji_events_rounded,
-                label:
-                    'top ${formatAmount(session.biggest!.amountMinor, session.currency)}',
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 16),
-        _LastDonationHero(donation: live.lastDonation),
-        const SizedBox(height: 8),
-        Expanded(
-          child: donations.isEmpty
-              ? Center(
-                  child: Text(
-                    'Waiting for the first tip…\nthe QR code is doing its thing',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(color: Colors.white38),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: donations.length,
-                  itemBuilder: (context, index) =>
-                      DonationTile(donation: donations[index], dense: true),
-                ),
-        ),
-      ],
-    );
-  }
-}
-
-class _GoalProgressBar extends StatelessWidget {
-  const _GoalProgressBar({required this.progress, required this.reached});
-
-  final double progress;
-  final bool reached;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: progress),
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, _) => Container(
-        height: 26,
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(13),
-        ),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: FractionallySizedBox(
-            widthFactor: value.clamp(0.015, 1.0),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(13),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF9D2E), kGold],
-                ),
-                boxShadow: reached
-                    ? [
-                        BoxShadow(
-                          color: kGold.withValues(alpha: 0.7),
-                          blurRadius: 18,
-                        ),
-                      ]
-                    : null,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white10,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: kGold),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Colors.white70)),
-        ],
-      ),
-    );
-  }
-}
-
-class _LastDonationHero extends StatelessWidget {
-  const _LastDonationHero({this.donation});
-
-  final Donation? donation;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 450),
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween(
-            begin: const Offset(0, 0.3),
-            end: Offset.zero,
-          ).animate(animation),
-          child: child,
-        ),
-      ),
-      child: donation == null
-          ? const SizedBox(height: 8, key: ValueKey('empty'))
-          : Container(
-              key: ValueKey(donation!.id),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                    color: kGold.withValues(alpha: 0.65), width: 1.5),
-                color: kGold.withValues(alpha: 0.08),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '💛 ${donation!.displayName} tipped '
-                    '${formatAmount(donation!.amountMinor, donation!.currency)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  if (donation!.hasMessage) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      '“${donation!.message!.trim()}”',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontStyle: FontStyle.italic,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-    );
-  }
-}
+/// How many recent-message tiles fit under the QR block of the wide-layout
+/// panel. The QR always wins — messages only take what's left over after
+/// the QR core (~430 px) and the section header, at ~84 px a tile.
+int qrPanelMessageSlots(double maxHeight) =>
+    ((maxHeight - 460) / 84).floor().clamp(0, 3);
 
 class _QrPanel extends StatelessWidget {
-  const _QrPanel({required this.url, required this.name});
+  const _QrPanel({
+    required this.url,
+    required this.name,
+    this.messages = const [],
+  });
 
   final String url;
   final String name;
+
+  /// Latest tips that came with a message, newest first (capped upstream).
+  final List<Donation> messages;
 
   @override
   Widget build(BuildContext context) {
@@ -672,24 +532,106 @@ class _QrPanel extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
       ),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final shown =
+            messages.take(qrPanelMessageSlots(constraints.maxHeight));
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            QrBlock(data: url, size: 230),
+            const SizedBox(height: 18),
+            const Text(
+              'Scan to tip 💛',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white60),
+            ),
+            const SizedBox(height: 10),
+            // desktop reality: nobody scans a QR shown on their own screen
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  tooltip: 'Copy link',
+                  onPressed: () => copyTipLink(context, url),
+                  icon: const Icon(Icons.copy_rounded, size: 20),
+                ),
+                IconButton(
+                  tooltip: 'Open link',
+                  onPressed: () => openTipLink(url),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                ),
+              ],
+            ),
+            if (shown.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'RECENT MESSAGES',
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 1.4,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white38,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final d in shown) _QrPanelMessage(donation: d),
+            ],
+          ],
+        );
+      }),
+    );
+  }
+}
+
+class _QrPanelMessage extends StatelessWidget {
+  const _QrPanelMessage({required this.donation});
+
+  final Donation donation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          QrBlock(data: url, size: 230),
-          const SizedBox(height: 18),
-          const Text(
-            'Scan to tip 💛',
-            style: TextStyle(
-              fontSize: 22,
+          Text(
+            '${donation.displayName} · '
+            '${formatAmount(donation.amountMinor, donation.currency)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12.5,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: Colors.white70,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Text(
-            name,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white60),
+            '“${donation.message!.trim()}”',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+              color: Colors.white,
+              height: 1.25,
+            ),
           ),
         ],
       ),
@@ -741,6 +683,11 @@ class _LockOverlay extends StatelessWidget {
   }
 }
 
+/// Overall % of goal, honest past 100% (a 3-jar night should not say "100%").
+int _overallPct(LiveSession session) => session.goalMinor <= 0
+    ? 0
+    : (session.totalMinor / session.goalMinor * 100).round();
+
 class _SessionSummaryDialog extends StatelessWidget {
   const _SessionSummaryDialog({required this.session});
 
@@ -771,8 +718,14 @@ class _SessionSummaryDialog extends StatelessWidget {
           _SummaryRow(
             label: 'Goal',
             value:
-                '${formatAmount(session.goalMinor, session.currency)} · ${(session.progress * 100).round()}%',
+                '${formatAmount(session.goalMinor, session.currency)} · ${_overallPct(session)}%',
           ),
+          if (session.bankedJars > 0)
+            _SummaryRow(
+              label: 'Full jars',
+              value:
+                  '🏆 ${session.bankedJars} · ${formatAmount(session.bankedMinor, session.currency)} banked',
+            ),
           if (session.count > 0)
             _SummaryRow(
               label: 'Average tip',
