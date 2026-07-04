@@ -62,7 +62,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Stop this session?'),
         content: const Text(
-            'The session is saved to history with all its stats.'),
+          'The session is saved to history with all its stats.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -97,8 +98,9 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Leave the stage screen?'),
         content: const Text(
-            'The session keeps collecting in the background — you can '
-            'return from the home screen.'),
+          'The session keeps collecting in the background — you can '
+          'return from the home screen.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop('stay'),
@@ -128,10 +130,13 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     if (await lockService.ensureUnlockMethod(context)) {
       ref.read(liveSessionProvider.notifier).setLocked(true);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-            'Set up Face ID / device unlock or an app PIN to use stage lock.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Set up Face ID / device unlock or an app PIN to use stage lock.',
+          ),
+        ),
+      );
     }
   }
 
@@ -184,14 +189,17 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Adjust tonight\'s goal',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Adjust tonight\'s goal',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
               autofocus: true,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 labelText: 'Goal',
                 suffixText: session.currency.toUpperCase(),
@@ -205,12 +213,14 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                   ActionChip(
                     label: Text('+$bump'),
                     onPressed: () {
-                      final current = parseMajorToMinor(
-                              controller.text, session.currency) ??
+                      final current =
+                          parseMajorToMinor(
+                            controller.text,
+                            session.currency,
+                          ) ??
                           session.goalMinor;
                       controller.text = formatMajorPlain(
-                        current +
-                            bump * minorUnitsPerMajor(session.currency),
+                        current + bump * minorUnitsPerMajor(session.currency),
                         session.currency,
                       );
                     },
@@ -218,11 +228,13 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                 ActionChip(
                   label: const Text('×2'),
                   onPressed: () {
-                    final current = parseMajorToMinor(
-                            controller.text, session.currency) ??
+                    final current =
+                        parseMajorToMinor(controller.text, session.currency) ??
                         session.goalMinor;
-                    controller.text =
-                        formatMajorPlain(current * 2, session.currency);
+                    controller.text = formatMajorPlain(
+                      current * 2,
+                      session.currency,
+                    );
                   },
                 ),
               ],
@@ -230,8 +242,10 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
             const SizedBox(height: 20),
             FilledButton(
               onPressed: () {
-                final value =
-                    parseMajorToMinor(controller.text, session.currency);
+                final value = parseMajorToMinor(
+                  controller.text,
+                  session.currency,
+                );
                 Navigator.of(context).pop(value);
               },
               child: const Text('Save goal'),
@@ -267,91 +281,100 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
       }
     });
 
+    // Forced dark regardless of the app's light/dark setting: the stage is
+    // meant to be read from a distance during a live performance, not to
+    // match the device's ambient chrome.
     if (live == null || jar == null) {
       // Session just ended (summary flow pops us) — render nothing.
-      return const Scaffold(backgroundColor: Colors.black, body: SizedBox());
+      return Theme(
+        data: buildDarkTheme(),
+        child: const Scaffold(backgroundColor: Colors.black, body: SizedBox()),
+      );
     }
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _handleBack();
-      },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth > 780;
-                    return Column(
-                      children: [
-                        _TopBar(
-                          live: live,
-                          showQrButton: !wide,
-                          qrUrl: jar.url,
-                          onStop: _confirmStop,
-                          onEditGoal: _editGoal,
-                          onStageLook: _openStageLook,
-                          onLock: _lock,
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: JarStageView(
-                                  snapshot: StageSnapshot.fromState(live),
-                                  tips: live.newTips,
-                                  tipSerial: live.confettiTick,
-                                  config: stageConfig,
-                                ),
-                              ),
-                              if (wide) ...[
-                                const SizedBox(width: 24),
-                                _QrPanel(
-                                  url: jar.url,
-                                  name: jar.displayName,
-                                  messages: live.session.donations.reversed
-                                      .where((d) => d.hasMessage)
-                                      .take(3)
-                                      .toList(),
-                                ),
-                              ],
-                            ],
+    return Theme(
+      data: buildDarkTheme(),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _handleBack();
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final wide = constraints.maxWidth > 780;
+                      return Column(
+                        children: [
+                          _TopBar(
+                            live: live,
+                            showQrButton: !wide,
+                            qrUrl: jar.url,
+                            onStop: _confirmStop,
+                            onEditGoal: _editGoal,
+                            onStageLook: _openStageLook,
+                            onLock: _lock,
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: JarStageView(
+                                    snapshot: StageSnapshot.fromState(live),
+                                    tips: live.newTips,
+                                    tipSerial: live.confettiTick,
+                                    config: stageConfig,
+                                  ),
+                                ),
+                                if (wide) ...[
+                                  const SizedBox(width: 24),
+                                  _QrPanel(
+                                    url: jar.url,
+                                    name: jar.displayName,
+                                    messages: live.session.donations.reversed
+                                        .where((d) => d.hasMessage)
+                                        .take(3)
+                                        .toList(),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-            Align(
-              alignment: Alignment.topCenter,
-              child: ConfettiWidget(
-                confettiController: _confetti,
-                blastDirectionality: BlastDirectionality.explosive,
-                numberOfParticles: 28,
-                maxBlastForce: 30,
-                minBlastForce: 8,
-                gravity: 0.25,
-                shouldLoop: false,
-                colors: const [
-                  kGold,
-                  Colors.white,
-                  Colors.orangeAccent,
-                  Colors.amberAccent,
-                  Colors.pinkAccent,
-                ],
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConfettiWidget(
+                  confettiController: _confetti,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  numberOfParticles: 28,
+                  maxBlastForce: 30,
+                  minBlastForce: 8,
+                  gravity: 0.25,
+                  shouldLoop: false,
+                  colors: const [
+                    kGold,
+                    Colors.white,
+                    Colors.orangeAccent,
+                    Colors.amberAccent,
+                    Colors.pinkAccent,
+                  ],
+                ),
               ),
-            ),
-            if (live.locked) _LockOverlay(onUnlockHold: _unlock),
-          ],
+              if (live.locked) _LockOverlay(onUnlockHold: _unlock),
+            ],
+          ),
         ),
       ),
     );
@@ -532,62 +555,65 @@ class _QrPanel extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
       ),
-      child: LayoutBuilder(builder: (context, constraints) {
-        final shown =
-            messages.take(qrPanelMessageSlots(constraints.maxHeight));
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            QrBlock(data: url, size: 230),
-            const SizedBox(height: 18),
-            const Text(
-              'Scan to tip 💛',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              name,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60),
-            ),
-            const SizedBox(height: 10),
-            // desktop reality: nobody scans a QR shown on their own screen
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  tooltip: 'Copy link',
-                  onPressed: () => copyTipLink(context, url),
-                  icon: const Icon(Icons.copy_rounded, size: 20),
-                ),
-                IconButton(
-                  tooltip: 'Open link',
-                  onPressed: () => openTipLink(url),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 20),
-                ),
-              ],
-            ),
-            if (shown.isNotEmpty) ...[
-              const SizedBox(height: 16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final shown = messages.take(
+            qrPanelMessageSlots(constraints.maxHeight),
+          );
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              QrBlock(data: url, size: 230),
+              const SizedBox(height: 18),
               const Text(
-                'RECENT MESSAGES',
+                'Scan to tip 💛',
                 style: TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 1.4,
+                  fontSize: 22,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white38,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 8),
-              for (final d in shown) _QrPanelMessage(donation: d),
+              const SizedBox(height: 6),
+              Text(
+                name,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white60),
+              ),
+              const SizedBox(height: 10),
+              // desktop reality: nobody scans a QR shown on their own screen
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    tooltip: 'Copy link',
+                    onPressed: () => copyTipLink(context, url),
+                    icon: const Icon(Icons.copy_rounded, size: 20),
+                  ),
+                  IconButton(
+                    tooltip: 'Open link',
+                    onPressed: () => openTipLink(url),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                  ),
+                ],
+              ),
+              if (shown.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'RECENT MESSAGES',
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white38,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final d in shown) _QrPanelMessage(donation: d),
+              ],
             ],
-          ],
-        );
-      }),
+          );
+        },
+      ),
     );
   }
 }
@@ -657,8 +683,10 @@ class _LockOverlay extends StatelessWidget {
             child: GestureDetector(
               onLongPress: onUnlockHold,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(30),
@@ -710,11 +738,11 @@ class _SessionSummaryDialog extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          _SummaryRow(label: 'Tips', value: '${session.count}'),
           _SummaryRow(
-              label: 'Tips', value: '${session.count}'),
-          _SummaryRow(
-              label: 'Duration',
-              value: formatDuration(session.elapsed())),
+            label: 'Duration',
+            value: formatDuration(session.elapsed()),
+          ),
           _SummaryRow(
             label: 'Goal',
             value:
@@ -771,8 +799,10 @@ class _SummaryRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),

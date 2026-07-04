@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/stripe_onboarding.dart';
+import '../../domain/app_settings.dart';
 import '../../state/providers.dart';
 import '../lock/lock_service.dart';
 import '../setup/jar_setup_screen.dart';
@@ -27,8 +28,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _refreshLockInfo() async {
     final hasPin = await ref.read(secureStoreProvider).hasPin();
-    final deviceAuth =
-        await ref.read(lockServiceProvider).deviceAuthAvailable();
+    final deviceAuth = await ref
+        .read(lockServiceProvider)
+        .deviceAuthAvailable();
     if (mounted) {
       setState(() {
         _hasPin = hasPin;
@@ -108,18 +110,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.key_rounded),
                   title: Text(_maskedKey(app.apiKey)),
-                  subtitle: Text(app.isTestMode
-                      ? 'Test mode key — payments simulated'
-                      : 'Live mode key'),
+                  subtitle: Text(
+                    app.isTestMode
+                        ? 'Test mode key — payments simulated'
+                        : 'Live mode key',
+                  ),
                 ),
                 ListTile(
-                  leading: Icon(Icons.link_off_rounded,
-                      color: theme.colorScheme.error),
-                  title: Text('Disconnect & wipe this device',
-                      style: TextStyle(color: theme.colorScheme.error)),
+                  leading: Icon(
+                    Icons.link_off_rounded,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: Text(
+                    'Disconnect & wipe this device',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
                   onTap: _confirmDisconnect,
                 ),
               ],
+              const SizedBox(height: 8),
+              _SectionHeader('Appearance'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SegmentedButton<AppThemeMode>(
+                  segments: [
+                    for (final mode in AppThemeMode.values)
+                      ButtonSegment(
+                        value: mode,
+                        label: Text(mode.label),
+                        icon: Icon(switch (mode) {
+                          AppThemeMode.system => Icons.brightness_auto_rounded,
+                          AppThemeMode.light => Icons.light_mode_rounded,
+                          AppThemeMode.dark => Icons.dark_mode_rounded,
+                        }),
+                      ),
+                  ],
+                  selected: {settings.themeMode},
+                  onSelectionChanged: (selection) => ref
+                      .read(appStateProvider.notifier)
+                      .updateSettings(
+                        settings.copyWith(themeMode: selection.first),
+                      ),
+                ),
+              ),
               if (!app.demo && jar != null) ...[
                 const SizedBox(height: 8),
                 _SectionHeader('Tip jar'),
@@ -131,17 +164,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.open_in_new_rounded),
                   title: const Text('Open payment link'),
-                  subtitle: Text(jar.url,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                  onTap: () => launchUrl(Uri.parse(jar.url),
-                      mode: LaunchMode.externalApplication),
+                  subtitle: Text(
+                    jar.url,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => launchUrl(
+                    Uri.parse(jar.url),
+                    mode: LaunchMode.externalApplication,
+                  ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.refresh_rounded),
                   title: const Text('Create a new tip link'),
                   subtitle: const Text(
-                      'Change name or currency. The old link is deactivated '
-                      '— printed QR codes stop working.'),
+                    'Change name or currency. The old link is deactivated '
+                    '— printed QR codes stop working.',
+                  ),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const JarSetupScreen(recreate: true),
@@ -154,30 +193,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               SwitchListTile(
                 secondary: const Icon(Icons.fingerprint_rounded),
                 title: const Text('Prefer Face ID / device unlock'),
-                subtitle: Text(_deviceAuthAvailable
-                    ? 'Falls back to the app PIN if it fails'
-                    : 'Not available on this device — the app PIN is used'),
+                subtitle: Text(
+                  _deviceAuthAvailable
+                      ? 'Falls back to the app PIN if it fails'
+                      : 'Not available on this device — the app PIN is used',
+                ),
                 value: settings.preferDeviceAuth && _deviceAuthAvailable,
                 onChanged: _deviceAuthAvailable
                     ? (value) => ref
-                        .read(appStateProvider.notifier)
-                        .updateSettings(
-                            settings.copyWith(preferDeviceAuth: value))
+                          .read(appStateProvider.notifier)
+                          .updateSettings(
+                            settings.copyWith(preferDeviceAuth: value),
+                          )
                     : null,
               ),
               ListTile(
                 leading: const Icon(Icons.pin_rounded),
                 title: Text(_hasPin ? 'Change app PIN' : 'Set app PIN'),
                 subtitle: const Text(
-                    'Backup unlock for the stage lock, stored only on this '
-                    'device'),
+                  'Backup unlock for the stage lock, stored only on this '
+                  'device',
+                ),
                 onTap: () async {
                   final created = await ref
                       .read(lockServiceProvider)
                       .promptCreatePin(context);
                   if (created && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('PIN saved')));
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('PIN saved')));
                   }
                   _refreshLockInfo();
                 },
@@ -211,8 +255,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                   onChanged: (value) {
                     if (value != null) {
-                      ref.read(appStateProvider.notifier).updateSettings(
-                          settings.copyWith(pollIntervalSec: value));
+                      ref
+                          .read(appStateProvider.notifier)
+                          .updateSettings(
+                            settings.copyWith(pollIntervalSec: value),
+                          );
                     }
                   },
                 ),
@@ -223,14 +270,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 leading: Icon(Icons.info_outline_rounded),
                 title: Text('live.tips'),
                 subtitle: Text(
-                    'v0.1.0 · open-source tip jar — your keys, your money'),
+                  'v0.1.0 · open-source tip jar — your keys, your money',
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.code_rounded),
                 title: const Text('Source code'),
                 subtitle: const Text(kProjectUrl),
-                onTap: () => launchUrl(Uri.parse(kProjectUrl),
-                    mode: LaunchMode.externalApplication),
+                onTap: () => launchUrl(
+                  Uri.parse(kProjectUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.article_outlined),

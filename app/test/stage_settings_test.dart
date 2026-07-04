@@ -12,8 +12,11 @@ void main() {
       expect(s.theme, JarTheme.goldenHour);
       expect(s.showNotes, isFalse, reason: 'paper money is opt-in');
       expect(s.soundEnabled, isFalse);
-      expect(s.tipSoundEnabled, isFalse,
-          reason: 'no surprise audio on an unattended stage device');
+      expect(
+        s.tipSoundEnabled,
+        isFalse,
+        reason: 'no surprise audio on an unattended stage device',
+      );
       expect(s.quality, StageQuality.auto);
     });
 
@@ -79,6 +82,34 @@ void main() {
       expect(s.lastGoalMinor, 20000);
       expect(s.preferDeviceAuth, isFalse);
       expect(s.stage, const StageSettings());
+    });
+  });
+
+  group('AppThemeMode', () {
+    test('defaults to system', () {
+      const s = AppSettings();
+      expect(s.themeMode, AppThemeMode.system);
+    });
+
+    test('wire values', () {
+      expect(AppThemeMode.system.wire, 'system');
+      expect(AppThemeMode.light.wire, 'light');
+      expect(AppThemeMode.dark.wire, 'dark');
+    });
+
+    test('round-trips through AppSettings json', () {
+      const s = AppSettings(themeMode: AppThemeMode.dark);
+      expect(AppSettings.fromJson(s.toJson()).themeMode, AppThemeMode.dark);
+    });
+
+    test('unknown or missing wire value falls back to system', () {
+      expect(AppThemeMode.fromWire('solarized'), AppThemeMode.system);
+      expect(AppThemeMode.fromWire(null), AppThemeMode.system);
+    });
+
+    test('legacy settings_v1 blob without a themeMode key gets system', () {
+      final legacy = {'pollIntervalSec': 6};
+      expect(AppSettings.fromJson(legacy).themeMode, AppThemeMode.system);
     });
   });
 }
