@@ -13,17 +13,20 @@ import '../../domain/live_session.dart';
 import '../../domain/stage_settings.dart';
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
+import '../../widgets/goal_editor.dart';
 import '../../widgets/qr_card.dart';
 import '../lock/lock_service.dart';
 import '../poster/poster_screen.dart';
 import '../settings/stage_settings_section.dart';
 import 'stage/jar_stage_view.dart';
+import 'stage/stage_hud.dart';
 import 'stage/stage_resolver.dart';
 import 'stage/stage_types.dart';
 
-/// The stage screen: big total, goal progress, live donation feed, confetti.
-/// Designed to be readable from a distance on a dark stage, to keep the
-/// screen awake, and to be lockable while the device is unattended.
+/// The stage screen: the jar fills full-bleed, glass controls float on top —
+/// big total, goal progress, live donation feed, celebration. Designed to be
+/// readable from a distance on a dark stage, to keep the screen awake, and
+/// to be lockable while the device is unattended.
 class LiveScreen extends ConsumerStatefulWidget {
   const LiveScreen({super.key});
 
@@ -148,112 +151,15 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     }
   }
 
-  /// Restyle the stage mid-show: scene/theme/vessel apply live over the
-  /// bridge, a style switch swaps the stage widget — the session, timers and
-  /// totals are untouched underneath.
-  void _openStageLook() {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.55,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) => ListView(
-          controller: scrollController,
-          padding: const EdgeInsets.only(bottom: 24),
-          children: const [StageSettingsSection()],
-        ),
-      ),
-    );
-  }
-
   Future<void> _editGoal() async {
     final live = ref.read(liveSessionProvider);
     if (live == null) return;
     final session = live.session;
-    final controller = TextEditingController(
-      text: formatMajorPlain(session.goalMinor, session.currency),
-    );
-    final newGoal = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Adjust tonight\'s goal',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Goal',
-                suffixText: session.currency.toUpperCase(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final bump in [50, 100, 200])
-                  ActionChip(
-                    label: Text('+$bump'),
-                    onPressed: () {
-                      final current =
-                          parseMajorToMinor(
-                            controller.text,
-                            session.currency,
-                          ) ??
-                          session.goalMinor;
-                      controller.text = formatMajorPlain(
-                        current + bump * minorUnitsPerMajor(session.currency),
-                        session.currency,
-                      );
-                    },
-                  ),
-                ActionChip(
-                  label: const Text('×2'),
-                  onPressed: () {
-                    final current =
-                        parseMajorToMinor(controller.text, session.currency) ??
-                        session.goalMinor;
-                    controller.text = formatMajorPlain(
-                      current * 2,
-                      session.currency,
-                    );
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: () {
-                final value = parseMajorToMinor(
-                  controller.text,
-                  session.currency,
-                );
-                Navigator.of(context).pop(value);
-              },
-              child: const Text('Save goal'),
-            ),
-          ],
-        ),
-      ),
+    final newGoal = await showGoalEditorSheet(
+      context,
+      initialMinor: session.goalMinor,
+      currency: session.currency,
+      title: 'Adjust tonight\'s goal',
     );
     if (newGoal != null) {
       ref.read(liveSessionProvider.notifier).editGoal(newGoal);
@@ -289,7 +195,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
       // Session just ended (summary flow pops us) — render nothing.
       return Theme(
         data: buildDarkTheme(),
-        child: const Scaffold(backgroundColor: Colors.black, body: SizedBox()),
+        child:
+            const Scaffold(backgroundColor: kStageBlack, body: SizedBox()),
       );
     }
 
@@ -301,80 +208,196 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
           if (!didPop) _handleBack();
         },
         child: Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            children: [
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final wide = constraints.maxWidth > 780;
-                      return Column(
-                        children: [
-                          _TopBar(
-                            live: live,
-                            showQrButton: !wide,
-                            qrUrl: jar.url,
-                            onStop: _confirmStop,
-                            onEditGoal: _editGoal,
-                            onStageLook: _openStageLook,
-                            onLock: _lock,
-                          ),
-                          const SizedBox(height: 8),
-                          Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Expanded(
-                                  child: JarStageView(
-                                    snapshot: StageSnapshot.fromState(live),
-                                    tips: live.newTips,
-                                    tipSerial: live.confettiTick,
-                                    config: stageConfig,
-                                  ),
-                                ),
-                                if (wide) ...[
-                                  const SizedBox(width: 24),
-                                  _QrPanel(
-                                    url: jar.url,
-                                    name: jar.displayName,
-                                    messages: live.session.donations.reversed
-                                        .where((d) => d.hasMessage)
-                                        .take(3)
-                                        .toList(),
-                                  ),
-                                ],
-                              ],
+          backgroundColor: kStageBlack,
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth > 780;
+              final safeTop = MediaQuery.paddingOf(context).top;
+              return Stack(
+                children: [
+                  // ---- the stage itself, edge to edge ----
+                  Positioned.fill(
+                    child: effectiveStyle == StageStyle.classic
+                        ? Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              16,
+                              safeTop + 72,
+                              16,
+                              wide ? 16 : 100,
                             ),
+                            child: JarStageView(
+                              snapshot: StageSnapshot.fromState(live),
+                              tips: live.newTips,
+                              tipSerial: live.confettiTick,
+                              config: stageConfig,
+                            ),
+                          )
+                        : JarStageView(
+                            snapshot: StageSnapshot.fromState(live),
+                            tips: live.newTips,
+                            tipSerial: live.confettiTick,
+                            config: stageConfig,
+                          ),
+                  ),
+                  // ---- wide: floating QR + messages panel ----
+                  if (wide)
+                    Positioned(
+                      right: 16,
+                      top: safeTop + 76,
+                      bottom: 16,
+                      width: 280,
+                      child: _QrPanel(
+                        url: jar.url,
+                        name: jar.displayName,
+                        messages: live.session.donations.reversed
+                            .where((d) => d.hasMessage)
+                            .take(3)
+                            .toList(),
+                      ),
+                    ),
+                  // ---- top controls ----
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Row(
+                        children: [
+                          _GlassCircleButton(
+                            icon: Icons.stop_rounded,
+                            iconColor: const Color(0xFFFF6B5E),
+                            tooltip: 'Stop session',
+                            size: wide ? 44 : 40,
+                            onTap: _confirmStop,
+                          ),
+                          const SizedBox(width: 8),
+                          _LivePill(
+                            startedAt: live.session.startedAt,
+                            compact: !wide,
+                          ),
+                          if (wide) ...[
+                            const SizedBox(width: 8),
+                            _HealthPill(
+                                health: live.health, error: live.lastError),
+                          ] else if (live.health != PollHealth.ok) ...[
+                            const SizedBox(width: 8),
+                            _HealthPill(
+                              health: live.health,
+                              error: live.lastError,
+                              dotOnly: true,
+                            ),
+                          ],
+                          const Spacer(),
+                          if (wide) ...[
+                            _GlassCircleButton(
+                              icon: Icons.flag_rounded,
+                              tooltip: 'Adjust goal',
+                              onTap: _editGoal,
+                            ),
+                            const SizedBox(width: 8),
+                            _GlassCircleButton(
+                              icon: Icons.palette_rounded,
+                              tooltip: 'Stage look',
+                              onTap: () => showStageLookSheet(context),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          _GlassCircleButton(
+                            icon: Icons.lock_outline_rounded,
+                            tooltip: 'Lock stage screen',
+                            size: wide ? 44 : 40,
+                            onTap: _lock,
                           ),
                         ],
-                      );
-                    },
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.topCenter,
-                child: ConfettiWidget(
-                  confettiController: _confetti,
-                  blastDirectionality: BlastDirectionality.explosive,
-                  numberOfParticles: 28,
-                  maxBlastForce: 30,
-                  minBlastForce: 8,
-                  gravity: 0.25,
-                  shouldLoop: false,
-                  colors: const [
-                    kGold,
-                    Colors.white,
-                    Colors.orangeAccent,
-                    Colors.amberAccent,
-                    Colors.pinkAccent,
-                  ],
-                ),
-              ),
-              if (live.locked) _LockOverlay(onUnlockHold: _unlock),
-            ],
+                  // ---- mobile: bottom glass action bar ----
+                  if (!wide)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: SafeArea(
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: kStageGlassSoft,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color:
+                                    Colors.white.withValues(alpha: 0.08)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Material(
+                                  color: kStageAccent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: () =>
+                                        showFullscreenQr(context, jar.url),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 11),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.qr_code_2_rounded,
+                                              size: 19,
+                                              color: Color(0xFF40160A)),
+                                          const SizedBox(width: 7),
+                                          Text(
+                                            'Show QR',
+                                            style: outfitStyle(
+                                                14, const Color(0xFF40160A),
+                                                weight: FontWeight.w700),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _GlassSquareButton(
+                                icon: Icons.flag_rounded,
+                                tooltip: 'Adjust goal',
+                                onTap: _editGoal,
+                              ),
+                              const SizedBox(width: 8),
+                              _GlassSquareButton(
+                                icon: Icons.palette_rounded,
+                                tooltip: 'Stage look',
+                                onTap: () => showStageLookSheet(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: ConfettiWidget(
+                      confettiController: _confetti,
+                      blastDirectionality: BlastDirectionality.explosive,
+                      numberOfParticles: 28,
+                      maxBlastForce: 30,
+                      minBlastForce: 8,
+                      gravity: 0.25,
+                      shouldLoop: false,
+                      colors: const [
+                        kStageAccent,
+                        Colors.white,
+                        Color(0xFFFFB79F),
+                        kGold,
+                        Colors.pinkAccent,
+                      ],
+                    ),
+                  ),
+                  if (live.locked) _LockOverlay(onUnlockHold: _unlock),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -382,104 +405,214 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.live,
-    required this.showQrButton,
-    required this.qrUrl,
-    required this.onStop,
-    required this.onEditGoal,
-    required this.onStageLook,
-    required this.onLock,
+// ---------------------------------------------------------------------------
+// Glass controls
+// ---------------------------------------------------------------------------
+
+class _GlassCircleButton extends StatelessWidget {
+  const _GlassCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.iconColor,
+    this.tooltip,
+    this.size = 44,
   });
 
-  final LiveState live;
-  final bool showQrButton;
-  final String qrUrl;
-  final VoidCallback onStop;
-  final VoidCallback onEditGoal;
-  final VoidCallback onStageLook;
-  final VoidCallback onLock;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? iconColor;
+  final String? tooltip;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          tooltip: 'Stop session',
-          onPressed: onStop,
-          icon: const Icon(Icons.stop_circle_outlined),
-          color: Colors.redAccent,
-          iconSize: 30,
-        ),
-        const SizedBox(width: 4),
-        _HealthDot(health: live.health, error: live.lastError),
-        const SizedBox(width: 10),
-        _ElapsedClock(startedAt: live.session.startedAt),
-        const Spacer(),
-        if (showQrButton) ...[
-          IconButton(
-            tooltip: 'Show QR',
-            onPressed: () => showFullscreenQr(context, qrUrl),
-            icon: const Icon(Icons.qr_code_2_rounded),
-            iconSize: 28,
+    final button = Material(
+      color: kStageGlassSoft,
+      shape: CircleBorder(
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Icon(
+            icon,
+            size: size * 0.45,
+            color: iconColor ?? Colors.white.withValues(alpha: 0.85),
           ),
-          IconButton(
-            tooltip: 'Print poster',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PosterScreen()),
+        ),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
+  }
+}
+
+class _GlassSquareButton extends StatelessWidget {
+  const _GlassSquareButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = Material(
+      color: Colors.white.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child:
+              Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.85)),
+        ),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
+  }
+}
+
+/// "● LIVE · 42:17" — pulsing dot, tracked LIVE, tabular clock.
+class _LivePill extends StatelessWidget {
+  const _LivePill({required this.startedAt, this.compact = false});
+
+  final DateTime startedAt;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: compact ? 40 : 44,
+      padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 18),
+      decoration: BoxDecoration(
+        color: kStageGlassSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const _PulsingDot(color: Color(0xFFFF6B5E)),
+          SizedBox(width: compact ? 8 : 9),
+          Text(
+            'LIVE',
+            style: outfitStyle(compact ? 12 : 13, Colors.white,
+                weight: FontWeight.w700, letterSpacing: 1),
+          ),
+          if (!compact) ...[
+            const SizedBox(width: 10),
+            Container(
+              width: 1,
+              height: 16,
+              color: Colors.white.withValues(alpha: 0.15),
             ),
-            icon: const Icon(Icons.print_rounded),
-            iconSize: 26,
-          ),
+            const SizedBox(width: 10),
+          ] else
+            const SizedBox(width: 8),
+          _ElapsedClock(startedAt: startedAt, compact: compact),
         ],
-        IconButton(
-          tooltip: 'Adjust goal',
-          onPressed: onEditGoal,
-          icon: const Icon(Icons.flag_rounded),
-          iconSize: 26,
-        ),
-        IconButton(
-          tooltip: 'Stage look',
-          onPressed: onStageLook,
-          icon: const Icon(Icons.palette_rounded),
-          iconSize: 26,
-        ),
-        IconButton(
-          tooltip: 'Lock stage screen',
-          onPressed: onLock,
-          icon: const Icon(Icons.lock_outline_rounded),
-          iconSize: 26,
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _HealthDot extends StatelessWidget {
-  const _HealthDot({required this.health, this.error});
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot({required this.color});
+
+  final Color color;
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 1, end: 0.35).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      ),
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration:
+            BoxDecoration(color: widget.color, shape: BoxShape.circle),
+      ),
+    );
+  }
+}
+
+class _HealthPill extends StatelessWidget {
+  const _HealthPill({required this.health, this.error, this.dotOnly = false});
 
   final PollHealth health;
   final String? error;
+  final bool dotOnly;
 
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (health) {
-      PollHealth.ok => (Colors.greenAccent, 'Watching your Stripe account'),
-      PollHealth.connecting => (Colors.amberAccent, 'Connecting…'),
-      PollHealth.error => (Colors.redAccent, error ?? 'Connection trouble'),
+      PollHealth.ok => (const Color(0xFF4FCB8D), 'Watching Stripe'),
+      PollHealth.connecting => (const Color(0xFFFFC24D), 'Connecting…'),
+      PollHealth.error =>
+        (const Color(0xFFFF6B5E), error ?? 'Connection trouble'),
     };
+    final dot = Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.7), blurRadius: 8),
+        ],
+      ),
+    );
     return Tooltip(
       message: label,
       triggerMode: TooltipTriggerMode.tap,
       child: Container(
-        width: 12,
-        height: 12,
+        height: dotOnly ? 40 : 44,
+        padding: EdgeInsets.symmetric(horizontal: dotOnly ? 15 : 14),
         decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 8),
+          color: kStageGlassSoft,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            dot,
+            if (!dotOnly) ...[
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: outfitStyle(
+                    12, Colors.white.withValues(alpha: 0.6)),
+              ),
+            ],
           ],
         ),
       ),
@@ -488,9 +621,10 @@ class _HealthDot extends StatelessWidget {
 }
 
 class _ElapsedClock extends StatefulWidget {
-  const _ElapsedClock({required this.startedAt});
+  const _ElapsedClock({required this.startedAt, this.compact = false});
 
   final DateTime startedAt;
+  final bool compact;
 
   @override
   State<_ElapsedClock> createState() => _ElapsedClockState();
@@ -518,10 +652,12 @@ class _ElapsedClockState extends State<_ElapsedClock> {
     final elapsed = DateTime.now().difference(widget.startedAt);
     return Text(
       formatDuration(elapsed),
-      style: const TextStyle(
-        fontFeatures: [FontFeature.tabularFigures()],
-        fontSize: 16,
-        color: Colors.white70,
+      style: TextStyle(
+        fontFamily: kFontOutfit,
+        fontWeight: FontWeight.w600,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        fontSize: widget.compact ? 13 : 14,
+        color: Colors.white.withValues(alpha: 0.75),
       ),
     );
   }
@@ -559,11 +695,11 @@ class _QrPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 300,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: kStageGlassSoft,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -573,23 +709,26 @@ class _QrPanel extends StatelessWidget {
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              QrBlock(data: url, size: 230),
-              const SizedBox(height: 18),
-              const Text(
-                'Scan to tip 💛',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+              QrBlock(data: url, size: 200),
+              const SizedBox(height: 14),
+              Text(
+                'Scan to tip',
+                style: outfitStyle(20, Colors.white,
+                    weight: FontWeight.w700),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 name,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white60),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: kFontBody,
+                  fontSize: 13,
+                  color: Colors.white.withValues(alpha: 0.55),
+                ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               // desktop reality: nobody scans a QR shown on their own screen
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -597,31 +736,47 @@ class _QrPanel extends StatelessWidget {
                   IconButton(
                     tooltip: 'Copy link',
                     onPressed: () => copyTipLink(context, url),
-                    icon: const Icon(Icons.copy_rounded, size: 20),
+                    icon: Icon(Icons.content_copy_rounded,
+                        size: 18,
+                        color: Colors.white.withValues(alpha: 0.7)),
                   ),
                   IconButton(
                     tooltip: 'Open link',
                     onPressed: () => openTipLink(url),
-                    icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                    icon: Icon(Icons.open_in_new_rounded,
+                        size: 18,
+                        color: Colors.white.withValues(alpha: 0.7)),
                   ),
                   IconButton(
                     tooltip: 'Print poster',
                     onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PosterScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('Poster')),
+                          body: const PosterScreen(),
+                        ),
+                      ),
                     ),
-                    icon: const Icon(Icons.print_rounded, size: 20),
+                    icon: Icon(Icons.print_rounded,
+                        size: 18,
+                        color: Colors.white.withValues(alpha: 0.7)),
                   ),
                 ],
               ),
               if (shown.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'RECENT MESSAGES',
-                  style: TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white38,
+                const SizedBox(height: 10),
+                Container(
+                  height: 1,
+                  color: Colors.white.withValues(alpha: 0.1),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'RECENT MESSAGES',
+                    style: outfitStyle(
+                        10.5, Colors.white.withValues(alpha: 0.4),
+                        weight: FontWeight.w700, letterSpacing: 1.4),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -647,22 +802,37 @@ class _QrPanelMessage extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${donation.displayName} · '
-            '${formatAmount(donation.amountMinor, donation.currency)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: Colors.white70,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  donation.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
+                ),
+              ),
+              Text(
+                formatAmount(donation.amountMinor, donation.currency),
+                style: const TextStyle(
+                  fontFamily: kFontOutfit,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: kStageAmount,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 3),
           Text(
@@ -670,10 +840,11 @@ class _QrPanelMessage extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 14,
+              fontFamily: kFontBody,
+              fontSize: 13.5,
               fontStyle: FontStyle.italic,
               color: Colors.white,
-              height: 1.25,
+              height: 1.3,
             ),
           ),
         ],
@@ -705,17 +876,21 @@ class _LockOverlay extends StatelessWidget {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(30),
+                  color: kStageGlass,
+                  borderRadius: BorderRadius.circular(999),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock_rounded, size: 18, color: Colors.white70),
-                    SizedBox(width: 8),
+                    Icon(Icons.lock_rounded,
+                        size: 17, color: Colors.white.withValues(alpha: 0.75)),
+                    const SizedBox(width: 8),
                     Text(
                       'Locked · hold to unlock',
-                      style: TextStyle(color: Colors.white70),
+                      style: outfitStyle(
+                          13.5, Colors.white.withValues(alpha: 0.8)),
                     ),
                   ],
                 ),
@@ -740,7 +915,7 @@ class _SessionSummaryDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.lt;
     return AlertDialog(
       title: Text(session.goalReached ? '🎉 Goal reached!' : 'Session done'),
       content: Column(
@@ -749,12 +924,9 @@ class _SessionSummaryDialog extends StatelessWidget {
         children: [
           Text(
             formatAmount(session.totalMinor, session.currency),
-            style: theme.textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: theme.colorScheme.primary,
-            ),
+            style: moneyStyle(36, c.accent),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _SummaryRow(label: 'Tips', value: '${session.count}'),
           _SummaryRow(
             label: 'Duration',
@@ -802,7 +974,7 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.lt;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -812,13 +984,21 @@ class _SummaryRow extends StatelessWidget {
             width: 110,
             child: Text(
               label,
-              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                  fontFamily: kFontBody,
+                  fontSize: 14,
+                  color: c.textSecondary),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontFamily: kFontBody,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: c.text,
+              ),
             ),
           ),
         ],

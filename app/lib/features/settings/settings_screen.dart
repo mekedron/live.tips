@@ -3,12 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/stripe_onboarding.dart';
+import '../../core/theme.dart';
 import '../../domain/app_settings.dart';
 import '../../state/providers.dart';
+import '../../widgets/lt_ui.dart';
 import '../lock/lock_service.dart';
-import '../poster/poster_screen.dart';
 import '../setup/jar_setup_screen.dart';
+import '../shell/app_shell.dart';
 import 'stage_settings_section.dart';
+
+const _kAppVersion = '0.2.0';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -28,10 +32,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _refreshLockInfo() async {
-    final hasPin = await ref.read(secureStoreProvider).hasPin();
-    final deviceAuth = await ref
-        .read(lockServiceProvider)
-        .deviceAuthAvailable();
+    // Both probes touch platform plugins — treat "unavailable" as false
+    // rather than crashing on platforms (or tests) without them.
+    bool hasPin;
+    bool deviceAuth;
+    try {
+      hasPin = await ref.read(secureStoreProvider).hasPin();
+    } catch (_) {
+      hasPin = false;
+    }
+    try {
+      deviceAuth = await ref.read(lockServiceProvider).deviceAuthAvailable();
+    } catch (_) {
+      deviceAuth = false;
+    }
     if (mounted) {
       setState(() {
         _hasPin = hasPin;
@@ -64,6 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Disconnect'),
@@ -79,255 +94,327 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.lt;
     final app = ref.watch(appStateProvider);
     final jar = app.effectiveTipJar;
     final settings = app.settings;
+    final isRail = AppShellScope.of(context)?.isRail ?? false;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _SectionHeader('Account'),
-              if (app.demo) ...[
-                const ListTile(
-                  leading: Icon(Icons.science_rounded),
-                  title: Text('Demo mode'),
-                  subtitle: Text('No Stripe account connected'),
+    final sections = <Widget>[
+      // ------------------------------------------------------- account ---
+      if (app.demo)
+        LtRowGroup(
+          header: 'Account',
+          children: [
+            const LtRow(
+              icon: Icons.science_rounded,
+              title: 'Demo mode',
+              subtitle: 'No Stripe account connected',
+            ),
+            LtRow(
+              icon: Icons.logout_rounded,
+              title: 'Exit demo',
+              chevron: true,
+              onTap: () {
+                ref.read(appStateProvider.notifier).exitDemo();
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+            ),
+          ],
+        )
+      else
+        LtRowGroup(
+          header: 'Account',
+          children: [
+            LtRow(
+              icon: Icons.key_rounded,
+              title: _maskedKey(app.apiKey),
+              subtitle: 'Connected to your Stripe account',
+              trailing: StatusPill(
+                status:
+                    app.isTestMode ? LtKeyStatus.test : LtKeyStatus.live,
+                compact: true,
+              ),
+            ),
+            LtRow(
+              icon: Icons.link_off_rounded,
+              iconColor: c.danger,
+              title: 'Disconnect & wipe this device',
+              titleColor: c.danger,
+              chevron: true,
+              onTap: _confirmDisconnect,
+            ),
+          ],
+        ),
+      // ---------------------------------------------------- appearance ---
+      LtCard(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const LtSectionLabel('Appearance'),
+            const SizedBox(height: 10),
+            LtSegmented<AppThemeMode>(
+              values: AppThemeMode.values,
+              selected: settings.themeMode,
+              onChanged: (mode) => ref
+                  .read(appStateProvider.notifier)
+                  .updateSettings(settings.copyWith(themeMode: mode)),
+              labelOf: (mode) => switch (mode) {
+                AppThemeMode.system => 'Auto',
+                AppThemeMode.light => 'Light',
+                AppThemeMode.dark => 'Dark',
+              },
+              iconOf: (mode) => switch (mode) {
+                AppThemeMode.system => Icons.brightness_auto_rounded,
+                AppThemeMode.light => Icons.light_mode_rounded,
+                AppThemeMode.dark => Icons.dark_mode_rounded,
+              },
+            ),
+          ],
+        ),
+      ),
+      // ------------------------------------------------------- tip jar ---
+      if (!app.demo && jar != null)
+        LtRowGroup(
+          header: 'Tip jar',
+          children: [
+            LtRow(
+              icon: Icons.storefront_rounded,
+              title: jar.displayName,
+              subtitle: '${jar.currency.toUpperCase()} · '
+                  '${jar.url.replaceFirst(RegExp('^https?://'), '')}',
+              chevron: true,
+              onTap: () => launchUrl(
+                Uri.parse(jar.url),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
+            LtRow(
+              icon: Icons.print_rounded,
+              title: 'Print poster',
+              chevron: true,
+              onTap: () =>
+                  AppShellScope.of(context)?.select(ShellTab.poster),
+            ),
+            LtRow(
+              icon: Icons.refresh_rounded,
+              title: 'Create a new tip link',
+              subtitle:
+                  'Old link is deactivated — printed QRs stop working',
+              chevron: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const JarSetupScreen(recreate: true),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.logout_rounded),
-                  title: const Text('Exit demo'),
-                  onTap: () {
-                    ref.read(appStateProvider.notifier).exitDemo();
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                  },
-                ),
-              ] else ...[
-                ListTile(
-                  leading: const Icon(Icons.key_rounded),
-                  title: Text(_maskedKey(app.apiKey)),
-                  subtitle: Text(
-                    app.isTestMode
-                        ? 'Test mode key — payments simulated'
-                        : 'Live mode key',
-                  ),
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.link_off_rounded,
-                    color: theme.colorScheme.error,
-                  ),
-                  title: Text(
-                    'Disconnect & wipe this device',
-                    style: TextStyle(color: theme.colorScheme.error),
-                  ),
-                  onTap: _confirmDisconnect,
-                ),
-              ],
-              const SizedBox(height: 8),
-              _SectionHeader('Appearance'),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SegmentedButton<AppThemeMode>(
-                  segments: [
-                    for (final mode in AppThemeMode.values)
-                      ButtonSegment(
-                        value: mode,
-                        label: Text(mode.label),
-                        icon: Icon(switch (mode) {
-                          AppThemeMode.system => Icons.brightness_auto_rounded,
-                          AppThemeMode.light => Icons.light_mode_rounded,
-                          AppThemeMode.dark => Icons.dark_mode_rounded,
-                        }),
-                      ),
-                  ],
-                  selected: {settings.themeMode},
-                  onSelectionChanged: (selection) => ref
+              ),
+            ),
+          ],
+        ),
+      // ---------------------------------------------------- stage look ---
+      LtCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Padding(
+              padding: EdgeInsets.only(top: 8, bottom: 2),
+              child: LtSectionLabel('Stage look'),
+            ),
+            StageSettingsSection(),
+          ],
+        ),
+      ),
+      // ---------------------------------------------------- stage lock ---
+      LtRowGroup(
+        header: 'Stage lock',
+        children: [
+          LtRow(
+            icon: Icons.fingerprint_rounded,
+            title: 'Face ID / device unlock',
+            subtitle: _deviceAuthAvailable
+                ? 'Falls back to the app PIN'
+                : 'Not available on this device — the app PIN is used',
+            trailing: Switch(
+              value: settings.preferDeviceAuth && _deviceAuthAvailable,
+              onChanged: _deviceAuthAvailable
+                  ? (value) => ref
                       .read(appStateProvider.notifier)
                       .updateSettings(
-                        settings.copyWith(themeMode: selection.first),
-                      ),
-                ),
-              ),
-              if (!app.demo && jar != null) ...[
-                const SizedBox(height: 8),
-                _SectionHeader('Tip jar'),
-                ListTile(
-                  leading: const Icon(Icons.storefront_rounded),
-                  title: Text(jar.displayName),
-                  subtitle: Text('Currency: ${jar.currency.toUpperCase()}'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.open_in_new_rounded),
-                  title: const Text('Open payment link'),
-                  subtitle: Text(
-                    jar.url,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () => launchUrl(
-                    Uri.parse(jar.url),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.print_rounded),
-                  title: const Text('Print poster'),
-                  subtitle: const Text(
-                    'A print-ready QR poster — pick a theme, language, and '
-                    'paper size',
-                  ),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PosterScreen()),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.refresh_rounded),
-                  title: const Text('Create a new tip link'),
-                  subtitle: const Text(
-                    'Change name, currency, or thank-you message. The old '
-                    'link is deactivated — printed QR codes stop working.',
-                  ),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const JarSetupScreen(recreate: true),
+                          settings.copyWith(preferDeviceAuth: value))
+                  : null,
+            ),
+          ),
+          LtRow(
+            icon: Icons.pin_rounded,
+            title: _hasPin ? 'Change app PIN' : 'Set app PIN',
+            subtitle: 'Backup unlock, stored on this device only',
+            trailing: _hasPin
+                ? IconButton(
+                    tooltip: 'Remove PIN',
+                    icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                    onPressed: () async {
+                      await ref.read(secureStoreProvider).clearPin();
+                      _refreshLockInfo();
+                    },
+                  )
+                : null,
+            chevron: true,
+            onTap: () async {
+              final created = await ref
+                  .read(lockServiceProvider)
+                  .promptCreatePin(context);
+              if (created && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('PIN saved')));
+              }
+              _refreshLockInfo();
+            },
+          ),
+        ],
+      ),
+      // -------------------------------------------------- live session ---
+      LtRowGroup(
+        header: 'Live session',
+        children: [
+          LtRow(
+            icon: Icons.speed_rounded,
+            title: 'Check for new tips every',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final seconds in const [2, 4, 8, 15])
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: _IntervalChip(
+                      label: '${seconds}s',
+                      selected: settings.pollIntervalSec == seconds,
+                      onTap: () => ref
+                          .read(appStateProvider.notifier)
+                          .updateSettings(
+                              settings.copyWith(pollIntervalSec: seconds)),
                     ),
                   ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      // -------------------------------------------------------- footer ---
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            Text(
+              'live.tips v$_kAppVersion · open source — your keys, your money',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontFamily: kFontBody, fontSize: 12, color: c.textMuted),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                      textStyle: outfitStyle(12, c.accent)),
+                  onPressed: () => launchUrl(
+                    Uri.parse(kProjectUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: const Text('Source code'),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                      textStyle: outfitStyle(12, c.accent)),
+                  onPressed: () => showLicensePage(
+                    context: context,
+                    applicationName: 'live.tips',
+                    applicationVersion: _kAppVersion,
+                  ),
+                  child: const Text('Licenses'),
                 ),
               ],
-              const SizedBox(height: 8),
-              _SectionHeader('Stage lock'),
-              SwitchListTile(
-                secondary: const Icon(Icons.fingerprint_rounded),
-                title: const Text('Prefer Face ID / device unlock'),
-                subtitle: Text(
-                  _deviceAuthAvailable
-                      ? 'Falls back to the app PIN if it fails'
-                      : 'Not available on this device — the app PIN is used',
-                ),
-                value: settings.preferDeviceAuth && _deviceAuthAvailable,
-                onChanged: _deviceAuthAvailable
-                    ? (value) => ref
-                          .read(appStateProvider.notifier)
-                          .updateSettings(
-                            settings.copyWith(preferDeviceAuth: value),
-                          )
-                    : null,
-              ),
-              ListTile(
-                leading: const Icon(Icons.pin_rounded),
-                title: Text(_hasPin ? 'Change app PIN' : 'Set app PIN'),
-                subtitle: const Text(
-                  'Backup unlock for the stage lock, stored only on this '
-                  'device',
-                ),
-                onTap: () async {
-                  final created = await ref
-                      .read(lockServiceProvider)
-                      .promptCreatePin(context);
-                  if (created && context.mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text('PIN saved')));
-                  }
-                  _refreshLockInfo();
-                },
-                trailing: _hasPin
-                    ? IconButton(
-                        tooltip: 'Remove PIN',
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        onPressed: () async {
-                          await ref.read(secureStoreProvider).clearPin();
-                          _refreshLockInfo();
-                        },
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 8),
-              _SectionHeader('Stage look'),
-              const StageSettingsSection(),
-              const SizedBox(height: 8),
-              _SectionHeader('Live session'),
-              ListTile(
-                leading: const Icon(Icons.speed_rounded),
-                title: const Text('Check for new tips every'),
-                trailing: DropdownButton<int>(
-                  value: settings.pollIntervalSec,
-                  underline: const SizedBox(),
-                  items: const [
-                    DropdownMenuItem(value: 2, child: Text('2 s')),
-                    DropdownMenuItem(value: 4, child: Text('4 s')),
-                    DropdownMenuItem(value: 8, child: Text('8 s')),
-                    DropdownMenuItem(value: 15, child: Text('15 s')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      ref
-                          .read(appStateProvider.notifier)
-                          .updateSettings(
-                            settings.copyWith(pollIntervalSec: value),
-                          );
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-              _SectionHeader('About'),
-              const ListTile(
-                leading: Icon(Icons.info_outline_rounded),
-                title: Text('live.tips'),
-                subtitle: Text(
-                  'v0.1.0 · open-source tip jar — your keys, your money',
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.code_rounded),
-                title: const Text('Source code'),
-                subtitle: const Text(kProjectUrl),
-                onTap: () => launchUrl(
-                  Uri.parse(kProjectUrl),
-                  mode: LaunchMode.externalApplication,
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.article_outlined),
-                title: const Text('Open-source licenses'),
-                onTap: () => showLicensePage(
-                  context: context,
-                  applicationName: 'live.tips',
-                  applicationVersion: '0.1.0',
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
+            ),
+          ],
+        ),
+      ),
+    ];
+
+    if (isRail) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(40, 36, 40, 36),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Settings',
+                    style: outfitStyle(32, c.text, weight: FontWeight.w800)),
+                const SizedBox(height: 24),
+                for (final section in sections) ...[
+                  section,
+                  const SizedBox(height: 14),
+                ],
+              ],
+            ),
           ),
+        ),
+      );
+    }
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          children: [
+            SizedBox(
+              height: 56,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Settings',
+                    style: outfitStyle(20, c.text, weight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 4),
+            for (final section in sections) ...[
+              section,
+              const SizedBox(height: 14),
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
+class _IntervalChip extends StatelessWidget {
+  const _IntervalChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-  final String title;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        title.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.primary,
-          letterSpacing: 1.4,
-          fontWeight: FontWeight.w700,
+    final c = context.lt;
+    return Material(
+      color: selected ? c.accent : c.chip,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          child: Text(
+            label,
+            style: outfitStyle(12, selected ? c.onAccent : c.textSecondary),
+          ),
         ),
       ),
     );

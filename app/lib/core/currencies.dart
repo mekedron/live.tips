@@ -27,6 +27,40 @@ const List<String> kSupportedCurrencies = [
   'inr',
 ];
 
+/// Human names for the picker ("USD — US Dollar"). Any code missing here
+/// still works — it just shows as the bare uppercase code.
+const Map<String, String> kCurrencyNames = {
+  'usd': 'US Dollar',
+  'eur': 'Euro',
+  'gbp': 'British Pound',
+  'cad': 'Canadian Dollar',
+  'aud': 'Australian Dollar',
+  'nzd': 'New Zealand Dollar',
+  'chf': 'Swiss Franc',
+  'sek': 'Swedish Krona',
+  'nok': 'Norwegian Krone',
+  'dkk': 'Danish Krone',
+  'pln': 'Polish Złoty',
+  'czk': 'Czech Koruna',
+  'ron': 'Romanian Leu',
+  'huf': 'Hungarian Forint',
+  'jpy': 'Japanese Yen',
+  'mxn': 'Mexican Peso',
+  'brl': 'Brazilian Real',
+  'sgd': 'Singapore Dollar',
+  'hkd': 'Hong Kong Dollar',
+  'ils': 'Israeli Shekel',
+  'aed': 'UAE Dirham',
+  'inr': 'Indian Rupee',
+};
+
+/// "USD — US Dollar", or just "USD" for codes we have no name for.
+String currencyLabel(String code) {
+  final name = kCurrencyNames[code.toLowerCase()];
+  final upper = code.toUpperCase();
+  return name == null ? upper : '$upper — $name';
+}
+
 /// Currencies whose Stripe amounts are expressed in whole units
 /// (not multiplied by 100). https://docs.stripe.com/currencies#zero-decimal
 const Set<String> kZeroDecimalCurrencies = {

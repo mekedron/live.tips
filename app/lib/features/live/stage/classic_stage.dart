@@ -4,6 +4,7 @@ import '../../../core/money.dart';
 import '../../../core/theme.dart';
 import '../../../domain/donation.dart';
 import '../../../widgets/donation_tile.dart';
+import 'stage_hud.dart' show kStageAccent, kStageAmount;
 import 'stage_types.dart';
 
 /// The original numbers-first stage: big total, animated goal bar, stat
@@ -28,6 +29,7 @@ class ClassicStage extends StatelessWidget {
           child: Text(
             formatAmount(snapshot.totalMinor, snapshot.currency),
             style: const TextStyle(
+              fontFamily: kFontOutfit,
               fontSize: 96,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -40,7 +42,7 @@ class ClassicStage extends StatelessWidget {
           'of ${formatAmount(snapshot.goalMinor, snapshot.currency)} goal · '
           '${(snapshot.progress * 100).round()}%',
           textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium?.copyWith(color: Colors.white60),
+          style: outfitStyle(16, Colors.white.withValues(alpha: 0.6)),
         ),
         const SizedBox(height: 14),
         _GoalProgressBar(
@@ -88,7 +90,7 @@ class ClassicStage extends StatelessWidget {
               : ListView.builder(
                   itemCount: donations.length,
                   itemBuilder: (context, index) =>
-                      DonationTile(donation: donations[index], dense: true),
+                      DonationTile(donation: donations[index]),
                 ),
         ),
       ],
@@ -122,12 +124,12 @@ class _GoalProgressBar extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(13),
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFFF9D2E), kGold],
+                  colors: [kStageAccent, kStageAmount],
                 ),
                 boxShadow: reached
                     ? [
                         BoxShadow(
-                          color: kGold.withValues(alpha: 0.7),
+                          color: kStageAccent.withValues(alpha: 0.7),
                           blurRadius: 18,
                         ),
                       ]
@@ -158,9 +160,10 @@ class _StatChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: kGold),
+          Icon(icon, size: 16, color: kStageAccent),
           const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Colors.white70)),
+          Text(label,
+              style: outfitStyle(13.5, Colors.white.withValues(alpha: 0.75))),
         ],
       ),
     );
@@ -199,17 +202,18 @@ class LastDonationHero extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                    color: kGold.withValues(alpha: 0.65), width: 1.5),
-                color: kGold.withValues(alpha: compact ? 0.16 : 0.08),
+                    color: kStageAccent.withValues(alpha: 0.6), width: 1.5),
+                color: kStageAccent.withValues(alpha: compact ? 0.16 : 0.08),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '💛 ${donation!.displayName} tipped '
+                    '${donation!.displayName} tipped '
                     '${formatAmount(donation!.amountMinor, donation!.currency)}',
                     textAlign: TextAlign.center,
                     style: TextStyle(
+                      fontFamily: kFontOutfit,
                       fontSize: compact ? 17 : 22,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,

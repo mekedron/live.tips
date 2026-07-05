@@ -31,7 +31,7 @@ void main() {
     await tester.tap(find.text('Try the demo'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Start live session'), findsOneWidget);
-    expect(find.textContaining('DEMO'), findsOneWidget);
+    expect(find.text('Go live'), findsOneWidget);
+    expect(find.text('Demo'), findsOneWidget);
   });
 }

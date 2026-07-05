@@ -4,15 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/stripe_onboarding.dart';
+import '../../core/theme.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../data/stripe/stripe_requests.dart';
 import '../../state/providers.dart';
+import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
 import 'key_guide_screen.dart';
 
 /// Bring-your-own-key onboarding: the artist creates a *restricted* key in
 /// their own dashboard, pastes it here, and we verify every permission
-/// before letting them through.
+/// before letting them through. Step 1 of 2.
 class ConnectScreen extends ConsumerStatefulWidget {
   const ConnectScreen({super.key});
 
@@ -36,7 +38,7 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
     if (key.isEmpty) return 'Paste your restricted API key first.';
     if (key.startsWith('pk_')) {
       return 'That\'s a *publishable* key. You need the restricted key '
-          '(starts with rk_) — see the guide below.';
+          '(starts with rk_) — see the guide.';
     }
     if (key.startsWith('sk_live_')) {
       return 'That\'s your full live secret key — too powerful to put on a '
@@ -100,222 +102,340 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.lt;
     final key = _keyController.text.trim();
     final isTest = key.startsWith('rk_test_') || key.startsWith('sk_test_');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Connect Stripe')),
+      appBar: AppBar(
+        title: const Text('Connect Stripe'),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Center(child: LtPill(label: 'Step 1 of 2')),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('How this works',
-                          style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 12),
-                      const Text(
-                        '1. Open your Stripe dashboard and create a '
-                        'restricted API key with the four permissions below.\n'
-                        '2. Paste the key here — it\'s stored only in this '
-                        'device\'s keychain and talks directly to Stripe.\n'
-                        '3. We create your personal donation link. Done.',
-                      ),
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          FilledButton.tonalIcon(
-                            onPressed: () => launchUrl(
-                              Uri.parse(kCreateKeyUrl),
-                              mode: LaunchMode.externalApplication,
-                            ),
-                            icon: const Icon(Icons.open_in_new_rounded,
-                                size: 18),
-                            label: const Text(
-                                'Create the key (pre-filled) in Stripe'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const KeyGuideScreen()),
-                            ),
-                            icon: const Icon(Icons.menu_book_rounded,
-                                size: 18),
-                            label: const Text('Step-by-step guide'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () =>
-                                showFullscreenQr(context, kCreateKeyUrl),
-                            icon: const Icon(Icons.qr_code_rounded, size: 18),
-                            label: const Text('QR for your laptop'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'The pre-filled link selects exactly the five '
-                        'permissions below — you just review and click '
-                        '“Create key”.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const LtProgressSegments(total: 2, filled: 1),
               const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Permissions the key needs',
-                          style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Everything else stays “None” — the key can\'t touch '
-                        'payouts, refunds or your balance.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant),
+              LtCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Create your restricted key',
+                        style: outfitStyle(16, c.text,
+                            weight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Two minutes, once. The key can create your tip link '
+                      'and watch donations — nothing else.',
+                      style: TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 13,
+                        height: 1.5,
+                        color: c.textSecondary,
                       ),
-                      const SizedBox(height: 8),
-                      for (final p in kRequiredPermissions)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  p.access,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color:
-                                        theme.colorScheme.onPrimaryContainer,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(p.resource,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w600)),
-                                    Text(p.why,
-                                        style: theme.textTheme.bodySmall),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _keyController,
-                autocorrect: false,
-                enableSuggestions: false,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'Restricted API key',
-                  hintText: 'rk_live_…',
-                  suffixIcon: IconButton(
-                    tooltip: 'Paste',
-                    icon: const Icon(Icons.content_paste_rounded),
-                    onPressed: _pasteFromClipboard,
-                  ),
-                ),
-                onChanged: (_) => setState(() {
-                  _error = null;
-                  _checks = null;
-                }),
-                onSubmitted: (_) => _verifyAndConnect(),
-              ),
-              if (key.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Chip(
-                    visualDensity: VisualDensity.compact,
-                    avatar: Icon(
-                      isTest ? Icons.science_rounded : Icons.bolt_rounded,
-                      size: 16,
                     ),
-                    label: Text(isTest
-                        ? 'Test / sandbox key — payments will be simulated'
-                        : 'Live key — real payments'),
-                  ),
+                    const SizedBox(height: 14),
+                    const _NumberedLine(
+                        1, 'Open the pre-filled form in your Stripe dashboard'),
+                    const SizedBox(height: 10),
+                    const _NumberedLine(
+                        2, 'Review the permissions, click “Create key”'),
+                    const SizedBox(height: 10),
+                    const _NumberedLine(3, 'Copy it and paste it below'),
+                    const SizedBox(height: 16),
+                    FilledButton.tonalIcon(
+                      onPressed: () => launchUrl(
+                        Uri.parse(kCreateKeyUrl),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      label: const Text('Open pre-filled form in Stripe'),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const KeyGuideScreen()),
+                          ),
+                          child: const Text('Step-by-step guide'),
+                        ),
+                        const SizedBox(width: 6),
+                        TextButton(
+                          onPressed: () =>
+                              showFullscreenQr(context, kCreateKeyUrl),
+                          child: const Text('QR for your laptop'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: TextStyle(color: theme.colorScheme.error),
+              ),
+              const SizedBox(height: 14),
+              LtCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('What the key can do',
+                        style: outfitStyle(16, c.text,
+                            weight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    for (var i = 0; i < kRequiredPermissions.length; i++) ...[
+                      if (i > 0) Divider(height: 1, color: c.divider),
+                      _PermissionRow(permission: kRequiredPermissions[i]),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Everything else stays “None” — no payouts, refunds or '
+                      'balance access. Full live keys are refused.',
+                      style: TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        height: 1.5,
+                        color: c.textMuted,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+              const SizedBox(height: 14),
+              LtCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Paste the key',
+                        style: outfitStyle(16, c.text,
+                            weight: FontWeight.w700)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _keyController,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      style: const TextStyle(
+                          fontFamily: 'monospace', fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'rk_live_…',
+                        suffixIcon: IconButton(
+                          tooltip: 'Paste',
+                          icon: Icon(Icons.content_paste_rounded,
+                              size: 20, color: c.accent),
+                          onPressed: _pasteFromClipboard,
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {
+                        _error = null;
+                        _checks = null;
+                      }),
+                      onSubmitted: (_) => _verifyAndConnect(),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Stored in this device\'s keychain. Only ever talks '
+                      'to api.stripe.com.',
+                      style: TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        height: 1.5,
+                        color: c.textMuted,
+                      ),
+                    ),
+                    if (key.isNotEmpty && isTest) ...[
+                      const SizedBox(height: 10),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: LtPill(
+                          label: 'Test / sandbox key — payments simulated',
+                          icon: Icons.science_rounded,
+                          soft: false,
+                        ),
+                      ),
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: TextStyle(
+                          fontFamily: kFontBody,
+                          fontSize: 13,
+                          height: 1.45,
+                          color: c.danger,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    LtPrimaryButton(
+                      label: 'Verify & connect',
+                      busy: _busy,
+                      onPressed: _verifyAndConnect,
+                    ),
+                  ],
+                ),
+              ),
               if (_checks != null) ...[
-                const SizedBox(height: 12),
-                Card(
+                const SizedBox(height: 14),
+                LtCard(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Column(
                     children: [
-                      for (final check in _checks!.checks)
-                        ListTile(
-                          dense: true,
-                          leading: Icon(
-                            check.ok
-                                ? Icons.check_circle_rounded
-                                : Icons.cancel_rounded,
-                            color: check.ok
-                                ? Colors.greenAccent
-                                : theme.colorScheme.error,
-                          ),
-                          title: Text(check.label),
-                          subtitle:
-                              check.detail == null ? null : Text(check.detail!),
-                        ),
+                      for (var i = 0; i < _checks!.checks.length; i++) ...[
+                        if (i > 0) Divider(height: 1, color: c.divider),
+                        _CheckRow(check: _checks!.checks[i]),
+                      ],
                     ],
                   ),
                 ),
               ],
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: _busy ? null : _verifyAndConnect,
-                child: _busy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : const Text('Verify & connect'),
-              ),
-              const SizedBox(height: 32),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NumberedLine extends StatelessWidget {
+  const _NumberedLine(this.number, this.text);
+
+  final int number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Row(
+      children: [
+        LtStepNumber(number, size: 24),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+                fontFamily: kFontBody, fontSize: 14, color: c.text),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PermissionRow extends StatelessWidget {
+  const _PermissionRow({required this.permission});
+
+  final RequiredPermission permission;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    final write = permission.access == 'Write';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  permission.resource,
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: c.text,
+                  ),
+                ),
+                Text(
+                  permission.why,
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 12,
+                    height: 1.35,
+                    color: c.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: write ? c.accentSoft : c.chip,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              permission.access,
+              style: TextStyle(
+                fontFamily: kFontBody,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: write ? c.onAccentSoft : c.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckRow extends StatelessWidget {
+  const _CheckRow({required this.check});
+
+  final PermissionCheck check;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            check.ok ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 20,
+            color: check.ok ? c.success : c.danger,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  check.label,
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: c.text,
+                  ),
+                ),
+                if (check.detail != null)
+                  Text(
+                    check.detail!,
+                    style: TextStyle(
+                      fontFamily: kFontBody,
+                      fontSize: 12.5,
+                      height: 1.4,
+                      color: c.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

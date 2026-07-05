@@ -41,10 +41,11 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
     return Theme(
       data: buildDarkTheme(),
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: kStageBlack,
         appBar: AppBar(
           title: const Text('Stage preview'),
           backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
         ),
         floatingActionButton: settings.stage.style == StageStyle.classic
             ? null

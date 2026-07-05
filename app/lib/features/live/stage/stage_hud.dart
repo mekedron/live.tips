@@ -9,8 +9,14 @@ import 'stage_types.dart';
 
 /// Vertical space the HUD occupies at the top / the mini-feed at the bottom —
 /// sent to the renderer as `insets` so the vessel frames into the free band.
-const double kStageHudTopInset = 132;
-const double kStageHudBottomInset = 84;
+const double kStageHudTopInset = 150;
+const double kStageHudBottomInset = 96;
+
+/// Coral accent + warm whites of the always-dark stage.
+const kStageAccent = Color(0xFFFF7C55);
+const kStageAmount = Color(0xFFFF9E7E);
+const kStageGlass = Color(0xE614110E); // rgba(20,17,20,.9-ish) legible glass
+const kStageGlassSoft = Color(0xB314110E);
 
 /// Native text overlay for the jar stages. The renderer draws NO text — real
 /// currency formatting, fonts and accessibility all live here. Wrapped in
@@ -31,54 +37,96 @@ class StageHud extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = snapshot;
     final jarPctRounded = (s.jarPct * 100).round();
-    return Column(
-      children: [
-        // ---- top band: the numbers that matter, readable from the bar ----
-        SizedBox(
-          height: kStageHudTopInset,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  formatAmount(s.totalMinor, s.currency),
-                  style: const TextStyle(
-                    fontSize: 54,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.0,
-                    shadows: [Shadow(blurRadius: 18, color: Colors.black87)],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth > 780;
+        final barWidth = wide ? 320.0 : 220.0;
+        // Tablet: the money shares the top band with the corner controls.
+        // Phone: it drops below the 40px control row.
+        final topOffset =
+            MediaQuery.paddingOf(context).top + (wide ? 24.0 : 72.0);
+        return Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(top: topOffset),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      formatAmount(s.totalMinor, s.currency),
+                      style: TextStyle(
+                        fontFamily: kFontOutfit,
+                        fontSize: wide ? 60 : 46,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.0,
+                        shadows: const [
+                          Shadow(blurRadius: 24, color: Colors.black87),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  SizedBox(height: wide ? 12 : 10),
+                  SizedBox(
+                    width: barWidth,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: SizedBox(
+                        height: wide ? 6 : 5,
+                        child: Stack(
+                          children: [
+                            Container(
+                                color: Colors.white.withValues(alpha: 0.14)),
+                            FractionallySizedBox(
+                              widthFactor:
+                                  s.jarPct.clamp(0.0, 1.0).toDouble(),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: kStageAccent,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: wide ? 8 : 7),
+                  Text(
+                    '${formatAmount(s.currentJarMinor, s.currency)} of '
+                    '${formatAmount(s.goalMinor, s.currency)} · '
+                    '$jarPctRounded%${wide ? ' of tonight\'s goal' : ''}',
+                    style: TextStyle(
+                      fontFamily: kFontOutfit,
+                      fontSize: wide ? 14 : 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: s.jarPct >= 1
+                          ? const Color(0xFF4FCB8D)
+                          : Colors.white.withValues(alpha: 0.7),
+                      shadows: const [
+                        Shadow(blurRadius: 8, color: Colors.black),
+                      ],
+                    ),
+                  ),
+                  if (s.bankedJars > 0) ...[
+                    const SizedBox(height: 4),
+                    _TrophyLine(
+                      bankedJars: s.bankedJars,
+                      bankedMinor: s.bankedMinor,
+                      currency: s.currency,
+                      pulse: trophyPulse,
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 4),
-              // the user's ask: ALWAYS show what belongs to the current jar
-              Text(
-                'this jar: ${formatAmount(s.currentJarMinor, s.currency)}'
-                ' of ${formatAmount(s.goalMinor, s.currency)}'
-                ' · $jarPctRounded%',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: s.jarPct >= 1 ? const Color(0xFF7DDE8A) : Colors.white70,
-                  fontWeight: FontWeight.w600,
-                  shadows: const [Shadow(blurRadius: 12, color: Colors.black)],
-                ),
-              ),
-              if (s.bankedJars > 0) ...[
-                const SizedBox(height: 3),
-                _TrophyLine(
-                  bankedJars: s.bankedJars,
-                  bankedMinor: s.bankedMinor,
-                  currency: s.currency,
-                  pulse: trophyPulse,
-                ),
-              ],
-            ],
-          ),
-        ),
-        const Spacer(),
-      ],
+            ),
+            const Spacer(),
+          ],
+        );
+      },
     );
   }
 }
@@ -108,13 +156,14 @@ class _TrophyLine extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.emoji_events_rounded, size: 17, color: kGold),
+          const Icon(Icons.emoji_events_rounded, size: 16, color: kGold),
           const SizedBox(width: 5),
           Text(
             '${formatAmount(bankedMinor, currency)} in $bankedJars full '
             '${bankedJars == 1 ? 'jar' : 'jars'}',
             style: const TextStyle(
-              fontSize: 15,
+              fontFamily: kFontOutfit,
+              fontSize: 14,
               color: kGold,
               fontWeight: FontWeight.w700,
               shadows: [Shadow(blurRadius: 12, color: Colors.black)],
@@ -126,8 +175,8 @@ class _TrophyLine extends StatelessWidget {
   }
 }
 
-/// Compact donation ticker for the jar stages: the last few tips, faded,
-/// bottom-left — the jar is the show, the feed just whispers.
+/// Compact donation ticker for the jar stages: the last few tips as fading
+/// glass pills, bottom-left — the jar is the show, the feed just whispers.
 class StageMiniFeed extends StatelessWidget {
   const StageMiniFeed({super.key, required this.snapshot});
 
@@ -137,9 +186,22 @@ class StageMiniFeed extends StatelessWidget {
   Widget build(BuildContext context) {
     final tips = snapshot.recentDonations.take(3).toList();
     if (tips.isEmpty) {
-      return Text(
-        'Waiting for the first tip…',
-        style: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: kStageGlassSoft,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Text(
+          'Waiting for the first tip…',
+          style: TextStyle(
+            fontFamily: kFontOutfit,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withValues(alpha: 0.5),
+          ),
+        ),
       );
     }
     return Column(
@@ -148,16 +210,44 @@ class StageMiniFeed extends StatelessWidget {
       children: [
         for (var i = 0; i < tips.length; i++)
           Padding(
-            padding: const EdgeInsets.only(top: 3),
+            padding: const EdgeInsets.only(top: 6),
             child: Opacity(
-              opacity: 1 - i * 0.28,
-              child: Text(
-                '${tips[i].displayName} · '
-                '${formatAmount(tips[i].amountMinor, tips[i].currency)}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  shadows: [Shadow(blurRadius: 10, color: Colors.black)],
+              opacity: (1 - i * 0.25).clamp(0.3, 1.0).toDouble(),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: kStageGlassSoft,
+                  borderRadius: BorderRadius.circular(999),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      tips[i].displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: kFontOutfit,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      formatAmount(
+                          tips[i].amountMinor, tips[i].currency),
+                      style: const TextStyle(
+                        fontFamily: kFontOutfit,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: kStageAmount,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -255,11 +345,14 @@ class _TipBannerLayerState extends State<TipBannerLayer> {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
+    return LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth > 780;
+      return Align(
       alignment: Alignment.topCenter,
       child: Padding(
         // just below the HUD numbers, over the jar's headroom
-        padding: const EdgeInsets.only(top: kStageHudTopInset + 10),
+        padding: EdgeInsets.only(
+            top: MediaQuery.paddingOf(context).top + (wide ? 160 : 188)),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 480),
           reverseDuration: const Duration(milliseconds: 320),
@@ -290,6 +383,7 @@ class _TipBannerLayerState extends State<TipBannerLayer> {
         ),
       ),
     );
+    });
   }
 }
 
@@ -302,53 +396,91 @@ class _TipBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = tip.donation;
     final big = tip.deltaPct >= 0.1; // a tenth of tonight's goal in one tip
+    final anonymous = d.name == null || d.name!.trim().isEmpty;
     return Container(
       constraints: const BoxConstraints(maxWidth: 460),
       margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.62),
-        borderRadius: BorderRadius.circular(22),
+        color: kStageGlass,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: kGold.withValues(alpha: big ? 0.95 : 0.55),
-          width: big ? 2 : 1.4,
+          color: kStageAccent.withValues(alpha: big ? 0.9 : 0.45),
+          width: big ? 1.8 : 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: kGold.withValues(alpha: big ? 0.4 : 0.2),
-            blurRadius: 26,
-            spreadRadius: 1,
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 32,
+            offset: const Offset(0, 8),
           ),
+          if (big)
+            BoxShadow(
+              color: kStageAccent.withValues(alpha: 0.35),
+              blurRadius: 26,
+              spreadRadius: 1,
+            ),
         ],
       ),
-      child: Column(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '${big ? '👑' : '💛'} ${d.displayName} tipped '
-            '${formatAmount(d.amountMinor, d.currency)}',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: big ? 22 : 19,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: anonymous
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : const Color(0xFF3E2018),
+              shape: BoxShape.circle,
             ),
-          ),
-          if (d.hasMessage) ...[
-            const SizedBox(height: 6),
-            Text(
-              '“${d.message!.trim()}”',
-              textAlign: TextAlign.center,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 16,
-                fontStyle: FontStyle.italic,
-                color: Color(0xFFFFE9B0),
-                height: 1.3,
+            child: Text(
+              d.displayName.characters.first.toUpperCase(),
+              style: TextStyle(
+                fontFamily: kFontOutfit,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: anonymous
+                    ? Colors.white.withValues(alpha: 0.75)
+                    : const Color(0xFFFFB79F),
               ),
             ),
-          ],
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${big ? '👑 ' : ''}${d.displayName} tipped '
+                  '${formatAmount(d.amountMinor, d.currency)}',
+                  style: TextStyle(
+                    fontFamily: kFontOutfit,
+                    fontSize: big ? 18 : 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                if (d.hasMessage) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '“${d.message!.trim()}”',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: kFontBody,
+                      fontSize: 13.5,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.white.withValues(alpha: 0.85),
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

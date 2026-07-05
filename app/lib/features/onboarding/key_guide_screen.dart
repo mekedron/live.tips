@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/stripe_onboarding.dart';
+import '../../core/theme.dart';
+import '../../widgets/lt_ui.dart';
 
 /// In-app version of docs/onboarding/create-restricted-key.md — the full
 /// walkthrough with screenshots lives in the repository.
@@ -10,117 +12,161 @@ class KeyGuideScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = context.lt;
     return Scaffold(
-      appBar: AppBar(title: const Text('Create your restricted key')),
+      appBar: AppBar(
+        title: const Text('Create the key'),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Center(child: LtPill(label: '~2 min', soft: false)),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 620),
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
-              Text(
-                'Takes about two minutes. You only do this once.',
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Shortcut: the button below opens the create-key '
-                        'form with everything pre-selected — you just review '
-                        'and click “Create key”. The steps that follow are '
-                        'the manual path.',
-                      ),
-                      const SizedBox(height: 12),
-                      FilledButton.tonalIcon(
-                        onPressed: () => launchUrl(
-                          Uri.parse(kCreateKeyUrl),
-                          mode: LaunchMode.externalApplication,
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: c.accentSoft,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.bolt_rounded, size: 22, color: c.onAccentSoft),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Shortcut: the pre-filled form selects everything '
+                        'for you — review and click “Create key”.',
+                        style: TextStyle(
+                          fontFamily: kFontBody,
+                          fontSize: 13,
+                          height: 1.45,
+                          color: c.onAccentSoft,
                         ),
-                        icon: const Icon(Icons.bolt_rounded, size: 18),
-                        label: const Text('Open pre-filled key form'),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 12),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        textStyle: outfitStyle(12, Colors.white),
+                        minimumSize: Size.zero,
+                      ),
+                      onPressed: () => launchUrl(
+                        Uri.parse(kCreateKeyUrl),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      child: const Text('Open form'),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              const _Step(
+              const SizedBox(height: 12),
+              const _StepCard(
                 number: 1,
                 title: 'Sign in to your Stripe dashboard',
-                body: 'On a laptop is easiest. Go to dashboard.stripe.com '
-                    'and sign in to the account that should receive the tips.',
+                body: 'On a laptop is easiest — dashboard.stripe.com, the '
+                    'account that should receive the tips.',
               ),
-              const _Step(
+              const SizedBox(height: 12),
+              const _StepCard(
                 number: 2,
                 title: 'Open API keys',
-                body: 'Click “Developers” (bottom-left corner), then the '
-                    '“API keys” tab. Or open '
+                body: '“Developers” (bottom-left) → “API keys”, or '
                     'dashboard.stripe.com/apikeys directly.',
               ),
-              const _Step(
+              const SizedBox(height: 12),
+              const _StepCard(
                 number: 3,
                 title: 'Create a restricted key',
-                body: 'Click “Create restricted key”. When Stripe asks how '
-                    'you\'ll use it, choose “Providing this key to a '
-                    'third-party application” and enter live.tips as the '
-                    'name. Tick “Customize permissions for this key”.',
+                body: '“Create restricted key” → “Providing this key to a '
+                    'third-party application” → name it live.tips → '
+                    '“Customize permissions”.',
               ),
-              const _Step(
+              const SizedBox(height: 12),
+              _StepCard(
                 number: 4,
                 title: 'Grant exactly these permissions',
-                body: 'Leave every other permission on “None”:',
-              ),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final p in kRequiredPermissions)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Text('• ${p.resource}  →  ${p.access}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 8),
+                    for (final p in kRequiredPermissions)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              p.resource,
+                              style: TextStyle(
+                                fontFamily: kFontBody,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: c.text,
+                              ),
+                            ),
+                            Text(
+                              p.access,
+                              style: TextStyle(
+                                fontFamily: kFontBody,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: p.access == 'Write'
+                                    ? c.onAccentSoft
+                                    : c.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                    ],
-                  ),
+                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Everything else stays “None”.',
+                      style: TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        color: c.textMuted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const _Step(
+              const SizedBox(height: 12),
+              const _StepCard(
                 number: 5,
-                title: 'Create & copy the key',
-                body: 'Click “Create key”, then “Reveal key” and copy it. It '
-                    'starts with rk_live_ (or rk_test_ in a sandbox). Paste '
-                    'it into the app — AirDrop, a password manager, or a '
-                    'synced clipboard gets it from laptop to tablet safely.',
+                title: 'Create, reveal & copy',
+                body: 'Starts with rk_live_ (or rk_test_ in a sandbox). '
+                    'AirDrop or a password manager gets it to the tablet '
+                    'safely. Rehearse with test card 4242 4242 4242 4242.',
               ),
-              const _Step(
+              const SizedBox(height: 12),
+              const _StepCard(
                 number: 6,
                 title: 'Good to know',
-                body: '• The key is stored in this device\'s secure keychain '
-                    'and is only ever sent to api.stripe.com.\n'
-                    '• You can revoke it any time in the dashboard — the app '
-                    'simply stops working until you connect a new one.\n'
-                    '• To rehearse without real money, create the key inside '
-                    'a Stripe sandbox and use test card 4242 4242 4242 4242.',
+                body: 'The key lives in this device\'s secure keychain and '
+                    'is only ever sent to api.stripe.com. Revoke it any time '
+                    'in the dashboard — the app simply stops working until '
+                    'you connect a new one.',
               ),
               const SizedBox(height: 16),
-              FilledButton.tonalIcon(
+              OutlinedButton.icon(
                 onPressed: () => launchUrl(
                   Uri.parse(kApiKeysDashboardUrl),
                   mode: LaunchMode.externalApplication,
                 ),
-                icon: const Icon(Icons.open_in_new_rounded),
+                icon: Icon(Icons.open_in_new_rounded,
+                    size: 18, color: c.textSecondary),
                 label: const Text('Open dashboard.stripe.com/apikeys'),
               ),
-              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -129,42 +175,48 @@ class KeyGuideScreen extends StatelessWidget {
   }
 }
 
-class _Step extends StatelessWidget {
-  const _Step({required this.number, required this.title, required this.body});
+class _StepCard extends StatelessWidget {
+  const _StepCard({
+    required this.number,
+    required this.title,
+    this.body,
+    this.child,
+  });
 
   final int number;
   final String title;
-  final String body;
+  final String? body;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+    final c = context.lt;
+    return LtCard(
+      radius: 16,
+      padding: const EdgeInsets.all(16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Text(
-              '$number',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
-            ),
-          ),
+          LtStepNumber(number),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(body),
+                Text(title, style: outfitStyle(14.5, c.text)),
+                if (body != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    body!,
+                    style: TextStyle(
+                      fontFamily: kFontBody,
+                      fontSize: 13,
+                      height: 1.45,
+                      color: c.textSecondary,
+                    ),
+                  ),
+                ],
+                ?child,
               ],
             ),
           ),

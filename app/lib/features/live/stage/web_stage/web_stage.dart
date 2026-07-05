@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../../../core/theme.dart';
 import '../../../../domain/rollover_math.dart';
 import '../../../../domain/stage_settings.dart';
 import '../stage_hud.dart';
@@ -241,9 +242,13 @@ class _WebStageState extends ConsumerState<WebStage> {
   @override
   Widget build(BuildContext context) {
     final t = _transport;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: Stack(
+    return LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth > 780;
+      final safeBottom = MediaQuery.paddingOf(context).bottom;
+      // On phones the glass action bar floats over the bottom band — the
+      // mini feed must clear it.
+      final feedBottom = 12.0 + (wide ? 0 : 84) + safeBottom;
+      return Stack(
         fit: StackFit.expand,
         children: [
           if (t is WebViewStageTransport)
@@ -251,11 +256,11 @@ class _WebStageState extends ConsumerState<WebStage> {
           else if (t is IframeStageTransport)
             HtmlElementView(viewType: t.viewType)
           else
-            const ColoredBox(color: Color(0xFF0D0E12)),
+            const ColoredBox(color: kStageBlack),
           // native poster until the renderer's first frame — no white flash
           if (!_ready)
             const ColoredBox(
-              color: Color(0xFF0D0E12),
+              color: kStageBlack,
               child: Center(
                 child: SizedBox(
                   width: 26,
@@ -281,13 +286,13 @@ class _WebStageState extends ConsumerState<WebStage> {
             child: Align(
               alignment: Alignment.bottomLeft,
               child: Padding(
-                padding: const EdgeInsets.only(left: 14, bottom: 12),
+                padding: EdgeInsets.only(left: 16, bottom: feedBottom),
                 child: StageMiniFeed(snapshot: widget.snapshot),
               ),
             ),
           ),
         ],
-      ),
-    );
+      );
+    });
   }
 }

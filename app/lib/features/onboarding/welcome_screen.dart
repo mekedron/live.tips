@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../state/providers.dart';
+import '../../widgets/lt_ui.dart';
 import 'connect_screen.dart';
 
 class WelcomeScreen extends ConsumerWidget {
@@ -10,7 +11,7 @@ class WelcomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+    final c = context.lt;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -24,72 +25,106 @@ class WelcomeScreen extends ConsumerWidget {
                       BoxConstraints(minHeight: constraints.maxHeight),
                   child: IntrinsicHeight(
                     child: Padding(
-                      padding: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.all(24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Spacer(),
-                  Container(
-                    width: 88,
-                    height: 88,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: kGold.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child:
-                        const Icon(Icons.volunteer_activism, size: 44, color: kGold),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'live.tips',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.displaySmall
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'A live tip jar for performers.\nCash is gone — the applause isn\'t.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 32),
-                  const _FeatureRow(
-                    icon: Icons.account_balance_rounded,
-                    text: 'Tips go straight to your own Stripe account — '
-                        'no middleman, no platform cut.',
-                  ),
-                  const _FeatureRow(
-                    icon: Icons.qr_code_2_rounded,
-                    text: 'One QR code on stage. Fans scan, tap, done.',
-                  ),
-                  const _FeatureRow(
-                    icon: Icons.celebration_rounded,
-                    text: 'Watch tips land live, with a goal bar and confetti.',
-                  ),
-                  const Spacer(),
-                  FilledButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const ConnectScreen()),
-                    ),
-                    icon: const Icon(Icons.link_rounded),
-                    label: const Text('Connect your Stripe account'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () =>
-                        ref.read(appStateProvider.notifier).enterDemo(),
-                    icon: const Icon(Icons.play_circle_outline_rounded),
-                    label: const Text('Try the demo'),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Open source · your API key never leaves this device',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          const Spacer(flex: 6),
+                          Center(
+                            child: Container(
+                              width: 72,
+                              height: 72,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: c.accent,
+                                borderRadius: BorderRadius.circular(22),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: c.accent.withValues(alpha: 0.25),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(Icons.volunteer_activism,
+                                  size: 38, color: c.onAccent),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'live.tips',
+                            textAlign: TextAlign.center,
+                            style: outfitStyle(34, c.text,
+                                weight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Your live tip jar.\nOn stage in minutes.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: kFontBody,
+                              fontSize: 16,
+                              height: 1.5,
+                              color: c.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          const _FeatureCard(
+                            icon: Icons.account_balance_rounded,
+                            title: 'Straight to your Stripe',
+                            body: 'No middleman, no platform cut — tips land '
+                                'in your own account.',
+                          ),
+                          const SizedBox(height: 12),
+                          const _FeatureCard(
+                            icon: Icons.qr_code_2_rounded,
+                            title: 'One QR on stage',
+                            body: 'Fans scan, pick an amount, leave a name '
+                                'and a message.',
+                          ),
+                          const SizedBox(height: 12),
+                          const _FeatureCard(
+                            icon: Icons.celebration_rounded,
+                            title: 'A jar that fills live',
+                            body: 'Watch your 3D jar fill toward tonight\'s '
+                                'goal, tip by tip.',
+                          ),
+                          const Spacer(flex: 5),
+                          LtPrimaryButton(
+                            label: 'Connect your Stripe account',
+                            trailingIcon: Icons.arrow_forward_rounded,
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const ConnectScreen()),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                ref.read(appStateProvider.notifier).enterDemo(),
+                            icon: Icon(Icons.play_circle_outline_rounded,
+                                size: 20, color: c.textSecondary),
+                            label: const Text('Try the demo'),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.lock_rounded,
+                                  size: 14, color: c.textMuted),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Open source · your key never leaves this device',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: kFontBody,
+                                    fontSize: 12,
+                                    color: c.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -105,21 +140,52 @@ class WelcomeScreen extends ConsumerWidget {
   }
 }
 
-class _FeatureRow extends StatelessWidget {
-  const _FeatureRow({required this.icon, required this.text});
+class _FeatureCard extends StatelessWidget {
+  const _FeatureCard({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
 
   final IconData icon;
-  final String text;
+  final String title;
+  final String body;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    final c = context.lt;
+    return LtCard(
+      radius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Icon(icon, color: kGold, size: 26),
-          const SizedBox(width: 16),
-          Expanded(child: Text(text)),
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration:
+                BoxDecoration(color: c.accentSoft, shape: BoxShape.circle),
+            child: Icon(icon, size: 22, color: c.accent),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: outfitStyle(14.5, c.text)),
+                Text(
+                  body,
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 13,
+                    height: 1.4,
+                    color: c.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

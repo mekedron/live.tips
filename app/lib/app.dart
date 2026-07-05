@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme.dart';
 import 'domain/app_settings.dart';
-import 'features/home/home_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
+import 'features/shell/app_shell.dart';
 import 'state/providers.dart';
 
 class LiveTipsApp extends ConsumerWidget {
@@ -41,6 +41,6 @@ class RootGate extends ConsumerWidget {
     final app = ref.watch(appStateProvider);
     if (!app.connected) return const WelcomeScreen();
     if (app.effectiveTipJar == null) return const JarSetupScreen();
-    return const HomeScreen();
+    return const AppShell();
   }
 }
