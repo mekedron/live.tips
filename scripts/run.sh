@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Launch the live.tips app on one or more targets.
+# Launch the live.tips app on one target, in the foreground.
 #
-#   ./scripts/run.sh iphone            # most recently active iPhone simulator
-#   ./scripts/run.sh ipad iphone mac   # several at once
-#   ./scripts/run.sh android           # running emulator, or boots the last-used AVD
-#   ./scripts/run.sh web               # flutter run -d web-server, opens in the browser
+#   ./scripts/run.sh            # web (default): opens in the browser
+#   ./scripts/run.sh web        # same as the default
+#   ./scripts/run.sh iphone     # most recently active iPhone simulator
+#   ./scripts/run.sh ipad       # most recently active iPad simulator
+#   ./scripts/run.sh mac        # macOS desktop build
+#   ./scripts/run.sh android    # running emulator, or the last-used AVD
+#
+# Every target runs flutter in the foreground, so you get the interactive
+# console (r = hot reload, R = restart, q = quit) and Ctrl-C stops it. Run
+# one target per invocation — open a new terminal tab for each.
 #
 # Device choice: an already-booted simulator wins; otherwise the one you
 # used most recently (data-directory mtime) is booted. Everything runs the
@@ -13,13 +19,11 @@
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../app" && pwd)"
-BUNDLE_ID="tips.live.liveTips"
-ANDROID_PKG="tips.live.live_tips"
 SIM_DEVICES_DIR="$HOME/Library/Developer/CoreSimulator/Devices"
 WEB_PORT=8734
 
 usage() {
-  sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -56,15 +60,6 @@ PY
   return $result
 }
 
-build_ios_done=""
-ensure_ios_build() {
-  if [[ -z "$build_ios_done" ]]; then
-    log "Building iOS simulator app…"
-    (cd "$APP_DIR" && flutter build ios --simulator --debug >/dev/null)
-    build_ios_done=1
-  fi
-}
-
 run_ios_simulator() {
   local kind="$1" regex="$2"
   local picked
@@ -72,21 +67,18 @@ run_ios_simulator() {
     log "No available $kind simulator found (xcrun simctl list devices)"; return 1
   fi
   local udid="${picked%% *}" name="${picked#* }"
-  ensure_ios_build
   log "$kind → $name ($udid)"
   xcrun simctl boot "$udid" 2>/dev/null || true
   xcrun simctl bootstatus "$udid" -b >/dev/null
   open -a Simulator --args -CurrentDeviceUDID "$udid"
-  xcrun simctl install "$udid" "$APP_DIR/build/ios/iphonesimulator/Runner.app"
-  xcrun simctl launch "$udid" "$BUNDLE_ID" >/dev/null
-  log "$kind: launched ✓"
+  log "Launching on $name — Ctrl-C to stop (r: hot reload, R: restart, q: quit)"
+  # flutter run builds, installs, launches, and attaches with hot reload.
+  (cd "$APP_DIR" && flutter run -d "$udid")
 }
 
 run_mac() {
-  log "Building macOS app…"
-  (cd "$APP_DIR" && flutter build macos --debug >/dev/null)
-  open "$APP_DIR/build/macos/Build/Products/Debug/live_tips.app"
-  log "mac: launched ✓"
+  log "Launching macOS app — Ctrl-C to stop (r: hot reload, R: restart, q: quit)"
+  (cd "$APP_DIR" && flutter run -d macos)
 }
 
 # Android SDK location: env vars first, then the default macOS install path.
@@ -135,20 +127,9 @@ run_android() {
     done
     serial=$(android_running_device "$sdk")
   fi
-  log "Building Android APK…"
-  (cd "$APP_DIR" && flutter build apk --debug >/dev/null)
-  log "android → $serial"
-  local attempt
-  for attempt in 1 2 3; do
-    if "$adb" -s "$serial" install -r \
-        "$APP_DIR/build/app/outputs/flutter-apk/app-debug.apk" >/dev/null 2>&1; then
-      break
-    fi
-    [[ $attempt == 3 ]] && { log "android: install failed"; return 1; }
-    sleep 5
-  done
-  "$adb" -s "$serial" shell monkey -p "$ANDROID_PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
-  log "android: launched ✓"
+  log "android → $serial — Ctrl-C to stop (r: hot reload, R: restart, q: quit)"
+  # flutter run builds, installs, launches, and attaches with hot reload.
+  (cd "$APP_DIR" && flutter run -d "$serial")
 }
 
 run_web() {
@@ -187,15 +168,20 @@ run_web() {
   (cd "$APP_DIR" && flutter run -d web-server --web-port="$WEB_PORT")
 }
 
-[[ $# -ge 1 ]] || usage
+# No target → web. Exactly one target per run: each launches flutter in the
+# foreground, so run several by opening a new terminal tab per target.
+if [[ $# -eq 0 ]]; then
+  set -- web
+elif [[ $# -gt 1 ]]; then
+  log "One target at a time — open a new terminal tab for each (got: $*)"
+  usage
+fi
 
-for target in "$@"; do
-  case "$(echo "$target" | tr '[:upper:]' '[:lower:]')" in
-    iphone)      run_ios_simulator "iphone" '^iPhone' ;;
-    ipad)        run_ios_simulator "ipad" '^iPad' ;;
-    mac|macos)   run_mac ;;
-    android)     run_android ;;
-    web|chrome)  run_web ;;
-    *)           log "Unknown target: $target"; usage ;;
-  esac
-done
+case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in
+  iphone)      run_ios_simulator "iphone" '^iPhone' ;;
+  ipad)        run_ios_simulator "ipad" '^iPad' ;;
+  mac|macos)   run_mac ;;
+  android)     run_android ;;
+  web|chrome)  run_web ;;
+  *)           log "Unknown target: $1"; usage ;;
+esac
