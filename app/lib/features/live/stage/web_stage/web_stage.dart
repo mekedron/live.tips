@@ -73,7 +73,17 @@ class _WebStageState extends ConsumerState<WebStage> {
       }
     });
     _lifecycle = AppLifecycleListener(onStateChange: (s) {
-      final pause = s != AppLifecycleState.resumed;
+      // `inactive` fires the instant focus merely shifts away from the top
+      // Flutter view — on Flutter Web that includes focus moving into our
+      // OWN iframe (e.g. dragging to rotate the 3D scene), which is normal,
+      // continuous use, not backgrounding. Flutter Web synthesizes it from a
+      // plain `window.blur`, with no matching `focus` while the user keeps
+      // interacting with the stage — so treating it as "pause" freezes the
+      // stage on the first drag and never un-freezes it. Only states that
+      // mean genuinely-not-visible should pause.
+      final pause = s == AppLifecycleState.hidden ||
+          s == AppLifecycleState.paused ||
+          s == AppLifecycleState.detached;
       if (pause == _paused) return;
       _paused = pause;
       _lastAlive = DateTime.now(); // don't count sleep as silence
