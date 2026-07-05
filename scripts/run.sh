@@ -4,6 +4,7 @@
 #   ./scripts/run.sh iphone            # most recently active iPhone simulator
 #   ./scripts/run.sh ipad iphone mac   # several at once
 #   ./scripts/run.sh android           # running emulator, or boots the last-used AVD
+#   ./scripts/run.sh web               # flutter run -d web-server, opens in the browser
 #
 # Device choice: an already-booted simulator wins; otherwise the one you
 # used most recently (data-directory mtime) is booted. Everything runs the
@@ -15,9 +16,10 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../app" && pwd)"
 BUNDLE_ID="tips.live.liveTips"
 ANDROID_PKG="tips.live.live_tips"
 SIM_DEVICES_DIR="$HOME/Library/Developer/CoreSimulator/Devices"
+WEB_PORT=8734
 
 usage() {
-  sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -149,6 +151,23 @@ run_android() {
   log "android: launched ✓"
 }
 
+run_web() {
+  log "Launching web app…"
+  local logfile
+  logfile=$(mktemp)
+  (cd "$APP_DIR" && nohup flutter run -d web-server --web-port="$WEB_PORT" >"$logfile" 2>&1 &)
+  local waited=0
+  until grep -q "is being served at" "$logfile" 2>/dev/null; do
+    if (( waited >= 90 )); then
+      log "web: timed out waiting for the dev server — see $logfile"; return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  open "http://localhost:$WEB_PORT"
+  log "web: launched ✓ ($logfile)"
+}
+
 [[ $# -ge 1 ]] || usage
 
 for target in "$@"; do
@@ -157,6 +176,7 @@ for target in "$@"; do
     ipad)        run_ios_simulator "ipad" '^iPad' ;;
     mac|macos)   run_mac ;;
     android)     run_android ;;
+    web|chrome)  run_web ;;
     *)           log "Unknown target: $target"; usage ;;
   esac
 done
