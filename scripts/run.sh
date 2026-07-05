@@ -152,20 +152,39 @@ run_android() {
 }
 
 run_web() {
-  log "Launching web app…"
-  local logfile
-  logfile=$(mktemp)
-  (cd "$APP_DIR" && nohup flutter run -d web-server --web-port="$WEB_PORT" >"$logfile" 2>&1 &)
-  local waited=0
-  until grep -q "is being served at" "$logfile" 2>/dev/null; do
-    if (( waited >= 90 )); then
-      log "web: timed out waiting for the dev server — see $logfile"; return 1
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
-  open "http://localhost:$WEB_PORT"
-  log "web: launched ✓ ($logfile)"
+  # Free the port if a previous dev server is still holding it (e.g. a run that
+  # was backgrounded or never cleanly stopped) so we don't fail with
+  # "address already in use".
+  local holders
+  holders=$(lsof -ti tcp:"$WEB_PORT" 2>/dev/null || true)
+  if [[ -n "$holders" ]]; then
+    log "Port $WEB_PORT busy — stopping the old dev server ($(echo $holders | tr '\n' ' '))…"
+    kill $holders 2>/dev/null || true
+    local tries=0
+    while lsof -ti tcp:"$WEB_PORT" >/dev/null 2>&1 && (( tries < 10 )); do
+      sleep 1; tries=$((tries + 1))
+    done
+    holders=$(lsof -ti tcp:"$WEB_PORT" 2>/dev/null || true)
+    [[ -n "$holders" ]] && kill -9 $holders 2>/dev/null || true
+  fi
+
+  log "Launching web app on http://localhost:$WEB_PORT — press Ctrl-C to stop"
+  # Open the browser once the server accepts connections. This runs in the
+  # background because flutter itself owns the foreground below.
+  (
+    n=0
+    until curl -s -o /dev/null "http://localhost:$WEB_PORT"; do
+      (( n++ >= 90 )) && exit 0
+      sleep 1
+    done
+    open "http://localhost:$WEB_PORT"
+  ) &
+  local opener=$!
+  trap 'kill "$opener" 2>/dev/null || true' RETURN
+
+  # Foreground: the script stays attached, Ctrl-C stops the server, and you get
+  # flutter's interactive console (press r to hot reload, R to restart, q to quit).
+  (cd "$APP_DIR" && flutter run -d web-server --web-port="$WEB_PORT")
 }
 
 [[ $# -ge 1 ]] || usage
