@@ -15,6 +15,7 @@ import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/qr_card.dart';
 import '../lock/lock_service.dart';
+import '../poster/poster_screen.dart';
 import '../settings/stage_settings_section.dart';
 import 'stage/jar_stage_view.dart';
 import 'stage/stage_resolver.dart';
@@ -416,13 +417,22 @@ class _TopBar extends StatelessWidget {
         const SizedBox(width: 10),
         _ElapsedClock(startedAt: live.session.startedAt),
         const Spacer(),
-        if (showQrButton)
+        if (showQrButton) ...[
           IconButton(
             tooltip: 'Show QR',
             onPressed: () => showFullscreenQr(context, qrUrl),
             icon: const Icon(Icons.qr_code_2_rounded),
             iconSize: 28,
           ),
+          IconButton(
+            tooltip: 'Print poster',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PosterScreen()),
+            ),
+            icon: const Icon(Icons.print_rounded),
+            iconSize: 26,
+          ),
+        ],
         IconButton(
           tooltip: 'Adjust goal',
           onPressed: onEditGoal,
@@ -593,6 +603,13 @@ class _QrPanel extends StatelessWidget {
                     tooltip: 'Open link',
                     onPressed: () => openTipLink(url),
                     icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                  ),
+                  IconButton(
+                    tooltip: 'Print poster',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PosterScreen()),
+                    ),
+                    icon: const Icon(Icons.print_rounded, size: 20),
                   ),
                 ],
               ),

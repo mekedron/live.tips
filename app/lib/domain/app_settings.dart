@@ -1,3 +1,4 @@
+import 'poster.dart';
 import 'stage_settings.dart';
 
 /// The app's own light/dark appearance. Independent of the live stage screen,
@@ -26,6 +27,7 @@ class AppSettings {
     this.preferDeviceAuth = true,
     this.themeMode = AppThemeMode.system,
     this.stage = const StageSettings(),
+    this.poster = const PosterSettings(),
   });
 
   /// How often the live session polls Stripe for new donations.
@@ -44,18 +46,23 @@ class AppSettings {
   /// How the live stage looks (style, vessel, scene, theme…).
   final StageSettings stage;
 
+  /// Last-picked print-poster theme, caption language, and paper size.
+  final PosterSettings poster;
+
   AppSettings copyWith({
     int? pollIntervalSec,
     int? lastGoalMinor,
     bool? preferDeviceAuth,
     AppThemeMode? themeMode,
     StageSettings? stage,
+    PosterSettings? poster,
   }) => AppSettings(
     pollIntervalSec: pollIntervalSec ?? this.pollIntervalSec,
     lastGoalMinor: lastGoalMinor ?? this.lastGoalMinor,
     preferDeviceAuth: preferDeviceAuth ?? this.preferDeviceAuth,
     themeMode: themeMode ?? this.themeMode,
     stage: stage ?? this.stage,
+    poster: poster ?? this.poster,
   );
 
   Map<String, dynamic> toJson() => {
@@ -64,6 +71,7 @@ class AppSettings {
     'preferDeviceAuth': preferDeviceAuth,
     'themeMode': themeMode.wire,
     'stage': stage.toJson(),
+    'poster': poster.toJson(),
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -76,5 +84,10 @@ class AppSettings {
             Map<String, dynamic>.from(json['stage'] as Map),
           )
         : const StageSettings(),
+    poster: json['poster'] is Map
+        ? PosterSettings.fromJson(
+            Map<String, dynamic>.from(json['poster'] as Map),
+          )
+        : const PosterSettings(),
   );
 }

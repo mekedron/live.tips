@@ -43,6 +43,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
     if (widget.recreate && app.tipJar != null) {
       _nameController.text = app.tipJar!.displayName;
       _currency = app.tipJar!.currency;
+      _thanksController.text = app.tipJar!.thankYouMessage;
     }
   }
 

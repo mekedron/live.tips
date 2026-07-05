@@ -4,6 +4,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../features/poster/poster_screen.dart';
+
 /// Copy the tip link — the desktop-friendly path (nobody scans a QR code on
 /// the machine that displays it).
 Future<void> copyTipLink(BuildContext context, String url) async {
@@ -98,6 +100,14 @@ class TipLinkCard extends StatelessWidget {
                       SharePlus.instance.share(ShareParams(text: url)),
                   icon: const Icon(Icons.ios_share_rounded, size: 18),
                   label: const Text('Share'),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PosterScreen()),
+                  ),
+                  icon: const Icon(Icons.print_rounded, size: 18),
+                  label: const Text('Print'),
                 ),
               ],
             ),

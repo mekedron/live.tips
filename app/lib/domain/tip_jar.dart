@@ -9,6 +9,7 @@ class TipJar {
     required this.currency,
     required this.displayName,
     required this.livemode,
+    this.thankYouMessage = 'Thank you! 💛',
   });
 
   final String productId;
@@ -21,6 +22,11 @@ class TipJar {
   final String displayName;
   final bool livemode;
 
+  /// The message fans see after tipping (Stripe's hosted confirmation
+  /// page). Stored locally too — Stripe doesn't hand it back on read — so
+  /// [JarSetupScreen] can prefill it when recreating the link.
+  final String thankYouMessage;
+
   bool get isDemo => paymentLinkId == 'demo';
 
   static const demo = TipJar(
@@ -31,6 +37,7 @@ class TipJar {
     currency: 'usd',
     displayName: 'Demo Artist',
     livemode: false,
+    thankYouMessage: 'Thank you for supporting live music! 🎶',
   );
 
   Map<String, dynamic> toJson() => {
@@ -41,6 +48,7 @@ class TipJar {
         'currency': currency,
         'displayName': displayName,
         'livemode': livemode,
+        'thankYouMessage': thankYouMessage,
       };
 
   factory TipJar.fromJson(Map<String, dynamic> json) => TipJar(
@@ -51,5 +59,6 @@ class TipJar {
         currency: json['currency'] as String,
         displayName: json['displayName'] as String? ?? '',
         livemode: json['livemode'] as bool? ?? true,
+        thankYouMessage: json['thankYouMessage'] as String? ?? 'Thank you! 💛',
       );
 }

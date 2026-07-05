@@ -138,6 +138,7 @@ class StripeRequests {
       currency: currency,
       displayName: displayName,
       livemode: link['livemode'] as bool? ?? false,
+      thankYouMessage: thankYouMessage,
     );
   }
 

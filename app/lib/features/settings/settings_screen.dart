@@ -6,6 +6,7 @@ import '../../core/stripe_onboarding.dart';
 import '../../domain/app_settings.dart';
 import '../../state/providers.dart';
 import '../lock/lock_service.dart';
+import '../poster/poster_screen.dart';
 import '../setup/jar_setup_screen.dart';
 import 'stage_settings_section.dart';
 
@@ -175,11 +176,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.print_rounded),
+                  title: const Text('Print poster'),
+                  subtitle: const Text(
+                    'A print-ready QR poster — pick a theme, language, and '
+                    'paper size',
+                  ),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PosterScreen()),
+                  ),
+                ),
+                ListTile(
                   leading: const Icon(Icons.refresh_rounded),
                   title: const Text('Create a new tip link'),
                   subtitle: const Text(
-                    'Change name or currency. The old link is deactivated '
-                    '— printed QR codes stop working.',
+                    'Change name, currency, or thank-you message. The old '
+                    'link is deactivated — printed QR codes stop working.',
                   ),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
