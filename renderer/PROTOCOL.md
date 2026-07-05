@@ -10,10 +10,18 @@ fall back to another stage style.
 ## Transport
 
 - **JS → host**: `window.LiveTips.postMessage(jsonString)` — a
-  webview_flutter `JavaScriptChannel` named `LiveTips`. When absent (plain
-  browser), messages go to `console.log('[stage→host]', …)`.
-- **Host → JS**: `window.__stage.dispatch(jsonStringOrObject)` — the app calls
-  it via `runJavaScript(…)`.
+  webview_flutter `JavaScriptChannel` named `LiveTips` (Android/iOS/macOS).
+  On Flutter Web (no JavaScriptChannel — there's no embedding WebView), the
+  stage runs in a same-origin `<iframe>` and falls back to
+  `window.parent.postMessage({liveTipsStage: jsonString}, origin)`. When
+  neither is available (plain browser / `dev.html`), messages go to
+  `console.log('[stage→host]', …)`.
+- **Host → JS**: `window.__stage.dispatch(jsonStringOrObject)` — the
+  webview_flutter host calls it via `runJavaScript(…)`; the Flutter Web host
+  calls it directly as `iframe.contentWindow.__stage.dispatch(…)` (same-origin
+  property access — safe because the host never dispatches before it has
+  already received `hello`, and `window.__stage` is always assigned,
+  synchronously, before `hello` is ever emitted).
 
 ## Handshake
 

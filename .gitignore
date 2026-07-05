@@ -1,3 +1,8 @@
 .DS_Store
 .validation/
 node_modules/
+
+# Local secrets (Stripe dev keys etc.) — never commit
+.env
+.env.*
+!.env.example

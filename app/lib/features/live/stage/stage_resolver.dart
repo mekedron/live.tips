@@ -5,11 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/stage_settings.dart';
 
-/// Whether this platform can host the WebView stage at all.
-/// webview_flutter officially supports Android, iOS and macOS — everywhere
-/// else (web, Windows, Linux) the jar styles resolve to classic.
+/// Whether this platform can host the JS-driven jar stage at all — either
+/// via webview_flutter (Android/iOS/macOS) or, on Flutter Web, a same-origin
+/// `<iframe>` transport (see web_stage/iframe_stage_transport_web.dart).
+/// Windows/Linux still resolve to classic.
 final stageCapabilityProvider = Provider<bool>((ref) {
-  if (kIsWeb) return false;
+  if (kIsWeb) return true;
   return Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
 });
 

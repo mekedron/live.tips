@@ -4,12 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import 'iframe_stage_transport_stub.dart'
+    if (dart.library.js_interop) 'iframe_stage_transport_web.dart';
 import 'stage_bridge_codec.dart';
+
+export 'iframe_stage_transport_stub.dart'
+    if (dart.library.js_interop) 'iframe_stage_transport_web.dart';
 
 /// Test seam: overriding this provider swaps the WebView for a fake, so all
 /// WebStage logic (handshake, diffing, watchdog) runs in plain widget tests.
-final stageTransportFactoryProvider =
-    Provider<StageTransport Function()>((ref) => WebViewStageTransport.new);
+final stageTransportFactoryProvider = Provider<StageTransport Function()>(
+    (ref) => kIsWeb ? IframeStageTransport.new : WebViewStageTransport.new);
 
 /// The wire between WebStage and the renderer — seam for tests: the widget
 /// logic (handshake, watchdog, diffing) runs against a fake transport with

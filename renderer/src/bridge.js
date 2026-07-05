@@ -3,8 +3,13 @@
  *
  * JS → host: `window.LiveTips.postMessage(json)` — a webview_flutter
  * JavaScriptChannel in the app; the dev harness installs the same global.
- * Host → JS: `window.__stage.dispatch(jsonOrObject)` — the app calls it via
- * runJavaScript(); the harness calls it directly.
+ * On Flutter Web the stage runs in a same-origin `<iframe>` instead (no
+ * JavaScriptChannel exists in a plain browser), so it falls back to
+ * `window.parent.postMessage({liveTipsStage: json}, origin)`.
+ * Host → JS: `window.__stage.dispatch(jsonOrObject)` — the webview_flutter
+ * host calls it via runJavaScript(); the Flutter Web host calls it directly
+ * as `iframe.contentWindow.__stage.dispatch(...)` (same-origin property
+ * access); the harness calls it directly too.
  *
  * Every outgoing message carries `v: 1` (protocol version). Malformed input
  * never throws into the host — it answers with a non-fatal `error` message.
@@ -18,6 +23,8 @@ export function createBridge() {
     const s = JSON.stringify({ v: PROTOCOL, ...m });
     if (window.LiveTips && window.LiveTips.postMessage) {
       window.LiveTips.postMessage(s);
+    } else if (window.parent !== window) {
+      window.parent.postMessage({ liveTipsStage: s }, window.location.origin);
     } else {
       console.log('[stage→host]', s); // headless dev — visible in devtools
     }

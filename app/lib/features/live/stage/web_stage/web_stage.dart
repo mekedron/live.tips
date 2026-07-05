@@ -238,6 +238,8 @@ class _WebStageState extends ConsumerState<WebStage> {
         children: [
           if (t is WebViewStageTransport)
             WebViewWidget(controller: t.controller)
+          else if (t is IframeStageTransport)
+            HtmlElementView(viewType: t.viewType)
           else
             const ColoredBox(color: Color(0xFF0D0E12)),
           // native poster until the renderer's first frame — no white flash
