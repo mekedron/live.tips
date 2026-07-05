@@ -197,7 +197,7 @@ void main() {
       expect(init['renderer'], '3d');
       expect(init['state']['jarPct'], closeTo(1.3, 1e-9));
       expect(init['state']['bankedJars'], 2);
-      expect(init['config']['vessel'], 'stage');
+      expect(init['config']['vessel'], 'jar2');
       expect(init['config']['theme'], 'golden-hour');
       expect(init['config']['sound'], isFalse);
       expect(init['config']['tipSound'], isFalse);

@@ -102,7 +102,7 @@ class StageSettingsSection extends ConsumerWidget {
             final picked = await showLtPicker<JarVessel>(
               context: context,
               title: 'Vessel — any size fills toward your goal',
-              values: JarVessel.values,
+              values: JarVessel.selectable,
               selected: stage.vessel,
               labelOf: (v) => v.label,
               detailOf: (v) => 'holds ~${fits(v)}',

@@ -40,6 +40,9 @@ enum JarVessel {
   jar05('jar05', 'Jar — 0.5 L', 125),
   jar1('jar1', 'Jar — 1 L', 250),
   jar2('jar2', 'Jar — 2 L', 500),
+  // Hidden from the picker (see [selectable]) but kept in the library so
+  // already-saved stages and the renderer bridge keep resolving it. The plain
+  // 2 L [jar2] is the selectable stand-in and the default.
   stage('stage', 'Stage jar — stylized 2 L', 500),
   jar3('jar3', 'Jar — 3 L', 1000),
   jar5('jar5', 'Pickle jar — 5 L', 1500),
@@ -52,8 +55,13 @@ enum JarVessel {
   final int capacityMajor;
 
   static JarVessel fromWire(String? wire,
-          {JarVessel fallback = JarVessel.stage}) =>
+          {JarVessel fallback = JarVessel.jar2}) =>
       values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
+
+  /// Vessels the picker offers. [stage] is intentionally left out — it stays a
+  /// valid library/wire value, just not something a performer can pick.
+  static List<JarVessel> get selectable =>
+      values.where((v) => v != stage).toList(growable: false);
 
   /// Smallest vessel whose recommended capacity covers the goal (the biggest
   /// one for stadium-sized dreams).
@@ -117,7 +125,7 @@ enum StageQuality {
 class StageSettings {
   const StageSettings({
     this.style = StageStyle.jar3d,
-    this.vessel = JarVessel.stage,
+    this.vessel = JarVessel.jar2,
     this.scene = JarScene.abstractGlow,
     this.theme = JarTheme.goldenHour,
     this.showNotes = false,

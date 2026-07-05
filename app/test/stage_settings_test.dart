@@ -4,10 +4,10 @@ import 'package:live_tips/domain/stage_settings.dart';
 
 void main() {
   group('StageSettings', () {
-    test('defaults: 3D stage jar, abstract set, golden hour, coins only', () {
+    test('defaults: 3D plain 2 L jar, abstract set, golden hour, coins only', () {
       const s = StageSettings();
       expect(s.style, StageStyle.jar3d);
-      expect(s.vessel, JarVessel.stage);
+      expect(s.vessel, JarVessel.jar2);
       expect(s.scene, JarScene.abstractGlow);
       expect(s.theme, JarTheme.goldenHour);
       expect(s.showNotes, isFalse, reason: 'paper money is opt-in');
@@ -46,6 +46,15 @@ void main() {
       expect(JarTheme.goldenHour.wire, 'golden-hour');
       expect(JarVessel.stage.wire, 'stage');
       expect(StageQuality.auto.wire, 'auto');
+    });
+
+    test('the stage jar stays in the library but is hidden from the picker', () {
+      // Still decodes from the wire (already-saved stages keep working)...
+      expect(JarVessel.values, contains(JarVessel.stage));
+      expect(JarVessel.fromWire('stage'), JarVessel.stage);
+      // ...but performers can't pick it; the plain 2 L jar stands in.
+      expect(JarVessel.selectable, isNot(contains(JarVessel.stage)));
+      expect(JarVessel.selectable, contains(JarVessel.jar2));
     });
 
     test('unknown wire values decode to defaults (forward compatibility)', () {
