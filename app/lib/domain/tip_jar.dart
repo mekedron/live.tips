@@ -29,6 +29,12 @@ class TipJar {
 
   bool get isDemo => paymentLinkId == 'demo';
 
+  /// The artist's own Stripe Dashboard, opened to the full payments list —
+  /// every transaction in the account, across all of their payment links.
+  /// Test-mode keys live under the dashboard's `/test/` path.
+  String get stripePaymentsUrl =>
+      'https://dashboard.stripe.com/${livemode ? '' : 'test/'}payments';
+
   static const demo = TipJar(
     productId: 'demo',
     priceId: 'demo',

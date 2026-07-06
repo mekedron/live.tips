@@ -42,16 +42,26 @@ class DonationTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  donation.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: c.text,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        donation.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: kFontBody,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: c.text,
+                        ),
+                      ),
+                    ),
+                    if (!donation.viaService) ...[
+                      const SizedBox(width: 6),
+                      const ExternalTag(),
+                    ],
+                  ],
                 ),
                 Text(
                   donation.hasMessage
@@ -95,6 +105,34 @@ class DonationTile extends StatelessWidget {
     );
     if (onTap == null) return row;
     return InkWell(onTap: onTap, child: row);
+  }
+}
+
+/// Muted "External" pill flagging a payment that did NOT come through the
+/// live.tips tip link — surfaced in History now that it lists every payment in
+/// the account, not only the current link's. Ordinary live.tips tips are left
+/// unmarked, so the tag draws the eye straight to the exceptions.
+class ExternalTag extends StatelessWidget {
+  const ExternalTag({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Tooltip(
+      message: 'Received outside live.tips — not through your tip link.',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: c.chip,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          'External',
+          style: outfitStyle(10.5, c.textMuted,
+              weight: FontWeight.w700, letterSpacing: 0.3),
+        ),
+      ),
+    );
   }
 }
 

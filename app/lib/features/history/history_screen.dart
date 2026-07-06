@@ -32,6 +32,39 @@ VoidCallback? _stripeTap(Donation donation) =>
         ? null
         : () => _openDonationInStripe(donation);
 
+/// A subtle link that opens the artist's whole Stripe payments list in the
+/// Dashboard — the escape hatch to *every* transaction in the account,
+/// including anything that didn't come in through live.tips.
+class _ViewInStripeButton extends StatelessWidget {
+  const _ViewInStripeButton(this.url);
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return TextButton(
+      onPressed: () =>
+          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      style: TextButton.styleFrom(
+        foregroundColor: c.textSecondary,
+        textStyle: outfitStyle(12.5, c.textSecondary, weight: FontWeight.w600),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('View all in Stripe'),
+          SizedBox(width: 5),
+          Icon(Icons.open_in_new_rounded, size: 14),
+        ],
+      ),
+    );
+  }
+}
+
 /// All-time donations (straight from the Stripe API, paginated) and the
 /// locally recorded session archive.
 class HistoryScreen extends ConsumerStatefulWidget {
@@ -84,7 +117,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     try {
       if (!_hasMore) return;
       final page = await requests.listDonations(
-        paymentLinkId: jar.paymentLinkId,
         startingAfter: _donations.isEmpty ? null : _donations.last.id,
       );
       if (!mounted) return;
@@ -112,7 +144,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final isRail = AppShellScope.of(context)?.isRail ?? false;
     final sessions =
         ref.watch(localStoreProvider).readSessionHistory().reversed.toList();
-    return isRail ? _buildDesktop(sessions) : _buildMobile(sessions);
+    final jar = ref.watch(appStateProvider).effectiveTipJar;
+    final stripeAllUrl =
+        (jar == null || jar.isDemo) ? null : jar.stripePaymentsUrl;
+    return isRail
+        ? _buildDesktop(sessions, stripeAllUrl)
+        : _buildMobile(sessions, stripeAllUrl);
   }
 
   // -------------------------------------------------------------- stats ---
@@ -134,7 +171,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // ------------------------------------------------------------- mobile ---
 
-  Widget _buildMobile(List<LiveSession> sessions) {
+  Widget _buildMobile(List<LiveSession> sessions, String? stripeAllUrl) {
     final c = context.lt;
     final stats = _stats(sessions);
     return Center(
@@ -182,9 +219,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 },
               ),
               const SizedBox(height: 14),
-              if (_tab == _HistoryTab.donations)
-                ..._donationGroups()
-              else
+              if (_tab == _HistoryTab.donations) ...[
+                if (stripeAllUrl != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _ViewInStripeButton(stripeAllUrl),
+                  ),
+                ..._donationGroups(),
+              ] else
                 ..._sessionCards(sessions),
             ],
           ),
@@ -195,7 +237,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // ------------------------------------------------------------ desktop ---
 
-  Widget _buildDesktop(List<LiveSession> sessions) {
+  Widget _buildDesktop(List<LiveSession> sessions, String? stripeAllUrl) {
     final c = context.lt;
     final stats = _stats(sessions);
     return SingleChildScrollView(
@@ -236,6 +278,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     flex: 17,
                     child: _DonationsTable(
                       demo: ref.watch(appStateProvider).demo,
+                      stripeAllUrl: stripeAllUrl,
                       donations: _donations,
                       loading: _loading,
                       hasMore: _hasMore,
@@ -504,6 +547,7 @@ const double _kStripeColWidth = 32;
 class _DonationsTable extends StatelessWidget {
   const _DonationsTable({
     required this.demo,
+    required this.stripeAllUrl,
     required this.donations,
     required this.loading,
     required this.hasMore,
@@ -512,6 +556,7 @@ class _DonationsTable extends StatelessWidget {
   });
 
   final bool demo;
+  final String? stripeAllUrl;
   final List<Donation> donations;
   final bool loading;
   final bool hasMore;
@@ -539,8 +584,15 @@ class _DonationsTable extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Donations',
-              style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+          Row(
+            children: [
+              Text('Donations',
+                  style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+              const Spacer(),
+              if (!demo && stripeAllUrl != null)
+                _ViewInStripeButton(stripeAllUrl!),
+            ],
+          ),
           const SizedBox(height: 12),
           if (demo)
             Padding(
@@ -633,7 +685,7 @@ class _TableRow extends StatelessWidget {
                     anonymous: anonymous,
                     size: 32),
                 const SizedBox(width: 10),
-                Expanded(
+                Flexible(
                   child: Text(
                     donation.displayName,
                     maxLines: 1,
@@ -646,6 +698,10 @@ class _TableRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (!donation.viaService) ...[
+                  const SizedBox(width: 6),
+                  const ExternalTag(),
+                ],
               ],
             ),
           ),

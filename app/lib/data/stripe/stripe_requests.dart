@@ -179,15 +179,18 @@ class StripeRequests {
     );
   }
 
-  /// Full donation history for the tip link via the Checkout Sessions list.
+  /// Every completed donation in the account, newest first — the full history
+  /// across *all* of the artist's payment links, not just the current one, so
+  /// regenerating the link no longer wipes the history. Each session's
+  /// `payment_link` is expanded so [Donation.viaService] can flag which
+  /// payments actually came in through live.tips.
   Future<DonationsPage> listDonations({
-    required String paymentLinkId,
     String? startingAfter,
     int limit = 25,
   }) async {
     final response = await client.get('checkout/sessions', query: {
-      'payment_link': paymentLinkId,
       'status': 'complete',
+      'expand[]': 'data.payment_link',
       'limit': '$limit',
       'starting_after': ?startingAfter,
     });

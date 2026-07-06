@@ -149,9 +149,6 @@ final recentDonationsProvider =
   final requests = ref.watch(stripeRequestsProvider);
   final jar = ref.watch(appStateProvider).effectiveTipJar;
   if (requests == null || jar == null || jar.isDemo) return const [];
-  final page = await requests.listDonations(
-    paymentLinkId: jar.paymentLinkId,
-    limit: 5,
-  );
+  final page = await requests.listDonations(limit: 5);
   return page.donations;
 });

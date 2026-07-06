@@ -9,6 +9,7 @@ class Donation {
     this.name,
     this.message,
     this.livemode = true,
+    this.viaService = true,
     this.paymentIntentId,
   });
 
@@ -20,6 +21,15 @@ class Donation {
   final String? name;
   final String? message;
   final bool livemode;
+
+  /// Whether this payment arrived through the live.tips-managed payment link —
+  /// recognised by the `managed_by: live.tips` metadata we stamp on every link
+  /// we create. False for anything else in the account (a link or Checkout the
+  /// artist set up themselves, a manual charge, an invoice), which now shows up
+  /// here because History lists the whole account, not just the current link.
+  /// Defaults to true: demo tips and everything archived from a live session
+  /// came in through our link.
+  final bool viaService;
 
   /// PaymentIntent id (`pi_…`) behind this checkout session, when known.
   /// Absent for demo tips and for donations archived before we started
@@ -68,6 +78,20 @@ class Donation {
     // `pi_…` string id; expanded it would be the full object — guard for both.
     final paymentIntent = session['payment_intent'];
 
+    // `payment_link` is expandable too. The Checkout Sessions list expands it
+    // (`expand[]=data.payment_link`) so we can read the link's metadata and
+    // separate live.tips payments from anything else in the account; the
+    // `/v1/events` feed leaves it as the bare `plink_…` id — and only ever for
+    // our own link. No link at all means it wasn't one of our checkouts.
+    final paymentLink = session['payment_link'];
+    final bool viaService;
+    if (paymentLink is Map) {
+      final metadata = paymentLink['metadata'];
+      viaService = metadata is Map && metadata['managed_by'] == 'live.tips';
+    } else {
+      viaService = paymentLink is String;
+    }
+
     return Donation(
       id: session['id'] as String,
       amountMinor: (session['amount_total'] as num?)?.toInt() ?? 0,
@@ -78,6 +102,7 @@ class Donation {
       name: customField('nickname') ?? customerName,
       message: customField('message'),
       livemode: session['livemode'] as bool? ?? true,
+      viaService: viaService,
       paymentIntentId: paymentIntent is String
           ? paymentIntent
           : (paymentIntent is Map ? paymentIntent['id'] as String? : null),
@@ -92,6 +117,7 @@ class Donation {
         if (name != null) 'name': name,
         if (message != null) 'message': message,
         'livemode': livemode,
+        'viaService': viaService,
         if (paymentIntentId != null) 'paymentIntentId': paymentIntentId,
       };
 
@@ -105,6 +131,7 @@ class Donation {
         name: json['name'] as String?,
         message: json['message'] as String?,
         livemode: json['livemode'] as bool? ?? true,
+        viaService: json['viaService'] as bool? ?? true,
         paymentIntentId: json['paymentIntentId'] as String?,
       );
 }
