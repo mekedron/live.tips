@@ -12,6 +12,16 @@ import 'stage_types.dart';
 const double kStageHudTopInset = 150;
 const double kStageHudBottomInset = 96;
 
+/// The floating QR + recent-messages rail shown on wide (tablet+) stages.
+const double kStageRailWidth = 280;
+
+/// Clear strip reserved on the right of a wide stage so the jar frames to the
+/// LEFT of the rail — centring it in the visible working area instead of
+/// letting the rail crowd it. Sent to the renderer as `insets.right` (it pans
+/// the camera / pivot left by half of this). = rail width + its 16px right
+/// margin + a 16px breathing gap.
+const double kStageRailInset = kStageRailWidth + 32;
+
 /// Coral accent + warm whites of the always-dark stage.
 const kStageAccent = Color(0xFFFF7C55);
 const kStageAmount = Color(0xFFFF9E7E);

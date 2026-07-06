@@ -62,8 +62,10 @@ bowl`), `scene` (`abstract pub concert street metro cafe`), `theme`
 milestone/goal chimes; muted default), `tipSound:bool` (a throttled "ta-da!"
 fanfare on every `tip`/`demoPulse` so the artist HEARS money arrive; muted
 default, independent of `sound`), `quality:'auto'|'high'|'low'` (bloom tier,
-3D), `reducedMotion:bool`, `insets:{top,bottom}` (logical px the host's
-native HUD/chrome occupies — the vessel frames itself into the free band).
+3D), `reducedMotion:bool`, `insets:{top,bottom,right?,left?}` (logical px the
+host's native HUD/chrome occupies — the vessel frames itself into the free
+band; `right` reserves the wide-stage QR rail so the jar centres to its left,
+panning the pivot/camera; omitted sides default to 0).
 
 ## JS → host
 

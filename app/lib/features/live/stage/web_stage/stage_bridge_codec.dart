@@ -22,6 +22,7 @@ Map<String, dynamic> stageConfigJson(
   required bool reducedMotion,
   required double insetTop,
   required double insetBottom,
+  double insetRight = 0,
 }) =>
     {
       'vessel': s.vessel.wire,
@@ -32,7 +33,7 @@ Map<String, dynamic> stageConfigJson(
       'tipSound': s.tipSoundEnabled,
       'quality': s.quality.wire,
       'reducedMotion': reducedMotion,
-      'insets': {'top': insetTop, 'bottom': insetBottom},
+      'insets': {'top': insetTop, 'bottom': insetBottom, 'right': insetRight},
     };
 
 class StageInit extends StageOutMessage {

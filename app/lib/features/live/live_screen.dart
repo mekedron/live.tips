@@ -215,7 +215,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                             padding: EdgeInsets.fromLTRB(
                               16,
                               safeTop + 72,
-                              16,
+                              // wide: keep the numbers clear of the QR rail
+                              wide ? kStageRailInset : 16,
                               wide ? 16 : 100,
                             ),
                             child: JarStageView(
@@ -238,7 +239,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                       right: 16,
                       top: safeTop + 76,
                       bottom: 16,
-                      width: 280,
+                      width: kStageRailWidth,
                       child: StageQrPanel(
                         url: jar.url,
                         name: jar.displayName,

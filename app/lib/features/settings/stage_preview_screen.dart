@@ -205,7 +205,8 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                           padding: EdgeInsets.fromLTRB(
                             16,
                             safeTop + 72,
-                            16,
+                            // wide: keep the numbers clear of the QR rail
+                            wide ? kStageRailInset : 16,
                             wide ? 16 : 100,
                           ),
                           child: JarStageView(
@@ -228,7 +229,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                     right: 16,
                     top: safeTop + 76,
                     bottom: 16,
-                    width: 280,
+                    width: kStageRailWidth,
                     child: StageQrPanel(
                       url: jar.url,
                       name: jar.displayName,
@@ -280,8 +281,16 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                 if (wide)
                   Align(
                     alignment: Alignment.bottomCenter,
+                    // Nudge the CTA left onto the jar with LAYOUT padding, not a
+                    // paint Transform: the button carries a PointerInterceptor
+                    // (so taps don't fall through to the jar iframe on web), and
+                    // a Transform would move the pixels while leaving the
+                    // interceptor's hit-region behind — a dead button. Right
+                    // padding under bottomCenter shifts it left by half the
+                    // reserved strip, matching the jar.
                     child: Padding(
-                      padding: EdgeInsets.only(bottom: 24 + safeBottom),
+                      padding: EdgeInsets.only(
+                          bottom: 24 + safeBottom, right: kStageRailInset),
                       child: _PretendTipButton(
                         busy: _pending,
                         onTap: () => _onPretendTip(context),
@@ -338,10 +347,14 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                 if (_pending)
                   Align(
                     alignment: Alignment.topCenter,
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                          top: safeTop + (wide ? 160 : 188)),
-                      child: const _PendingPill(),
+                    child: Transform.translate(
+                      // matches the shifted banner it stands in for
+                      offset: Offset(wide ? -kStageRailInset / 2 : 0.0, 0),
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                            top: safeTop + (wide ? 160 : 188)),
+                        child: const _PendingPill(),
+                      ),
                     ),
                   ),
                 // classic celebrates with screen confetti; jars do it in-scene

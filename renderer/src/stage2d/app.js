@@ -986,12 +986,14 @@ export function createStage(ctx) {
     canvas.style.height = H + 'px';
 
     // frame the jar into the free band the host left us between its native
-    // HUD (insets.top) and bottom chrome (insets.bottom)
+    // HUD (insets.top), bottom chrome (insets.bottom) and — on wide stages —
+    // the QR rail (insets.right): the jar centres in the working area to the
+    // left of the rail instead of hiding behind it.
     const topPad = insets.top + 8;
     const botPad = insets.bottom + 26;
     const band = Math.max(160, H - topPad - botPad);
     JH = Math.min(band * 0.96, W * 1.55);
-    cx = W / 2;
+    cx = ((insets.left || 0) + (W - (insets.right || 0))) / 2;
     jarBot = H - botPad - band * 0.02;
     interiorPath = buildInteriorPath(true);
     jarInnerPath = buildInteriorPath(false);

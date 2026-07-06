@@ -1360,6 +1360,18 @@ export function createStage(ctx) {
     const needHalf = spec.R * 2.1 + 0.4;
     const halfW = Math.tan((camera.fov * Math.PI) / 360) * camera.aspect * autoRadius;
     if (halfW < needHalf) autoRadius *= needHalf / halfW;
+    // On wide stages the host reserves a strip on the right for the QR rail
+    // (insets.right). Frame the jar into the band to its LEFT with an off-axis
+    // LENS shift — a projection nudge, NOT a camTarget move: camTarget stays on
+    // the jar's axis so drag-to-rotate keeps spinning the jar in place instead
+    // of swinging it around an off-jar pivot. projectionMatrix[8] is the
+    // horizontal frustum asymmetry (0 = centred); a point at screen centre maps
+    // to NDC.x = -[8], so [8] = 2·(0.5 − bandCenterFracX) lands the jar exactly
+    // at the band centre. updateProjectionMatrix() above rebuilds the matrix
+    // each resize, so this re-applies after it; no rail → 0 → dead centre.
+    const rightPad = insets.right || 0, leftPad = insets.left || 0;
+    const bandCenterFracX = (leftPad + (w - leftPad - rightPad) / 2) / w;
+    camera.projectionMatrix.elements[8] = 2 * (0.5 - bandCenterFracX);
     bloomFx.resize();
   }
   addEventListener('resize', resize);

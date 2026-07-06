@@ -53,6 +53,7 @@ class _WebStageState extends ConsumerState<WebStage> {
   var _weakPerfStreak = 0;
   double _syncedJarPct = 0;
   int _syncedGoal = 0;
+  double _sentRailInset = 0;
   Timer? _readyDeadline;
   Timer? _heartbeatCheck;
   DateTime _lastAlive = DateTime.now();
@@ -141,7 +142,13 @@ class _WebStageState extends ConsumerState<WebStage> {
     }
   }
 
+  /// Strip to keep clear on the right so the jar frames LEFT of the QR rail —
+  /// only the wide (tablet+) layout floats that rail. See [kStageRailInset].
+  double get _railInset =>
+      MediaQuery.sizeOf(context).width > 780 ? kStageRailInset : 0;
+
   void _sendInit() {
+    final railInset = _railInset;
     _transport.send(StageInit(
       renderer: widget.renderer,
       config: stageConfigJson(
@@ -149,10 +156,12 @@ class _WebStageState extends ConsumerState<WebStage> {
         reducedMotion: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
         insetTop: kStageHudTopInset,
         insetBottom: kStageHudBottomInset,
+        insetRight: railInset,
       ),
       jarPct: widget.snapshot.jarPct,
       bankedJars: widget.snapshot.bankedJars,
     ));
+    _sentRailInset = railInset;
     _syncedJarPct = widget.snapshot.jarPct;
     _syncedGoal = widget.snapshot.goalMinor;
   }
@@ -253,6 +262,24 @@ class _WebStageState extends ConsumerState<WebStage> {
     final t = _transport;
     return LayoutBuilder(builder: (context, constraints) {
       final wide = constraints.maxWidth > 780;
+      // Re-frame the jar when the QR rail appears/disappears after the renderer
+      // is already live (e.g. rotating a tablet across the wide threshold) —
+      // _sendInit only covers the first frame's inset.
+      final railInset = wide ? kStageRailInset : 0.0;
+      if (_ready && railInset != _sentRailInset) {
+        _sentRailInset = railInset;
+        _transport.send(StageSetConfig({
+          'insets': {
+            'top': kStageHudTopInset,
+            'bottom': kStageHudBottomInset,
+            'right': railInset,
+          },
+        }));
+      }
+      // Centred top overlays (HUD total/bar, tip banner) slide left with the
+      // jar on wide stages so they stay over it, clear of the QR rail. Half the
+      // reserved strip == the jar's own leftward shift, for any width.
+      final overlayShift = -railInset / 2;
       final safeBottom = MediaQuery.paddingOf(context).bottom;
       // On phones the glass action bar floats over the bottom band — the
       // mini feed must clear it.
@@ -279,27 +306,39 @@ class _WebStageState extends ConsumerState<WebStage> {
               ),
             ),
           // the native HUD floats above; IgnorePointer keeps orbit gestures
-          // flowing into the WebView
+          // flowing into the WebView. On wide stages it slides left with the
+          // jar (overlayShift) so the total/bar stay centred over it.
           IgnorePointer(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: StageHud(
-                  snapshot: widget.snapshot, trophyPulse: _trophyPulse),
-            ),
-          ),
-          IgnorePointer(
-            child: TipBannerLayer(
-                tips: widget.tips, tipSerial: widget.tipSerial),
-          ),
-          IgnorePointer(
-            child: Align(
-              alignment: Alignment.bottomLeft,
+            child: Transform.translate(
+              offset: Offset(overlayShift, 0),
               child: Padding(
-                padding: EdgeInsets.only(left: 16, bottom: feedBottom),
-                child: StageMiniFeed(snapshot: widget.snapshot),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: StageHud(
+                    snapshot: widget.snapshot, trophyPulse: _trophyPulse),
               ),
             ),
           ),
+          // the donation banner rides the same shift so it pops up centred
+          // over the jar, not under the rail
+          IgnorePointer(
+            child: Transform.translate(
+              offset: Offset(overlayShift, 0),
+              child: TipBannerLayer(
+                  tips: widget.tips, tipSerial: widget.tipSerial),
+            ),
+          ),
+          // The bottom-left mini feed duplicates the QR rail's recent list, so
+          // it only shows when the rail is hidden (phone / narrow).
+          if (!wide)
+            IgnorePointer(
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 16, bottom: feedBottom),
+                  child: StageMiniFeed(snapshot: widget.snapshot),
+                ),
+              ),
+            ),
         ],
       );
     });
