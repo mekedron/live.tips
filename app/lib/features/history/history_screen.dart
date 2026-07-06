@@ -488,7 +488,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 }
 
-/// Desktop donations table: FAN · MESSAGE · WHEN · AMOUNT.
+/// Width of the trailing open-in-Stripe icon column — shared by the header
+/// spacer and the rows so the money column stays aligned above and below.
+const double _kStripeColWidth = 32;
+
+/// Desktop donations table: FAN · MESSAGE · WHEN · AMOUNT · ↗ (Stripe link).
 class _DonationsTable extends StatelessWidget {
   const _DonationsTable({
     required this.demo,
@@ -552,6 +556,7 @@ class _DonationsTable extends StatelessWidget {
                   headerCell('Message', flex: 8),
                   headerCell('When', flex: 3),
                   headerCell('Amount', flex: 2, align: TextAlign.right),
+                  const SizedBox(width: _kStripeColWidth),
                 ],
               ),
             ),
@@ -668,6 +673,15 @@ class _TableRow extends StatelessWidget {
               textAlign: TextAlign.right,
               style: outfitStyle(15, c.accent, weight: FontWeight.w700),
             ),
+          ),
+          SizedBox(
+            width: _kStripeColWidth,
+            child: onTap == null
+                ? null
+                : Center(
+                    child: Icon(Icons.open_in_new_rounded,
+                        size: 16, color: c.textMuted),
+                  ),
           ),
         ],
       ),
