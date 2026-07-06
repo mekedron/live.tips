@@ -722,21 +722,59 @@
     goalEl.textContent = '$' + Math.round(state.total).toLocaleString('en') + ' of ' + goalStr + ' · ' + pct + '% of tonight’s goal';
   }
 
+  // The demo fan wall. 42 of them, because of course it is. Most take a random
+  // amount from AMOUNTS below; a few carry a fixed `amt` so the punchline lands:
+  //   $4.33 → John Cage's 4′33″ · $11 → Spinal Tap · $42 → the answer · $88 → piano keys.
   var FANS = [
     { name: 'Anna S.', msg: '“Great set! 🎸”' },
-    { name: 'Marco', msg: '“Play Wonderwall!”' },
+    { name: 'Marco', msg: '“Play Wonderwall! 🙏”' },
     { name: 'Lena', msg: '“Beautiful voice ❤️”' },
-    { name: 'Jules', msg: '“From the bar — cheers!”' },
+    { name: 'Jules', msg: '“From the bar — cheers! 🍻”' },
     { name: 'Someone', msg: '' },
     { name: 'Priya', msg: '“That solo!! 🔥”' },
-    { name: 'Tom', msg: '“Keep going!”' }
+    { name: 'Tom', msg: '“Keep going!”' },
+    { name: 'Dave', msg: '“FREEBIRD! 🦅”' },
+    { name: 'Sofia', msg: '“Play Despacito, I’m begging 🙏”' },
+    { name: 'Liam G.', msg: '“is this Wonderwall? it better be Wonderwall”' },
+    { name: 'Monitor Mike', msg: '“more ME in the monitor 🎧”' },
+    { name: 'Sound guy Steve', msg: '“fell asleep at the desk. worth it.”' },
+    { name: 'Nadia', msg: '“you’re 2 cents sharp. no questions.”' },
+    { name: 'Front-row Jen', msg: '“the drummer is carrying you 🥁”' },
+    { name: 'Tomás', msg: '“bass so low my beer left the glass”' },
+    { name: 'Anonymous', msg: '“(it’s the drummer. tipping himself.)”' },
+    { name: 'Beth', msg: '“tell the bassist to smile once 😐”' },
+    { name: 'J. Cage', msg: '“the silence between songs was art 🤫”', amt: 4.33 },
+    { name: 'Nigel T.', msg: '“this one goes to eleven 🎸”', amt: 11 },
+    { name: 'Ford P.', msg: '“the answer to life & the setlist”', amt: 42 },
+    { name: 'Rick A.', msg: '“never gonna give you up 💸”' },
+    { name: 'Ada', msg: '“440 Hz of pure serotonin”', amt: 4.40 },
+    { name: 'Yuki', msg: '“more than Spotify paid you all year 💀”' },
+    { name: 'Ravi', msg: '“you > my entire Discover Weekly”' },
+    { name: 'Chloe', msg: '“gas money to the next town ⛽”' },
+    { name: 'Marta', msg: '“ONE MORE SONG 👏 ONE MORE SONG”' },
+    { name: 'Sam', msg: '“encore! then I sprint for the last train 🚆”' },
+    { name: 'Grandma Rose', msg: '“don’t know the song, you seem nice 👵”' },
+    { name: 'Elena', msg: '“proposing during the slow one. DON’T mess up 💍”' },
+    { name: 'The Hendersons', msg: '“you played our wedding. still married 💐”' },
+    { name: 'Kid up front', msg: '“play the Minecraft song 🥺”' },
+    { name: 'Mia', msg: '“tip’s from my cat. she’s purring 🐱”' },
+    { name: 'A curious dev', msg: '“I know this tip is fake but the jar rules”' },
+    { name: 'You, probably', msg: '“reading the source instead of tipping 😌”' },
+    { name: 'Nikita', msg: '“ship it 🚀”' },
+    { name: 'Generous Greg', msg: '“buy yourself new strings 🎸”' },
+    { name: 'Otis', msg: '“RIP the string you broke in song 2”' },
+    { name: 'Cowbell Chris', msg: '“needs more cowbell 🔔”', amt: 20 },
+    { name: 'Syd', msg: '“shine on you crazy busker 🌟”' },
+    { name: '88 Keys', msg: '“one buck per piano key 🎹”', amt: 88 },
+    { name: 'Lars', msg: '“I’d headbang but I’m holding a drink 🤘”' },
+    { name: 'Robert J.', msg: '“sold my soul at the crossroads for this 🎸”' }
   ];
-  var AMOUNTS = [2, 5, 5, 10, 10, 15, 20, 25];
+  var AMOUNTS = [2, 3, 5, 5, 7, 10, 10, 15, 20, 25, 50];
   var tipId = 0;
 
   function tossTip() {
     var fan = FANS[Math.floor(Math.random() * FANS.length)];
-    var amount = AMOUNTS[Math.floor(Math.random() * AMOUNTS.length)];
+    var amount = fan.amt != null ? fan.amt : AMOUNTS[Math.floor(Math.random() * AMOUNTS.length)];
     var delta = amount / GOAL;
     var after = state.jarPct + delta;
     var rollovers = 0;
