@@ -1,17 +1,26 @@
-name: Deploy landing page
+name: Deploy site (landing + app)
 
-# Publishes the marketing landing page (website/) to GitHub Pages at
-# https://mekedron.github.io/live.tips/. The tip-jar stage is NOT copied into
-# website/: it is assembled here from the committed renderer build in
-# app/assets/stage/, so there is a single source of truth for that ~600 KB
-# artifact (rebuilt from renderer/src via `npm run build`).
+# Publishes the whole site to GitHub Pages as ONE artifact, because Pages keeps
+# only a single deployment per repository — a second, independent workflow would
+# overwrite this one rather than add a folder alongside it. Everything is
+# assembled under _site/ and deployed together:
+#   _site/         marketing landing page (website/)   -> /live.tips/
+#   _site/stage/   tip-jar stage (app/assets/stage/)   -> /live.tips/stage/
+#   _site/app/     Flutter web build                   -> /live.tips/app/
+# The stage is assembled from the committed renderer build in app/assets/stage/,
+# so there is a single source of truth for that ~600 KB artifact (rebuilt from
+# renderer/src via `npm run build`). The Flutter app is built fresh here.
 
 on:
   push:
     branches: [main]
     paths:
       - 'website/**'
-      - 'app/assets/stage/**'
+      - 'app/lib/**'
+      - 'app/web/**'
+      - 'app/assets/**'
+      - 'app/pubspec.yaml'
+      - 'app/pubspec.lock'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -33,6 +42,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Pin to the version tracked in app/.metadata so CI matches local builds.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.9
+          channel: stable
+          cache: true
+
+      # Pub packages are keyed on the lockfile so unchanged deps restore instantly.
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('app/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Build Flutter web
+        working-directory: app
+        run: |
+          flutter pub get
+          # Served from a sub-path, so the base href must match the deploy URL or
+          # assets and flutter_service_worker.js resolve from the wrong root.
+          flutter build web --release --base-href "/live.tips/app/"
+
       - name: Assemble site
         run: |
           set -euo pipefail
@@ -44,8 +78,12 @@ jobs:
           # Reuse the committed renderer build — never duplicated in website/.
           mkdir -p _site/stage
           cp app/assets/stage/index.html app/assets/stage/stage.js _site/stage/
-          # The Flutter web app will be built into _site/app/ in a later change.
-          echo "Assembled site:" && find _site -type f | sort
+          # Flutter web build -> /live.tips/app/.
+          mkdir -p _site/app
+          cp -R app/build/web/. _site/app/
+          echo "Assembled site:"
+          find _site -maxdepth 2 | sort
+          echo "($(find _site -type f | wc -l) files total)"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
