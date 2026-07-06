@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/fullscreen.dart';
 import '../../core/install_prompt.dart';
 import '../../core/theme.dart';
 import '../../widgets/install_steps.dart';
@@ -18,10 +19,57 @@ import 'connect_screen.dart';
 class InstallHintScreen extends StatelessWidget {
   const InstallHintScreen({super.key});
 
+  /// The nudge is advisory, but skipping it has real costs — confirm once and
+  /// spell them out before connecting inside the browser. [noFullscreen] is the
+  /// iPhone case, where the stage can't go full-screen at all; elsewhere the
+  /// toggle still works, so we only warn about the lingering browser chrome.
+  Future<void> _continueInBrowser(
+      BuildContext context, bool noFullscreen) async {
+    final navigator = Navigator.of(context);
+    final firstLine = noFullscreen
+        ? 'Without live.tips on your Home Screen, the stage can’t go '
+            'full-screen — the browser’s bars stay on screen and moving around '
+            'the app feels less smooth.'
+        : 'In the browser the address bar and toolbars stay on screen and '
+            'moving around the app feels less smooth.';
+    // The clincher: there's no server. History lives in this browser's storage,
+    // and a Home-Screen app installed later can start from a separate store —
+    // so sessions collected in the browser first may not follow it over.
+    final message = '$firstLine\n\n'
+        'Your session history is saved on this device only — there’s no '
+        'server — and an app added later can start from a separate store, so '
+        'sessions you collect in the browser first may not carry over. Adding '
+        'it now keeps everything in one place.';
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Continue in the browser?'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continue anyway'),
+          ),
+        ],
+      ),
+    );
+    if (proceed == true) {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => const ConnectScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
     final apple = installGuideIsApple;
+    // iPhone Safari has no Fullscreen API; on iPad/Android the toggle works.
+    final noFullscreen = !fullscreenSupported;
 
     return Scaffold(
       appBar: AppBar(),
@@ -98,10 +146,8 @@ class InstallHintScreen extends StatelessWidget {
                       LtPrimaryButton(
                         label: 'Continue',
                         trailingIcon: Icons.arrow_forward_rounded,
-                        onPressed: () => Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                              builder: (_) => const ConnectScreen()),
-                        ),
+                        onPressed: () =>
+                            _continueInBrowser(context, noFullscreen),
                       ),
                       const SizedBox(height: 10),
                       Text(
