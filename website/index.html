@@ -655,27 +655,46 @@
     } catch (e) { /* stage not ready yet */ }
   }
 
+  // Send the stage its boot config. The renderer only builds its scene once it
+  // gets this (until then the card shows just its black backdrop), and it
+  // ignores a second init — so every path below can call this freely. It no-ops
+  // until the stage's bridge is installed; the protocol guarantees __stage is
+  // assigned synchronously before the stage ever speaks, so its presence is our
+  // readiness signal.
+  function sendInit() {
+    if (inited) return;
+    var w = frame.contentWindow;
+    if (!w || !w.__stage) return;
+    dispatch({
+      type: 'init',
+      renderer: '3d',
+      config: {
+        vessel: cfg.vessel, scene: cfg.scene, theme: cfg.theme,
+        notes: false, sound: false, tipSound: false, quality: 'auto',
+        reducedMotion: reduced,
+        insets: { top: 180, bottom: 100 }
+      },
+      state: { jarPct: state.jarPct, bankedJars: state.banked }
+    });
+    inited = true;
+  }
+
+  // Do NOT rely on catching the stage's one-shot `hello`: the iframe is lazily
+  // loaded and usually cached, so on a fresh tab it can boot and fire `hello`
+  // before this listener exists — the message is lost and the demo stays black.
+  // Instead drive `init` ourselves from the iframe's load event, and once right
+  // now in case it already finished before this script ran. We still honour a
+  // late `hello` (e.g. a reloaded stage after a crash) as a belt-and-braces
+  // re-init; `sendInit` is idempotent so these never collide.
   window.addEventListener('message', function (e) {
     var raw = e.data && e.data.liveTipsStage;
     if (!raw) return;
     var msg;
     try { msg = JSON.parse(raw); } catch (err) { return; }
-    if (msg.type === 'hello') {
-      inited = false;
-      dispatch({
-        type: 'init',
-        renderer: '3d',
-        config: {
-          vessel: cfg.vessel, scene: cfg.scene, theme: cfg.theme,
-          notes: false, sound: false, tipSound: false, quality: 'auto',
-          reducedMotion: reduced,
-          insets: { top: 180, bottom: 100 }
-        },
-        state: { jarPct: state.jarPct, bankedJars: state.banked }
-      });
-      inited = true;
-    }
+    if (msg.type === 'hello') { inited = false; sendInit(); }
   });
+  frame.addEventListener('load', sendInit);
+  sendInit();
 
   /* HUD */
   var fmt = function (n) { return '$' + n.toFixed(2); };
