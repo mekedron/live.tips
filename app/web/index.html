@@ -48,6 +48,17 @@
 
   <title>live.tips</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Stop the browser turning a horizontal overscroll into history
+       navigation — the two-finger swipe (macOS trackpad) and edge swipe
+       (iOS) otherwise fire back/forward mid-session and tear down open
+       modals. Flutter drives its own scrolling, so blocking the x-axis
+       navigation gesture here has no effect on in-app scrolling. */
+    html, body {
+      overscroll-behavior-x: none;
+    }
+  </style>
 </head>
 <body>
   <!--
