@@ -8,7 +8,6 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
-import '../../domain/donation.dart';
 import '../../domain/live_session.dart';
 import '../../domain/stage_settings.dart';
 import '../../state/live_session_controller.dart';
@@ -16,9 +15,9 @@ import '../../state/providers.dart';
 import '../../widgets/goal_editor.dart';
 import '../../widgets/qr_card.dart';
 import '../lock/lock_service.dart';
-import '../poster/poster_screen.dart';
 import '../settings/stage_settings_section.dart';
 import 'stage/jar_stage_view.dart';
+import 'stage/stage_chrome.dart';
 import 'stage/stage_hud.dart';
 import 'stage/stage_resolver.dart';
 import 'stage/stage_types.dart';
@@ -246,7 +245,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                       top: safeTop + 76,
                       bottom: 16,
                       width: 280,
-                      child: _QrPanel(
+                      child: StageQrPanel(
                         url: jar.url,
                         name: jar.displayName,
                         messages: live.session.donations.reversed
@@ -261,7 +260,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                       child: Row(
                         children: [
-                          _GlassCircleButton(
+                          StageGlassButton(
                             icon: Icons.stop_rounded,
                             iconColor: const Color(0xFFFF6B5E),
                             tooltip: 'Stop session',
@@ -287,20 +286,20 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                           ],
                           const Spacer(),
                           if (wide) ...[
-                            _GlassCircleButton(
+                            StageGlassButton(
                               icon: Icons.flag_rounded,
                               tooltip: 'Adjust goal',
                               onTap: _editGoal,
                             ),
                             const SizedBox(width: 8),
-                            _GlassCircleButton(
+                            StageGlassButton(
                               icon: Icons.palette_rounded,
                               tooltip: 'Stage look',
                               onTap: () => showStageLookSheet(context),
                             ),
                             const SizedBox(width: 8),
                           ],
-                          _GlassCircleButton(
+                          StageGlassButton(
                             icon: Icons.lock_outline_rounded,
                             tooltip: 'Lock stage screen',
                             size: wide ? 44 : 40,
@@ -359,13 +358,13 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              _GlassSquareButton(
+                              StageGlassSquare(
                                 icon: Icons.flag_rounded,
                                 tooltip: 'Adjust goal',
                                 onTap: _editGoal,
                               ),
                               const SizedBox(width: 8),
-                              _GlassSquareButton(
+                              StageGlassSquare(
                                 icon: Icons.palette_rounded,
                                 tooltip: 'Stage look',
                                 onTap: () => showStageLookSheet(context),
@@ -402,83 +401,6 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
         ),
       ),
     );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Glass controls
-// ---------------------------------------------------------------------------
-
-class _GlassCircleButton extends StatelessWidget {
-  const _GlassCircleButton({
-    required this.icon,
-    required this.onTap,
-    this.iconColor,
-    this.tooltip,
-    this.size = 44,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color? iconColor;
-  final String? tooltip;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final button = Material(
-      color: kStageGlassSoft,
-      shape: CircleBorder(
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Icon(
-            icon,
-            size: size * 0.45,
-            color: iconColor ?? Colors.white.withValues(alpha: 0.85),
-          ),
-        ),
-      ),
-    );
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip!, child: button);
-  }
-}
-
-class _GlassSquareButton extends StatelessWidget {
-  const _GlassSquareButton({
-    required this.icon,
-    required this.onTap,
-    this.tooltip,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final String? tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    final button = Material(
-      color: Colors.white.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child:
-              Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.85)),
-        ),
-      ),
-    );
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip!, child: button);
   }
 }
 
@@ -671,186 +593,6 @@ String formatDuration(Duration duration) {
   return hours > 0
       ? '$hours:${two(minutes)}:${two(seconds)}'
       : '${two(minutes)}:${two(seconds)}';
-}
-
-/// How many recent-message tiles fit under the QR block of the wide-layout
-/// panel. The QR always wins — messages only take what's left over after
-/// the QR core (~430 px) and the section header, at ~84 px a tile.
-int qrPanelMessageSlots(double maxHeight) =>
-    ((maxHeight - 460) / 84).floor().clamp(0, 3);
-
-class _QrPanel extends StatelessWidget {
-  const _QrPanel({
-    required this.url,
-    required this.name,
-    this.messages = const [],
-  });
-
-  final String url;
-  final String name;
-
-  /// Latest tips that came with a message, newest first (capped upstream).
-  final List<Donation> messages;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: kStageGlassSoft,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final shown = messages.take(
-            qrPanelMessageSlots(constraints.maxHeight),
-          );
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              QrBlock(data: url, size: 200),
-              const SizedBox(height: 14),
-              Text(
-                'Scan to tip',
-                style: outfitStyle(20, Colors.white,
-                    weight: FontWeight.w700),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                name,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: kFontBody,
-                  fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.55),
-                ),
-              ),
-              const SizedBox(height: 6),
-              // desktop reality: nobody scans a QR shown on their own screen
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    tooltip: 'Copy link',
-                    onPressed: () => copyTipLink(context, url),
-                    icon: Icon(Icons.content_copy_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.7)),
-                  ),
-                  IconButton(
-                    tooltip: 'Open link',
-                    onPressed: () => openTipLink(url),
-                    icon: Icon(Icons.open_in_new_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.7)),
-                  ),
-                  IconButton(
-                    tooltip: 'Print poster',
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => Scaffold(
-                          appBar: AppBar(title: const Text('Poster')),
-                          body: const PosterScreen(),
-                        ),
-                      ),
-                    ),
-                    icon: Icon(Icons.print_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.7)),
-                  ),
-                ],
-              ),
-              if (shown.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Container(
-                  height: 1,
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'RECENT MESSAGES',
-                    style: outfitStyle(
-                        10.5, Colors.white.withValues(alpha: 0.4),
-                        weight: FontWeight.w700, letterSpacing: 1.4),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (final d in shown) _QrPanelMessage(donation: d),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _QrPanelMessage extends StatelessWidget {
-  const _QrPanelMessage({required this.donation});
-
-  final Donation donation;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  donation.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white.withValues(alpha: 0.75),
-                  ),
-                ),
-              ),
-              Text(
-                formatAmount(donation.amountMinor, donation.currency),
-                style: const TextStyle(
-                  fontFamily: kFontOutfit,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: kStageAmount,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Text(
-            '“${donation.message!.trim()}”',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: kFontBody,
-              fontSize: 13.5,
-              fontStyle: FontStyle.italic,
-              color: Colors.white,
-              height: 1.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _LockOverlay extends StatelessWidget {

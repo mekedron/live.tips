@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/domain/donation.dart';
 import 'package:live_tips/domain/rollover_math.dart';
-import 'package:live_tips/features/live/live_screen.dart';
+import 'package:live_tips/features/live/stage/stage_chrome.dart';
 import 'package:live_tips/features/live/stage/stage_hud.dart';
 
 JarTipAttribution tip(
