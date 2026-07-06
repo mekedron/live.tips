@@ -50,6 +50,9 @@ class AppStateNotifier extends Notifier<AppState> {
   Future<void> connect(String apiKey) async {
     final trimmed = apiKey.trim();
     await ref.read(secureStoreProvider).writeApiKey(trimmed);
+    // A newly connected account must not inherit demo/test tips from earlier
+    // play — otherwise its history shows donations that never happened.
+    await ref.read(localStoreProvider).purgeSimulatedData();
     state = AppState(
       apiKey: trimmed,
       tipJar: state.tipJar,

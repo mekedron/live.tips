@@ -104,6 +104,30 @@ class LocalStore {
     await _prefs.remove(_kActiveCursor);
   }
 
+  // --- Demo/test cleanup ---
+
+  /// A session that never took real (live) money — pure demo play or a
+  /// test-mode set. Empty sessions count as real: we can't prove they're
+  /// fake, and would rather keep a genuine zero-tip live set than delete it.
+  static bool _isSimulated(LiveSession s) =>
+      s.donations.isNotEmpty && s.donations.every((d) => !d.livemode);
+
+  /// Scrubs locally cached demo/test sessions so a real (live) Stripe account
+  /// never shows tips that weren't real money. Called when a real account
+  /// connects, and once at startup for an already-connected live account.
+  Future<void> purgeSimulatedData() async {
+    final real =
+        readSessionHistory().where((s) => !_isSimulated(s)).toList();
+    await _prefs.setString(
+      _kHistory,
+      jsonEncode(real.map((s) => s.toJson()).toList()),
+    );
+    final active = readActiveSession();
+    if (active != null && _isSimulated(active)) {
+      await clearActiveSession();
+    }
+  }
+
   Future<void> wipeAll() async {
     await _prefs.clear();
   }

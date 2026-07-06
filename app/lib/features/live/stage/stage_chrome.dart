@@ -97,30 +97,17 @@ class StageGlassSquare extends StatelessWidget {
   }
 }
 
-/// Web-only fullscreen toggle for the stage. Enters/exits the browser's
-/// fullscreen and swaps its icon to match; renders nothing where fullscreen
-/// isn't supported (native already runs full-window), so callers can drop it
-/// in unconditionally.
+/// Web-only fullscreen toggle for the stage — a native DOM button (see
+/// [fullscreenButton]) styled to match the glass controls, so its click keeps
+/// the user gesture `requestFullscreen()` needs. Renders nothing where
+/// fullscreen isn't supported, so callers can drop it in unconditionally.
 class StageFullscreenButton extends StatelessWidget {
   const StageFullscreenButton({super.key, this.size = 44});
 
   final double size;
 
   @override
-  Widget build(BuildContext context) {
-    if (!fullscreenSupported) return const SizedBox.shrink();
-    return ValueListenableBuilder<bool>(
-      valueListenable: fullscreenState,
-      builder: (context, isFull, _) => StageGlassButton(
-        icon: isFull
-            ? Icons.fullscreen_exit_rounded
-            : Icons.fullscreen_rounded,
-        tooltip: isFull ? 'Exit fullscreen' : 'Fullscreen',
-        size: size,
-        onTap: toggleFullscreen,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => fullscreenButton(size: size);
 }
 
 /// How many recent-message tiles fit under the QR block of the wide-layout

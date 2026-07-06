@@ -33,6 +33,14 @@ Future<void> main() async {
     }
   }
 
+  // A real (live) account must never surface tips left over from demo or
+  // test play. connect() scrubs on the way in; this covers accounts that were
+  // already connected before that scrubbing existed. Test-mode sessions are
+  // the user's own real integration tests, so they're left alone here.
+  if (apiKey != null && !apiKey.contains('_test_')) {
+    await localStore.purgeSimulatedData();
+  }
+
   runApp(
     ProviderScope(
       overrides: [
