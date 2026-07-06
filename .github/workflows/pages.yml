@@ -1,0 +1,64 @@
+name: Deploy landing page
+
+# Publishes the marketing landing page (website/) to GitHub Pages at
+# https://mekedron.github.io/live.tips/. The tip-jar stage is NOT copied into
+# website/: it is assembled here from the committed renderer build in
+# app/assets/stage/, so there is a single source of truth for that ~600 KB
+# artifact (rebuilt from renderer/src via `npm run build`).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'app/assets/stage/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Least privilege the Pages deploy action needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push supersedes an in-flight run.
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assemble site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          # Landing page + any future static assets under website/.
+          cp -R website/. _site/
+          rm -f _site/README.md            # internal note, not for publishing
+          # Reuse the committed renderer build — never duplicated in website/.
+          mkdir -p _site/stage
+          cp app/assets/stage/index.html app/assets/stage/stage.js _site/stage/
+          # The Flutter web app will be built into _site/app/ in a later change.
+          echo "Assembled site:" && find _site -type f | sort
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
