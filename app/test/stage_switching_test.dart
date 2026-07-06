@@ -199,8 +199,8 @@ void main() {
       expect(init['state']['bankedJars'], 2);
       expect(init['config']['vessel'], 'jar2');
       expect(init['config']['theme'], 'golden-hour');
-      expect(init['config']['sound'], isFalse);
-      expect(init['config']['tipSound'], isFalse);
+      expect(init['config']['sound'], isTrue);
+      expect(init['config']['tipSound'], isTrue);
       expect(init['config']['insets']['top'], greaterThan(0));
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
@@ -246,7 +246,9 @@ void main() {
 
     testWidgets('config change diffs into one partial setConfig',
         (tester) async {
-      await tester.pumpWidget(stage());
+      await tester.pumpWidget(stage(
+          config:
+              const StageSettings(soundEnabled: false, tipSoundEnabled: false)));
       transport.receive({'type': 'hello', 'protocol': 1});
       transport.receive({'type': 'ready'});
       await tester.pump();

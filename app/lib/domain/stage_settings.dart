@@ -129,8 +129,8 @@ class StageSettings {
     this.scene = JarScene.abstractGlow,
     this.theme = JarTheme.goldenHour,
     this.showNotes = false,
-    this.soundEnabled = false,
-    this.tipSoundEnabled = false,
+    this.soundEnabled = true,
+    this.tipSoundEnabled = true,
     this.quality = StageQuality.auto,
   });
 
@@ -147,12 +147,12 @@ class StageSettings {
   /// Mix folded banknotes into the pile (both jar renderers).
   final bool showNotes;
 
-  /// Synthesized coin clinks / milestone chimes (muted by default).
+  /// Synthesized coin clinks / milestone chimes (on by default).
   final bool soundEnabled;
 
   /// The "ta-da!" fanfare when a new tip arrives — loud enough that the
   /// artist hears money land mid-song and can thank the donor from the
-  /// stage. Independent of [soundEnabled]; muted by default.
+  /// stage. Independent of [soundEnabled]; on by default.
   final bool tipSoundEnabled;
 
   final StageQuality quality;
@@ -195,8 +195,8 @@ class StageSettings {
         scene: JarScene.fromWire(json['scene'] as String?),
         theme: JarTheme.fromWire(json['theme'] as String?),
         showNotes: json['showNotes'] as bool? ?? false,
-        soundEnabled: json['soundEnabled'] as bool? ?? false,
-        tipSoundEnabled: json['tipSoundEnabled'] as bool? ?? false,
+        soundEnabled: json['soundEnabled'] as bool? ?? true,
+        tipSoundEnabled: json['tipSoundEnabled'] as bool? ?? true,
         quality: StageQuality.fromWire(json['quality'] as String?),
       );
 

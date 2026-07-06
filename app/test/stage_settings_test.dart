@@ -4,18 +4,18 @@ import 'package:live_tips/domain/stage_settings.dart';
 
 void main() {
   group('StageSettings', () {
-    test('defaults: 3D plain 2 L jar, abstract set, golden hour, coins only', () {
+    test('defaults: 3D plain 2 L jar, abstract set, golden hour, sound on', () {
       const s = StageSettings();
       expect(s.style, StageStyle.jar3d);
       expect(s.vessel, JarVessel.jar2);
       expect(s.scene, JarScene.abstractGlow);
       expect(s.theme, JarTheme.goldenHour);
       expect(s.showNotes, isFalse, reason: 'paper money is opt-in');
-      expect(s.soundEnabled, isFalse);
+      expect(s.soundEnabled, isTrue);
       expect(
         s.tipSoundEnabled,
-        isFalse,
-        reason: 'no surprise audio on an unattended stage device',
+        isTrue,
+        reason: 'donation moments should be audible out of the box',
       );
       expect(s.quality, StageQuality.auto);
     });
@@ -35,9 +35,10 @@ void main() {
     });
 
     test('the sound toggles are independent', () {
-      const s = StageSettings(soundEnabled: true);
-      expect(s.copyWith(tipSoundEnabled: true).soundEnabled, isTrue);
-      expect(s.tipSoundEnabled, isFalse);
+      const s = StageSettings(soundEnabled: true, tipSoundEnabled: false);
+      final flipped = s.copyWith(tipSoundEnabled: true);
+      expect(flipped.soundEnabled, isTrue, reason: 'unrelated toggle stays put');
+      expect(flipped.tipSoundEnabled, isTrue);
     });
 
     test('wire values match the bridge protocol', () {
