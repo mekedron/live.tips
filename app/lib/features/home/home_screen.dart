@@ -116,6 +116,108 @@ LtKeyStatus _keyStatus(AppState app) => app.demo
         ? LtKeyStatus.test
         : LtKeyStatus.live;
 
+/// The artist / band name with an inline pencil to rename it. Renaming changes
+/// only the *local* display name (home, stage, poster) — it never touches the
+/// Stripe link or its QR code, so it's safe any time. The pencil is hidden in
+/// demo mode (there's no real jar to name).
+class _EditableJarName extends ConsumerWidget {
+  const _EditableJarName({
+    required this.jar,
+    required this.demo,
+    required this.fontSize,
+    required this.weight,
+  });
+
+  final TipJar jar;
+  final bool demo;
+  final double fontSize;
+  final FontWeight weight;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.lt;
+    final style = outfitStyle(fontSize, c.text, weight: weight);
+    if (demo) return Text(jar.displayName, style: style);
+    // A WidgetSpan keeps the pencil flowing with the text, so long names still
+    // wrap / ellipsize naturally instead of overflowing a fixed-width Row.
+    return Text.rich(
+      TextSpan(
+        text: jar.displayName,
+        children: [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _editJarName(context, ref, jar),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Icon(Icons.edit_outlined,
+                    size: fontSize * 0.6, color: c.textMuted),
+              ),
+            ),
+          ),
+        ],
+      ),
+      style: style,
+    );
+  }
+}
+
+/// Rename the local display name — a light in-place edit that leaves the tip
+/// link untouched (see [_EditableJarName]).
+Future<void> _editJarName(
+    BuildContext context, WidgetRef ref, TipJar jar) async {
+  final notifier = ref.read(appStateProvider.notifier);
+  final controller = TextEditingController(text: jar.displayName);
+  final saved = await showDialog<String>(
+    context: context,
+    builder: (context) {
+      final c = context.lt;
+      return AlertDialog(
+        title: const Text('Display name'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration:
+                  const InputDecoration(hintText: 'Artist or band name'),
+              onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Shown on your home screen, stage and poster. Your tip link and '
+              'its QR code aren\'t affected.',
+              style: TextStyle(
+                  fontFamily: kFontBody,
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: c.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      );
+    },
+  );
+  controller.dispose();
+  if (saved != null && saved.isNotEmpty && saved != jar.displayName) {
+    await notifier.setTipJar(jar.copyWith(displayName: saved));
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Mobile · 390-style single column with the logo top bar
 // ---------------------------------------------------------------------------
@@ -167,9 +269,12 @@ class _MobileHome extends StatelessWidget {
                           fontFamily: kFontBody,
                           fontSize: 14,
                           color: c.textSecondary)),
-                  Text(jar.displayName,
-                      style:
-                          outfitStyle(24, c.text, weight: FontWeight.w700)),
+                  _EditableJarName(
+                    jar: jar,
+                    demo: app.demo,
+                    fontSize: 24,
+                    weight: FontWeight.w700,
+                  ),
                   const SizedBox(height: 14),
                   goalCard,
                   const SizedBox(height: 14),
@@ -229,9 +334,12 @@ class _DesktopHome extends ConsumerWidget {
                               fontFamily: kFontBody,
                               fontSize: 15,
                               color: c.textSecondary)),
-                      Text(jar.displayName,
-                          style: outfitStyle(32, c.text,
-                              weight: FontWeight.w800)),
+                      _EditableJarName(
+                        jar: jar,
+                        demo: app.demo,
+                        fontSize: 32,
+                        weight: FontWeight.w800,
+                      ),
                     ],
                   ),
                   const Spacer(),
@@ -770,7 +878,13 @@ class _NewTipLinkButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: TextButton.icon(
-        onPressed: () => _confirmRecreateLink(context),
+        // Opens the recreate editor: prefilled name / currency / thank-you
+        // message plus a warning that the old link and its QR codes stop
+        // working. The old link is only retired once the new one is created.
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: (_) => const JarSetupScreen(recreate: true)),
+        ),
         style: TextButton.styleFrom(
           foregroundColor: c.textSecondary,
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -779,37 +893,6 @@ class _NewTipLinkButton extends StatelessWidget {
         label: Text('Create new tip link',
             style: outfitStyle(13, c.textSecondary)),
       ),
-    );
-  }
-}
-
-/// Warn before regenerating the tip link — the current one is deactivated and
-/// any printed QR codes stop working — then hand off to the recreate flow.
-Future<void> _confirmRecreateLink(BuildContext context) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Create a new tip link?'),
-      content: const Text(
-        'Your current link is replaced and deactivated — any printed QR codes '
-        'or links you\'ve already shared will stop working. You\'ll set up a '
-        'fresh one on the next screen.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Create new link'),
-        ),
-      ],
-    ),
-  );
-  if (confirmed == true && context.mounted) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const JarSetupScreen(recreate: true)),
     );
   }
 }

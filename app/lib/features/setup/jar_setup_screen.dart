@@ -158,6 +158,35 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
           const LtProgressSegments(total: 2, filled: 2),
           const SizedBox(height: 16),
         ],
+        if (widget.recreate) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: c.danger.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: c.danger.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 20, color: c.danger),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'This replaces your current link — the old link and any '
+                    'printed QR codes will stop working. Edit the details below, '
+                    'then create the new one.',
+                    style: TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 13,
+                        height: 1.4,
+                        color: c.text),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Text(
           'This creates a donation link in your Stripe account. Fans choose '
           'their own amount and can leave a name and a message.',

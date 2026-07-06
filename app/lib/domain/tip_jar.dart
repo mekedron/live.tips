@@ -40,6 +40,27 @@ class TipJar {
     thankYouMessage: 'Thank you for supporting live music! 🎶',
   );
 
+  TipJar copyWith({
+    String? productId,
+    String? priceId,
+    String? paymentLinkId,
+    String? url,
+    String? currency,
+    String? displayName,
+    bool? livemode,
+    String? thankYouMessage,
+  }) =>
+      TipJar(
+        productId: productId ?? this.productId,
+        priceId: priceId ?? this.priceId,
+        paymentLinkId: paymentLinkId ?? this.paymentLinkId,
+        url: url ?? this.url,
+        currency: currency ?? this.currency,
+        displayName: displayName ?? this.displayName,
+        livemode: livemode ?? this.livemode,
+        thankYouMessage: thankYouMessage ?? this.thankYouMessage,
+      );
+
   Map<String, dynamic> toJson() => {
         'productId': productId,
         'priceId': priceId,
