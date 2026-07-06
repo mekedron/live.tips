@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../domain/donation.dart';
 import '../../domain/live_session.dart';
 import '../../features/live/live_screen.dart' show formatDuration;
+import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/donation_tile.dart';
 import '../../widgets/lt_ui.dart';
@@ -101,6 +102,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // A session that just ended likely brought in tips this list hasn't seen —
+    // reload from Stripe the moment live mode exits so History isn't stuck on a
+    // pre-session snapshot. (History stays mounted in the shell's IndexedStack,
+    // so this fires even while the artist is still on the summary screen.)
+    ref.listen<LiveState?>(liveSessionProvider, (previous, next) {
+      if (previous != null && next == null) _loadMore(reset: true);
+    });
     final isRail = AppShellScope.of(context)?.isRail ?? false;
     final sessions =
         ref.watch(localStoreProvider).readSessionHistory().reversed.toList();

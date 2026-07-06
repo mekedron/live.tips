@@ -218,6 +218,9 @@ class LiveSessionController extends Notifier<LiveState?> {
     await local.appendSessionToHistory(session);
     await local.clearActiveSession();
     state = null;
+    // Tips that arrived during the set aren't in the home preview's cached
+    // Stripe query — refresh it so Recent tips reflects the night just played.
+    ref.invalidate(recentDonationsProvider);
     return session;
   }
 
