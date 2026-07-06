@@ -40,11 +40,11 @@ Future<void> main(List<String> args) async {
   );
 
   for (final entry in posterTemplates.entries) {
-    for (final language in [PosterLanguage.english, PosterLanguage.russian]) {
+    for (final sample in _captionSamples.entries) {
       final data = PosterData(
         qrData: _sampleJarUrl,
         artistName: _sampleArtistName,
-        strings: kPosterStrings[language]!,
+        strings: sample.value,
         format: posterPageFormats[PosterPaperSize.a4]!,
       );
       final doc = pw.Document(
@@ -58,10 +58,22 @@ Future<void> main(List<String> args) async {
         ),
       );
       final file = File(
-        '${outDir.path}/${entry.key.wire}-${language.wire}.pdf',
+        '${outDir.path}/${entry.key.wire}-${sample.key}.pdf',
       );
       await file.writeAsBytes(await doc.save());
       stdout.writeln('wrote ${file.path}');
     }
   }
 }
+
+/// Two caption passes per theme: the default English wording, plus a
+/// Russian one to catch Cyrillic/font regressions. Captions are plain text
+/// now (no per-language table), so these live right here in the QA tool.
+const Map<String, PosterStrings> _captionSamples = {
+  'en': kDefaultPosterStrings,
+  'ru': PosterStrings(
+    headline: 'Отсканируйте для чаевых',
+    subline: 'Поддержите выступление',
+    footer: 'Спасибо за чаевые!',
+  ),
+};

@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
@@ -12,8 +16,9 @@ import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../shell/app_shell.dart';
 
-/// Pick a poster theme / caption language, preview it live, then print or
-/// save a PDF — the print-ready alternative to reading a QR off a screen.
+/// Pick a poster theme / paper size, preview it live in a pan-and-zoom
+/// canvas, then print or save a PDF — the print-ready alternative to
+/// reading a QR off a screen.
 class PosterScreen extends ConsumerWidget {
   const PosterScreen({super.key});
 
@@ -41,68 +46,47 @@ class PosterScreen extends ConsumerWidget {
           );
     }
 
-    final paperPill = LtPill(
-      label: posterSettings.paperSize.label,
-      soft: false,
-      trailing: Icon(Icons.expand_more_rounded,
-          size: 16, color: c.textSecondary),
-      onTap: () async {
-        final picked = await showLtPicker<PosterPaperSize>(
-          context: context,
-          title: 'Paper size',
-          values: PosterPaperSize.values,
-          selected: posterSettings.paperSize,
-          labelOf: (p) => p.label,
-        );
-        if (picked != null) {
-          updatePoster((s) => s.copyWith(paperSize: picked));
-        }
-      },
-    );
-
-    final themeChips = SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      clipBehavior: Clip.none,
-      child: Row(
-        children: [
-          for (final t in PosterTheme.values) ...[
-            _ThemeChip(
-              label: t.label,
-              selected: posterSettings.theme == t,
-              onTap: () => updatePoster((s) => s.copyWith(theme: t)),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ],
-      ),
-    );
-
+    // Theme · Format · Customize — one plain select list, mirroring the
+    // Style/Vessel rows in the stage settings.
     final optionsCard = LtCard(
       radius: 16,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
           LtRow(
-            icon: Icons.language_rounded,
-            title: 'Language',
-            trailing: Text(
-              posterSettings.language.label,
-              style: TextStyle(
-                  fontFamily: kFontBody,
-                  fontSize: 13.5,
-                  color: c.textSecondary),
-            ),
+            icon: Icons.palette_outlined,
+            title: 'Theme',
+            trailing: _ValueText(posterSettings.theme.label),
             chevron: true,
             onTap: () async {
-              final picked = await showLtPicker<PosterLanguage>(
+              final picked = await showLtPicker<PosterTheme>(
                 context: context,
-                title: 'Caption language',
-                values: PosterLanguage.values,
-                selected: posterSettings.language,
-                labelOf: (l) => l.label,
+                title: 'Poster theme',
+                values: PosterTheme.values,
+                selected: posterSettings.theme,
+                labelOf: (t) => t.label,
               );
               if (picked != null) {
-                updatePoster((s) => s.copyWith(language: picked));
+                updatePoster((s) => s.copyWith(theme: picked));
+              }
+            },
+          ),
+          Divider(height: 1, color: c.divider),
+          LtRow(
+            icon: Icons.crop_free_rounded,
+            title: 'Format',
+            trailing: _ValueText(posterSettings.paperSize.label),
+            chevron: true,
+            onTap: () async {
+              final picked = await showLtPicker<PosterPaperSize>(
+                context: context,
+                title: 'Paper size',
+                values: PosterPaperSize.values,
+                selected: posterSettings.paperSize,
+                labelOf: (p) => p.label,
+              );
+              if (picked != null) {
+                updatePoster((s) => s.copyWith(paperSize: picked));
               }
             },
           ),
@@ -130,7 +114,6 @@ class PosterScreen extends ConsumerWidget {
         onLayout: (format) => buildPosterPdf(
           jar: jar,
           theme: posterSettings.theme,
-          language: posterSettings.language,
           paperSize:
               posterPaperSizeForFormat(format) ?? posterSettings.paperSize,
           displayName: posterSettings.displayName,
@@ -146,7 +129,6 @@ class PosterScreen extends ConsumerWidget {
         final bytes = await buildPosterPdf(
           jar: jar,
           theme: posterSettings.theme,
-          language: posterSettings.language,
           paperSize: posterSettings.paperSize,
           displayName: posterSettings.displayName,
           headline: posterSettings.headline,
@@ -160,7 +142,7 @@ class PosterScreen extends ConsumerWidget {
       label: const Text('Share PDF'),
     );
 
-    final preview = _PosterPreview(jar: jar, settings: posterSettings);
+    final preview = _PosterViewport(jar: jar, settings: posterSettings);
 
     if (isRail) {
       return Padding(
@@ -174,23 +156,10 @@ class PosterScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text('Poster',
-                              style: outfitStyle(32, c.text,
-                                  weight: FontWeight.w800)),
-                        ),
-                        paperPill,
-                      ],
-                    ),
+                    Text('Poster',
+                        style:
+                            outfitStyle(32, c.text, weight: FontWeight.w800)),
                     const SizedBox(height: 24),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8),
-                      child: LtSectionLabel('Theme'),
-                    ),
-                    themeChips,
-                    const SizedBox(height: 16),
                     optionsCard,
                     const SizedBox(height: 16),
                     printButton,
@@ -223,7 +192,6 @@ class PosterScreen extends ConsumerWidget {
                           style: outfitStyle(20, c.text,
                               weight: FontWeight.w700)),
                     ),
-                    paperPill,
                   ],
                 ),
               ),
@@ -239,15 +207,6 @@ class PosterScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: LtSectionLabel('Theme'),
-                    ),
-                  ),
-                  themeChips,
-                  const SizedBox(height: 14),
                   optionsCard,
                   const SizedBox(height: 14),
                   printButton,
@@ -273,7 +232,6 @@ class PosterScreen extends ConsumerWidget {
     required String jarDisplayName,
     required void Function(PosterSettings Function(PosterSettings)) updatePoster,
   }) {
-    final languageStrings = kPosterStrings[settings.language]!;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -288,7 +246,6 @@ class PosterScreen extends ConsumerWidget {
           child: _CustomizeForm(
             settings: settings,
             jarDisplayName: jarDisplayName,
-            languageStrings: languageStrings,
             updatePoster: updatePoster,
             textColor: c.text,
           ),
@@ -302,14 +259,12 @@ class _CustomizeForm extends StatefulWidget {
   const _CustomizeForm({
     required this.settings,
     required this.jarDisplayName,
-    required this.languageStrings,
     required this.updatePoster,
     required this.textColor,
   });
 
   final PosterSettings settings;
   final String jarDisplayName;
-  final PosterStrings languageStrings;
   final void Function(PosterSettings Function(PosterSettings)) updatePoster;
   final Color textColor;
 
@@ -352,7 +307,8 @@ class _CustomizeFormState extends State<_CustomizeForm> {
               style: outfitStyle(18, c.text, weight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(
-            'Leave a field blank to use the language\'s own wording.',
+            'Write these in any language you like. Leave a field blank to '
+            'use the default wording.',
             style: TextStyle(
                 fontFamily: kFontBody,
                 fontSize: 12.5,
@@ -365,11 +321,11 @@ class _CustomizeFormState extends State<_CustomizeForm> {
             onChanged: (v) =>
                 widget.updatePoster((s) => s.copyWith(displayName: v)),
           ),
-          label('Main message'),
+          label('“Scan to tip” line'),
           TextField(
             controller: _headlineController,
-            decoration:
-                InputDecoration(hintText: widget.languageStrings.headline),
+            decoration: InputDecoration(
+                hintText: kDefaultPosterStrings.headline),
             onChanged: (v) =>
                 widget.updatePoster((s) => s.copyWith(headline: v)),
           ),
@@ -377,7 +333,7 @@ class _CustomizeFormState extends State<_CustomizeForm> {
           TextField(
             controller: _sublineController,
             decoration:
-                InputDecoration(hintText: widget.languageStrings.subline),
+                InputDecoration(hintText: kDefaultPosterStrings.subline),
             onChanged: (v) =>
                 widget.updatePoster((s) => s.copyWith(subline: v)),
           ),
@@ -385,7 +341,7 @@ class _CustomizeFormState extends State<_CustomizeForm> {
           TextField(
             controller: _footerController,
             decoration:
-                InputDecoration(hintText: widget.languageStrings.footer),
+                InputDecoration(hintText: kDefaultPosterStrings.footer),
             onChanged: (v) =>
                 widget.updatePoster((s) => s.copyWith(footer: v)),
           ),
@@ -400,72 +356,262 @@ class _CustomizeFormState extends State<_CustomizeForm> {
   }
 }
 
-class _ThemeChip extends StatelessWidget {
-  const _ThemeChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+/// Trailing value text for a select row — matches the stage settings.
+class _ValueText extends StatelessWidget {
+  const _ValueText(this.text);
 
-  final String label;
-  final bool selected;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontFamily: kFontBody,
+        fontSize: 13.5,
+        color: context.lt.textSecondary,
+      ),
+    );
+  }
+}
+
+/// A pan-and-zoom canvas that rasterizes the current poster and shows it
+/// inside an [InteractiveViewer]:
+///   • mouse wheel / trackpad pinch → zoom toward the cursor
+///   • left-drag / one-finger drag / two-finger trackpad → pan
+///   • double-tap or the reset button → back to fit
+///
+/// Replaces the printing package's `PdfPreview`, whose built-in multi-page
+/// scroller renders cramped and off-center on wide desktop layouts.
+class _PosterViewport extends StatefulWidget {
+  const _PosterViewport({required this.jar, required this.settings});
+
+  final TipJar jar;
+  final PosterSettings settings;
+
+  @override
+  State<_PosterViewport> createState() => _PosterViewportState();
+}
+
+class _PosterViewportState extends State<_PosterViewport> {
+  final TransformationController _transform = TransformationController();
+  Timer? _debounce;
+  int _rasterToken = 0;
+  ui.Image? _image;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rasterize();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PosterViewport old) {
+    super.didUpdateWidget(old);
+    if (old.settings != widget.settings || old.jar.url != widget.jar.url) {
+      // Typing in the customize sheet fires many rebuilds a second — collapse
+      // them so pdf.js doesn't re-rasterize on every keystroke.
+      _debounce?.cancel();
+      _debounce = Timer(const Duration(milliseconds: 240), _rasterize);
+    }
+  }
+
+  Future<void> _rasterize() async {
+    final token = ++_rasterToken;
+    final settings = widget.settings;
+    final jar = widget.jar;
+    try {
+      final bytes = await buildPosterPdf(
+        jar: jar,
+        theme: settings.theme,
+        paperSize: settings.paperSize,
+        displayName: settings.displayName,
+        headline: settings.headline,
+        subline: settings.subline,
+        footer: settings.footer,
+      );
+      // Aim for ~2000px on the long edge whatever the paper size, so an A2
+      // poster doesn't rasterize into a 60-megapixel image on the web.
+      final format = posterPageFormats[settings.paperSize]!;
+      final longEdgeInches = math.max(format.width, format.height) / 72.0;
+      final dpi = (2000 / longEdgeInches).clamp(96.0, 300.0);
+      final raster =
+          await Printing.raster(bytes, pages: const [0], dpi: dpi).first;
+      final image = await raster.toImage();
+      if (!mounted || token != _rasterToken) {
+        image.dispose();
+        return;
+      }
+      setState(() {
+        _image?.dispose();
+        _image = image;
+        _failed = false;
+      });
+    } catch (_) {
+      if (!mounted || token != _rasterToken) return;
+      setState(() => _failed = true);
+    }
+  }
+
+  void _resetView() => _transform.value = Matrix4.identity();
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _rasterToken++; // orphan any in-flight raster so it can't setState
+    _image?.dispose();
+    _transform.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    final image = _image;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: c.chip.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.border),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: image == null
+            ? Center(
+                child: _failed
+                    ? Text('Preview unavailable',
+                        style: outfitStyle(14, c.textSecondary))
+                    : const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+              )
+            : Stack(
+                children: [
+                  Positioned.fill(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Keep the poster from being flung out of sight: cap
+                        // the pan at half the canvas on each side, so at the
+                        // extreme its centre only reaches a corner of the
+                        // viewport — never further, never lost.
+                        final boundary = EdgeInsets.symmetric(
+                          horizontal: constraints.maxWidth / 2,
+                          vertical: constraints.maxHeight / 2,
+                        );
+                        return GestureDetector(
+                          onDoubleTap: _resetView,
+                          child: InteractiveViewer(
+                            transformationController: _transform,
+                            minScale: 0.5,
+                            maxScale: 6,
+                            boundaryMargin: boundary,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(28),
+                                child: _PosterPaper(image: image),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 12,
+                    child: IgnorePointer(
+                      child: Center(child: _ViewportHint()),
+                    ),
+                  ),
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: _ResetButton(onTap: _resetView),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+/// The rasterized poster sized to its own aspect ratio, on a white sheet
+/// with a soft drop shadow.
+class _PosterPaper extends StatelessWidget {
+  const _PosterPaper({required this.image});
+
+  final ui.Image image;
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: image.width / image.height,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        // Cloned internally by RawImage, so the state's own handle stays
+        // free to dispose on the next raster.
+        child: RawImage(image: image, fit: BoxFit.contain),
+      ),
+    );
+  }
+}
+
+class _ViewportHint extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: c.card.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: c.border),
+      ),
+      child: Text(
+        'Scroll or pinch to zoom · drag to move',
+        style: outfitStyle(11, c.textSecondary),
+      ),
+    );
+  }
+}
+
+class _ResetButton extends StatelessWidget {
+  const _ResetButton({required this.onTap});
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
     return Material(
-      color: selected ? c.accent : c.card,
-      shape: StadiumBorder(
-        side: selected ? BorderSide.none : BorderSide(color: c.border),
-      ),
+      color: c.card.withValues(alpha: 0.9),
+      shape: CircleBorder(side: BorderSide(color: c.border)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            label,
-            style: outfitStyle(13, selected ? c.onAccent : c.textSecondary),
+        child: Tooltip(
+          message: 'Reset zoom',
+          child: SizedBox(
+            width: 34,
+            height: 34,
+            child: Icon(Icons.center_focus_strong_rounded,
+                size: 18, color: c.textSecondary),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _PosterPreview extends StatelessWidget {
-  const _PosterPreview({required this.jar, required this.settings});
-
-  final TipJar jar;
-  final PosterSettings settings;
-
-  @override
-  Widget build(BuildContext context) {
-    return PdfPreview(
-      key: ValueKey(
-        '${settings.theme.wire}-${settings.language.wire}-'
-        '${settings.paperSize.wire}-${settings.displayName}-'
-        '${settings.headline}-${settings.subline}-${settings.footer}',
-      ),
-      build: (format) => buildPosterPdf(
-        jar: jar,
-        theme: settings.theme,
-        language: settings.language,
-        paperSize: posterPaperSizeForFormat(format) ?? settings.paperSize,
-        displayName: settings.displayName,
-        headline: settings.headline,
-        subline: settings.subline,
-        footer: settings.footer,
-      ),
-      initialPageFormat: posterPageFormats[settings.paperSize],
-      canChangePageFormat: false,
-      canChangeOrientation: false,
-      canDebug: false,
-      useActions: false,
-      scrollViewDecoration: const BoxDecoration(color: Colors.transparent),
-      previewPageMargin:
-          const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
     );
   }
 }

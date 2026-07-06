@@ -22,20 +22,23 @@ const Map<PosterPaperSize, PdfPageFormat> posterPageFormats = {
     210 * PdfPageFormat.mm,
     297 * PdfPageFormat.mm,
   ),
+  PosterPaperSize.a5: PdfPageFormat(
+    148 * PdfPageFormat.mm,
+    210 * PdfPageFormat.mm,
+  ),
+  PosterPaperSize.a6: PdfPageFormat(
+    105 * PdfPageFormat.mm,
+    148 * PdfPageFormat.mm,
+  ),
   PosterPaperSize.letter: PdfPageFormat(
     8.5 * PdfPageFormat.inch,
     11.0 * PdfPageFormat.inch,
   ),
 };
 
-/// `PdfPreview`'s own paper-format picker wants `Map<String, PdfPageFormat>`
-/// keyed by display label.
-final Map<String, PdfPageFormat> posterPickerFormats = {
-  for (final entry in posterPageFormats.entries) entry.key.label: entry.value,
-};
-
-/// Reverse lookup for `PdfPreview`'s `onPageFormatChanged` callback, so the
-/// user's paper-size choice can be persisted back as a [PosterPaperSize].
+/// Reverse lookup for the OS print dialog's chosen format (via
+/// `Printing.layoutPdf`'s `onLayout` callback), so a size picked there maps
+/// back to a [PosterPaperSize] for rendering.
 PosterPaperSize? posterPaperSizeForFormat(PdfPageFormat format) {
   for (final entry in posterPageFormats.entries) {
     if (entry.value == format) return entry.key;

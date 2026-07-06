@@ -27,7 +27,6 @@ void main() {
           final bytes = await buildPosterPdf(
             jar: _jar,
             theme: theme,
-            language: PosterLanguage.english,
             paperSize: paperSize,
           );
           expect(bytes, isNotEmpty);
@@ -36,18 +35,18 @@ void main() {
       }
     }
 
-    for (final language in PosterLanguage.values) {
-      test('builds a valid PDF captioned in ${language.wire}', () async {
-        final bytes = await buildPosterPdf(
-          jar: _jar,
-          theme: PosterTheme.minimalFrame,
-          language: language,
-          paperSize: PosterPaperSize.a4,
-        );
-        expect(bytes, isNotEmpty);
-        expect(bytes.sublist(0, 4), _pdfMagic);
-      });
-    }
+    test('custom caption overrides build a valid PDF', () async {
+      final bytes = await buildPosterPdf(
+        jar: _jar,
+        theme: PosterTheme.minimalFrame,
+        paperSize: PosterPaperSize.a4,
+        headline: 'Scannez pour un pourboire',
+        subline: 'Soutenez le spectacle',
+        footer: 'Merci !',
+      );
+      expect(bytes, isNotEmpty);
+      expect(bytes.sublist(0, 4), _pdfMagic);
+    });
 
     test('a blank displayName override still builds a valid PDF', () async {
       // Not byte-compared against the no-override case: package:pdf embeds
@@ -56,7 +55,6 @@ void main() {
       final bytes = await buildPosterPdf(
         jar: _jar,
         theme: PosterTheme.minimalFrame,
-        language: PosterLanguage.english,
         paperSize: PosterPaperSize.a4,
         displayName: '   ',
       );
@@ -73,7 +71,6 @@ void main() {
       final bytes = await buildPosterPdf(
         jar: _jar,
         theme: PosterTheme.minimalFrame,
-        language: PosterLanguage.english,
         paperSize: PosterPaperSize.a4,
         displayName: 'DJ Overridden',
       );

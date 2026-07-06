@@ -15,11 +15,10 @@ import 'poster_templates.dart';
 /// [displayName], when non-empty, overrides [TipJar.displayName] on the
 /// poster — e.g. a shorter or friendlier name than the one used for the
 /// payment link. [headline]/[subline]/[footer], when non-empty, override
-/// the chosen [language]'s own caption text (poster_strings.dart).
+/// the default caption text ([kDefaultPosterStrings] in poster_strings.dart).
 Future<Uint8List> buildPosterPdf({
   required TipJar jar,
   required PosterTheme theme,
-  required PosterLanguage language,
   required PosterPaperSize paperSize,
   String displayName = '',
   String headline = '',
@@ -28,20 +27,16 @@ Future<Uint8List> buildPosterPdf({
 }) async {
   final fonts = await loadPosterFonts();
   final format = posterPageFormats[paperSize]!;
-  final languageStrings = kPosterStrings[language]!;
+  const defaults = kDefaultPosterStrings;
   final data = PosterData(
     qrData: jar.url,
     artistName: displayName.trim().isEmpty
         ? jar.displayName
         : displayName.trim(),
     strings: PosterStrings(
-      headline: headline.trim().isEmpty
-          ? languageStrings.headline
-          : headline.trim(),
-      subline: subline.trim().isEmpty
-          ? languageStrings.subline
-          : subline.trim(),
-      footer: footer.trim().isEmpty ? languageStrings.footer : footer.trim(),
+      headline: headline.trim().isEmpty ? defaults.headline : headline.trim(),
+      subline: subline.trim().isEmpty ? defaults.subline : subline.trim(),
+      footer: footer.trim().isEmpty ? defaults.footer : footer.trim(),
     ),
     format: format,
   );

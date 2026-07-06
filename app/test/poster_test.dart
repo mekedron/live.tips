@@ -4,10 +4,9 @@ import 'package:live_tips/domain/poster.dart';
 
 void main() {
   group('PosterSettings', () {
-    test('defaults: minimal frame, English, A4, no overrides', () {
+    test('defaults: minimal frame, A4, no overrides', () {
       const s = PosterSettings();
       expect(s.theme, PosterTheme.minimalFrame);
-      expect(s.language, PosterLanguage.english);
       expect(s.paperSize, PosterPaperSize.a4);
       expect(s.displayName, isEmpty);
       expect(s.headline, isEmpty);
@@ -18,7 +17,6 @@ void main() {
     test('json round-trip preserves every field', () {
       const s = PosterSettings(
         theme: PosterTheme.goldOnBlack,
-        language: PosterLanguage.russian,
         paperSize: PosterPaperSize.a3,
         displayName: 'The Midnight Foxes',
         headline: 'Custom headline',
@@ -32,7 +30,6 @@ void main() {
       const s = PosterSettings(theme: PosterTheme.ticketStub);
       final next = s.copyWith(paperSize: PosterPaperSize.letter);
       expect(next.theme, PosterTheme.ticketStub);
-      expect(next.language, PosterLanguage.english);
       expect(next.paperSize, PosterPaperSize.letter);
       expect(next.displayName, isEmpty);
       expect(next.headline, isEmpty);
@@ -57,17 +54,16 @@ void main() {
       expect(PosterTheme.roundedCard.wire, 'rounded-card');
       expect(PosterTheme.centerMedallion.wire, 'center-medallion');
       expect(PosterTheme.splitDuotone.wire, 'split-duotone');
-      expect(PosterLanguage.english.wire, 'en');
-      expect(PosterLanguage.russian.wire, 'ru');
       expect(PosterPaperSize.a4.wire, 'a4');
     });
 
-    test('all 8 themes and 9 languages have distinct wire values', () {
+    test('all 8 themes have distinct wire values', () {
       expect(PosterTheme.values.map((t) => t.wire).toSet().length, 8);
-      expect(PosterLanguage.values.map((l) => l.wire).toSet().length, 9);
     });
 
-    test('unknown wire values decode to defaults (forward compatibility)', () {
+    test('unknown / retired wire values decode to defaults', () {
+      // 'language' is a retired key — a blob written by an old build that
+      // still carries it must decode cleanly, ignoring it.
       final s = PosterSettings.fromJson({
         'theme': 'holographic',
         'language': 'klingon',
@@ -82,13 +78,11 @@ void main() {
       const s = AppSettings(
         poster: PosterSettings(
           theme: PosterTheme.splitDuotone,
-          language: PosterLanguage.polish,
           paperSize: PosterPaperSize.a2,
         ),
       );
       final revived = AppSettings.fromJson(s.toJson());
       expect(revived.poster.theme, PosterTheme.splitDuotone);
-      expect(revived.poster.language, PosterLanguage.polish);
       expect(revived.poster.paperSize, PosterPaperSize.a2);
     });
 

@@ -50,36 +50,14 @@ enum PosterTheme {
   }) => values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
 }
 
-/// A caption language for the poster's printed text (headline/subline/
-/// footer) — independent of the app's own UI language, which stays
-/// English-only.
-enum PosterLanguage {
-  english('en', 'English'),
-  dutch('nl', 'Dutch — Nederlands'),
-  french('fr', 'French — Français'),
-  german('de', 'German — Deutsch'),
-  italian('it', 'Italian — Italiano'),
-  polish('pl', 'Polish — Polski'),
-  portuguese('pt', 'Portuguese — Português'),
-  russian('ru', 'Russian — Русский'),
-  spanish('es', 'Spanish — Español');
-
-  const PosterLanguage(this.wire, this.label);
-  final String wire;
-  final String label;
-
-  static PosterLanguage fromWire(
-    String? wire, {
-    PosterLanguage fallback = PosterLanguage.english,
-  }) => values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
-}
-
 /// A paper size to print the poster on — the ISO 216 A-series plus US
 /// Letter.
 enum PosterPaperSize {
   a2('a2', 'A2 · 420 × 594 mm'),
   a3('a3', 'A3 · 297 × 420 mm'),
   a4('a4', 'A4 · 210 × 297 mm'),
+  a5('a5', 'A5 · 148 × 210 mm'),
+  a6('a6', 'A6 · 105 × 148 mm'),
   letter('letter', 'US Letter · 8.5 × 11 in');
 
   const PosterPaperSize(this.wire, this.label);
@@ -97,7 +75,6 @@ enum PosterPaperSize {
 class PosterSettings {
   const PosterSettings({
     this.theme = PosterTheme.minimalFrame,
-    this.language = PosterLanguage.english,
     this.paperSize = PosterPaperSize.a4,
     this.displayName = '',
     this.headline = '',
@@ -106,7 +83,6 @@ class PosterSettings {
   });
 
   final PosterTheme theme;
-  final PosterLanguage language;
   final PosterPaperSize paperSize;
 
   /// Overrides the jar's own display name on the printed poster — e.g. a
@@ -114,16 +90,15 @@ class PosterSettings {
   /// Empty (the default) prints the jar's own name as-is.
   final String displayName;
 
-  /// Overrides for the language table's headline/subline/footer captions
-  /// (poster_strings.dart) — each empty by default, meaning "use the
-  /// chosen language's own text".
+  /// Overrides for the poster's headline/subline/footer captions — each
+  /// empty by default, meaning "use the default wording"
+  /// ([kDefaultPosterStrings] in poster_strings.dart).
   final String headline;
   final String subline;
   final String footer;
 
   PosterSettings copyWith({
     PosterTheme? theme,
-    PosterLanguage? language,
     PosterPaperSize? paperSize,
     String? displayName,
     String? headline,
@@ -131,7 +106,6 @@ class PosterSettings {
     String? footer,
   }) => PosterSettings(
     theme: theme ?? this.theme,
-    language: language ?? this.language,
     paperSize: paperSize ?? this.paperSize,
     displayName: displayName ?? this.displayName,
     headline: headline ?? this.headline,
@@ -141,7 +115,6 @@ class PosterSettings {
 
   Map<String, dynamic> toJson() => {
     'theme': theme.wire,
-    'language': language.wire,
     'paperSize': paperSize.wire,
     'displayName': displayName,
     'headline': headline,
@@ -152,7 +125,6 @@ class PosterSettings {
   factory PosterSettings.fromJson(Map<String, dynamic> json) =>
       PosterSettings(
         theme: PosterTheme.fromWire(json['theme'] as String?),
-        language: PosterLanguage.fromWire(json['language'] as String?),
         paperSize: PosterPaperSize.fromWire(json['paperSize'] as String?),
         displayName: json['displayName'] as String? ?? '',
         headline: json['headline'] as String? ?? '',
@@ -164,7 +136,6 @@ class PosterSettings {
   bool operator ==(Object other) =>
       other is PosterSettings &&
       other.theme == theme &&
-      other.language == language &&
       other.paperSize == paperSize &&
       other.displayName == displayName &&
       other.headline == headline &&
@@ -173,5 +144,5 @@ class PosterSettings {
 
   @override
   int get hashCode =>
-      Object.hash(theme, language, paperSize, displayName, headline, subline, footer);
+      Object.hash(theme, paperSize, displayName, headline, subline, footer);
 }
