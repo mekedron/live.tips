@@ -16,6 +16,18 @@ import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../shell/app_shell.dart';
 
+/// Open the poster designer as a modal route with a back arrow — poster is no
+/// longer a bottom-nav tab, so this gives a clear way back. PosterScreen draws
+/// its own header + back button (shown whenever it can pop), so no AppBar
+/// wrapper is needed.
+void openPoster(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => const Scaffold(body: SafeArea(child: PosterScreen())),
+    ),
+  );
+}
+
 /// Pick a poster theme / paper size, preview it live in a pan-and-zoom
 /// canvas, then print or save a PDF — the print-ready alternative to
 /// reading a QR off a screen.
@@ -35,7 +47,11 @@ class PosterScreen extends ConsumerWidget {
     }
 
     final posterSettings = app.settings.poster;
-    final isRail = AppShellScope.of(context)?.isRail ?? false;
+    // In the shell it follows the rail; opened as a modal route (no shell
+    // scope) it falls back to the screen width, so desktop keeps the wide
+    // layout there too.
+    final isRail = AppShellScope.of(context)?.isRail ??
+        (MediaQuery.sizeOf(context).width >= kRailBreakpoint);
 
     // Reads fresh state at call time: the customize sheet outlives this
     // build, and consecutive edits must not clobber each other.
@@ -156,9 +172,22 @@ class PosterScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Poster',
-                        style:
-                            outfitStyle(32, c.text, weight: FontWeight.w800)),
+                    Row(
+                      children: [
+                        if (Navigator.of(context).canPop())
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: IconButton(
+                              tooltip: 'Back',
+                              icon: const Icon(Icons.arrow_back_rounded),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                        Text('Poster',
+                            style: outfitStyle(32, c.text,
+                                weight: FontWeight.w800)),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     optionsCard,
                     const SizedBox(height: 16),
@@ -183,17 +212,23 @@ class PosterScreen extends ConsumerWidget {
           children: [
             SizedBox(
               height: 56,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text('Poster',
-                          style: outfitStyle(20, c.text,
-                              weight: FontWeight.w700)),
-                    ),
-                  ],
-                ),
+              child: Row(
+                children: [
+                  if (Navigator.of(context).canPop())
+                    IconButton(
+                      tooltip: 'Back',
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      onPressed: () => Navigator.of(context).pop(),
+                    )
+                  else
+                    const SizedBox(width: 20),
+                  Expanded(
+                    child: Text('Poster',
+                        style:
+                            outfitStyle(20, c.text, weight: FontWeight.w700)),
+                  ),
+                  const SizedBox(width: 20),
+                ],
               ),
             ),
             Expanded(

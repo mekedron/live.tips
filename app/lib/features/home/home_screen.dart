@@ -14,6 +14,7 @@ import '../../widgets/goal_editor.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
 import '../live/live_screen.dart';
+import '../poster/poster_screen.dart';
 import '../settings/stage_preview_screen.dart';
 import '../settings/stage_settings_section.dart';
 import '../setup/jar_setup_screen.dart';
@@ -722,8 +723,7 @@ class _TipLinkRowCard extends StatelessWidget {
                         LtIconCircleButton(
                           icon: Icons.print_rounded,
                           tooltip: 'Poster',
-                          onTap: () => AppShellScope.of(context)
-                              ?.select(ShellTab.poster),
+                          onTap: () => openPoster(context),
                         ),
                       ],
                     ),
@@ -816,8 +816,7 @@ class _DesktopTipLinkCard extends StatelessWidget {
                 child: _SoftMini(
                   icon: Icons.print_rounded,
                   label: 'Poster',
-                  onTap: () =>
-                      AppShellScope.of(context)?.select(ShellTab.poster),
+                  onTap: () => openPoster(context),
                 ),
               ),
             ],

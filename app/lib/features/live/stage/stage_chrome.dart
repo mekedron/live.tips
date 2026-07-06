@@ -336,14 +336,7 @@ class StageQrPanel extends StatelessWidget {
                   ),
                   IconButton(
                     tooltip: 'Print poster',
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => Scaffold(
-                          appBar: AppBar(title: const Text('Poster')),
-                          body: const PosterScreen(),
-                        ),
-                      ),
-                    ),
+                    onPressed: () => openPoster(context),
                     icon: Icon(Icons.print_rounded,
                         size: 18,
                         color: Colors.white.withValues(alpha: 0.7)),
