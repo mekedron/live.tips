@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme.dart';
 import 'domain/app_settings.dart';
+import 'features/live/stage/stage_overlay.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
 import 'features/shell/app_shell.dart';
@@ -26,6 +27,9 @@ class LiveTipsApp extends ConsumerWidget {
         AppThemeMode.light => ThemeMode.light,
         AppThemeMode.dark => ThemeMode.dark,
       },
+      // Lets the web stage go inert while a sheet/dialog covers it, so modals
+      // stay clickable over the jar's iframe.
+      navigatorObservers: [StageOverlayObserver()],
       home: const RootGate(),
     );
   }

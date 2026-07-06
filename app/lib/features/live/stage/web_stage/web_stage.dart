@@ -9,6 +9,7 @@ import '../../../../core/theme.dart';
 import '../../../../domain/rollover_math.dart';
 import '../../../../domain/stage_settings.dart';
 import '../stage_hud.dart';
+import '../stage_overlay.dart';
 import '../stage_resolver.dart';
 import '../stage_types.dart';
 import 'stage_bridge_codec.dart';
@@ -65,6 +66,8 @@ class _WebStageState extends ConsumerState<WebStage> {
     _syncedGoal = widget.snapshot.goalMinor;
     _transport = ref.read(stageTransportFactoryProvider)();
     _transport.onMessage = _onMessage;
+    stageOverlayDepth.addListener(_syncStageInteractive);
+    _syncStageInteractive();
     _armReadyDeadline();
     _heartbeatCheck = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_ready &&
@@ -230,10 +233,16 @@ class _WebStageState extends ConsumerState<WebStage> {
     }
   }
 
+  /// Web: while a modal covers the stage, make the iframe inert so the modal
+  /// stays clickable over it (see stage_overlay.dart). No-op on native.
+  void _syncStageInteractive() =>
+      _transport.setInteractive(stageOverlayDepth.value == 0);
+
   @override
   void dispose() {
     _readyDeadline?.cancel();
     _heartbeatCheck?.cancel();
+    stageOverlayDepth.removeListener(_syncStageInteractive);
     _lifecycle.dispose();
     _transport.dispose();
     super.dispose();

@@ -78,6 +78,11 @@ class IframeStageTransport extends StageTransport {
   }
 
   @override
+  void setInteractive(bool interactive) {
+    _iframe.style.setProperty('pointer-events', interactive ? 'auto' : 'none');
+  }
+
+  @override
   Future<void> reload() async {
     final win = _iframe.contentWindow;
     if (win != null) {

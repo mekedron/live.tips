@@ -28,6 +28,13 @@ abstract class StageTransport {
   /// Full page reload — the recovery path after a render-process death.
   Future<void> reload();
 
+  /// Web only: toggle whether the embedded stage receives pointer events. The
+  /// host flips this off while a modal covers the stage, so sheets and dialogs
+  /// stay clickable over the <iframe> platform view (which on Flutter Web would
+  /// otherwise swallow every tap). No-op on native — platform-view hit-testing
+  /// already lets widgets above the WebView receive gestures there.
+  void setInteractive(bool interactive) {}
+
   void dispose() {}
 }
 

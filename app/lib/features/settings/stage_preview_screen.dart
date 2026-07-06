@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
+import '../../app.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../domain/donation.dart';
@@ -23,6 +24,7 @@ import '../live/stage/stage_chrome.dart';
 import '../live/stage/stage_hud.dart';
 import '../live/stage/stage_resolver.dart';
 import '../live/stage/stage_types.dart';
+import '../shell/app_shell.dart';
 import 'stage_settings_section.dart';
 
 /// Try-before-the-gig: a faithful replica of the live stage — same jar, HUD,
@@ -143,6 +145,21 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
     HapticFeedback.mediumImpact();
   }
 
+  /// Back arrow: pop to wherever we came from, but when there's nothing to
+  /// pop (e.g. the preview was opened directly on a fresh web load) fall back
+  /// to Home rather than stranding the performer on a dead-end screen.
+  void _handleBack(BuildContext context) {
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+    } else {
+      ref.read(shellTabRequestProvider.notifier).request(ShellTab.home);
+      nav.pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const RootGate()),
+      );
+    }
+  }
+
   Future<void> _editGoal(BuildContext context) async {
     final newGoal = await showGoalEditorSheet(
       context,
@@ -230,7 +247,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                           icon: Icons.arrow_back_rounded,
                           tooltip: 'Back',
                           size: wide ? 44 : 40,
-                          onTap: () => Navigator.of(context).maybePop(),
+                          onTap: () => _handleBack(context),
                         ),
                         const SizedBox(width: 8),
                         const _PreviewPill(),
