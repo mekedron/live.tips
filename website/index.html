@@ -342,6 +342,10 @@
     .hero { padding-top: 56px; padding-bottom: 40px; }
     .stage-card { border-radius: 24px; min-height: 420px; height: 68vh; }
     .hud-watch { display: none; }
+    /* the LIVE-DEMO label collides with the total on narrow screens — keep the
+       pulsing dot, drop the label, and shrink the pill to a neat circle */
+    .hud-live-label { display: none; }
+    .hud-live { width: 40px; padding: 0; justify-content: center; }
     section.block { padding-top: 48px; padding-bottom: 48px; }
     .wrap { padding-left: 18px; padding-right: 18px; }
   }
@@ -403,7 +407,7 @@
       <iframe id="stage-frame" src="stage/index.html" title="live.tips 3D tip jar" loading="lazy"></iframe>
       <div class="stage-shield" aria-hidden="true"></div>
       <div class="stage-hud">
-        <div class="hud-pill hud-live"><div class="dot"></div>LIVE DEMO</div>
+        <div class="hud-pill hud-live"><div class="dot"></div><span class="hud-live-label">LIVE DEMO</span></div>
         <div class="hud-pill hud-watch"><div class="dot"></div>Watching Stripe</div>
         <div class="hud-top">
           <div class="hud-total" id="hud-total">$87.00</div>
@@ -422,7 +426,7 @@
           <button class="zoom-btn" id="zoom-out" title="Zoom out" aria-label="Zoom out"><span class="ms">remove</span></button>
         </div>
         <div class="hud-bottom">
-          <button class="btn btn-primary btn-tip" id="tip-btn"><span class="ms">paid</span>Toss in a tip</button>
+          <button class="btn btn-primary btn-tip" id="tip-btn"><span class="ms">paid</span>Toss in a demo tip</button>
         </div>
       </div>
     </div>
