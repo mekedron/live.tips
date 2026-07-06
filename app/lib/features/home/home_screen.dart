@@ -139,81 +139,91 @@ class _EditableJarName extends ConsumerWidget {
     final c = context.lt;
     final style = outfitStyle(fontSize, c.text, weight: weight);
     if (demo) return Text(jar.displayName, style: style);
-    // A WidgetSpan keeps the pencil flowing with the text, so long names still
-    // wrap / ellipsize naturally instead of overflowing a fixed-width Row.
-    return Text.rich(
-      TextSpan(
-        text: jar.displayName,
-        children: [
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _editJarName(context, ref, jar),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 6),
-                child: Icon(Icons.edit_outlined,
-                    size: fontSize * 0.6, color: c.textMuted),
+    // The whole name is the tap target, mirroring the Tonight's-goal editor: an
+    // InkWell gives the grey hover highlight and the pointer cursor for free.
+    // Align(widthFactor/heightFactor) shrink-wraps the ink to the text so the
+    // highlight hugs the name (not the full row) under both the tight ListView
+    // width on phones and the unbounded header width on desktop. The pencil
+    // rides along as an inline WidgetSpan so long names still wrap.
+    return Align(
+      alignment: Alignment.centerLeft,
+      widthFactor: 1,
+      heightFactor: 1,
+      child: InkWell(
+        onTap: () => _editJarName(context, ref, jar),
+        borderRadius: BorderRadius.circular(8),
+        child: Text.rich(
+          TextSpan(
+            text: jar.displayName,
+            children: [
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: Icon(Icons.edit_outlined,
+                      size: fontSize * 0.6, color: c.textMuted),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+          style: style,
+        ),
       ),
-      style: style,
     );
   }
 }
 
 /// Rename the local display name — a light in-place edit that leaves the tip
-/// link untouched (see [_EditableJarName]).
+/// link untouched (see [_EditableJarName]). Opens as a bottom sheet, matching
+/// the Tonight's-goal editor.
 Future<void> _editJarName(
     BuildContext context, WidgetRef ref, TipJar jar) async {
   final notifier = ref.read(appStateProvider.notifier);
   final controller = TextEditingController(text: jar.displayName);
-  final saved = await showDialog<String>(
+  final saved = await showModalBottomSheet<String>(
     context: context,
+    isScrollControlled: true,
     builder: (context) {
       final c = context.lt;
-      return AlertDialog(
-        title: const Text('Display name'),
-        content: Column(
+      void submit() => Navigator.of(context).pop(controller.text.trim());
+      return Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: controller,
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
-              decoration:
-                  const InputDecoration(hintText: 'Artist or band name'),
-              onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
-            ),
-            const SizedBox(height: 10),
+            Text('Display name',
+                style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+            const SizedBox(height: 4),
             Text(
               'Shown on your home screen, stage and poster. Your tip link and '
               'its QR code aren\'t affected.',
               style: TextStyle(
-                  fontFamily: kFontBody,
-                  fontSize: 12.5,
-                  height: 1.4,
-                  color: c.textSecondary),
+                  fontFamily: kFontBody, fontSize: 13, color: c.textSecondary),
             ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              style: outfitStyle(20, c.text, weight: FontWeight.w700),
+              decoration:
+                  const InputDecoration(hintText: 'Artist or band name'),
+              onSubmitted: (_) => submit(),
+            ),
+            const SizedBox(height: 20),
+            LtPrimaryButton(label: 'Save name', onPressed: submit),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
       );
     },
   );
-  controller.dispose();
+  // Dispose after the sheet's exit animation is fully done.
+  Future.delayed(const Duration(seconds: 1), controller.dispose);
   if (saved != null && saved.isNotEmpty && saved != jar.displayName) {
     await notifier.setTipJar(jar.copyWith(displayName: saved));
   }
