@@ -30,13 +30,23 @@ class ShellTabRequest extends Notifier<ShellTab?> {
 enum ShellTab {
   home('Home', Icons.home_rounded, Icons.home_outlined),
   history('History', Icons.receipt_long_rounded, Icons.receipt_long_outlined),
-  poster('Poster', Icons.print_rounded, Icons.print_outlined),
+  // Poster still lives in the shell (so the bottom nav / rail stay visible while
+  // you design it), but it has no nav item of its own — it's reached only from
+  // Home's tip-link "Poster" button. inNav: false keeps it out of the bars.
+  poster('Poster', Icons.print_rounded, Icons.print_outlined, inNav: false),
   settings('Settings', Icons.settings_rounded, Icons.settings_outlined);
 
-  const ShellTab(this.label, this.activeIcon, this.inactiveIcon);
+  const ShellTab(this.label, this.activeIcon, this.inactiveIcon,
+      {this.inNav = true});
   final String label;
   final IconData activeIcon;
   final IconData inactiveIcon;
+
+  /// Whether this tab appears in the bottom bar / side rail.
+  final bool inNav;
+
+  /// The tabs that get a nav item (everything but the poster designer).
+  static List<ShellTab> get navTabs => values.where((t) => t.inNav).toList();
 }
 
 /// Lets any tab switch tabs (Home's "View all" → History, …) and tells
@@ -179,7 +189,7 @@ class _BottomTabBar extends StatelessWidget {
           height: 68,
           child: Row(
             children: [
-              for (final t in ShellTab.values)
+              for (final t in ShellTab.navTabs)
                 Expanded(
                   child: InkWell(
                     onTap: () => onSelect(t),
@@ -258,7 +268,7 @@ class _SideRail extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 28),
-          for (final t in ShellTab.values)
+          for (final t in ShellTab.navTabs)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Material(

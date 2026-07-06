@@ -253,17 +253,18 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                         const SizedBox(width: 8),
                         const _PreviewPill(),
                         const Spacer(),
-                        if (fullscreenSupported) ...[
+                        if (fullscreenAvailable)
                           StageFullscreenButton(size: wide ? 44 : 40),
-                          const SizedBox(width: 8),
-                        ],
-                        StageGlassButton(
-                          icon: Icons.flag_rounded,
-                          tooltip: 'Preview goal',
-                          size: wide ? 44 : 40,
-                          onTap: () => _editGoal(context),
-                        ),
+                        // Goal + stage-look sit up here only on wide screens; on
+                        // phones they move into the bottom action bar (alongside
+                        // Show QR), so all the stage tweaks are one thumb-reach.
                         if (wide) ...[
+                          const SizedBox(width: 8),
+                          StageGlassButton(
+                            icon: Icons.flag_rounded,
+                            tooltip: 'Preview goal',
+                            onTap: () => _editGoal(context),
+                          ),
                           const SizedBox(width: 8),
                           StageGlassButton(
                             icon: Icons.palette_rounded,
@@ -306,6 +307,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                             Expanded(
                               child: _PretendTipButton(
                                 busy: _pending,
+                                filled: true,
                                 onTap: () => _onPretendTip(context),
                               ),
                             ),
@@ -314,6 +316,12 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                               icon: Icons.qr_code_2_rounded,
                               tooltip: 'Show QR',
                               onTap: () => showFullscreenQr(context, jar.url),
+                            ),
+                            const SizedBox(width: 8),
+                            StageGlassSquare(
+                              icon: Icons.flag_rounded,
+                              tooltip: 'Preview goal',
+                              onTap: () => _editGoal(context),
                             ),
                             const SizedBox(width: 8),
                             StageGlassSquare(
@@ -423,13 +431,31 @@ class _PreviewPill extends StatelessWidget {
 /// The coral pretend-tip CTA — an expanded bar button on phones, a floating
 /// pill on wide screens. Spins while the tip is "landing".
 class _PretendTipButton extends StatelessWidget {
-  const _PretendTipButton({required this.onTap, this.busy = false});
+  const _PretendTipButton({
+    required this.onTap,
+    this.busy = false,
+    this.filled = false,
+  });
 
   final VoidCallback onTap;
   final bool busy;
 
+  /// True when it fills a fixed-width slot (the phone action bar, now sharing
+  /// the row with three square buttons): the label is allowed to ellipsize so
+  /// it never overflows. As a free-floating pill on wide screens it keeps its
+  /// natural width — a [Flexible] can't live under the unbounded constraints
+  /// there, hence the two modes.
+  final bool filled;
+
   @override
   Widget build(BuildContext context) {
+    final label = Text(
+      busy ? 'Landing…' : 'Pretend tip',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style:
+          outfitStyle(14.5, const Color(0xFF40160A), weight: FontWeight.w700),
+    );
     final button = Material(
       color: kStageAccent,
       borderRadius: BorderRadius.circular(14),
@@ -439,7 +465,7 @@ class _PretendTipButton extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: filled ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (busy)
@@ -453,11 +479,9 @@ class _PretendTipButton extends StatelessWidget {
                 const Icon(Icons.volunteer_activism_rounded,
                     size: 19, color: Color(0xFF40160A)),
               const SizedBox(width: 8),
-              Text(
-                busy ? 'Landing…' : 'Pretend tip',
-                style: outfitStyle(14.5, const Color(0xFF40160A),
-                    weight: FontWeight.w700),
-              ),
+              // Loose Flexible: centered by the row when there's slack, clipped
+              // to an ellipsis when the slot is tight.
+              if (filled) Flexible(child: label) else label,
             ],
           ),
         ),

@@ -7,9 +7,7 @@ import '../../core/theme.dart';
 import '../../domain/app_settings.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
-import '../setup/jar_setup_screen.dart';
 import '../shell/app_shell.dart';
-import 'stage_settings_section.dart';
 
 const _kAppVersion = '0.2.0';
 
@@ -63,7 +61,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
-    final jar = app.effectiveTipJar;
     final settings = app.settings;
     final isRail = AppShellScope.of(context)?.isRail ?? false;
 
@@ -141,57 +138,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
-      // ------------------------------------------------------- tip jar ---
-      if (!app.demo && jar != null)
-        LtRowGroup(
-          header: 'Tip jar',
-          children: [
-            LtRow(
-              icon: Icons.storefront_rounded,
-              title: jar.displayName,
-              subtitle: '${jar.currency.toUpperCase()} · '
-                  '${jar.url.replaceFirst(RegExp('^https?://'), '')}',
-              chevron: true,
-              onTap: () => launchUrl(
-                Uri.parse(jar.url),
-                mode: LaunchMode.externalApplication,
-              ),
-            ),
-            LtRow(
-              icon: Icons.print_rounded,
-              title: 'Print poster',
-              chevron: true,
-              onTap: () =>
-                  AppShellScope.of(context)?.select(ShellTab.poster),
-            ),
-            LtRow(
-              icon: Icons.refresh_rounded,
-              title: 'Create a new tip link',
-              subtitle:
-                  'Old link is deactivated — printed QRs stop working',
-              chevron: true,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const JarSetupScreen(recreate: true),
-                ),
-              ),
-            ),
-          ],
-        ),
-      // ---------------------------------------------------- stage look ---
-      LtCard(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Padding(
-              padding: EdgeInsets.only(top: 8, bottom: 2),
-              child: LtSectionLabel('Stage look'),
-            ),
-            StageSettingsSection(),
-          ],
-        ),
-      ),
+      // The tip jar (link / poster / recreate) and Stage look now live on the
+      // Home screen and the stage-look sheet, so Settings no longer repeats them.
       // -------------------------------------------------- live session ---
       LtRowGroup(
         header: 'Live session',

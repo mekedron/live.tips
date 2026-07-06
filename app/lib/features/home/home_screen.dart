@@ -14,7 +14,9 @@ import '../../widgets/goal_editor.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
 import '../live/live_screen.dart';
+import '../settings/stage_preview_screen.dart';
 import '../settings/stage_settings_section.dart';
+import '../setup/jar_setup_screen.dart';
 import '../shell/app_shell.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -132,6 +134,9 @@ class _MobileHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
+    // Phones skip Recent tips — History sits one tap away in the nav. Tablets
+    // keep it to fill out the roomier canvas.
+    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
     return Column(
       children: [
         SizedBox(
@@ -169,8 +174,10 @@ class _MobileHome extends StatelessWidget {
                   goalCard,
                   const SizedBox(height: 14),
                   _TipLinkRowCard(url: jar.url),
-                  const SizedBox(height: 14),
-                  _RecentTipsCard(compact: true),
+                  if (isTablet) ...[
+                    const SizedBox(height: 14),
+                    _RecentTipsCard(compact: true),
+                  ],
                 ],
               ),
             ),
@@ -390,6 +397,16 @@ class _GoalCard extends ConsumerWidget {
             ),
           ],
         ],
+        const SizedBox(height: 10),
+        // A no-stakes dry run of the stage — pour pretend tips before going live.
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const StagePreviewScreen()),
+          ),
+          icon: Icon(Icons.play_circle_outline_rounded,
+              size: 18, color: c.textSecondary),
+          label: const Text('Preview stage'),
+        ),
       ],
     );
 
@@ -537,65 +554,78 @@ class _TipLinkRowCard extends StatelessWidget {
     final c = context.lt;
     return LtCard(
       padding: const EdgeInsets.all(16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => showFullscreenQr(context, url),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: c.border),
+          Row(
+            children: [
+              InkWell(
                 borderRadius: BorderRadius.circular(12),
-              ),
-              child: QrBlock(data: url, size: 84, padding: 0, radius: 6),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Your tip link', style: outfitStyle(15, c.text)),
-                Padding(
-                  padding: const EdgeInsets.only(top: 3, bottom: 8),
-                  child: Text(
-                    url.replaceFirst(RegExp('^https?://'), ''),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11.5,
-                        color: c.textMuted),
+                onTap: () => showFullscreenQr(context, url),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: c.border),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  child: QrBlock(data: url, size: 84, padding: 0, radius: 6),
                 ),
-                Row(
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    LtIconCircleButton(
-                      icon: Icons.content_copy_rounded,
-                      tooltip: 'Copy link',
-                      onTap: () => copyTipLink(context, url),
+                    Text('Your tip link', style: outfitStyle(15, c.text)),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3, bottom: 8),
+                      child: Text(
+                        url.replaceFirst(RegExp('^https?://'), ''),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11.5,
+                            color: c.textMuted),
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    LtIconCircleButton(
-                      icon: Icons.ios_share_rounded,
-                      tooltip: 'Share',
-                      onTap: () =>
-                          SharePlus.instance.share(ShareParams(text: url)),
-                    ),
-                    const SizedBox(width: 8),
-                    LtIconCircleButton(
-                      icon: Icons.print_rounded,
-                      tooltip: 'Poster',
-                      onTap: () => AppShellScope.of(context)
-                          ?.select(ShellTab.poster),
+                    Row(
+                      children: [
+                        LtIconCircleButton(
+                          icon: Icons.open_in_new_rounded,
+                          tooltip: 'Open in new tab',
+                          onTap: () => openTipLink(url),
+                        ),
+                        const SizedBox(width: 8),
+                        LtIconCircleButton(
+                          icon: Icons.content_copy_rounded,
+                          tooltip: 'Copy link',
+                          onTap: () => copyTipLink(context, url),
+                        ),
+                        const SizedBox(width: 8),
+                        LtIconCircleButton(
+                          icon: Icons.ios_share_rounded,
+                          tooltip: 'Share',
+                          onTap: () =>
+                              SharePlus.instance.share(ShareParams(text: url)),
+                        ),
+                        const SizedBox(width: 8),
+                        LtIconCircleButton(
+                          icon: Icons.print_rounded,
+                          tooltip: 'Poster',
+                          onTap: () => AppShellScope.of(context)
+                              ?.select(ShellTab.poster),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+          const SizedBox(height: 12),
+          const _NewTipLinkButton(),
         ],
       ),
     );
@@ -684,6 +714,8 @@ class _DesktopTipLinkCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          const _NewTipLinkButton(),
         ],
       ),
     );
@@ -722,6 +754,62 @@ class _SoftMini extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Create new tip link" — shared by both tip-link cards. Understated on
+/// purpose: it's rare and destructive (it retires the current QR), so it sits
+/// quietly below the everyday actions and always confirms first.
+class _NewTipLinkButton extends StatelessWidget {
+  const _NewTipLinkButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton.icon(
+        onPressed: () => _confirmRecreateLink(context),
+        style: TextButton.styleFrom(
+          foregroundColor: c.textSecondary,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+        icon: const Icon(Icons.autorenew_rounded, size: 17),
+        label: Text('Create new tip link',
+            style: outfitStyle(13, c.textSecondary)),
+      ),
+    );
+  }
+}
+
+/// Warn before regenerating the tip link — the current one is deactivated and
+/// any printed QR codes stop working — then hand off to the recreate flow.
+Future<void> _confirmRecreateLink(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Create a new tip link?'),
+      content: const Text(
+        'Your current link is replaced and deactivated — any printed QR codes '
+        'or links you\'ve already shared will stop working. You\'ll set up a '
+        'fresh one on the next screen.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Create new link'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const JarSetupScreen(recreate: true)),
     );
   }
 }
