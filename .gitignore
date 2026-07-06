@@ -1,6 +1,7 @@
 .DS_Store
 .validation/
 node_modules/
+__pycache__/
 
 # Local secrets (Stripe dev keys etc.) — never commit
 .env

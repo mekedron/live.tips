@@ -13,6 +13,8 @@ To rebrand, edit the constants below and rerun ``python3 scripts/gen_icons.py``:
 
 Everything it writes (paths relative to the repo root):
   website/index.html ............................. inline SVG favicon (landing)
+  website/favicon.png ............................ landing PNG favicon (search engines)
+  website/apple-touch-icon.png ................... landing iOS bookmark icon
   app/web/favicon.png + app/web/icons/*.png ...... Flutter web favicon + PWA icons
   app/ios/.../AppIcon.appiconset/*.png ........... iOS app icon (opaque, all sizes)
   app/macos/.../AppIcon.appiconset/*.png ......... macOS app icon (padded squircle)
@@ -205,6 +207,8 @@ def png_targets():
         t.append((f"{IOS}/{fn}", sz, "ios"))
     for sz in (16, 32, 64, 128, 256, 512, 1024):
         t.append((f"{MAC}/app_icon_{sz}.png", sz, "macos"))
+    t.append(("website/favicon.png", 96, "fav_rounded"))
+    t.append(("website/apple-touch-icon.png", 180, "square"))
     t.append((f"{WEB}/favicon.png", 64, "fav_rounded"))
     t.append((f"{WEB}/icons/Icon-192.png", 192, "square"))
     t.append((f"{WEB}/icons/Icon-512.png", 512, "square"))
@@ -259,10 +263,11 @@ def landing_favicon_datauri():
 def write_landing_favicon():
     path = os.path.join(ROOT, "website", "index.html")
     html = open(path).read()
-    line = f'<link rel="icon" href="{landing_favicon_datauri()}">'
+    line = f'<link rel="icon" type="image/svg+xml" href="{landing_favicon_datauri()}">'
     # href is double-quoted and the data-URI SVG uses single quotes inside, so
     # match to the closing quote — NOT the first '>' (the SVG contains many).
-    new, n = re.subn(r'<link rel="icon" href="[^"]*">', line, html, count=1)
+    new, n = re.subn(r'<link rel="icon" type="image/svg\+xml" href="[^"]*">',
+                     line, html, count=1)
     if n == 0:
         print('  ! website/index.html: <link rel="icon"> not found — skipped')
     elif new != html:
