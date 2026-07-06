@@ -6,6 +6,8 @@ Map<String, dynamic> checkoutSession({
   int amount = 500,
   List<Map<String, dynamic>>? customFields,
   Map<String, dynamic>? customerDetails,
+  bool livemode = false,
+  Object? paymentIntent = 'pi_1',
 }) =>
     {
       'id': id,
@@ -13,9 +15,10 @@ Map<String, dynamic> checkoutSession({
       'amount_total': amount,
       'currency': 'eur',
       'created': 1751500000,
-      'livemode': false,
+      'livemode': livemode,
       'payment_link': 'plink_1',
       'payment_status': 'paid',
+      'payment_intent': paymentIntent,
       'custom_fields': customFields ?? [],
       'customer_details': customerDetails,
     };
@@ -84,5 +87,38 @@ void main() {
     expect(restored.message, original.message);
     expect(restored.createdAt, original.createdAt);
     expect(restored.livemode, original.livemode);
+    expect(restored.paymentIntentId, original.paymentIntentId);
+  });
+
+  test('captures the payment_intent id and links test-mode payments', () {
+    final donation = Donation.fromCheckoutSession(
+      checkoutSession(paymentIntent: 'pi_test_123'),
+    );
+    expect(donation.paymentIntentId, 'pi_test_123');
+    expect(donation.stripeDashboardUrl,
+        'https://dashboard.stripe.com/test/payments/pi_test_123');
+  });
+
+  test('live-mode payments link without the /test/ segment', () {
+    final donation = Donation.fromCheckoutSession(
+      checkoutSession(livemode: true, paymentIntent: 'pi_live_456'),
+    );
+    expect(donation.stripeDashboardUrl,
+        'https://dashboard.stripe.com/payments/pi_live_456');
+  });
+
+  test('unwraps an expanded payment_intent object', () {
+    final donation = Donation.fromCheckoutSession(
+      checkoutSession(paymentIntent: {'id': 'pi_expanded_789'}),
+    );
+    expect(donation.paymentIntentId, 'pi_expanded_789');
+  });
+
+  test('no dashboard link without a payment_intent (e.g. demo tips)', () {
+    final donation = Donation.fromCheckoutSession(
+      checkoutSession(paymentIntent: null),
+    );
+    expect(donation.paymentIntentId, isNull);
+    expect(donation.stripeDashboardUrl, isNull);
   });
 }

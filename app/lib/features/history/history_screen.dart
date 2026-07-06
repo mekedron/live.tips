@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
@@ -13,6 +14,22 @@ import '../../widgets/lt_ui.dart';
 import '../shell/app_shell.dart';
 
 enum _HistoryTab { donations, sessions }
+
+/// Opens the donation's transaction in the artist's Stripe Dashboard (a new
+/// browser tab on web). No-op for tips that have no link — demo tips, or
+/// records archived before the PaymentIntent id was captured.
+void _openDonationInStripe(Donation donation) {
+  final url = donation.stripeDashboardUrl;
+  if (url == null) return;
+  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+}
+
+/// The tap handler for a donation row, or null when it has no Stripe link
+/// (so the row stays non-interactive rather than looking tappable but dead).
+VoidCallback? _stripeTap(Donation donation) =>
+    donation.stripeDashboardUrl == null
+        ? null
+        : () => _openDonationInStripe(donation);
 
 /// All-time donations (straight from the Stripe API, paginated) and the
 /// locally recorded session archive.
@@ -338,7 +355,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             children: [
               for (var i = 0; i < rows.length; i++) ...[
                 if (i > 0) Divider(height: 1, color: c.divider),
-                DonationTile(donation: rows[i], showTime: true),
+                DonationTile(
+                  donation: rows[i],
+                  showTime: true,
+                  onTap: _stripeTap(rows[i]),
+                ),
               ],
             ],
           ),
@@ -449,11 +470,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       itemCount: session.donations.length,
                       separatorBuilder: (_, _) =>
                           Divider(height: 1, color: c.divider),
-                      itemBuilder: (context, index) => DonationTile(
-                        donation: session
-                            .donations[session.donations.length - 1 - index],
-                        showTime: true,
-                      ),
+                      itemBuilder: (context, index) {
+                        final donation = session
+                            .donations[session.donations.length - 1 - index];
+                        return DonationTile(
+                          donation: donation,
+                          showTime: true,
+                          onTap: _stripeTap(donation),
+                        );
+                      },
                     ),
             ),
           ],
@@ -544,7 +569,10 @@ class _DonationsTable extends StatelessWidget {
               ),
             for (var i = 0; i < donations.length; i++) ...[
               if (i > 0) Divider(height: 1, color: c.divider),
-              _TableRow(donation: donations[i]),
+              _TableRow(
+                donation: donations[i],
+                onTap: _stripeTap(donations[i]),
+              ),
             ],
             if (loading)
               const Padding(
@@ -570,15 +598,16 @@ class _DonationsTable extends StatelessWidget {
 }
 
 class _TableRow extends StatelessWidget {
-  const _TableRow({required this.donation});
+  const _TableRow({required this.donation, this.onTap});
 
   final Donation donation;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
     final anonymous = donation.name == null || donation.name!.trim().isEmpty;
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 11),
       child: Row(
         children: [
@@ -643,6 +672,8 @@ class _TableRow extends StatelessWidget {
         ],
       ),
     );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
   }
 
   String _when(DateTime time) {

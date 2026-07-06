@@ -15,6 +15,7 @@ class DonationTile extends StatelessWidget {
     required this.donation,
     this.showTime = false,
     this.padding = const EdgeInsets.symmetric(vertical: 8),
+    this.onTap,
   });
 
   final Donation donation;
@@ -23,11 +24,15 @@ class DonationTile extends StatelessWidget {
   final bool showTime;
   final EdgeInsetsGeometry padding;
 
+  /// When set, the row becomes tappable and shows a subtle open-in-new hint —
+  /// History uses it to open the donation's transaction in Stripe.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
     final anonymous = donation.name == null || donation.name!.trim().isEmpty;
-    return Padding(
+    final row = Padding(
       padding: padding,
       child: Row(
         children: [
@@ -81,9 +86,15 @@ class DonationTile extends StatelessWidget {
                 ),
             ],
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: 10),
+            Icon(Icons.open_in_new_rounded, size: 14, color: c.textFaint),
+          ],
         ],
       ),
     );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
   }
 }
 

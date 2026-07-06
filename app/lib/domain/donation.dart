@@ -9,6 +9,7 @@ class Donation {
     this.name,
     this.message,
     this.livemode = true,
+    this.paymentIntentId,
   });
 
   /// Checkout Session id (`cs_…`) — stable, used for de-duplication.
@@ -20,12 +21,28 @@ class Donation {
   final String? message;
   final bool livemode;
 
+  /// PaymentIntent id (`pi_…`) behind this checkout session, when known.
+  /// Absent for demo tips and for donations archived before we started
+  /// capturing it. Powers [stripeDashboardUrl].
+  final String? paymentIntentId;
+
   String get displayName {
     final trimmed = name?.trim() ?? '';
     return trimmed.isEmpty ? 'Anonymous' : trimmed;
   }
 
   bool get hasMessage => (message?.trim() ?? '').isNotEmpty;
+
+  /// Deep link to this payment in the artist's own Stripe Dashboard — the
+  /// "transaction" page — or null when there's nothing to open (demo tips,
+  /// or older records saved before the PaymentIntent id was captured).
+  /// Test-mode payments live under the dashboard's `/test/` path.
+  String? get stripeDashboardUrl {
+    final pi = paymentIntentId;
+    if (pi == null || !pi.startsWith('pi_')) return null;
+    final mode = livemode ? '' : 'test/';
+    return 'https://dashboard.stripe.com/${mode}payments/$pi';
+  }
 
   /// Parses a Checkout Session object (from `/v1/events` payloads or the
   /// `/v1/checkout/sessions` list) into a donation.
@@ -47,6 +64,10 @@ class Donation {
     final customer = session['customer_details'];
     final customerName = customer is Map ? customer['name'] as String? : null;
 
+    // `payment_intent` is an expandable field: unexpanded (as here) it's the
+    // `pi_…` string id; expanded it would be the full object — guard for both.
+    final paymentIntent = session['payment_intent'];
+
     return Donation(
       id: session['id'] as String,
       amountMinor: (session['amount_total'] as num?)?.toInt() ?? 0,
@@ -57,6 +78,9 @@ class Donation {
       name: customField('nickname') ?? customerName,
       message: customField('message'),
       livemode: session['livemode'] as bool? ?? true,
+      paymentIntentId: paymentIntent is String
+          ? paymentIntent
+          : (paymentIntent is Map ? paymentIntent['id'] as String? : null),
     );
   }
 
@@ -68,6 +92,7 @@ class Donation {
         if (name != null) 'name': name,
         if (message != null) 'message': message,
         'livemode': livemode,
+        if (paymentIntentId != null) 'paymentIntentId': paymentIntentId,
       };
 
   factory Donation.fromJson(Map<String, dynamic> json) => Donation(
@@ -80,5 +105,6 @@ class Donation {
         name: json['name'] as String?,
         message: json['message'] as String?,
         livemode: json['livemode'] as bool? ?? true,
+        paymentIntentId: json['paymentIntentId'] as String?,
       );
 }
