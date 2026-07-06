@@ -4,6 +4,7 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
@@ -407,7 +408,7 @@ class _PretendTipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final button = Material(
       color: kStageAccent,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
@@ -440,6 +441,9 @@ class _PretendTipButton extends StatelessWidget {
         ),
       ),
     );
+    // Intercept real pointer events so the CTA is tappable over the jar's
+    // web <iframe> platform view (no-op off web).
+    return PointerInterceptor(child: button);
   }
 }
 

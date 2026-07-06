@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
@@ -49,8 +50,13 @@ class StageGlassButton extends StatelessWidget {
         ),
       ),
     );
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip!, child: button);
+    final control = tooltip == null
+        ? button
+        : Tooltip(message: tooltip!, child: button);
+    // Web: the jar is an <iframe> platform view that would otherwise swallow
+    // real clicks landing on this control — intercept so it stays tappable (a
+    // harmless no-op off web). Orbit still works wherever no control sits.
+    return PointerInterceptor(child: control);
   }
 }
 
@@ -83,8 +89,10 @@ class StageGlassSquare extends StatelessWidget {
         ),
       ),
     );
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip!, child: button);
+    final control = tooltip == null
+        ? button
+        : Tooltip(message: tooltip!, child: button);
+    return PointerInterceptor(child: control);
   }
 }
 
@@ -112,7 +120,7 @@ class StageQrPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final panel = Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: kStageGlassSoft,
@@ -205,6 +213,7 @@ class StageQrPanel extends StatelessWidget {
         },
       ),
     );
+    return PointerInterceptor(child: panel);
   }
 }
 
