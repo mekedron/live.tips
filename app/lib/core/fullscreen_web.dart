@@ -11,7 +11,30 @@ import 'package:web/web.dart' as web;
 /// that activation, so the browser silently refuses it. A raw `onclick` keeps
 /// the gesture, so the toggle actually works. It styles itself to match the
 /// glass stage controls and tracks state via `fullscreenchange`.
-bool get fullscreenSupported => true;
+/// Real Fullscreen API support — true on desktop, Android and iPad, but
+/// **false on iPhone Safari**, which has simply never implemented it (an
+/// Apple/WebKit limitation we can't polyfill). `fullscreenEnabled` is the
+/// honest feature-detect.
+bool get fullscreenSupported => web.document.fullscreenEnabled;
+
+/// iPhone can't truly go fullscreen — but an installed PWA ("Add to Home
+/// Screen") launches chrome-free, so there we surface that hint instead of a
+/// dead button. iPhone/iPod only (iPad *is* supported); dropped once already
+/// running standalone (nothing left to install).
+bool get fullscreenNeedsInstall =>
+    !fullscreenSupported && _isIPhone && !_isStandalone;
+
+/// Whether to show the stage fullscreen control at all: a real toggle where
+/// the API exists, the install hint on iPhone.
+bool get fullscreenAvailable => fullscreenSupported || fullscreenNeedsInstall;
+
+bool get _isIPhone {
+  final ua = web.window.navigator.userAgent;
+  return ua.contains('iPhone') || ua.contains('iPod');
+}
+
+bool get _isStandalone =>
+    web.window.matchMedia('(display-mode: standalone)').matches;
 
 // Material fullscreen / fullscreen-exit glyphs (24×24 viewBox).
 const _enterPath =
@@ -27,10 +50,15 @@ String _iconUrl() {
 }
 
 void _toggle() {
-  if (web.document.fullscreenElement != null) {
-    web.document.exitFullscreen();
-  } else {
-    web.document.documentElement?.requestFullscreen();
+  try {
+    if (web.document.fullscreenElement != null) {
+      web.document.exitFullscreen();
+    } else {
+      web.document.documentElement?.requestFullscreen();
+    }
+  } catch (_) {
+    // Never let a rejected request (permissions policy, a lost gesture, an
+    // engine that mis-reported support) escape the native click handler.
   }
 }
 

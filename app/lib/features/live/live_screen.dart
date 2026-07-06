@@ -4,6 +4,7 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/fullscreen.dart';
@@ -292,7 +293,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                             ),
                             const SizedBox(width: 8),
                           ],
-                          if (fullscreenSupported) ...[
+                          if (fullscreenAvailable) ...[
                             StageFullscreenButton(size: wide ? 44 : 40),
                             const SizedBox(width: 8),
                           ],
@@ -325,31 +326,42 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                           child: Row(
                             children: [
                               Expanded(
-                                child: Material(
-                                  color: kStageAccent,
-                                  borderRadius: BorderRadius.circular(12),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: InkWell(
-                                    onTap: () =>
-                                        showFullscreenQr(context, jar.url),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 11),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.qr_code_2_rounded,
-                                              size: 19,
-                                              color: Color(0xFF40160A)),
-                                          const SizedBox(width: 7),
-                                          Text(
-                                            'Show QR',
-                                            style: outfitStyle(
-                                                14, const Color(0xFF40160A),
-                                                weight: FontWeight.w700),
-                                          ),
-                                        ],
+                                // Web: the jar renders as an <iframe> platform
+                                // view that swallows pointer events, so ANY
+                                // control floating over it must be wrapped in a
+                                // PointerInterceptor — otherwise its taps fall
+                                // through to the iframe and nothing happens. That
+                                // was the "Show QR doesn't work in live mode" bug:
+                                // the glass buttons wrap themselves, but this
+                                // hand-rolled coral button has to opt in here.
+                                // (Harmless no-op on native platforms.)
+                                child: PointerInterceptor(
+                                  child: Material(
+                                    color: kStageAccent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: InkWell(
+                                      onTap: () =>
+                                          showFullscreenQr(context, jar.url),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 11),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(Icons.qr_code_2_rounded,
+                                                size: 19,
+                                                color: Color(0xFF40160A)),
+                                            const SizedBox(width: 7),
+                                            Text(
+                                              'Show QR',
+                                              style: outfitStyle(
+                                                  14, const Color(0xFF40160A),
+                                                  weight: FontWeight.w700),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),

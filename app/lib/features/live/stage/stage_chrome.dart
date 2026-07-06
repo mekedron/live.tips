@@ -7,7 +7,7 @@ import '../../../core/theme.dart';
 import '../../../domain/donation.dart';
 import '../../../widgets/qr_card.dart';
 import '../../poster/poster_screen.dart';
-import 'stage_hud.dart' show kStageGlassSoft, kStageAmount;
+import 'stage_hud.dart' show kStageGlassSoft, kStageAmount, kStageAccent;
 
 /// Frosted-glass floating controls and the QR panel shared by the live stage
 /// and its preview — extracted so both screens present identical chrome.
@@ -97,17 +97,164 @@ class StageGlassSquare extends StatelessWidget {
   }
 }
 
-/// Web-only fullscreen toggle for the stage — a native DOM button (see
-/// [fullscreenButton]) styled to match the glass controls, so its click keeps
-/// the user gesture `requestFullscreen()` needs. Renders nothing where
-/// fullscreen isn't supported, so callers can drop it in unconditionally.
+/// Fullscreen control for the stage. Where the browser has a real Fullscreen
+/// API (desktop, Android, iPad) this is a native DOM button (see
+/// [fullscreenButton]) whose raw click keeps the user gesture
+/// `requestFullscreen()` needs. On iPhone — which has no Fullscreen API at all
+/// — it becomes an "Add to Home Screen" hint, the only way to get a chrome-free
+/// stage there. Renders nothing where neither applies, so callers can gate on
+/// [fullscreenAvailable] and drop it in.
 class StageFullscreenButton extends StatelessWidget {
   const StageFullscreenButton({super.key, this.size = 44});
 
   final double size;
 
   @override
-  Widget build(BuildContext context) => fullscreenButton(size: size);
+  Widget build(BuildContext context) {
+    if (fullscreenSupported) return fullscreenButton(size: size);
+    if (fullscreenNeedsInstall) {
+      return StageGlassButton(
+        icon: Icons.fullscreen_rounded,
+        tooltip: 'Fullscreen',
+        size: size,
+        onTap: () => showAddToHomeScreenSheet(context),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+/// iPhone Safari can't enter true fullscreen, but a Home-Screen PWA runs
+/// without browser bars — this sheet walks the performer through installing it.
+/// Shown from [StageFullscreenButton] on iPhone in place of a dead toggle.
+void showAddToHomeScreenSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: const Color(0xFF1B1613),
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (context) => Padding(
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, 24 + MediaQuery.paddingOf(context).bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: kStageAccent.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.fullscreen_rounded,
+                    color: kStageAccent, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Go fullscreen on iPhone',
+                    style:
+                        outfitStyle(18, Colors.white, weight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'iPhone Safari can’t expand a web page to fullscreen. Add live.tips '
+            'to your Home Screen once and it launches with no browser bars — a '
+            'clean, full-screen stage.',
+            style: TextStyle(
+              fontFamily: kFontBody,
+              fontSize: 14,
+              height: 1.5,
+              color: Colors.white.withValues(alpha: 0.75),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const _InstallStep(
+            n: '1',
+            icon: Icons.ios_share_rounded,
+            text: 'Tap the Share button in Safari’s toolbar.',
+          ),
+          const _InstallStep(
+            n: '2',
+            icon: Icons.add_box_outlined,
+            text: 'Choose “Add to Home Screen”.',
+          ),
+          const _InstallStep(
+            n: '3',
+            icon: Icons.rocket_launch_rounded,
+            text: 'Open live.tips from your Home Screen — fullscreen.',
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: kStageAccent,
+                foregroundColor: const Color(0xFF40160A),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Got it',
+                  style: outfitStyle(15, const Color(0xFF40160A),
+                      weight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _InstallStep extends StatelessWidget {
+  const _InstallStep({required this.n, required this.icon, required this.text});
+
+  final String n;
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Text(n,
+                style: outfitStyle(13, Colors.white, weight: FontWeight.w700)),
+          ),
+          const SizedBox(width: 12),
+          Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.7)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontFamily: kFontBody,
+                fontSize: 14,
+                height: 1.35,
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// How many recent-message tiles fit under the QR block of the wide-layout

@@ -1,11 +1,11 @@
 {
-    "name": "live_tips",
-    "short_name": "live_tips",
+    "name": "live.tips",
+    "short_name": "live.tips",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FAF6F1",
+    "theme_color": "#FF7C55",
+    "description": "Your tip jar for live performances — fans scan a code, you watch the jar fill.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
