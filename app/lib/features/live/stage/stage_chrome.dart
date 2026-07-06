@@ -5,6 +5,7 @@ import '../../../core/fullscreen.dart';
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
 import '../../../domain/donation.dart';
+import '../../../widgets/install_steps.dart';
 import '../../../widgets/qr_card.dart';
 import '../../poster/poster_screen.dart';
 import 'stage_hud.dart' show kStageGlassSoft, kStageAmount, kStageAccent;
@@ -176,20 +177,14 @@ void showAddToHomeScreenSheet(BuildContext context) {
             ),
           ),
           const SizedBox(height: 18),
-          const _InstallStep(
-            n: '1',
-            icon: Icons.ios_share_rounded,
-            text: 'Tap the Share button in Safari’s toolbar.',
-          ),
-          const _InstallStep(
-            n: '2',
-            icon: Icons.add_box_outlined,
-            text: 'Choose “Add to Home Screen”.',
-          ),
-          const _InstallStep(
-            n: '3',
-            icon: Icons.rocket_launch_rounded,
-            text: 'Open live.tips from your Home Screen — fullscreen.',
+          // Shared with the onboarding install nudge — see widgets/install_steps.
+          // The stage hint only ever fires on iPhone, so the Apple steps apply.
+          InstallStepList(
+            steps: installSteps(apple: true),
+            numberBg: Colors.white.withValues(alpha: 0.08),
+            numberFg: Colors.white,
+            iconColor: Colors.white.withValues(alpha: 0.7),
+            textColor: Colors.white.withValues(alpha: 0.85),
           ),
           const SizedBox(height: 20),
           SizedBox(
@@ -210,51 +205,6 @@ void showAddToHomeScreenSheet(BuildContext context) {
       ),
     ),
   );
-}
-
-class _InstallStep extends StatelessWidget {
-  const _InstallStep({required this.n, required this.icon, required this.text});
-
-  final String n;
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Text(n,
-                style: outfitStyle(13, Colors.white, weight: FontWeight.w700)),
-          ),
-          const SizedBox(width: 12),
-          Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.7)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 14,
-                height: 1.35,
-                color: Colors.white.withValues(alpha: 0.85),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// How many recent-message tiles fit under the QR block of the wide-layout

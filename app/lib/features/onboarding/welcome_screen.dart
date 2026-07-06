@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/install_prompt.dart';
 import '../../core/theme.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import 'connect_screen.dart';
+import 'install_hint_screen.dart';
 
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
@@ -93,9 +95,15 @@ class WelcomeScreen extends ConsumerWidget {
                           LtPrimaryButton(
                             label: 'Connect your Stripe account',
                             trailingIcon: Icons.arrow_forward_rounded,
+                            // Phones and tablets in a browser get the one-time
+                            // "Add to Home Screen" nudge first; desktop and the
+                            // installed PWA go straight to connecting.
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute(
-                                  builder: (_) => const ConnectScreen()),
+                                builder: (_) => shouldSuggestInstall
+                                    ? const InstallHintScreen()
+                                    : const ConnectScreen(),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 10),
