@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../app.dart';
+import '../../core/fullscreen.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../domain/donation.dart';
@@ -252,6 +253,10 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                         const SizedBox(width: 8),
                         const _PreviewPill(),
                         const Spacer(),
+                        if (fullscreenSupported) ...[
+                          StageFullscreenButton(size: wide ? 44 : 40),
+                          const SizedBox(width: 8),
+                        ],
                         StageGlassButton(
                           icon: Icons.flag_rounded,
                           tooltip: 'Preview goal',

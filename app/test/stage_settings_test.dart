@@ -89,7 +89,6 @@ void main() {
       final s = AppSettings.fromJson(legacy);
       expect(s.pollIntervalSec, 6);
       expect(s.lastGoalMinor, 20000);
-      expect(s.preferDeviceAuth, isFalse);
       expect(s.stage, const StageSettings());
     });
   });

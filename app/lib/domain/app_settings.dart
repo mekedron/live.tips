@@ -24,7 +24,6 @@ class AppSettings {
   const AppSettings({
     this.pollIntervalSec = 4,
     this.lastGoalMinor = 10000,
-    this.preferDeviceAuth = true,
     this.themeMode = AppThemeMode.system,
     this.stage = const StageSettings(),
     this.poster = const PosterSettings(),
@@ -35,10 +34,6 @@ class AppSettings {
 
   /// Last goal the artist used — prefilled next time.
   final int lastGoalMinor;
-
-  /// Prefer Face ID / Touch ID / device passcode to unlock stage lock;
-  /// falls back to the in-app PIN when unavailable.
-  final bool preferDeviceAuth;
 
   /// The app's appearance — system-follows by default, or a manual override.
   final AppThemeMode themeMode;
@@ -52,14 +47,12 @@ class AppSettings {
   AppSettings copyWith({
     int? pollIntervalSec,
     int? lastGoalMinor,
-    bool? preferDeviceAuth,
     AppThemeMode? themeMode,
     StageSettings? stage,
     PosterSettings? poster,
   }) => AppSettings(
     pollIntervalSec: pollIntervalSec ?? this.pollIntervalSec,
     lastGoalMinor: lastGoalMinor ?? this.lastGoalMinor,
-    preferDeviceAuth: preferDeviceAuth ?? this.preferDeviceAuth,
     themeMode: themeMode ?? this.themeMode,
     stage: stage ?? this.stage,
     poster: poster ?? this.poster,
@@ -68,7 +61,6 @@ class AppSettings {
   Map<String, dynamic> toJson() => {
     'pollIntervalSec': pollIntervalSec,
     'lastGoalMinor': lastGoalMinor,
-    'preferDeviceAuth': preferDeviceAuth,
     'themeMode': themeMode.wire,
     'stage': stage.toJson(),
     'poster': poster.toJson(),
@@ -77,7 +69,6 @@ class AppSettings {
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
     pollIntervalSec: (json['pollIntervalSec'] as num?)?.toInt() ?? 4,
     lastGoalMinor: (json['lastGoalMinor'] as num?)?.toInt() ?? 10000,
-    preferDeviceAuth: json['preferDeviceAuth'] as bool? ?? true,
     themeMode: AppThemeMode.fromWire(json['themeMode'] as String?),
     stage: json['stage'] is Map
         ? StageSettings.fromJson(

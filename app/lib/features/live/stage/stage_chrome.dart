@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
+import '../../../core/fullscreen.dart';
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
 import '../../../domain/donation.dart';
@@ -93,6 +94,32 @@ class StageGlassSquare extends StatelessWidget {
         ? button
         : Tooltip(message: tooltip!, child: button);
     return PointerInterceptor(child: control);
+  }
+}
+
+/// Web-only fullscreen toggle for the stage. Enters/exits the browser's
+/// fullscreen and swaps its icon to match; renders nothing where fullscreen
+/// isn't supported (native already runs full-window), so callers can drop it
+/// in unconditionally.
+class StageFullscreenButton extends StatelessWidget {
+  const StageFullscreenButton({super.key, this.size = 44});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!fullscreenSupported) return const SizedBox.shrink();
+    return ValueListenableBuilder<bool>(
+      valueListenable: fullscreenState,
+      builder: (context, isFull, _) => StageGlassButton(
+        icon: isFull
+            ? Icons.fullscreen_exit_rounded
+            : Icons.fullscreen_rounded,
+        tooltip: isFull ? 'Exit fullscreen' : 'Fullscreen',
+        size: size,
+        onTap: toggleFullscreen,
+      ),
+    );
   }
 }
 

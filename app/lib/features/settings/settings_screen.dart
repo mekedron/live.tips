@@ -7,7 +7,6 @@ import '../../core/theme.dart';
 import '../../domain/app_settings.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
-import '../lock/lock_service.dart';
 import '../setup/jar_setup_screen.dart';
 import '../shell/app_shell.dart';
 import 'stage_settings_section.dart';
@@ -22,38 +21,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _hasPin = false;
-  bool _deviceAuthAvailable = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshLockInfo();
-  }
-
-  Future<void> _refreshLockInfo() async {
-    // Both probes touch platform plugins — treat "unavailable" as false
-    // rather than crashing on platforms (or tests) without them.
-    bool hasPin;
-    bool deviceAuth;
-    try {
-      hasPin = await ref.read(secureStoreProvider).hasPin();
-    } catch (_) {
-      hasPin = false;
-    }
-    try {
-      deviceAuth = await ref.read(lockServiceProvider).deviceAuthAvailable();
-    } catch (_) {
-      deviceAuth = false;
-    }
-    if (mounted) {
-      setState(() {
-        _hasPin = hasPin;
-        _deviceAuthAvailable = deviceAuth;
-      });
-    }
-  }
-
   String _maskedKey(String? key) {
     if (key == null) return '—';
     if (key.length <= 12) return '••••';
@@ -224,54 +191,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             StageSettingsSection(),
           ],
         ),
-      ),
-      // ---------------------------------------------------- stage lock ---
-      LtRowGroup(
-        header: 'Stage lock',
-        children: [
-          LtRow(
-            icon: Icons.fingerprint_rounded,
-            title: 'Face ID / device unlock',
-            subtitle: _deviceAuthAvailable
-                ? 'Falls back to the app PIN'
-                : 'Not available on this device — the app PIN is used',
-            trailing: Switch(
-              value: settings.preferDeviceAuth && _deviceAuthAvailable,
-              onChanged: _deviceAuthAvailable
-                  ? (value) => ref
-                      .read(appStateProvider.notifier)
-                      .updateSettings(
-                          settings.copyWith(preferDeviceAuth: value))
-                  : null,
-            ),
-          ),
-          LtRow(
-            icon: Icons.pin_rounded,
-            title: _hasPin ? 'Change app PIN' : 'Set app PIN',
-            subtitle: 'Backup unlock, stored on this device only',
-            trailing: _hasPin
-                ? IconButton(
-                    tooltip: 'Remove PIN',
-                    icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                    onPressed: () async {
-                      await ref.read(secureStoreProvider).clearPin();
-                      _refreshLockInfo();
-                    },
-                  )
-                : null,
-            chevron: true,
-            onTap: () async {
-              final created = await ref
-                  .read(lockServiceProvider)
-                  .promptCreatePin(context);
-              if (created && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('PIN saved')));
-              }
-              _refreshLockInfo();
-            },
-          ),
-        ],
       ),
       // -------------------------------------------------- live session ---
       LtRowGroup(

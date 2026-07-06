@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../../core/fullscreen.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../domain/live_session.dart';
@@ -128,24 +129,12 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     }
   }
 
-  Future<void> _lock() async {
-    final lockService = ref.read(lockServiceProvider);
-    if (await lockService.ensureUnlockMethod(context)) {
-      ref.read(liveSessionProvider.notifier).setLocked(true);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Set up Face ID / device unlock or an app PIN to use stage lock.',
-          ),
-        ),
-      );
-    }
-  }
+  // The lock button only shows where device auth exists (see canLock), so
+  // locking just flips the flag — the OS prompt comes on unlock.
+  void _lock() => ref.read(liveSessionProvider.notifier).setLocked(true);
 
   Future<void> _unlock() async {
-    final lockService = ref.read(lockServiceProvider);
-    if (await lockService.unlock(context)) {
+    if (await ref.read(lockServiceProvider).authenticate()) {
       ref.read(liveSessionProvider.notifier).setLocked(false);
     }
   }
@@ -171,6 +160,10 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     final app = ref.watch(appStateProvider);
     final jar = app.effectiveTipJar;
     final stageConfig = app.settings.stage;
+    // The stage can only be locked where the device itself can authenticate —
+    // no Face ID / device unlock (e.g. the browser) → no lock button.
+    final canLock =
+        ref.watch(deviceAuthAvailableProvider).asData?.value ?? false;
     final effectiveStyle = resolveEffectiveStyle(
       stageConfig.style,
       webViewSupported: ref.watch(stageCapabilityProvider),
@@ -299,12 +292,17 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                             ),
                             const SizedBox(width: 8),
                           ],
-                          StageGlassButton(
-                            icon: Icons.lock_outline_rounded,
-                            tooltip: 'Lock stage screen',
-                            size: wide ? 44 : 40,
-                            onTap: _lock,
-                          ),
+                          if (fullscreenSupported) ...[
+                            StageFullscreenButton(size: wide ? 44 : 40),
+                            const SizedBox(width: 8),
+                          ],
+                          if (canLock)
+                            StageGlassButton(
+                              icon: Icons.lock_outline_rounded,
+                              tooltip: 'Lock stage screen',
+                              size: wide ? 44 : 40,
+                              onTap: _lock,
+                            ),
                         ],
                       ),
                     ),
