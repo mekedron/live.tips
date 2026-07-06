@@ -342,40 +342,43 @@ class LtSegmented<T> extends StatelessWidget {
         children: [
           for (final v in values)
             Expanded(
-              child: GestureDetector(
-                onTap: () => onChanged(v),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: v == selected ? c.card : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
-                    boxShadow: v == selected
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 3,
-                              offset: const Offset(0, 1),
-                            ),
-                          ]
-                        : const [],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (iconOf?.call(v) != null) ...[
-                        Icon(iconOf!(v),
-                            size: 17,
-                            color: v == selected ? c.text : c.textSecondary),
-                        const SizedBox(width: 6),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => onChanged(v),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: v == selected ? c.card : Colors.transparent,
+                      borderRadius: BorderRadius.circular(9),
+                      boxShadow: v == selected
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
+                              ),
+                            ]
+                          : const [],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (iconOf?.call(v) != null) ...[
+                          Icon(iconOf!(v),
+                              size: 17,
+                              color: v == selected ? c.text : c.textSecondary),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          labelOf(v),
+                          style: outfitStyle(
+                              13, v == selected ? c.text : c.textSecondary),
+                        ),
                       ],
-                      Text(
-                        labelOf(v),
-                        style: outfitStyle(
-                            13, v == selected ? c.text : c.textSecondary),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
