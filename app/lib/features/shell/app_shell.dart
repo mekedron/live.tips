@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
-import '../../domain/app_settings.dart';
 import '../../state/providers.dart';
-import '../../widgets/lt_ui.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../poster/poster_screen.dart';
@@ -244,7 +242,6 @@ class _SideRail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
-    final themeMode = app.settings.themeMode;
 
     return Container(
       width: 240,
@@ -306,62 +303,6 @@ class _SideRail extends ConsumerWidget {
             ),
           const Spacer(),
           _RailKeyChip(app: app),
-          const SizedBox(height: 8),
-          Material(
-            color: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: c.border),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () async {
-                final picked = await showLtPicker<AppThemeMode>(
-                  context: context,
-                  title: 'App theme',
-                  values: AppThemeMode.values,
-                  selected: themeMode,
-                  labelOf: (m) => switch (m) {
-                    AppThemeMode.system => 'Auto — follow the system',
-                    AppThemeMode.light => 'Light',
-                    AppThemeMode.dark => 'Dark',
-                  },
-                );
-                if (picked != null) {
-                  final s = ref.read(appStateProvider).settings;
-                  await ref
-                      .read(appStateProvider.notifier)
-                      .updateSettings(s.copyWith(themeMode: picked));
-                }
-              },
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(
-                  children: [
-                    Icon(
-                      switch (themeMode) {
-                        AppThemeMode.system => Icons.brightness_auto_rounded,
-                        AppThemeMode.light => Icons.light_mode_rounded,
-                        AppThemeMode.dark => Icons.dark_mode_rounded,
-                      },
-                      size: 18,
-                      color: c.textSecondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Theme: ${themeMode.label == 'System' ? 'Auto' : themeMode.label}',
-                        style: outfitStyle(13, c.textSecondary),
-                      ),
-                    ),
-                    Icon(Icons.expand_more_rounded,
-                        size: 18, color: c.textMuted),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
