@@ -10,6 +10,7 @@ import '../../data/stripe/stripe_requests.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
+import '../shell/app_shell.dart' show kRailBreakpoint;
 import 'key_guide_screen.dart';
 
 /// Bring-your-own-key onboarding: the artist creates a *restricted* key in
@@ -100,11 +101,43 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
     }
   }
 
+  /// Mobile "?" affordance: the same permission table as the desktop card,
+  /// surfaced on demand so it doesn't push the paste field down.
+  void _showKeyPermissions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final c = context.lt;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
+              children: [
+                Text('What the key can do',
+                    style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                const _KeyPermissionsList(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
     final key = _keyController.text.trim();
     final isTest = key.startsWith('rk_test_') || key.startsWith('sk_test_');
+    // On phones the permissions live behind a "?" so the paste field isn't
+    // buried below the fold; wide layouts keep the full card visible.
+    final wide = MediaQuery.sizeOf(context).width >= kRailBreakpoint;
 
     return Scaffold(
       appBar: AppBar(
@@ -151,13 +184,31 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                     const SizedBox(height: 10),
                     const _NumberedLine(3, 'Copy it and paste it below'),
                     const SizedBox(height: 16),
-                    FilledButton.tonalIcon(
-                      onPressed: () => launchUrl(
-                        Uri.parse(kCreateKeyUrl),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                      label: const Text('Open pre-filled form in Stripe'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () => launchUrl(
+                              Uri.parse(kCreateKeyUrl),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                            icon: const Icon(Icons.open_in_new_rounded,
+                                size: 18),
+                            label: const Text('Open pre-filled form'),
+                          ),
+                        ),
+                        // Phones drop the permissions card; this reveals the
+                        // same table on demand right at the call to action.
+                        if (!wide) ...[
+                          const SizedBox(width: 8),
+                          LtIconCircleButton(
+                            icon: Icons.help_outline_rounded,
+                            tooltip: 'What the key can do',
+                            size: 48,
+                            onTap: () => _showKeyPermissions(context),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Row(
@@ -181,33 +232,21 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              LtCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('What the key can do',
-                        style: outfitStyle(16, c.text,
-                            weight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    for (var i = 0; i < kRequiredPermissions.length; i++) ...[
-                      if (i > 0) Divider(height: 1, color: c.divider),
-                      _PermissionRow(permission: kRequiredPermissions[i]),
+              if (wide) ...[
+                const SizedBox(height: 14),
+                LtCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('What the key can do',
+                          style: outfitStyle(16, c.text,
+                              weight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      const _KeyPermissionsList(),
                     ],
-                    const SizedBox(height: 8),
-                    Text(
-                      'Everything else stays “None” — no payouts, refunds or '
-                      'balance access. Full live keys are refused.',
-                      style: TextStyle(
-                        fontFamily: kFontBody,
-                        fontSize: 12,
-                        height: 1.5,
-                        color: c.textMuted,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 14),
               LtCard(
                 child: Column(
@@ -322,6 +361,37 @@ class _NumberedLine extends StatelessWidget {
             text,
             style: TextStyle(
                 fontFamily: kFontBody, fontSize: 14, color: c.text),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The permission table plus the "everything else is None" caveat — shared
+/// by the desktop card and the mobile "?" bottom sheet.
+class _KeyPermissionsList extends StatelessWidget {
+  const _KeyPermissionsList();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < kRequiredPermissions.length; i++) ...[
+          if (i > 0) Divider(height: 1, color: c.divider),
+          _PermissionRow(permission: kRequiredPermissions[i]),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          'Everything else stays “None” — no payouts, refunds or '
+          'balance access. Full live keys are refused.',
+          style: TextStyle(
+            fontFamily: kFontBody,
+            fontSize: 12,
+            height: 1.5,
+            color: c.textMuted,
           ),
         ),
       ],
