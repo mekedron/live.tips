@@ -262,11 +262,14 @@ def write_landing_favicon():
     line = f'<link rel="icon" href="{landing_favicon_datauri()}">'
     # href is double-quoted and the data-URI SVG uses single quotes inside, so
     # match to the closing quote — NOT the first '>' (the SVG contains many).
-    new = re.sub(r'<link rel="icon" href="[^"]*">', line, html, count=1)
-    if new == html:
-        print("  ! landing favicon <link rel=\"icon\"> not found — skipped")
-    else:
+    new, n = re.subn(r'<link rel="icon" href="[^"]*">', line, html, count=1)
+    if n == 0:
+        print('  ! website/index.html: <link rel="icon"> not found — skipped')
+    elif new != html:
         open(path, "w").write(new)
+        print("patched website/index.html landing favicon")
+    else:
+        print("website/index.html landing favicon already current")
 
 
 # --- run -------------------------------------------------------------------
@@ -279,7 +282,6 @@ def main():
     write_android_config()
     print("wrote android adaptive-icon config (colors.xml, mipmap-anydpi-v26)")
     write_landing_favicon()
-    print("patched website/index.html landing favicon")
 
 
 if __name__ == "__main__":
