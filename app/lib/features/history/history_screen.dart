@@ -249,8 +249,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('History',
-                  style: outfitStyle(32, c.text, weight: FontWeight.w800)),
+              Row(
+                children: [
+                  Text('History',
+                      style: outfitStyle(32, c.text, weight: FontWeight.w800)),
+                  const Spacer(),
+                  if (!ref.watch(appStateProvider).demo &&
+                      stripeAllUrl != null)
+                    _ViewInStripeButton(stripeAllUrl),
+                ],
+              ),
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -278,7 +286,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     flex: 17,
                     child: _DonationsTable(
                       demo: ref.watch(appStateProvider).demo,
-                      stripeAllUrl: stripeAllUrl,
                       donations: _donations,
                       loading: _loading,
                       hasMore: _hasMore,
@@ -547,7 +554,6 @@ const double _kStripeColWidth = 32;
 class _DonationsTable extends StatelessWidget {
   const _DonationsTable({
     required this.demo,
-    required this.stripeAllUrl,
     required this.donations,
     required this.loading,
     required this.hasMore,
@@ -556,7 +562,6 @@ class _DonationsTable extends StatelessWidget {
   });
 
   final bool demo;
-  final String? stripeAllUrl;
   final List<Donation> donations;
   final bool loading;
   final bool hasMore;
@@ -584,15 +589,8 @@ class _DonationsTable extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Text('Donations',
-                  style: outfitStyle(17, c.text, weight: FontWeight.w700)),
-              const Spacer(),
-              if (!demo && stripeAllUrl != null)
-                _ViewInStripeButton(stripeAllUrl!),
-            ],
-          ),
+          Text('Donations',
+              style: outfitStyle(17, c.text, weight: FontWeight.w700)),
           const SizedBox(height: 12),
           if (demo)
             Padding(
