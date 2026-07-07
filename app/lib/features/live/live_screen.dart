@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
@@ -38,6 +39,23 @@ class LiveScreen extends ConsumerStatefulWidget {
 
 class _LiveScreenState extends ConsumerState<LiveScreen> {
   late final ConfettiController _confetti;
+
+  /// Live width of the QR rail while the performer drags its handle. Seeded
+  /// from the persisted [StageSettings.railWidth] on first paint; committed
+  /// back to settings on release (see [_commitRailWidth]).
+  double? _railWidth;
+
+  void _onRailResize(double width) => setState(() => _railWidth = width);
+
+  Future<void> _commitRailWidth() async {
+    final width = _railWidth;
+    if (width == null) return;
+    final settings = ref.read(appStateProvider).settings;
+    if (settings.stage.railWidth == width) return;
+    await ref.read(appStateProvider.notifier).updateSettings(
+          settings.copyWith(stage: settings.stage.copyWith(railWidth: width)),
+        );
+  }
 
   @override
   void initState() {
@@ -213,6 +231,19 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
             builder: (context, constraints) {
               final wide = constraints.maxWidth > 780;
               final safeTop = MediaQuery.paddingOf(context).top;
+              // The rail is drag-resizable, but never so wide that the jar has
+              // no room: cap it to leave the working area at least ~380px.
+              final maxRail = math.min(
+                kStageRailMaxWidth,
+                math.max(kStageRailMinWidth, constraints.maxWidth - 380),
+              );
+              final railWidth = (_railWidth ?? stageConfig.railWidth)
+                  .clamp(kStageRailMinWidth, maxRail)
+                  .toDouble();
+              final railInset = stageRailInset(railWidth);
+              // Feed the live width to the renderer so the jar/camera reframe as
+              // the rail moves (StageSettings.railWidth → insets.right).
+              final effectiveStage = stageConfig.copyWith(railWidth: railWidth);
               // Relay-only session with the feed down = the artist may be
               // playing to a dead stage without knowing — full-width banner,
               // not a subtle pill. With Stripe still polling, a pill is
@@ -229,33 +260,38 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                               16,
                               safeTop + 72,
                               // wide: keep the numbers clear of the QR rail
-                              wide ? kStageRailInset : 16,
+                              wide ? railInset : 16,
                               wide ? 16 : 100,
                             ),
                             child: JarStageView(
                               snapshot: StageSnapshot.fromState(live),
                               tips: live.newTips,
                               tipSerial: live.confettiTick,
-                              config: stageConfig,
+                              config: effectiveStage,
                             ),
                           )
                         : JarStageView(
                             snapshot: StageSnapshot.fromState(live),
                             tips: live.newTips,
                             tipSerial: live.confettiTick,
-                            config: stageConfig,
+                            config: effectiveStage,
                           ),
                   ),
-                  // ---- wide: floating QR + messages panel ----
+                  // ---- wide: floating, drag-resizable QR + messages panel ----
                   if (wide && qrUrl != null)
                     Positioned(
                       right: 16,
                       top: safeTop + 76,
                       bottom: 16,
-                      width: kStageRailWidth,
-                      child: StageQrPanel(
+                      width: railWidth,
+                      child: ResizableQrRail(
+                        width: railWidth,
+                        minWidth: kStageRailMinWidth,
+                        maxWidth: maxRail,
                         url: qrUrl,
                         name: app.displayName,
+                        onResize: _onRailResize,
+                        onResizeCommit: _commitRailWidth,
                         messages: live.session.donations.reversed
                             .where((d) => d.hasMessage)
                             .take(3)

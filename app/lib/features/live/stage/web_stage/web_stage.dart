@@ -143,9 +143,11 @@ class _WebStageState extends ConsumerState<WebStage> {
   }
 
   /// Strip to keep clear on the right so the jar frames LEFT of the QR rail —
-  /// only the wide (tablet+) layout floats that rail. See [kStageRailInset].
-  double get _railInset =>
-      MediaQuery.sizeOf(context).width > 780 ? kStageRailInset : 0;
+  /// only the wide (tablet+) layout floats that rail, and its width is the
+  /// performer's drag-resized [StageSettings.railWidth]. See [stageRailInset].
+  double get _railInset => MediaQuery.sizeOf(context).width > 780
+      ? stageRailInset(widget.config.railWidth)
+      : 0;
 
   void _sendInit() {
     final railInset = _railInset;
@@ -262,10 +264,11 @@ class _WebStageState extends ConsumerState<WebStage> {
     final t = _transport;
     return LayoutBuilder(builder: (context, constraints) {
       final wide = constraints.maxWidth > 780;
-      // Re-frame the jar when the QR rail appears/disappears after the renderer
-      // is already live (e.g. rotating a tablet across the wide threshold) —
-      // _sendInit only covers the first frame's inset.
-      final railInset = wide ? kStageRailInset : 0.0;
+      // Re-frame the jar when the QR rail appears/disappears OR is dragged wider
+      // /narrower after the renderer is already live (rotating a tablet across
+      // the wide threshold, or resizing the rail) — _sendInit only covers the
+      // first frame's inset.
+      final railInset = wide ? stageRailInset(widget.config.railWidth) : 0.0;
       if (_ready && railInset != _sentRailInset) {
         _sentRailInset = railInset;
         _transport.send(StageSetConfig({

@@ -106,6 +106,15 @@ enum JarTheme {
       values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
 }
 
+/// Bounds (logical px) for the drag-resizable wide-stage QR rail. The default
+/// is the historical fixed width; on a tablet+ stage the performer drags the
+/// rail's inner edge to widen/narrow it and the choice persists here. Kept in
+/// the domain layer so the persisted value is always clamped to a sane range,
+/// independent of the widget that renders the handle. See [StageSettings.railWidth].
+const double kStageRailDefaultWidth = 280;
+const double kStageRailMinWidth = 240;
+const double kStageRailMaxWidth = 640;
+
 /// Render-quality tier for the 3D renderer (bloom on/off/auto-detect).
 enum StageQuality {
   auto('auto', 'Auto'),
@@ -132,6 +141,7 @@ class StageSettings {
     this.soundEnabled = true,
     this.tipSoundEnabled = true,
     this.quality = StageQuality.auto,
+    this.railWidth = kStageRailDefaultWidth,
   });
 
   final StageStyle style;
@@ -157,6 +167,12 @@ class StageSettings {
 
   final StageQuality quality;
 
+  /// Wide (tablet+) stage only — the width (logical px) of the floating QR +
+  /// recent-messages rail, drag-resizable on stage. Always kept within
+  /// [kStageRailMinWidth]..[kStageRailMaxWidth]; the vessel, HUD, tip banner
+  /// and camera all reframe to the strip this leaves free.
+  final double railWidth;
+
   StageSettings copyWith({
     StageStyle? style,
     JarVessel? vessel,
@@ -166,6 +182,7 @@ class StageSettings {
     bool? soundEnabled,
     bool? tipSoundEnabled,
     StageQuality? quality,
+    double? railWidth,
   }) =>
       StageSettings(
         style: style ?? this.style,
@@ -176,6 +193,8 @@ class StageSettings {
         soundEnabled: soundEnabled ?? this.soundEnabled,
         tipSoundEnabled: tipSoundEnabled ?? this.tipSoundEnabled,
         quality: quality ?? this.quality,
+        railWidth: (railWidth ?? this.railWidth)
+            .clamp(kStageRailMinWidth, kStageRailMaxWidth),
       );
 
   Map<String, dynamic> toJson() => {
@@ -187,6 +206,7 @@ class StageSettings {
         'soundEnabled': soundEnabled,
         'tipSoundEnabled': tipSoundEnabled,
         'quality': quality.wire,
+        'railWidth': railWidth,
       };
 
   factory StageSettings.fromJson(Map<String, dynamic> json) => StageSettings(
@@ -198,6 +218,9 @@ class StageSettings {
         soundEnabled: json['soundEnabled'] as bool? ?? true,
         tipSoundEnabled: json['tipSoundEnabled'] as bool? ?? true,
         quality: StageQuality.fromWire(json['quality'] as String?),
+        railWidth: ((json['railWidth'] as num?)?.toDouble() ??
+                kStageRailDefaultWidth)
+            .clamp(kStageRailMinWidth, kStageRailMaxWidth),
       );
 
   @override
@@ -210,9 +233,10 @@ class StageSettings {
       other.showNotes == showNotes &&
       other.soundEnabled == soundEnabled &&
       other.tipSoundEnabled == tipSoundEnabled &&
-      other.quality == quality;
+      other.quality == quality &&
+      other.railWidth == railWidth;
 
   @override
   int get hashCode => Object.hash(style, vessel, scene, theme, showNotes,
-      soundEnabled, tipSoundEnabled, quality);
+      soundEnabled, tipSoundEnabled, quality, railWidth);
 }

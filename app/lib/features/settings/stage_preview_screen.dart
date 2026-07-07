@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
@@ -55,6 +56,23 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
   /// banner — mirrors the real gap between paying and the poll picking it up.
   var _pending = false;
   var _seq = 0;
+
+  /// Live QR-rail width while the handle is dragged; seeded from the persisted
+  /// [StageSettings.railWidth], committed back on release so the live stage
+  /// inherits the same rail the performer sized here.
+  double? _railWidth;
+
+  void _onRailResize(double width) => setState(() => _railWidth = width);
+
+  Future<void> _commitRailWidth() async {
+    final width = _railWidth;
+    if (width == null) return;
+    final settings = ref.read(appStateProvider).settings;
+    if (settings.stage.railWidth == width) return;
+    await ref.read(appStateProvider.notifier).updateSettings(
+          settings.copyWith(stage: settings.stage.copyWith(railWidth: width)),
+        );
+  }
 
   @override
   void initState() {
@@ -200,6 +218,16 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
             final wide = constraints.maxWidth > 780;
             final safeTop = MediaQuery.paddingOf(context).top;
             final safeBottom = MediaQuery.paddingOf(context).bottom;
+            // Drag-resizable rail, capped so the jar always keeps ~380px.
+            final maxRail = math.min(
+              kStageRailMaxWidth,
+              math.max(kStageRailMinWidth, constraints.maxWidth - 380),
+            );
+            final railWidth = (_railWidth ?? stageConfig.railWidth)
+                .clamp(kStageRailMinWidth, maxRail)
+                .toDouble();
+            final railInset = stageRailInset(railWidth);
+            final effectiveStage = stageConfig.copyWith(railWidth: railWidth);
             return Stack(
               children: [
                 // ---- the stage itself, edge to edge ----
@@ -210,33 +238,38 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                             16,
                             safeTop + 72,
                             // wide: keep the numbers clear of the QR rail
-                            wide ? kStageRailInset : 16,
+                            wide ? railInset : 16,
                             wide ? 16 : 100,
                           ),
                           child: JarStageView(
                             snapshot: snapshot,
                             tips: _newTips,
                             tipSerial: _tipSerial,
-                            config: stageConfig,
+                            config: effectiveStage,
                           ),
                         )
                       : JarStageView(
                           snapshot: snapshot,
                           tips: _newTips,
                           tipSerial: _tipSerial,
-                          config: stageConfig,
+                          config: effectiveStage,
                         ),
                 ),
-                // ---- wide: floating QR + messages panel ----
+                // ---- wide: floating, drag-resizable QR + messages panel ----
                 if (wide)
                   Positioned(
                     right: 16,
                     top: safeTop + 76,
                     bottom: 16,
-                    width: kStageRailWidth,
-                    child: StageQrPanel(
+                    width: railWidth,
+                    child: ResizableQrRail(
+                      width: railWidth,
+                      minWidth: kStageRailMinWidth,
+                      maxWidth: maxRail,
                       url: qrUrl,
                       name: artistName,
+                      onResize: _onRailResize,
+                      onResizeCommit: _commitRailWidth,
                       messages: _session.donations.reversed
                           .where((d) => d.hasMessage)
                           .take(3)
@@ -294,7 +327,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                     // reserved strip, matching the jar.
                     child: Padding(
                       padding: EdgeInsets.only(
-                          bottom: 24 + safeBottom, right: kStageRailInset),
+                          bottom: 24 + safeBottom, right: railInset),
                       child: _PretendTipButton(
                         busy: _pending,
                         onTap: () => _onPretendTip(context),
@@ -353,7 +386,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                     alignment: Alignment.topCenter,
                     child: Transform.translate(
                       // matches the shifted banner it stands in for
-                      offset: Offset(wide ? -kStageRailInset / 2 : 0.0, 0),
+                      offset: Offset(wide ? -railInset / 2 : 0.0, 0),
                       child: Padding(
                         padding: EdgeInsets.only(
                             top: safeTop + (wide ? 160 : 188)),

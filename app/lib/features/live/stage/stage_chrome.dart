@@ -243,10 +243,14 @@ class StageQrPanel extends StatelessWidget {
           final shown = messages.take(
             qrPanelMessageSlots(constraints.maxHeight),
           );
+          // The code grows with the rail (a wider rail was the whole point of
+          // making it resizable) but stays scannable-square, capped so it never
+          // eats the header/messages room.
+          final qrSize = constraints.maxWidth.clamp(180.0, 320.0);
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              QrBlock(data: url, size: 200),
+              QrBlock(data: url, size: qrSize),
               const SizedBox(height: 14),
               Text(
                 'Scan to tip',
@@ -318,6 +322,158 @@ class StageQrPanel extends StatelessWidget {
       ),
     );
     return PointerInterceptor(child: panel);
+  }
+}
+
+/// The wide-stage QR rail with a drag handle on its inner (left) edge. The rail
+/// is right-anchored, so dragging the handle LEFT widens it and RIGHT narrows
+/// it. The parent owns the width: [onResize] fires live with the new, clamped
+/// value each drag frame (re-flowing every left-side element and re-centring
+/// the jar as it feeds the width back into the layout + renderer insets), and
+/// [onResizeCommit] fires once on release so the parent can persist the choice.
+class ResizableQrRail extends StatelessWidget {
+  const ResizableQrRail({
+    super.key,
+    required this.width,
+    required this.minWidth,
+    required this.maxWidth,
+    required this.url,
+    required this.name,
+    required this.onResize,
+    required this.onResizeCommit,
+    this.messages = const [],
+  });
+
+  final double width;
+  final double minWidth;
+  final double maxWidth;
+  final String url;
+  final String name;
+  final List<Donation> messages;
+  final ValueChanged<double> onResize;
+  final VoidCallback onResizeCommit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          child: StageQrPanel(url: url, name: name, messages: messages),
+        ),
+        // The grip straddles the rail's left edge, running its full height so
+        // it's easy to grab from a distance on a tablet. Its own interceptor is
+        // deliberately WIDE (reaching ~26px into the jar) so that at the start
+        // of a leftward drag the cursor is still over an interceptor while the
+        // full-stage shield mounts a frame later — no gap for the iframe to
+        // grab the pointer and abort the resize.
+        Positioned(
+          left: -26,
+          top: 0,
+          bottom: 0,
+          width: 52,
+          child: _RailResizeHandle(
+            onDrag: (dx) =>
+                onResize((width - dx).clamp(minWidth, maxWidth).toDouble()),
+            onDragEnd: onResizeCommit,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The draggable pill grip for [ResizableQrRail]. A wide invisible hit-strip
+/// around a slim visible bar; shows a resize cursor and reports the horizontal
+/// drag delta via [onDrag], committing on release with [onDragEnd].
+///
+/// The tricky part is the web jar: it renders as an <iframe> platform view that
+/// swallows every mouse/touch event the moment the cursor is over it. The grip
+/// itself sits in a [PointerInterceptor] so the drag can *start*, but as soon as
+/// the performer drags left onto the jar, the raw pointer stream would fall into
+/// the iframe and the resize would stall. So on pointer-down we drop a
+/// FULL-STAGE [PointerInterceptor] shield into the overlay: it covers the iframe
+/// for the duration of the gesture, keeping every move/up event flowing to
+/// Flutter (this Listener), and tears down on release. All of this is a harmless
+/// no-op off web, where nothing steals the events in the first place.
+class _RailResizeHandle extends StatefulWidget {
+  const _RailResizeHandle({required this.onDrag, required this.onDragEnd});
+
+  final ValueChanged<double> onDrag;
+  final VoidCallback onDragEnd;
+
+  @override
+  State<_RailResizeHandle> createState() => _RailResizeHandleState();
+}
+
+class _RailResizeHandleState extends State<_RailResizeHandle> {
+  OverlayEntry? _shield;
+  double _lastX = 0;
+
+  void _onDown(PointerDownEvent e) {
+    _lastX = e.position.dx;
+    _shield?.remove();
+    // The pointer-down hit-test routes the whole gesture's move/up events back
+    // to THIS listener; the shield's only job is to stop the iframe from eating
+    // them so they ever reach Flutter. Hence it needs no listener of its own.
+    _shield = OverlayEntry(
+      builder: (_) => Positioned.fill(
+        child: PointerInterceptor(
+          child: const MouseRegion(
+            cursor: SystemMouseCursors.resizeLeftRight,
+            child: SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(_shield!);
+  }
+
+  void _onMove(PointerMoveEvent e) {
+    final dx = e.position.dx - _lastX;
+    _lastX = e.position.dx;
+    if (dx != 0) widget.onDrag(dx);
+  }
+
+  void _onUp([PointerEvent? _]) {
+    if (_shield == null) return;
+    _shield!.remove();
+    _shield = null;
+    widget.onDragEnd();
+  }
+
+  @override
+  void dispose() {
+    _shield?.remove();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PointerInterceptor(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeLeftRight,
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: _onDown,
+          onPointerMove: _onMove,
+          onPointerUp: _onUp,
+          onPointerCancel: _onUp,
+          child: Center(
+            child: Container(
+              width: 5,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.28),
+                borderRadius: BorderRadius.circular(3),
+                border:
+                    Border.all(color: Colors.black.withValues(alpha: 0.25)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

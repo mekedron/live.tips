@@ -18,6 +18,7 @@ void main() {
         reason: 'donation moments should be audible out of the box',
       );
       expect(s.quality, StageQuality.auto);
+      expect(s.railWidth, kStageRailDefaultWidth);
     });
 
     test('json round-trip preserves every field', () {
@@ -30,8 +31,32 @@ void main() {
         soundEnabled: true,
         tipSoundEnabled: true,
         quality: StageQuality.low,
+        railWidth: 372,
       );
       expect(StageSettings.fromJson(s.toJson()), s);
+    });
+
+    test('railWidth clamps to the valid rail range on copyWith and decode', () {
+      // Below the floor and above the ceiling both snap back into range.
+      expect(
+        const StageSettings().copyWith(railWidth: 10).railWidth,
+        kStageRailMinWidth,
+      );
+      expect(
+        const StageSettings().copyWith(railWidth: 5000).railWidth,
+        kStageRailMaxWidth,
+      );
+      expect(
+        StageSettings.fromJson({'railWidth': 99999}).railWidth,
+        kStageRailMaxWidth,
+      );
+      // A sane persisted value survives untouched.
+      expect(StageSettings.fromJson({'railWidth': 320}).railWidth, 320);
+    });
+
+    test('legacy stage blob without railWidth gets the default width', () {
+      final s = StageSettings.fromJson({'style': 'jar2d'});
+      expect(s.railWidth, kStageRailDefaultWidth);
     });
 
     test('the sound toggles are independent', () {
