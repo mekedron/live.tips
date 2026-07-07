@@ -8,6 +8,7 @@ import 'features/onboarding/welcome_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
 import 'features/shell/app_shell.dart';
 import 'state/providers.dart';
+import 'state/seen_ping.dart';
 
 class LiveTipsApp extends ConsumerWidget {
   const LiveTipsApp({super.key});
@@ -30,7 +31,9 @@ class LiveTipsApp extends ConsumerWidget {
       // Lets the web stage go inert while a sheet/dialog covers it, so modals
       // stay clickable over the jar's iframe.
       navigatorObservers: [StageOverlayObserver()],
-      home: const RootGate(),
+      // The keep-alive pings the relay on launch/resume (≤ once a day) so a
+      // connected-mode jar never expires under an active artist.
+      home: const RelayKeepalive(child: RootGate()),
     );
   }
 }

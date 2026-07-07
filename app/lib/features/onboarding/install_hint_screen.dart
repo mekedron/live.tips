@@ -5,15 +5,15 @@ import '../../core/install_prompt.dart';
 import '../../core/theme.dart';
 import '../../widgets/install_steps.dart';
 import '../../widgets/lt_ui.dart';
-import 'connect_screen.dart';
+import 'method_select_screen.dart';
 
 /// First stop of onboarding on a phone or tablet browser: recommend installing
 /// live.tips to the Home Screen before connecting Stripe. iPhone Safari can't
 /// show a web page full-screen at all, and everywhere else an installed PWA
 /// still launches chrome-free and app-like — so we surface this once, up front.
 ///
-/// Purely advisory: "Continue" carries straight on to [ConnectScreen] whether or
-/// not they installed. The steps come from the shared [installSteps] list, so
+/// Purely advisory: "Continue" carries straight on to [MethodSelectScreen]
+/// whether or not they installed. The steps come from the shared [installSteps] list, so
 /// they stay in lockstep with the stage's fullscreen hint. Shown only where
 /// [shouldSuggestInstall] is true (gated by the caller), never on desktop.
 class InstallHintScreen extends StatelessWidget {
@@ -59,7 +59,7 @@ class InstallHintScreen extends StatelessWidget {
     );
     if (proceed == true) {
       navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const ConnectScreen()),
+        MaterialPageRoute(builder: (_) => const MethodSelectScreen()),
       );
     }
   }

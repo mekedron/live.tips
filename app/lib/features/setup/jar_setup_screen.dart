@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -6,8 +8,12 @@ import '../../core/external_link.dart';
 import '../../core/currencies.dart';
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
+import '../../data/relay/relay_client.dart';
 import '../../data/stripe/stripe_client.dart';
+import '../../domain/relay_jar.dart';
 import '../../domain/tip_jar.dart';
+import '../onboarding/relay_setup_screen.dart';
+import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
@@ -15,7 +21,8 @@ import '../settings/stage_preview_screen.dart';
 import '../shell/app_shell.dart';
 
 /// Creates the artist's tip jar (Product + pay-what-you-want Price +
-/// Payment Link) in their Stripe account. Step 2 of 2.
+/// Payment Link) in their Stripe account. Step number comes from the
+/// onboarding draft (falls back to 2 of 2 when there is none).
 ///
 /// Shown as the root screen right after connecting, and pushed from settings
 /// with [recreate] to replace an existing link (the old one is deactivated).
@@ -97,6 +104,10 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
   Future<void> _finish({ShellTab? thenOpen}) async {
     final jar = _created;
     if (jar == null) return;
+    // Captured up front: setTipJar can swap RootGate's home away from this
+    // screen (fresh onboarding), unmounting us before the pushes below.
+    final navigator = Navigator.of(context);
+    final app = ref.read(appStateProvider);
     if (widget.recreate && _previousJar != null && !_previousJar!.isDemo) {
       try {
         await ref
@@ -105,15 +116,59 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
       } catch (_) {}
     }
     await ref.read(appStateProvider.notifier).setTipJar(jar);
+    // Connected mode: the donor page's card button must follow the new
+    // Stripe link (and name). Best effort — never blocks the artist.
+    final relayJar = app.relayJar;
+    final relaySecret = app.relaySecret;
+    if (relayJar != null && relaySecret != null) {
+      unawaited(_syncRelayStripeUrl(relayJar, relaySecret, jar));
+    }
     if (thenOpen != null) {
       ref.read(shellTabRequestProvider.notifier).request(thenOpen);
     }
-    // Fresh onboarding: RootGate swaps to the shell by itself.
-    if (widget.recreate && mounted) Navigator.of(context).pop();
+    if (widget.recreate) {
+      navigator.pop();
+      return;
+    }
+    // Fresh onboarding: RootGate swaps to the shell by itself. When the
+    // draft also wants Revolut/MobilePay, the relay step rides on top.
+    final draft = ref.read(onboardingDraftProvider);
+    if (draft != null && draft.wantsRelay) {
+      navigator.push(
+        MaterialPageRoute(builder: (_) => const RelaySetupScreen()),
+      );
+    } else {
+      ref.read(onboardingDraftProvider.notifier).clear();
+    }
+  }
+
+  /// Tells the relay about the (re)created Stripe link so the donor page's
+  /// card button never points at a retired payment link. Silent on failure:
+  /// the page just keeps the old link until the next successful update.
+  static Future<void> _syncRelayStripeUrl(
+      RelayJar relayJar, String secret, TipJar jar) async {
+    final client = RelayClient();
+    try {
+      await client.updateJar(
+        jar: relayJar,
+        secret: secret,
+        artistName: jar.displayName,
+        stripeUrl: jar.url,
+      );
+    } catch (_) {
+      // Best effort only.
+    } finally {
+      client.close();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Step numbering follows the onboarding draft; recreates and pre-draft
+    // installs keep the classic two-step count.
+    final draft = ref.watch(onboardingDraftProvider);
+    final step = draft?.stepOf(OnboardingDraft.stepJarSetup) ?? 2;
+    final total = draft?.totalSteps ?? 2;
     return Scaffold(
       appBar: _created != null
           ? null
@@ -133,9 +188,10 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
                         ref.read(appStateProvider.notifier).disconnect(),
                     child: const Text('Disconnect'),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(right: 16, left: 4),
-                    child: Center(child: LtPill(label: 'Step 2 of 2')),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16, left: 4),
+                    child: Center(
+                        child: LtPill(label: 'Step $step of $total')),
                   ),
                 ],
               ],
@@ -151,11 +207,14 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
 
   Widget _buildForm() {
     final c = context.lt;
+    final draft = ref.watch(onboardingDraftProvider);
+    final step = draft?.stepOf(OnboardingDraft.stepJarSetup) ?? 2;
+    final total = draft?.totalSteps ?? 2;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
       children: [
         if (!widget.recreate) ...[
-          const LtProgressSegments(total: 2, filled: 2),
+          LtProgressSegments(total: total, filled: step),
           const SizedBox(height: 16),
         ],
         if (widget.recreate) ...[
@@ -400,7 +459,13 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
         ),
         const SizedBox(height: 32),
         LtPrimaryButton(
-          label: widget.recreate ? 'Done' : 'Go to Home',
+          // With relay methods still to set up, this leads to the tip page
+          // step rather than the shell — the label must not overpromise.
+          label: widget.recreate
+              ? 'Done'
+              : (ref.watch(onboardingDraftProvider)?.wantsRelay ?? false)
+                  ? 'Continue — set up your tip page'
+                  : 'Go to Home',
           onPressed: _finish,
         ),
       ],

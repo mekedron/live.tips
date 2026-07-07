@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../domain/donation.dart';
+import '../domain/tip_method.dart';
 import 'stripe/stripe_requests.dart';
 
 /// Feeds a live session with newly arrived donations. The session controller
@@ -164,6 +165,11 @@ class DemoDonationSource extends DonationSource {
     _first = false;
     return List.generate(count, (_) {
       _counter++;
+      // ~25% of demo tips arrive "through the tip page" (Revolut/MobilePay,
+      // unverified) so the badges and the QR toggle can be experienced too.
+      final method = _random.nextDouble() < 0.25
+          ? (_random.nextBool() ? TipMethod.revolut : TipMethod.mobilepay)
+          : TipMethod.stripe;
       return Donation(
         id: 'demo_$_counter',
         amountMinor: _amounts[_random.nextInt(_amounts.length)],
@@ -172,6 +178,8 @@ class DemoDonationSource extends DonationSource {
         name: _names[_random.nextInt(_names.length)],
         message: _messages[_random.nextInt(_messages.length)],
         livemode: false,
+        method: method,
+        verified: method == TipMethod.stripe,
       );
     });
   }

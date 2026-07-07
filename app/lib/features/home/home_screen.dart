@@ -6,7 +6,9 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
+import '../../domain/app_settings.dart';
 import '../../domain/live_session.dart';
+import '../onboarding/relay_setup_screen.dart' show confirmAndRegenerateRelayJar;
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/donation_tile.dart';
@@ -308,10 +310,7 @@ class _MobileHome extends StatelessWidget {
                   goalCard,
                   if (url != null) ...[
                     const SizedBox(height: 14),
-                    _TipLinkRowCard(
-                      url: url,
-                      showRecreate: app.demo || app.hasStripe,
-                    ),
+                    _TipLinkRowCard(url: url),
                   ],
                   if (isTablet) ...[
                     const SizedBox(height: 14),
@@ -409,10 +408,7 @@ class _DesktopHome extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (url != null) ...[
-                          _DesktopTipLinkCard(
-                            url: url,
-                            showRecreate: app.demo || app.hasStripe,
-                          ),
+                          _DesktopTipLinkCard(url: url),
                           const SizedBox(height: 24),
                         ],
                         if (last != null) _LastSessionCard(session: last),
@@ -804,23 +800,25 @@ Future<_StoredSessionChoice?> _confirmStartOverStored(
 // Tip link cards
 // ---------------------------------------------------------------------------
 
-class _TipLinkRowCard extends StatelessWidget {
-  const _TipLinkRowCard({required this.url, this.showRecreate = true});
+class _TipLinkRowCard extends ConsumerWidget {
+  const _TipLinkRowCard({required this.url});
 
   final String url;
 
-  /// "Create new tip link" recreates the *Stripe* payment link — hidden for
-  /// relay-only installs, where there's no Stripe link to recreate.
-  final bool showRecreate;
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
+    final app = ref.watch(appStateProvider);
+    final connected = app.effectiveQrMode == QrMode.connected;
     return LtCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (app.hasBothQrModes) ...[
+            const _QrModeToggle(),
+            const SizedBox(height: 12),
+          ],
           Row(
             children: [
               InkWell(
@@ -841,17 +839,29 @@ class _TipLinkRowCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Your tip link', style: outfitStyle(15, c.text)),
+                    Text(connected ? 'Your tip page' : 'Your tip link',
+                        style: outfitStyle(15, c.text)),
                     Padding(
                       padding: const EdgeInsets.only(top: 3, bottom: 8),
                       child: Text(
-                        url.replaceFirst(RegExp('^https?://'), ''),
-                        maxLines: 1,
+                        // The Stripe URL is worth reading; the tip page URL
+                        // matters less than what fans find behind it.
+                        connected
+                            ? 'Fans pick Stripe, Revolut or MobilePay on '
+                                'your tip page.'
+                            : url.replaceFirst(RegExp('^https?://'), ''),
+                        maxLines: connected ? 2 : 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 11.5,
-                            color: c.textMuted),
+                        style: connected
+                            ? TextStyle(
+                                fontFamily: kFontBody,
+                                fontSize: 12,
+                                height: 1.35,
+                                color: c.textSecondary)
+                            : TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11.5,
+                                color: c.textMuted),
                       ),
                     ),
                     Row(
@@ -887,7 +897,7 @@ class _TipLinkRowCard extends StatelessWidget {
               ),
             ],
           ),
-          if (showRecreate) ...[
+          if (_showRecreate(app)) ...[
             const SizedBox(height: 12),
             const _NewTipLinkButton(),
           ],
@@ -897,17 +907,46 @@ class _TipLinkRowCard extends StatelessWidget {
   }
 }
 
-class _DesktopTipLinkCard extends StatelessWidget {
-  const _DesktopTipLinkCard({required this.url, this.showRecreate = true});
+/// Whether the "new link" button makes sense right now: in Stripe mode it
+/// recreates the payment link (needs a Stripe key; demo fakes it), in
+/// connected mode it regenerates the relay jar (needs one).
+bool _showRecreate(AppState app) {
+  if (app.demo) return true;
+  return app.effectiveQrMode == QrMode.connected
+      ? app.hasRelay
+      : app.hasStripe;
+}
+
+/// The Stripe-link ⇄ tip-page switch shown when both exist. Persisted in
+/// settings; every QR surface (home, stage, poster) follows it.
+class _QrModeToggle extends ConsumerWidget {
+  const _QrModeToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(appStateProvider.select((s) => s.settings));
+    final mode = ref.watch(appStateProvider.select((s) => s.effectiveQrMode));
+    return LtSegmented<QrMode>(
+      values: QrMode.values,
+      selected: mode,
+      labelOf: (m) => m.label,
+      onChanged: (m) => ref
+          .read(appStateProvider.notifier)
+          .updateSettings(settings.copyWith(qrMode: m)),
+    );
+  }
+}
+
+class _DesktopTipLinkCard extends ConsumerWidget {
+  const _DesktopTipLinkCard({required this.url});
 
   final String url;
 
-  /// See [_TipLinkRowCard.showRecreate].
-  final bool showRecreate;
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
+    final app = ref.watch(appStateProvider);
+    final connected = app.effectiveQrMode == QrMode.connected;
     return LtCard(
       radius: 24,
       padding: const EdgeInsets.all(26),
@@ -915,9 +954,14 @@ class _DesktopTipLinkCard extends StatelessWidget {
         children: [
           Align(
             alignment: Alignment.centerLeft,
-            child: Text('Your tip link', style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+            child: Text(connected ? 'Your tip page' : 'Your tip link',
+                style: outfitStyle(17, c.text, weight: FontWeight.w700)),
           ),
           const SizedBox(height: 18),
+          if (app.hasBothQrModes) ...[
+            const _QrModeToggle(),
+            const SizedBox(height: 16),
+          ],
           QrBlock(data: url, size: 210),
           const SizedBox(height: 18),
           InkWell(
@@ -952,6 +996,18 @@ class _DesktopTipLinkCard extends StatelessWidget {
               ),
             ),
           ),
+          if (connected) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Fans pick Stripe, Revolut or MobilePay on your tip page.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontFamily: kFontBody,
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: c.textSecondary),
+            ),
+          ],
           const SizedBox(height: 14),
           Row(
             children: [
@@ -981,7 +1037,7 @@ class _DesktopTipLinkCard extends StatelessWidget {
               ),
             ],
           ),
-          if (showRecreate) ...[
+          if (_showRecreate(app)) ...[
             const SizedBox(height: 12),
             const _NewTipLinkButton(),
           ],
@@ -1027,31 +1083,39 @@ class _SoftMini extends StatelessWidget {
   }
 }
 
-/// "Create new tip link" — shared by both tip-link cards. Understated on
-/// purpose: it's rare and destructive (it retires the current QR), so it sits
-/// quietly below the everyday actions and always confirms first.
-class _NewTipLinkButton extends StatelessWidget {
+/// "Create new tip link" / "New tip page link" — shared by both tip-link
+/// cards. Understated on purpose: it's rare and destructive (it retires the
+/// current QR), so it sits quietly below the everyday actions and always
+/// confirms first. Mode-aware: in Stripe mode it opens the recreate editor
+/// for the payment link; in connected mode it regenerates the relay jar
+/// (same profile, fresh link). Demo keeps the harmless Stripe path.
+class _NewTipLinkButton extends ConsumerWidget {
   const _NewTipLinkButton();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
+    final app = ref.watch(appStateProvider);
+    final connected = !app.demo && app.effectiveQrMode == QrMode.connected;
     return SizedBox(
       width: double.infinity,
       child: TextButton.icon(
-        // Opens the recreate editor: prefilled name / currency / thank-you
-        // message plus a warning that the old link and its QR codes stop
-        // working. The old link is only retired once the new one is created.
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const JarSetupScreen(recreate: true)),
-        ),
+        // Stripe mode opens the recreate editor: prefilled name / currency /
+        // thank-you message plus a warning that the old link and its QR
+        // codes stop working. The old link is only retired once the new one
+        // is created. Connected mode confirms, then swaps the relay jar.
+        onPressed: () => connected
+            ? confirmAndRegenerateRelayJar(context, ref)
+            : Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const JarSetupScreen(recreate: true)),
+              ),
         style: TextButton.styleFrom(
           foregroundColor: c.textSecondary,
           padding: const EdgeInsets.symmetric(vertical: 10),
         ),
         icon: const Icon(Icons.autorenew_rounded, size: 17),
-        label: Text('Create new tip link',
+        label: Text(connected ? 'New tip page link' : 'Create new tip link',
             style: outfitStyle(13, c.textSecondary)),
       ),
     );

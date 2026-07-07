@@ -7,6 +7,7 @@ import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../data/stripe/stripe_requests.dart';
+import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
@@ -15,7 +16,8 @@ import 'key_guide_screen.dart';
 
 /// Bring-your-own-key onboarding: the artist creates a *restricted* key in
 /// their own dashboard, pastes it here, and we verify every permission
-/// before letting them through. Step 1 of 2.
+/// before letting them through. Step number comes from the onboarding draft
+/// (falls back to 1 of 2 when opened standalone, e.g. from Settings).
 class ConnectScreen extends ConsumerStatefulWidget {
   const ConnectScreen({super.key});
 
@@ -138,14 +140,19 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
     // On phones the permissions live behind a "?" so the paste field isn't
     // buried below the fold; wide layouts keep the full card visible.
     final wide = MediaQuery.sizeOf(context).width >= kRailBreakpoint;
+    // Step numbering follows the onboarding draft; standalone (Settings)
+    // opens keep the classic two-step count.
+    final draft = ref.watch(onboardingDraftProvider);
+    final step = draft?.stepOf(OnboardingDraft.stepConnect) ?? 1;
+    final total = draft?.totalSteps ?? 2;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Connect Stripe'),
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Center(child: LtPill(label: 'Step 1 of 2')),
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(child: LtPill(label: 'Step $step of $total')),
           ),
         ],
       ),
@@ -155,7 +162,7 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
-              const LtProgressSegments(total: 2, filled: 1),
+              LtProgressSegments(total: total, filled: step),
               const SizedBox(height: 16),
               LtCard(
                 child: Column(
