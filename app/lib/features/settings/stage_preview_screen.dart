@@ -638,7 +638,6 @@ Future<PretendTip?> showPretendTipSheet(
                 const SizedBox(height: 18),
                 TextField(
                   controller: amountCtrl,
-                  autofocus: true,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   style: outfitStyle(22, c.text, weight: FontWeight.w700),

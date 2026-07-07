@@ -35,7 +35,6 @@ Future<int?> showGoalEditorSheet(
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              autofocus: true,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               style: outfitStyle(20, c.text, weight: FontWeight.w700),

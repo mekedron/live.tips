@@ -211,7 +211,6 @@ Future<void> _editJarName(
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              autofocus: true,
               textCapitalization: TextCapitalization.words,
               style: outfitStyle(20, c.text, weight: FontWeight.w700),
               decoration:
