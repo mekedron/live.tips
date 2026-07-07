@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/app_settings.dart';
 import '../domain/live_session.dart';
+import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
 
 /// Non-secret local persistence: tip jar config, settings, session history,
@@ -21,6 +22,8 @@ class LocalStore {
   static const _kHistory = 'session_history_v1';
   static const _kActiveSession = 'active_session_v1';
   static const _kActiveCursor = 'active_session_cursor_v1';
+  static const _kRelayJar = 'relay_jar_v1';
+  static const _kRelaySeenAt = 'relay_seen_at_v1';
 
   // --- Tip jar ---
 
@@ -40,6 +43,32 @@ class LocalStore {
   Future<void> clearTipJar() async {
     await _prefs.remove(_kTipJar);
   }
+
+  // --- Relay jar (connected mode) ---
+
+  RelayJar? readRelayJar() {
+    final raw = _prefs.getString(_kRelayJar);
+    if (raw == null) return null;
+    try {
+      return RelayJar.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveRelayJar(RelayJar jar) =>
+      _prefs.setString(_kRelayJar, jsonEncode(jar.toJson()));
+
+  Future<void> clearRelayJar() async {
+    await _prefs.remove(_kRelayJar);
+    await _prefs.remove(_kRelaySeenAt);
+  }
+
+  /// When (ms since epoch) the relay was last told the artist had seen
+  /// everything — the keep-alive/seen marker.
+  int? readRelaySeenAt() => _prefs.getInt(_kRelaySeenAt);
+
+  Future<void> writeRelaySeenAt(int ms) => _prefs.setInt(_kRelaySeenAt, ms);
 
   // --- Settings ---
 

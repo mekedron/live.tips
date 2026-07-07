@@ -1,5 +1,8 @@
+import 'tip_method.dart';
+
 /// A single tip, derived from a Stripe Checkout Session (one payment made
-/// through the artist's payment link) or synthesized in demo mode.
+/// through the artist's payment link), relayed from a MobilePay/Revolut
+/// donor page in connected mode, or synthesized in demo mode.
 class Donation {
   const Donation({
     required this.id,
@@ -11,6 +14,8 @@ class Donation {
     this.livemode = true,
     this.viaService = true,
     this.paymentIntentId,
+    this.method = TipMethod.stripe,
+    this.verified = true,
   });
 
   /// Checkout Session id (`cs_…`) — stable, used for de-duplication.
@@ -35,6 +40,15 @@ class Donation {
   /// Absent for demo tips and for donations archived before we started
   /// capturing it. Powers [stripeDashboardUrl].
   final String? paymentIntentId;
+
+  /// How this tip was paid. Everything that predates connected mode is
+  /// [TipMethod.stripe] — the default, so old stored history parses as-is.
+  final TipMethod method;
+
+  /// Whether the payment is confirmed by a source we trust (Stripe). Relay
+  /// tips are donor-declared — the worker can't see the MobilePay/Revolut
+  /// ledger — so they arrive unverified.
+  final bool verified;
 
   String get displayName {
     final trimmed = name?.trim() ?? '';
@@ -109,6 +123,58 @@ class Donation {
     );
   }
 
+  /// A tip relayed by the connected-mode worker (MobilePay/Revolut). The id
+  /// is only locally unique — [serial] disambiguates tips sharing the same
+  /// millisecond — and the payment is donor-declared, hence unverified.
+  factory Donation.relayTip({
+    required int amountMinor,
+    required String currency,
+    required TipMethod method,
+    String? name,
+    String? message,
+    required int ts,
+    required int serial,
+  }) =>
+      Donation(
+        id: 'relay_${ts}_$serial',
+        amountMinor: amountMinor,
+        currency: currency,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(ts),
+        name: name,
+        message: message,
+        livemode: true,
+        viaService: true,
+        method: method,
+        verified: false,
+      );
+
+  Donation copyWith({
+    String? id,
+    int? amountMinor,
+    String? currency,
+    DateTime? createdAt,
+    String? name,
+    String? message,
+    bool? livemode,
+    bool? viaService,
+    String? paymentIntentId,
+    TipMethod? method,
+    bool? verified,
+  }) =>
+      Donation(
+        id: id ?? this.id,
+        amountMinor: amountMinor ?? this.amountMinor,
+        currency: currency ?? this.currency,
+        createdAt: createdAt ?? this.createdAt,
+        name: name ?? this.name,
+        message: message ?? this.message,
+        livemode: livemode ?? this.livemode,
+        viaService: viaService ?? this.viaService,
+        paymentIntentId: paymentIntentId ?? this.paymentIntentId,
+        method: method ?? this.method,
+        verified: verified ?? this.verified,
+      );
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'amountMinor': amountMinor,
@@ -119,6 +185,10 @@ class Donation {
         'livemode': livemode,
         'viaService': viaService,
         if (paymentIntentId != null) 'paymentIntentId': paymentIntentId,
+        // Written only when non-default so pre-connected-mode history stays
+        // byte-identical on re-save.
+        if (method != TipMethod.stripe) 'method': method.wire,
+        if (!verified) 'verified': verified,
       };
 
   factory Donation.fromJson(Map<String, dynamic> json) => Donation(
@@ -133,5 +203,8 @@ class Donation {
         livemode: json['livemode'] as bool? ?? true,
         viaService: json['viaService'] as bool? ?? true,
         paymentIntentId: json['paymentIntentId'] as String?,
+        method: TipMethod.fromWire(json['method'] as String?) ??
+            TipMethod.stripe,
+        verified: json['verified'] as bool? ?? true,
       );
 }

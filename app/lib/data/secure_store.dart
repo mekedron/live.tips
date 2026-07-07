@@ -1,8 +1,8 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Everything secret lives in the platform keychain/keystore — currently just
-/// the Stripe restricted key. (The stage lock uses the device's own auth, so
-/// there's no app-managed secret for it.)
+/// Everything secret lives in the platform keychain/keystore — the Stripe
+/// restricted key and the connected-mode relay jar secret. (The stage lock
+/// uses the device's own auth, so there's no app-managed secret for it.)
 class SecureStore {
   SecureStore([FlutterSecureStorage? storage])
       : _storage = storage ??
@@ -17,6 +17,7 @@ class SecureStore {
   final FlutterSecureStorage _storage;
 
   static const _kApiKey = 'stripe_api_key';
+  static const _relaySecretKey = 'relay_jar_secret';
 
   Future<String?> readApiKey() => _storage.read(key: _kApiKey);
 
@@ -24,6 +25,13 @@ class SecureStore {
       _storage.write(key: _kApiKey, value: key.trim());
 
   Future<void> deleteApiKey() => _storage.delete(key: _kApiKey);
+
+  Future<String?> readRelaySecret() => _storage.read(key: _relaySecretKey);
+
+  Future<void> writeRelaySecret(String secret) =>
+      _storage.write(key: _relaySecretKey, value: secret.trim());
+
+  Future<void> deleteRelaySecret() => _storage.delete(key: _relaySecretKey);
 
   Future<void> wipeAll() => _storage.deleteAll();
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip_method.dart';
 
 Map<String, dynamic> checkoutSession({
   String id = 'cs_test_1',
@@ -162,5 +163,61 @@ void main() {
         Donation.fromCheckoutSession(checkoutSession(paymentLink: null));
     expect(external.viaService, isFalse);
     expect(Donation.fromJson(external.toJson()).viaService, isFalse);
+  });
+
+  test('method and verified survive a json round trip when non-default', () {
+    final relayed = Donation.relayTip(
+      amountMinor: 700,
+      currency: 'dkk',
+      method: TipMethod.mobilepay,
+      name: 'Ida',
+      message: 'Skål!',
+      ts: 1751500000000,
+      serial: 3,
+    );
+    final restored = Donation.fromJson(relayed.toJson());
+    expect(restored.method, TipMethod.mobilepay);
+    expect(restored.verified, isFalse);
+    expect(restored.id, relayed.id);
+    expect(restored.createdAt, relayed.createdAt);
+  });
+
+  test('legacy json without method/verified keys gets the defaults', () {
+    final legacy = Donation.fromJson({
+      'id': 'cs_old',
+      'amountMinor': 500,
+      'currency': 'eur',
+      'createdAt': 1751500000000,
+    });
+    expect(legacy.method, TipMethod.stripe);
+    expect(legacy.verified, isTrue);
+  });
+
+  test('toJson omits method/verified when default — stored history stays '
+      'byte-identical', () {
+    final stripe = Donation.fromCheckoutSession(checkoutSession());
+    expect(stripe.method, TipMethod.stripe);
+    expect(stripe.verified, isTrue);
+    final json = stripe.toJson();
+    expect(json.containsKey('method'), isFalse);
+    expect(json.containsKey('verified'), isFalse);
+  });
+
+  test('Donation.relayTip builds an unverified live relay tip', () {
+    final tip = Donation.relayTip(
+      amountMinor: 1200,
+      currency: 'eur',
+      method: TipMethod.revolut,
+      ts: 1751500123456,
+      serial: 7,
+    );
+    expect(tip.id, 'relay_1751500123456_7');
+    expect(tip.verified, isFalse);
+    expect(tip.livemode, isTrue);
+    expect(tip.viaService, isTrue);
+    expect(tip.method, TipMethod.revolut);
+    expect(tip.createdAt.millisecondsSinceEpoch, 1751500123456);
+    expect(tip.displayName, 'Anonymous');
+    expect(tip.stripeDashboardUrl, isNull);
   });
 }
