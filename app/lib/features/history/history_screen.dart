@@ -16,7 +16,16 @@ import '../../widgets/lt_ui.dart';
 import '../../widgets/method_badges.dart';
 import '../shell/app_shell.dart';
 
-enum _HistoryTab { donations, sessions }
+enum _HistoryTab { donations, relay, sessions }
+
+/// Header note over the device-local tip-page list — honesty first: these
+/// rows are donor-declared, not settled payments.
+const _kRelayHistoryNote =
+    'Recorded on this device when tips reach your live screen — '
+    'not confirmed payments.';
+
+const _kRelayHistoryEmpty =
+    'Tips from your tip page will appear here after your next live session.';
 
 /// Opens the donation's transaction in the artist's Stripe Dashboard (a new
 /// browser tab on web). No-op for tips that have no link — demo tips, or
@@ -146,12 +155,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final isRail = AppShellScope.of(context)?.isRail ?? false;
     final sessions =
         ref.watch(localStoreProvider).readSessionHistory().reversed.toList();
-    final jar = ref.watch(appStateProvider).effectiveTipJar;
+    final app = ref.watch(appStateProvider);
+    final jar = app.effectiveTipJar;
     final stripeAllUrl =
         (jar == null || jar.isDemo) ? null : jar.stripePaymentsUrl;
+    // The tip-page tab exists for anyone with a connected-mode jar, and for
+    // anyone whose device still remembers tips from one (jar deleted, tips
+    // kept). Stripe-only installs keep the familiar two tabs untouched.
+    final relayHistory = ref.watch(relayHistoryProvider);
+    final showRelay = app.hasRelay || relayHistory.isNotEmpty;
+    if (!showRelay && _tab == _HistoryTab.relay) {
+      _tab = _HistoryTab.donations; // the tab just vanished under us
+    }
     return isRail
-        ? _buildDesktop(sessions, stripeAllUrl)
-        : _buildMobile(sessions, stripeAllUrl);
+        ? _buildDesktop(sessions, stripeAllUrl, showRelay, relayHistory)
+        : _buildMobile(sessions, stripeAllUrl, showRelay, relayHistory);
   }
 
   // -------------------------------------------------------------- stats ---
@@ -173,7 +191,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // ------------------------------------------------------------- mobile ---
 
-  Widget _buildMobile(List<LiveSession> sessions, String? stripeAllUrl) {
+  Widget _buildMobile(List<LiveSession> sessions, String? stripeAllUrl,
+      bool showRelay, List<Donation> relayHistory) {
     final c = context.lt;
     final stats = _stats(sessions);
     return Center(
@@ -212,11 +231,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 14),
               LtSegmented<_HistoryTab>(
-                values: _HistoryTab.values,
+                values: showRelay
+                    ? _HistoryTab.values
+                    : const [_HistoryTab.donations, _HistoryTab.sessions],
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
                 labelOf: (t) => switch (t) {
-                  _HistoryTab.donations => 'Donations',
+                  // 'Stripe' only makes sense next to 'Tip page' — alone it
+                  // stays 'Donations', so Stripe-only users see no churn.
+                  _HistoryTab.donations => showRelay ? 'Stripe' : 'Donations',
+                  _HistoryTab.relay => 'Tip page',
                   _HistoryTab.sessions => 'Sessions',
                 },
               ),
@@ -228,7 +252,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     child: _ViewInStripeButton(stripeAllUrl),
                   ),
                 ..._donationGroups(),
-              ] else
+              ] else if (_tab == _HistoryTab.relay)
+                ..._relayGroups(relayHistory)
+              else
                 ..._sessionCards(sessions),
             ],
           ),
@@ -239,7 +265,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // ------------------------------------------------------------ desktop ---
 
-  Widget _buildDesktop(List<LiveSession> sessions, String? stripeAllUrl) {
+  Widget _buildDesktop(List<LiveSession> sessions, String? stripeAllUrl,
+      bool showRelay, List<Donation> relayHistory) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
     final stats = _stats(sessions);
@@ -286,14 +313,25 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 children: [
                   Expanded(
                     flex: 17,
-                    child: _DonationsTable(
-                      demo: app.demo,
-                      relayOnly: !app.demo && !app.hasStripe,
-                      donations: _donations,
-                      loading: _loading,
-                      hasMore: _hasMore,
-                      error: _error,
-                      onLoadMore: _loadMore,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _DonationsTable(
+                          // Next to the tip-page table, name the source.
+                          title: showRelay ? 'Stripe' : 'Donations',
+                          demo: app.demo,
+                          relayOnly: !app.demo && !app.hasStripe,
+                          donations: _donations,
+                          loading: _loading,
+                          hasMore: _hasMore,
+                          error: _error,
+                          onLoadMore: _loadMore,
+                        ),
+                        if (showRelay) ...[
+                          const SizedBox(height: 24),
+                          _RelayTable(donations: relayHistory),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(width: 24),
@@ -365,8 +403,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            'Revolut & MobilePay tips appear in Sessions — they never '
-            'leave this device.',
+            'Your Revolut & MobilePay tips are in the Tip page tab. '
+            'Connect a Stripe account to take card tips too.',
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontFamily: kFontBody,
@@ -415,6 +453,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       ];
     }
 
+    final widgets = _dayGroupedTiles(_donations);
+
+    if (_hasMore || _loading) {
+      widgets.add(const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+      ));
+    }
+    return widgets;
+  }
+
+  /// [donations] (newest first) as day-labelled cards of [DonationTile]s —
+  /// the shared body of the Stripe and tip-page mobile lists.
+  List<Widget> _dayGroupedTiles(List<Donation> donations) {
+    final c = context.lt;
     final widgets = <Widget>[];
     List<Donation> group = [];
     String? groupLabel;
@@ -437,6 +490,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 DonationTile(
                   donation: rows[i],
                   showTime: true,
+                  // Null for tip-page tips (no Stripe transaction to open) —
+                  // the row stays inert instead of tappable-but-dead.
                   onTap: _stripeTap(rows[i]),
                 ),
               ],
@@ -446,7 +501,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       group = [];
     }
 
-    for (final d in _donations) {
+    for (final d in donations) {
       final label = _dayLabel(d.createdAt);
       if (label != groupLabel) {
         flush();
@@ -455,14 +510,43 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       group.add(d);
     }
     flush();
-
-    if (_hasMore || _loading) {
-      widgets.add(const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
-      ));
-    }
     return widgets;
+  }
+
+  // --------------------------------------------------- tip-page history ---
+
+  List<Widget> _relayGroups(List<Donation> relayHistory) {
+    final c = context.lt;
+    if (relayHistory.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            _kRelayHistoryEmpty,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontFamily: kFontBody,
+                fontSize: 13.5,
+                height: 1.5,
+                color: c.textSecondary),
+          ),
+        ),
+      ];
+    }
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
+        child: Text(
+          _kRelayHistoryNote,
+          style: TextStyle(
+              fontFamily: kFontBody,
+              fontSize: 12.5,
+              height: 1.4,
+              color: c.textMuted),
+        ),
+      ),
+      ..._dayGroupedTiles(relayHistory),
+    ];
   }
 
   String _dayLabel(DateTime time) {
@@ -571,9 +655,44 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 /// spacer and the rows so the money column stays aligned above and below.
 const double _kStripeColWidth = 32;
 
+/// FAN · MESSAGE · WHEN · AMOUNT (+ trailing ↗ spacer) — the header row the
+/// Stripe and tip-page desktop tables share, so their columns line up.
+class _TableHeader extends StatelessWidget {
+  const _TableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+
+    Widget cell(String text, {int flex = 1, TextAlign? align}) => Expanded(
+          flex: flex,
+          child: Text(
+            text.toUpperCase(),
+            textAlign: align,
+            style: outfitStyle(11, c.textMuted,
+                weight: FontWeight.w700, letterSpacing: 1),
+          ),
+        );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          cell('Fan', flex: 5),
+          cell('Message', flex: 8),
+          cell('When', flex: 3),
+          cell('Amount', flex: 2, align: TextAlign.right),
+          const SizedBox(width: _kStripeColWidth),
+        ],
+      ),
+    );
+  }
+}
+
 /// Desktop donations table: FAN · MESSAGE · WHEN · AMOUNT · ↗ (Stripe link).
 class _DonationsTable extends StatelessWidget {
   const _DonationsTable({
+    required this.title,
     required this.demo,
     required this.relayOnly,
     required this.donations,
@@ -582,6 +701,9 @@ class _DonationsTable extends StatelessWidget {
     required this.error,
     required this.onLoadMore,
   });
+
+  /// 'Donations' alone; 'Stripe' when the tip-page table sits below it.
+  final String title;
 
   final bool demo;
 
@@ -597,24 +719,13 @@ class _DonationsTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
 
-    Widget headerCell(String text, {int flex = 1, TextAlign? align}) =>
-        Expanded(
-          flex: flex,
-          child: Text(
-            text.toUpperCase(),
-            textAlign: align,
-            style: outfitStyle(11, c.textMuted,
-                weight: FontWeight.w700, letterSpacing: 1),
-          ),
-        );
-
     return LtCard(
       radius: 24,
       padding: const EdgeInsets.fromLTRB(26, 22, 26, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Donations',
+          Text(title,
               style: outfitStyle(17, c.text, weight: FontWeight.w700)),
           const SizedBox(height: 12),
           if (demo)
@@ -634,8 +745,8 @@ class _DonationsTable extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                'Revolut & MobilePay tips appear in Sessions — they never '
-                'leave this device.',
+                'Your Revolut & MobilePay tips are in the table below. '
+                'Connect a Stripe account to take card tips too.',
                 style: TextStyle(
                     fontFamily: kFontBody,
                     fontSize: 13.5,
@@ -644,18 +755,7 @@ class _DonationsTable extends StatelessWidget {
               ),
             )
           else ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  headerCell('Fan', flex: 5),
-                  headerCell('Message', flex: 8),
-                  headerCell('When', flex: 3),
-                  headerCell('Amount', flex: 2, align: TextAlign.right),
-                  const SizedBox(width: _kStripeColWidth),
-                ],
-              ),
-            ),
+            const _TableHeader(),
             Divider(height: 1, color: c.border),
             if (donations.isEmpty && !loading)
               Padding(
@@ -691,6 +791,67 @@ class _DonationsTable extends StatelessWidget {
                   ),
                 ),
               ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Desktop table for the device-local tip-page (Revolut/MobilePay) archive.
+/// Same columns as the Stripe table; the trailing link column stays empty —
+/// these tips have no Stripe transaction to open.
+class _RelayTable extends StatelessWidget {
+  const _RelayTable({required this.donations});
+
+  /// Newest first, straight from [relayHistoryProvider].
+  final List<Donation> donations;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return LtCard(
+      radius: 24,
+      padding: const EdgeInsets.fromLTRB(26, 22, 26, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Revolut & MobilePay',
+              style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(
+            _kRelayHistoryNote,
+            style: TextStyle(
+                fontFamily: kFontBody,
+                fontSize: 12.5,
+                height: 1.4,
+                color: c.textMuted),
+          ),
+          const SizedBox(height: 12),
+          if (donations.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                _kRelayHistoryEmpty,
+                style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 13.5,
+                    height: 1.5,
+                    color: c.textSecondary),
+              ),
+            )
+          else ...[
+            const _TableHeader(),
+            Divider(height: 1, color: c.border),
+            for (var i = 0; i < donations.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: c.divider),
+              _TableRow(
+                donation: donations[i],
+                // Always null here (no dashboard link) — kept as the shared
+                // helper so the row logic stays identical to the Stripe table.
+                onTap: _stripeTap(donations[i]),
+              ),
+            ],
           ],
         ],
       ),

@@ -214,6 +214,22 @@ class LiveSessionController extends Notifier<LiveState?> {
     unawaited(ref
         .read(localStoreProvider)
         .saveActiveSession(current.session, _source?.cursor));
+    // Tip-page (relay) tips exist nowhere but this device — archive them so
+    // History still has them after the session ends. Real money only: demo
+    // relay tips (livemode:false) must never enter the archive. Replays
+    // (relay redelivery, resume/backfill) are deduped by id in the store,
+    // same as the session dedupes above, so double-writes are harmless.
+    final relayTips = [
+      for (final tip in tips)
+        if (!tip.donation.verified && tip.donation.livemode) tip.donation,
+    ];
+    if (relayTips.isNotEmpty) {
+      // Fire-and-forget like saveActiveSession above. setString updates the
+      // SharedPreferences in-memory cache synchronously, so the refresh
+      // below already sees the new tips — only the disk write is deferred.
+      unawaited(ref.read(localStoreProvider).appendRelayHistory(relayTips));
+      ref.read(relayHistoryProvider.notifier).refresh();
+    }
   }
 
   void _reportError(Object e) {

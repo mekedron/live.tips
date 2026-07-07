@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/app_settings.dart';
+import '../domain/donation.dart';
 import '../domain/live_session.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
@@ -24,6 +25,11 @@ class LocalStore {
   static const _kActiveCursor = 'active_session_cursor_v1';
   static const _kRelayJar = 'relay_jar_v1';
   static const _kRelaySeenAt = 'relay_seen_at_v1';
+  static const _kRelayHistory = 'relay_history_v1';
+
+  /// Relay tips are small, but SharedPreferences is not a database — beyond
+  /// this many archived tips the oldest fall off.
+  static const relayHistoryCap = 1000;
 
   // --- Tip jar ---
 
@@ -69,6 +75,49 @@ class LocalStore {
   int? readRelaySeenAt() => _prefs.getInt(_kRelaySeenAt);
 
   Future<void> writeRelaySeenAt(int ms) => _prefs.setInt(_kRelaySeenAt, ms);
+
+  // --- Relay tip history (device-local tip-page archive) ---
+
+  /// Donor-declared tip-page (Revolut/MobilePay) tips recorded on this
+  /// device, newest first. These exist nowhere else — the relay keeps no
+  /// ledger — so History serves them from here. Deliberately untouched by
+  /// [purgeSimulatedData]: only real (livemode) tips are ever written (the
+  /// session controller filters demo tips out at the write site), so there
+  /// is nothing simulated to purge.
+  List<Donation> readRelayHistory() {
+    final raw = _prefs.getString(_kRelayHistory);
+    if (raw == null) return [];
+    try {
+      return (jsonDecode(raw) as List)
+          .map((d) => Donation.fromJson(Map<String, dynamic>.from(d as Map)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Prepends [donations] to the archive, skipping ids already stored (the
+  /// relay redelivers and resumed sessions replay — same tip, same id),
+  /// capped at [relayHistoryCap] with the oldest dropped beyond it.
+  Future<void> appendRelayHistory(List<Donation> donations) async {
+    if (donations.isEmpty) return;
+    final existing = readRelayHistory();
+    final ids = existing.map((d) => d.id).toSet();
+    final fresh = [
+      for (final d in donations)
+        if (ids.add(d.id)) d,
+    ];
+    if (fresh.isEmpty) return;
+    // A batch arrives oldest→newest; the archive is newest-first.
+    final merged = [...fresh.reversed, ...existing];
+    final capped = merged.length > relayHistoryCap
+        ? merged.sublist(0, relayHistoryCap)
+        : merged;
+    await _prefs.setString(
+      _kRelayHistory,
+      jsonEncode([for (final d in capped) d.toJson()]),
+    );
+  }
 
   // --- Settings ---
 

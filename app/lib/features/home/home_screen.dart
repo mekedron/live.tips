@@ -7,6 +7,7 @@ import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
 import '../../domain/app_settings.dart';
+import '../../domain/donation.dart';
 import '../../domain/live_session.dart';
 import '../onboarding/relay_setup_screen.dart' show confirmAndRegenerateRelayJar;
 import '../../state/live_session_controller.dart';
@@ -1126,6 +1127,21 @@ class _NewTipLinkButton extends ConsumerWidget {
 // Recent tips + last session
 // ---------------------------------------------------------------------------
 
+/// One preview list from two feeds: the Stripe API's latest donations and
+/// the device-local tip-page (Revolut/MobilePay) archive — which Stripe
+/// never sees, so without this merge relay tips were invisible here.
+/// Both inputs arrive newest-first; the result is newest-first, capped.
+@visibleForTesting
+List<Donation> mergeRecentTips(
+  List<Donation> stripe,
+  List<Donation> relay, {
+  int limit = 5,
+}) {
+  final merged = [...stripe.take(limit), ...relay.take(limit)]
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  return merged.take(limit).toList();
+}
+
 class _RecentTipsCard extends ConsumerWidget {
   const _RecentTipsCard({required this.compact});
 
@@ -1136,6 +1152,9 @@ class _RecentTipsCard extends ConsumerWidget {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
     final recent = ref.watch(recentDonationsProvider);
+    // Refreshed by the session controller the moment a tip-page tip lands,
+    // so this card updates mid-session — just like it shows Stripe tips.
+    final relayRecent = ref.watch(relayHistoryProvider);
 
     return LtCard(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -1172,27 +1191,30 @@ class _RecentTipsCard extends ConsumerWidget {
             )
           else
             recent.when(
-              data: (donations) => donations.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text(
-                        'No tips yet. Put that QR code where people can '
-                        'see it! 🎯',
-                        style: TextStyle(
-                            fontFamily: kFontBody,
-                            fontSize: 13.5,
-                            color: c.textSecondary),
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        for (var i = 0; i < donations.length; i++) ...[
-                          if (i > 0) Divider(height: 1, color: c.divider),
-                          DonationTile(
-                              donation: donations[i], showTime: !compact),
+              data: (donations) {
+                final shown = mergeRecentTips(donations, relayRecent);
+                return shown.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No tips yet. Put that QR code where people can '
+                          'see it! 🎯',
+                          style: TextStyle(
+                              fontFamily: kFontBody,
+                              fontSize: 13.5,
+                              color: c.textSecondary),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          for (var i = 0; i < shown.length; i++) ...[
+                            if (i > 0) Divider(height: 1, color: c.divider),
+                            DonationTile(
+                                donation: shown[i], showTime: !compact),
+                          ],
                         ],
-                      ],
-                    ),
+                      );
+              },
               loading: () => const Padding(
                 padding: EdgeInsets.all(20),
                 child: Center(

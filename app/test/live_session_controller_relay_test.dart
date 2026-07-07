@@ -223,6 +223,90 @@ void main() {
     expect(state.confettiTick, 2);
   });
 
+  group('device-local relay history (the tip-page archive)', () {
+    test('a real relay tip is archived at ingest and survives stop()',
+        () async {
+      await setUpContainer();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+
+      channel.tipsCtrl.add(relayTip(0, amountMinor: 700));
+      await settle();
+
+      // Persisted the moment it reached the live screen…
+      final archived = store.readRelayHistory().single;
+      expect(archived.id, 'relay_1751500000000_0');
+      expect(archived.verified, isFalse);
+      expect(archived.method, TipMethod.mobilepay);
+      // …and the in-memory provider was refreshed for watching widgets.
+      expect(container.read(relayHistoryProvider).single.id,
+          'relay_1751500000000_0');
+
+      await controller.stop();
+      expect(store.readRelayHistory(), hasLength(1),
+          reason: 'the archive outlives the session — that is its point');
+    });
+
+    test('duplicate relay ids are archived exactly once', () async {
+      await setUpContainer();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+
+      channel.tipsCtrl.add(relayTip(0));
+      channel.tipsCtrl.add(relayTip(0)); // relay redelivery — same id
+      channel.tipsCtrl.add(relayTip(1));
+      await settle();
+
+      expect(store.readRelayHistory().map((d) => d.id), [
+        'relay_1751500000000_1',
+        'relay_1751500000000_0',
+      ]);
+    });
+
+    test('Stripe tips never enter the relay archive', () async {
+      await setUpContainer(stripeBatches: [
+        [
+          Donation(
+            id: 'cs_1',
+            amountMinor: 1200,
+            currency: 'eur',
+            createdAt: DateTime.utc(2026, 7, 6),
+          ),
+        ],
+      ]);
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+
+      channel.tipsCtrl.add(relayTip(0));
+      await settle();
+
+      expect(container.read(liveSessionProvider)!.session.count, 2);
+      expect(store.readRelayHistory().map((d) => d.id),
+          ['relay_1751500000000_0'],
+          reason: 'verified (Stripe) tips live in the Stripe account — only '
+              'donor-declared tip-page tips belong to the device archive');
+    });
+
+    test('demo relay tips (livemode:false) are never archived', () async {
+      await setUpContainer();
+      container.read(appStateProvider.notifier).enterDemo();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+
+      channel.tipsCtrl.add(relayTip(0).copyWith(livemode: false));
+      await settle();
+
+      expect(container.read(liveSessionProvider)!.session.count, 1,
+          reason: 'the demo tip still plays on the stage');
+      expect(store.readRelayHistory(), isEmpty,
+          reason: 'pretend money must never enter the real archive');
+    });
+  });
+
   test(
       'the DEFAULT factory returns null for demo or missing jar/secret and '
       'a real channel otherwise', () async {

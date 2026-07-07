@@ -223,6 +223,8 @@ class AppStateNotifier extends Notifier<AppState> {
     }
     await ref.read(secureStoreProvider).wipeAll();
     await ref.read(localStoreProvider).wipeAll();
+    // The wipe took relay_history_v1 with it — drop the in-memory copy too.
+    ref.invalidate(relayHistoryProvider);
     state = const AppState(settings: AppSettings());
   }
 }
@@ -298,3 +300,19 @@ final recentDonationsProvider =
   final page = await requests.listDonations(limit: 5);
   return page.donations;
 });
+
+/// The device-local archive of tip-page (Revolut/MobilePay) tips, newest
+/// first. This device is the only witness to these tips — the Stripe API
+/// never sees them — so every list that mixes them in reads this. Mirrors
+/// StoredSessionNotifier: SharedPreferences can't notify, so the session
+/// controller refreshes this explicitly after each write.
+class RelayHistoryNotifier extends Notifier<List<Donation>> {
+  @override
+  List<Donation> build() => ref.read(localStoreProvider).readRelayHistory();
+
+  void refresh() => state = ref.read(localStoreProvider).readRelayHistory();
+}
+
+final relayHistoryProvider =
+    NotifierProvider<RelayHistoryNotifier, List<Donation>>(
+        RelayHistoryNotifier.new);
