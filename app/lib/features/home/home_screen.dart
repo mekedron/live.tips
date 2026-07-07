@@ -42,7 +42,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final controller = ref.read(liveSessionProvider.notifier);
         if (ref.read(liveSessionProvider) == null &&
-            controller.hasStoredSession) {
+            ref.read(storedSessionProvider) != null) {
           final resumed = await controller.resumeStored();
           if (resumed && mounted) _openLive();
         }
@@ -430,7 +430,8 @@ class _GoalCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final controller = ref.read(liveSessionProvider.notifier);
-    final hasStored = live == null && controller.hasStoredSession;
+    final storedSession = ref.watch(storedSessionProvider);
+    final hasStored = live == null && storedSession != null;
 
     final money = InkWell(
       onTap: onEditGoal,
@@ -486,10 +487,30 @@ class _GoalCard extends ConsumerWidget {
           LtPrimaryButton(
             label: 'Go live',
             icon: Icons.sensors_rounded,
-            onPressed: onStart,
+            onPressed: () async {
+              if (storedSession == null) {
+                onStart();
+                return;
+              }
+              final choice =
+                  await _confirmStartOverStored(context, storedSession);
+              if (choice == _StoredSessionChoice.resume) {
+                final resumed = await controller.resumeStored();
+                if (resumed && context.mounted) onReturn();
+              } else if (choice == _StoredSessionChoice.discardAndStart) {
+                onStart();
+              }
+            },
           ),
           if (hasStored) ...[
             const SizedBox(height: 10),
+            Text(
+              'Started ${_startedAgo(storedSession)}'
+              '${_tipsSummary(storedSession)}',
+              style: TextStyle(
+                  fontFamily: kFontBody, fontSize: 12, color: c.textMuted),
+            ),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -500,16 +521,20 @@ class _GoalCard extends ConsumerWidget {
                     },
                     icon: Icon(Icons.restore_rounded,
                         size: 18, color: c.textSecondary),
-                    label: const Text('Resume interrupted session'),
+                    label: const Text(
+                      'Resume session',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
                 IconButton(
                   tooltip: 'Discard it',
                   icon: const Icon(Icons.delete_outline_rounded),
                   onPressed: () async {
-                    await controller.discardStored();
-                    // hasStored is read in build; poke a rebuild
-                    ref.invalidate(liveSessionProvider);
+                    final confirmed =
+                        await _confirmDiscardStored(context, storedSession);
+                    if (confirmed) await controller.discardStored();
                   },
                 ),
               ],
@@ -657,6 +682,96 @@ class _StageLookRow extends ConsumerWidget {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Stored (interrupted) session — resume / discard / overwrite dialogs
+// ---------------------------------------------------------------------------
+
+enum _StoredSessionChoice { resume, discardAndStart }
+
+/// "38 min ago", "2h ago", or the weekday once it's over a day old.
+String _startedAgo(LiveSession session) {
+  final elapsed = DateTime.now().difference(session.startedAt);
+  if (elapsed.inMinutes < 1) return 'just now';
+  if (elapsed.inMinutes < 60) return '${elapsed.inMinutes} min ago';
+  if (elapsed.inHours < 24) return '${elapsed.inHours}h ago';
+  return DateFormat('EEEE, MMMM d').format(session.startedAt);
+}
+
+/// A trailing clause, not a sentence: " with 4 tips ($128.00)" / " with no
+/// tips yet".
+String _tipsSummary(LiveSession session) => session.count == 0
+    ? ' with no tips yet'
+    : ' with ${session.count} tip${session.count == 1 ? '' : 's'} '
+        '(${formatAmount(session.totalMinor, session.currency)})';
+
+/// Confirms before wiping a stored session for good — names what's about to
+/// be lost so a stray tap can't silently erase a tracked set.
+Future<bool> _confirmDiscardStored(
+    BuildContext context, LiveSession session) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Discard this session?'),
+      content: Text(
+        'Started ${_startedAgo(session)}${_tipsSummary(session)}. '
+        'This can\'t be undone — it won\'t be saved to your history.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Discard'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
+/// "Go live" while a set is still stored would otherwise silently overwrite
+/// it — this lets the artist resume it, discard it and start fresh, or back
+/// out instead.
+Future<_StoredSessionChoice?> _confirmStartOverStored(
+    BuildContext context, LiveSession session) {
+  return showDialog<_StoredSessionChoice>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Unfinished session found'),
+      content: Text(
+        'Your last set started ${_startedAgo(session)}'
+        '${_tipsSummary(session)}. Starting a new one discards it for good.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () =>
+              Navigator.of(context).pop(_StoredSessionChoice.resume),
+          child: const Text('Resume it'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () => Navigator.of(context)
+              .pop(_StoredSessionChoice.discardAndStart),
+          child: const Text('Discard & start new'),
+        ),
+      ],
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------

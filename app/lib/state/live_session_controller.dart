@@ -76,9 +76,6 @@ class LiveSessionController extends Notifier<LiveState?> {
     return null;
   }
 
-  bool get hasStoredSession =>
-      ref.read(localStoreProvider).readActiveSession() != null;
-
   Future<void> start({required int goalMinor}) async {
     final app = ref.read(appStateProvider);
     final jar = app.effectiveTipJar;
@@ -107,8 +104,10 @@ class LiveSessionController extends Notifier<LiveState?> {
     return true;
   }
 
-  Future<void> discardStored() =>
-      ref.read(localStoreProvider).clearActiveSession();
+  Future<void> discardStored() async {
+    await ref.read(localStoreProvider).clearActiveSession();
+    ref.read(storedSessionProvider.notifier).refresh();
+  }
 
   Future<void> _begin(LiveSession session,
       {String? resumeCursor, bool resumed = false}) async {
@@ -122,6 +121,7 @@ class LiveSessionController extends Notifier<LiveState?> {
 
     state = LiveState(session: session);
     await ref.read(localStoreProvider).saveActiveSession(session, resumeCursor);
+    ref.read(storedSessionProvider.notifier).refresh();
 
     try {
       await _source!.prime(session.startedAt,
@@ -218,6 +218,7 @@ class LiveSessionController extends Notifier<LiveState?> {
     await local.appendSessionToHistory(session);
     await local.clearActiveSession();
     state = null;
+    ref.read(storedSessionProvider.notifier).refresh();
     // Tips that arrived during the set aren't in the home preview's cached
     // Stripe query — refresh it so Recent tips reflects the night just played.
     ref.invalidate(recentDonationsProvider);
@@ -237,3 +238,19 @@ class LiveSessionController extends Notifier<LiveState?> {
 final liveSessionProvider =
     NotifierProvider<LiveSessionController, LiveState?>(
         LiveSessionController.new);
+
+/// The session persisted for crash/restart recovery — watched separately
+/// from [liveSessionProvider] because discarding/resuming it never changes
+/// [LiveState] (which stays null throughout), so nothing would tell widgets
+/// to rebuild. Refreshed explicitly wherever the active-session storage key
+/// is written or cleared.
+class StoredSessionNotifier extends Notifier<LiveSession?> {
+  @override
+  LiveSession? build() => ref.read(localStoreProvider).readActiveSession();
+
+  void refresh() => state = ref.read(localStoreProvider).readActiveSession();
+}
+
+final storedSessionProvider =
+    NotifierProvider<StoredSessionNotifier, LiveSession?>(
+        StoredSessionNotifier.new);

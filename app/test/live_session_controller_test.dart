@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/donation_source.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -132,5 +133,75 @@ void main() {
     expect(s2.confettiTick, 1, reason: 'serial unchanged');
     expect(s2.newTips, hasLength(1),
         reason: 'batch is carried — consumers must gate on the serial');
+  });
+
+  group('storedSessionProvider (resume/discard banner reactivity)', () {
+    test('starts null when nothing is stored', () async {
+      await setUpContainer([[]]);
+      expect(container.read(storedSessionProvider), isNull);
+    });
+
+    test('start() populates it immediately', () async {
+      await setUpContainer([[]]);
+      await container.read(liveSessionProvider.notifier).start(
+            goalMinor: 10000,
+          );
+      expect(container.read(storedSessionProvider), isNotNull);
+    });
+
+    test('discardStored() clears it AND notifies listeners', () async {
+      // A session left behind by a crash: nothing in this app run called
+      // start() — it's just sitting on disk when the container boots, same
+      // as "Resume interrupted session" finding it cold.
+      SharedPreferences.setMockInitialValues({});
+      final store = LocalStore(await SharedPreferences.getInstance());
+      await store.saveActiveSession(
+        LiveSession(
+          id: 'ses_crashed',
+          startedAt: DateTime.utc(2026, 7, 3),
+          currency: 'usd',
+          goalMinor: 10000,
+          donations: [d('cs_1', 500)],
+        ),
+        'cur_1',
+      );
+      container = ProviderContainer(overrides: [
+        localStoreProvider.overrideWithValue(store),
+        donationSourceFactoryProvider.overrideWithValue(
+            ({required demo, required apiKey, required jar}) =>
+                ScriptedSource(const [])),
+      ]);
+      addTearDown(container.dispose);
+      expect(container.read(storedSessionProvider)?.id, 'ses_crashed');
+
+      // The bug this guards against: discarding used to leave every watcher
+      // un-notified (LiveState stayed null throughout), so the "Resume
+      // interrupted session" row only vanished after a full page reload.
+      final notified = <LiveSession?>[];
+      container.listen(storedSessionProvider, (_, next) => notified.add(next));
+
+      await container.read(liveSessionProvider.notifier).discardStored();
+
+      expect(notified, [null],
+          reason: 'a watcher must be notified — that is what makes the '
+              'banner disappear without a refresh');
+      expect(container.read(storedSessionProvider), isNull);
+      expect(store.readActiveSession(), isNull);
+    });
+
+    test('stop() also clears it — no stale banner after a clean end',
+        () async {
+      await setUpContainer([
+        [d('cs_1', 500)],
+      ]);
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+      expect(container.read(storedSessionProvider), isNotNull);
+
+      await controller.stop();
+
+      expect(container.read(storedSessionProvider), isNull);
+    });
   });
 }
