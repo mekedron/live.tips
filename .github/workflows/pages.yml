@@ -5,9 +5,11 @@ name: Deploy site (landing + app)
 # overwrite this one rather than add a folder alongside it. Everything is
 # assembled under _site/ and deployed together, served from the apex custom
 # domain live.tips (see the CNAME written below):
-#   _site/         marketing landing page (website/)   -> live.tips/
-#   _site/stage/   tip-jar stage (app/assets/stage/)   -> live.tips/stage/
-#   _site/app/     Flutter web build                   -> live.tips/app/
+#   _site/         landing page, root=English + /xx/ per locale   -> live.tips/
+#   _site/stage/   tip-jar stage (app/assets/stage/)              -> live.tips/stage/
+#   _site/app/     Flutter web build                              -> live.tips/app/
+# The landing pages are rendered from one template + per-language strings by
+# scripts/build_site.py (see website/i18n/); there is no per-locale HTML clone.
 # The stage is assembled from the committed renderer build in app/assets/stage/,
 # so there is a single source of truth for that ~600 KB artifact (rebuilt from
 # renderer/src via `npm run build`). The Flutter app is built fresh here.
@@ -17,6 +19,7 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      - 'scripts/build_site.py'
       - 'app/lib/**'
       - 'app/web/**'
       - 'app/assets/**'
@@ -78,9 +81,10 @@ jobs:
           # this in the repo's Pages settings, but shipping CNAME in the artifact
           # keeps the workflow deploy from dropping the domain.
           echo "live.tips" > _site/CNAME
-          # Landing page + any future static assets under website/.
-          cp -R website/. _site/
-          rm -f _site/README.md            # internal note, not for publishing
+          # Landing pages: render root (English) + every /xx/ locale from one
+          # template + per-language strings, and copy website/ static assets
+          # (fonts, icons, og-image, robots.txt) + emit sitemap.xml.
+          python3 scripts/build_site.py --out _site
           # Reuse the committed renderer build — never duplicated in website/.
           mkdir -p _site/stage
           cp app/assets/stage/index.html app/assets/stage/stage.js _site/stage/
