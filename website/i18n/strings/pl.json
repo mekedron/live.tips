@@ -4,7 +4,6 @@
   "twitter_description": "Jeden kod QR na scenie — napiwki trafiają prosto na Twoje konto Stripe. Bez platformy, bez prowizji.",
   "og_image_alt": "live.tips — Twój słoik na napiwki na żywo, na scenie w kilka minut",
   "jsonld_description": "Otwartoźródłowy słoik na napiwki na żywo dla artystów: jeden kod QR na scenie, a każdy napiwek trafia prosto na konto Stripe samego artysty — bez platformy, bez prowizji, bez pośredników.",
-
   "nav_jar": "Słoik",
   "nav_how": "Jak to działa",
   "nav_security": "Bezpieczeństwo",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "Otwórz aplikację",
   "a11y_lang": "Język",
-
   "hero_badge": "Open source · działa na Twoim własnym Stripe",
   "hero_h1": "Twój słoik na napiwki na żywo.<br>Na scenie <em>w kilka minut.</em>",
   "hero_sub": "Jeden kod QR na scenie. Fani skanują, wybierają kwotę, zostawiają imię i wiadomość — a każdy napiwek trafia prosto na <strong>Twoje własne konto Stripe</strong>. Bez platformy, bez pośredników, bez dodatkowej prowizji.",
   "hero_cta_run": "Uruchom w przeglądarce",
   "hero_cta_source": "Zobacz kod źródłowy",
   "hero_trust": "Bez konta, bez instalacji — Twój klucz Stripe nigdy nie opuszcza urządzenia",
-
   "hud_live": "DEMO NA ŻYWO",
   "hud_watching": "Obserwuje Stripe",
   "tip_btn": "Wrzuć próbny napiwek",
   "a11y_zoom_in": "Powiększ",
   "a11y_zoom_out": "Pomniejsz",
-
   "ctrl_jar": "SŁOIK",
   "ctrl_scene": "SCENA",
   "ctrl_theme": "MOTYW",
-
   "vessel_caviar": "Kawior 95 ml",
   "vessel_tin": "Puszka 0.3 L",
   "vessel_mug": "Kubek 0.5 L",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Ogórki 5 L",
   "vessel_bucket": "Wiadro 10 L",
   "vessel_bowl": "Akwarium 20 L",
-
   "scene_concert": "Koncert",
   "scene_pub": "Pub",
   "scene_street": "Ulica",
   "scene_metro": "Metro",
   "scene_cafe": "Kawiarnia",
   "scene_abstract": "Abstrakcja",
-
   "theme_golden-hour": "Złota godzina",
   "theme_nord-sky": "Nordyckie niebo",
   "theme_forest-signal": "Leśny sygnał",
   "theme_rose-pulse": "Różany puls",
   "theme_cobalt-stage": "Kobaltowa scena",
   "theme_graphite-lime": "Grafitowa limonka",
-
   "stage_caption": "To prawdziwy silnik graficzny, działający na żywo w Twojej przeglądarce — scena, którą każdy fan widzi podczas występu. <strong>Każda moneta to prawdziwy napiwek, który właśnie wpada.</strong>",
-
   "how_kicker": "Jak to działa",
   "how_h2": "Od próby dźwięku do pierwszego napiwku w trzech krokach",
   "step1_h3": "Podłącz swoje konto Stripe",
@@ -69,10 +60,9 @@
   "step2_p": "Wydrukuj plakat, przyklej go do futerału gitary, połóż na stoliku z merchem. Fani skanują, wybierają kwotę, zostawiają imię i wiadomość — a płatnością zajmuje się Stripe.",
   "step3_h3": "Patrz, jak słoik zapełnia się na żywo",
   "step3_p": "Twój tablet na scenie pokazuje każdy napiwek w czasie rzeczywistym na tle dzisiejszego celu — słoik 3D, wiadomości, konfetti. Zmieniaj cel w trakcie występu; zablokuj ekran, gdy tablet stoi na widoku.",
-
   "sec_kicker": "Bezpieczeństwo",
   "sec_h2": "Twoje klucze, Twoje pieniądze",
-  "sec_lede": "Między Twoimi fanami a Twoim kontem bankowym nie ma żadnego serwera live.tips. Aplikacja łączy się z api.stripe.com — i z niczym innym.",
+  "sec_lede": "Ze Stripe między Twoimi fanami a Twoim kontem bankowym nie stoi żaden serwer live.tips — aplikacja rozmawia z api.stripe.com i z niczym więcej. Opcjonalne napiwki przez Revolut i MobilePay przechodzą przez maleńki open-source'owy przekaźnik, który nie przechowuje żadnych danych płatności.",
   "sec1_h3": "Przynieś własny klucz, zachowaj własny klucz",
   "sec1_p": "Ograniczony klucz jest przechowywany w pęku kluczy Twojego urządzenia i wysyłany wyłącznie do Stripe przez TLS. Pełne, produkcyjne klucze tajne są od razu odrzucane.",
   "sec2_h3": "Minimum uprawnień z założenia",
@@ -83,7 +73,6 @@
   "perm_read": "Odczyt",
   "perm_write": "Zapis",
   "perm_note": "Wszystko inne pozostaje na „Brak” — bez wypłat, bez zwrotów, bez dostępu do salda.",
-
   "mini_kicker": "Stworzone na scenę",
   "mini_h2": "Szczegóły, które liczą się w trakcie występu",
   "mini1_h3": "Dzisiejszy cel",
@@ -94,17 +83,13 @@
   "mini3_p": "Plakaty z kodem QR w kilku motywach i językach, gotowe na stolik z merchem.",
   "mini4_h3": "Tryb demo",
   "mini4_p": "Przetestuj pełną symulowaną sesję, zanim podłączysz Stripe — bez zakładania konta.",
-
   "cta_kicker": "Za darmo i open source · MIT",
   "cta_h2": "Gotówka znika.<br>Brawa zostają.",
   "cta_p": "Już dziś działa w przeglądarce — bez instalacji, bez rejestracji. Aplikacje natywne i kolejne metody płatności są w planach.",
   "cta_foot": "Zrobione dla grajków, barowych kapel i ulicznych artystów — przez jednego z Was.",
-
   "foot_note": "Open source na licencji MIT. Napiwki trafiają prosto na konto Stripe samego artysty — live.tips nigdy nie dotyka pieniędzy.",
-
   "a11y_dismiss": "Zamknij",
   "banner": "Ta strona jest również dostępna po polsku.",
-
   "goal_tmpl": "{done} z {goal} · {pct}% dzisiejszego celu",
   "tip_tmpl": "{name} wrzucił(a) {amount}",
   "theme": "Motyw"

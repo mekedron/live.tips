@@ -1,0 +1,43 @@
+// live.tips relay — profile store + tip event pipe. No donation history, ever.
+//
+// Secrets (never here): TURNSTILE_SECRET, ADMIN_TOKEN — set via `wrangler secret put`.
+// Local dev: copy .dev.vars.example to .dev.vars.
+//
+// NOTE for future hardening: do NOT enable Bot Fight Mode on the zone — it
+// challenges non-browser clients (the native Flutter app's REST/WS calls)
+// and cannot be exempted with custom rules on the free plan.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "livetips-relay",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-10-11",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "api.live.tips", "custom_domain": true },
+    { "pattern": "live.tips/t/*", "zone_name": "live.tips" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "JAR", "class_name": "JarDO" },
+      { "name": "REGISTRY", "class_name": "RegistryDO" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["JarDO", "RegistryDO"] }],
+  "vars": {
+    // Public Turnstile sitekey. The placeholder is Cloudflare's visible,
+    // always-passing test key; replaced with the real key at deploy time.
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA"
+  },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "upload_source_maps": true,
+  // Burst guards at the edge (beta binding; period only supports 10 or 60 s).
+  // The real quotas — 20 jar creations/hour/IP, 6 tips/min/jar — are enforced
+  // in the Durable Objects, so tests and prod behave the same if this binding
+  // ever misbehaves (worker code treats it as optional).
+  "unsafe": {
+    "bindings": [
+      { "name": "CREATE_LIMITER", "type": "ratelimit", "namespace_id": "1001", "simple": { "limit": 3, "period": 60 } },
+      { "name": "TIPS_LIMITER", "type": "ratelimit", "namespace_id": "1002", "simple": { "limit": 12, "period": 60 } }
+    ]
+  }
+}

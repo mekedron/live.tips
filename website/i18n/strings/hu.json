@@ -4,7 +4,6 @@
   "twitter_description": "Egyetlen QR-kód a színpadon — a borravaló egyenesen a saját Stripe-fiókodba érkezik. Nincs platform, nincs jutalék.",
   "og_image_alt": "live.tips — az élő borravalós perselyed, percek alatt a színpadon",
   "jsonld_description": "Nyílt forrású élő borravalós persely előadóknak: egyetlen QR-kód a színpadon, és minden borravaló egyenesen az előadó saját Stripe-fiókjába érkezik — nincs platform, nincs jutalék, nincs közvetítő.",
-
   "nav_jar": "A persely",
   "nav_how": "Hogyan működik",
   "nav_security": "Biztonság",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "Alkalmazás megnyitása",
   "a11y_lang": "Nyelv",
-
   "hero_badge": "Nyílt forrású · a saját Stripe-fiókoddal működik",
   "hero_h1": "Az élő borravalós perselyed.<br>A színpadon <em>percek alatt.</em>",
   "hero_sub": "Egyetlen QR-kód a színpadon. A rajongók beolvassák, összeget választanak, nevet és üzenetet hagynak — és minden borravaló egyenesen a <strong>saját Stripe-fiókodba</strong> érkezik. Nincs platform, nincs közvetítő, nincs extra jutalék.",
   "hero_cta_run": "Futtasd a böngésződben",
   "hero_cta_source": "Nézd meg a forráskódot",
   "hero_trust": "Nincs regisztráció, nincs telepítés — a Stripe-kulcsod soha nem hagyja el a készülékedet",
-
   "hud_live": "ÉLŐ DEMÓ",
   "hud_watching": "Stripe figyelése",
   "tip_btn": "Dobj be egy demó borravalót",
   "a11y_zoom_in": "Nagyítás",
   "a11y_zoom_out": "Kicsinyítés",
-
   "ctrl_jar": "PERSELY",
   "ctrl_scene": "SZÍNTÉR",
   "ctrl_theme": "TÉMA",
-
   "vessel_caviar": "Kaviár 95 ml",
   "vessel_tin": "Konzerv 0,3 L",
   "vessel_mug": "Bögre 0,5 L",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Uborkásüveg 5 L",
   "vessel_bucket": "Vödör 10 L",
   "vessel_bowl": "Akvárium 20 L",
-
   "scene_concert": "Koncert",
   "scene_pub": "Kocsma",
   "scene_street": "Utca",
   "scene_metro": "Metró",
   "scene_cafe": "Kávézó",
   "scene_abstract": "Absztrakt",
-
   "theme_golden-hour": "Aranyóra",
   "theme_nord-sky": "Északi ég",
   "theme_forest-signal": "Erdei jel",
   "theme_rose-pulse": "Rózsalüktetés",
   "theme_cobalt-stage": "Kobalt színpad",
   "theme_graphite-lime": "Grafit lime",
-
   "stage_caption": "Ez a valódi megjelenítő, élőben a böngésződben — a közönség felé néző színpad, amit minden rajongó lát a fellépés alatt. <strong>Minden érme egy valódi borravaló, ami épp beérkezik.</strong>",
-
   "how_kicker": "Hogyan működik",
   "how_h2": "A hangpróbától az első borravalóig három lépésben",
   "step1_h3": "Csatlakoztasd a Stripe-fiókodat",
@@ -69,10 +60,9 @@
   "step2_p": "Nyomtasd ki a plakátot, ragaszd a gitártokra, tedd ki a merchpultra. A rajongók beolvassák, összeget választanak, nevet és üzenetet hagynak — a fizetést a Stripe intézi.",
   "step3_h3": "Nézd, ahogy élőben telik a persely",
   "step3_p": "A színpadon lévő tableted valós időben mutatja minden borravalót a ma esti célhoz mérve — 3D persely, üzenetek, konfetti. A célt fellépés közben is módosíthatod, a képernyőt pedig lezárhatod, amíg elöl van.",
-
   "sec_kicker": "Biztonság",
   "sec_h2": "A te kulcsaid, a te pénzed",
-  "sec_lede": "Nincs live.tips-szerver a rajongóid és a bankszámlád között. Az alkalmazás az api.stripe.com-mal kommunikál — és semmi mással.",
+  "sec_lede": "A Stripe esetében nincs live.tips-szerver a rajongóid és a bankszámlád között — az alkalmazás az api.stripe.com címmel kommunikál, és semmi mással. A Revolut és MobilePay útján érkező opcionális borravalók egy apró, nyílt forráskódú továbbítón mennek át, amely semmilyen fizetési adatot nem tárol.",
   "sec1_h3": "Hozd a saját kulcsod — és a tiéd is marad",
   "sec1_p": "A korlátozott kulcs a készüléked kulcstárában tárolódik, és kizárólag a Stripe-nak küldjük el, TLS-en keresztül. A teljes jogú, éles titkos kulcsokat kereken elutasítjuk.",
   "sec2_h3": "Eleve minimális jogosultság",
@@ -83,7 +73,6 @@
   "perm_read": "Olvasás",
   "perm_write": "Írás",
   "perm_note": "Minden más „Nincs” marad — nincs kifizetés, nincs visszatérítés, nincs hozzáférés az egyenleghez.",
-
   "mini_kicker": "A színpadra tervezve",
   "mini_h2": "A részletek, amik fellépés közben számítanak",
   "mini1_h3": "A ma esti cél",
@@ -94,17 +83,13 @@
   "mini3_p": "QR-plakátok többféle témában és nyelven, készen a merchpultra.",
   "mini4_h3": "Demó mód",
   "mini4_p": "Próbálj ki egy teljes szimulált munkamenetet, mielőtt csatlakoztatnád a Stripe-ot — fiók nélkül.",
-
   "cta_kicker": "Ingyenes és nyílt forrású · MIT",
   "cta_h2": "A készpénz eltűnt.<br>A taps marad.",
   "cta_p": "Már ma fut a böngésződben — telepítés és regisztráció nélkül. A natív appok és a további fizetési módok már úton vannak.",
   "cta_foot": "Utcazenészeknek, kocsmazenekaroknak és utcai előadóknak készült — egy közületek valótól.",
-
   "foot_note": "Nyílt forrású, MIT-licenc alatt. A borravaló egyenesen az előadó saját Stripe-fiókjába megy — a live.tips soha nem nyúl a pénzhez.",
-
   "a11y_dismiss": "Bezárás",
   "banner": "Ez az oldal magyarul is elérhető.",
-
   "goal_tmpl": "{done} / {goal} · a ma esti cél {pct}%-a",
   "tip_tmpl": "{name} {amount} borravalót adott",
   "theme": "Téma"

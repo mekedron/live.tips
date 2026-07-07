@@ -4,7 +4,6 @@
   "twitter_description": "Un seul QR code sur scène — les pourboires arrivent directement sur votre propre compte Stripe. Sans plateforme, sans commission.",
   "og_image_alt": "live.tips — votre pot à pourboires en direct, sur scène en quelques minutes",
   "jsonld_description": "Pot à pourboires en direct et open source pour artistes de scène : un seul QR code sur scène, et chaque pourboire arrive directement sur le compte Stripe de l’artiste — sans plateforme, sans commission, sans intermédiaire.",
-
   "nav_jar": "Le pot",
   "nav_how": "Comment ça marche",
   "nav_security": "Sécurité",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "Ouvrir l’app",
   "a11y_lang": "Langue",
-
   "hero_badge": "Open source · propulsé par votre propre Stripe",
   "hero_h1": "Votre pot à pourboires en direct.<br>Sur scène <em>en quelques minutes.</em>",
   "hero_sub": "Un seul QR code sur scène. Le public scanne, choisit un montant, laisse un nom et un message — et chaque pourboire arrive directement sur <strong>votre propre compte Stripe</strong>. Sans plateforme, sans intermédiaire, sans commission supplémentaire.",
   "hero_cta_run": "Lancez-le dans votre navigateur",
   "hero_cta_source": "Voir le code source",
   "hero_trust": "Sans compte, sans installation — votre clé Stripe ne quitte jamais votre appareil",
-
   "hud_live": "DÉMO EN DIRECT",
   "hud_watching": "À l’écoute de Stripe",
   "tip_btn": "Glissez un pourboire de démo",
   "a11y_zoom_in": "Zoomer",
   "a11y_zoom_out": "Dézoomer",
-
   "ctrl_jar": "POT",
   "ctrl_scene": "DÉCOR",
   "ctrl_theme": "THÈME",
-
   "vessel_caviar": "Caviar 95 ml",
   "vessel_tin": "Boîte 0,3 L",
   "vessel_mug": "Mug 0,5 L",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Cornichons 5 L",
   "vessel_bucket": "Seau 10 L",
   "vessel_bowl": "Aquarium 20 L",
-
   "scene_concert": "Concert",
   "scene_pub": "Pub",
   "scene_street": "Rue",
   "scene_metro": "Métro",
   "scene_cafe": "Café",
   "scene_abstract": "Abstrait",
-
   "theme_golden-hour": "Heure dorée",
   "theme_nord-sky": "Ciel nordique",
   "theme_forest-signal": "Signal forêt",
   "theme_rose-pulse": "Pulsation rose",
   "theme_cobalt-stage": "Scène cobalt",
   "theme_graphite-lime": "Graphite vert citron",
-
   "stage_caption": "C’est le vrai moteur de rendu, en direct dans votre navigateur — la scène côté public que voit chaque spectateur pendant un set. <strong>Chaque pièce qui tombe est un vrai pourboire.</strong>",
-
   "how_kicker": "Comment ça marche",
   "how_h2": "Des balances au premier pourboire en trois étapes",
   "step1_h3": "Connectez votre Stripe",
@@ -69,10 +60,9 @@
   "step2_p": "Imprimez l’affiche, scotchez-la sur l’étui de guitare, posez-la sur le stand de merch. Le public scanne, choisit un montant, laisse un nom et un message — Stripe s’occupe du paiement.",
   "step3_h3": "Regardez le pot se remplir en direct",
   "step3_p": "Votre tablette sur scène affiche chaque pourboire en temps réel par rapport à l’objectif du soir — pot en 3D, messages, confettis. Modifiez l’objectif en plein set ; verrouillez l’écran pendant qu’il trône devant le public.",
-
   "sec_kicker": "Sécurité",
   "sec_h2": "Vos clés, votre argent",
-  "sec_lede": "Aucun serveur live.tips ne s’interpose entre votre public et votre compte en banque. L’app communique avec api.stripe.com — et nulle part ailleurs.",
+  "sec_lede": "Avec Stripe, aucun serveur live.tips ne s'interpose entre vos fans et votre compte bancaire — l'appli ne parle qu'à api.stripe.com, et à rien d'autre. Les pourboires optionnels via Revolut et MobilePay passent par un minuscule relais open source qui ne conserve aucune donnée de paiement.",
   "sec1_h3": "Apportez votre clé, gardez votre clé",
   "sec1_p": "La clé restreinte est stockée dans le trousseau de votre appareil et n’est jamais transmise qu’à Stripe, via TLS. Les clés secrètes complètes en mode live sont refusées d’office.",
   "sec2_h3": "Le moindre privilège par conception",
@@ -83,7 +73,6 @@
   "perm_read": "Lecture",
   "perm_write": "Écriture",
   "perm_note": "Tout le reste demeure sur « Aucun » — aucun virement, aucun remboursement, aucun accès au solde.",
-
   "mini_kicker": "Conçu pour la scène",
   "mini_h2": "Les détails qui comptent en plein set",
   "mini1_h3": "L’objectif du soir",
@@ -94,17 +83,13 @@
   "mini3_p": "Des affiches QR en plusieurs thèmes et langues, prêtes pour le stand de merch.",
   "mini4_h3": "Mode démo",
   "mini4_p": "Essayez une session simulée complète avant de connecter Stripe — aucun compte requis.",
-
   "cta_kicker": "Gratuit et open source · MIT",
   "cta_h2": "Le cash disparaît.<br>Pas les applaudissements.",
   "cta_p": "Fonctionne dans votre navigateur dès aujourd’hui — sans installation, sans inscription. Les apps natives et d’autres moyens de paiement sont au programme.",
   "cta_foot": "Fait pour les musiciens de rue, les groupes de bar et les saltimbanques — par l’un des vôtres.",
-
   "foot_note": "Open source sous licence MIT. Les pourboires vont directement sur le compte Stripe de l’artiste — live.tips ne touche jamais à l’argent.",
-
   "a11y_dismiss": "Fermer",
   "banner": "Ce site est aussi disponible en français.",
-
   "goal_tmpl": "{done} sur {goal} · {pct} % de l’objectif du soir",
   "tip_tmpl": "{name} a laissé {amount}",
   "theme": "Thème"

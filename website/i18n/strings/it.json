@@ -4,7 +4,6 @@
   "twitter_description": "Un solo QR code sul palco — le mance arrivano dritte sul tuo account Stripe. Niente piattaforma, niente commissioni.",
   "og_image_alt": "live.tips — il tuo barattolo delle mance dal vivo, sul palco in pochi minuti",
   "jsonld_description": "Barattolo delle mance dal vivo e open source per artisti: un solo QR code sul palco e ogni mancia arriva dritta sull'account Stripe dell'artista — niente piattaforma, niente commissioni, niente intermediari.",
-
   "nav_jar": "Il barattolo",
   "nav_how": "Come funziona",
   "nav_security": "Sicurezza",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "Apri l'app",
   "a11y_lang": "Lingua",
-
   "hero_badge": "Open source · con il tuo account Stripe",
   "hero_h1": "Il tuo barattolo delle mance.<br>Sul palco <em>in pochi minuti.</em>",
   "hero_sub": "Un solo QR code sul palco. I fan scansionano, scelgono l'importo, lasciano un nome e un messaggio — e ogni mancia arriva dritta sul <strong>tuo account Stripe</strong>. Niente piattaforma, niente intermediari, niente commissioni extra.",
   "hero_cta_run": "Provalo nel browser",
   "hero_cta_source": "Guarda il codice",
   "hero_trust": "Nessun account, nessuna installazione — la tua chiave Stripe non lascia mai il tuo dispositivo",
-
   "hud_live": "DEMO LIVE",
   "hud_watching": "In ascolto di Stripe",
   "tip_btn": "Lancia una mancia demo",
   "a11y_zoom_in": "Ingrandisci",
   "a11y_zoom_out": "Rimpicciolisci",
-
   "ctrl_jar": "BARATTOLO",
   "ctrl_scene": "SCENA",
   "ctrl_theme": "TEMA",
-
   "vessel_caviar": "Caviale 95 ml",
   "vessel_tin": "Lattina 0,3 L",
   "vessel_mug": "Tazza 0,5 L",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Sottaceti 5 L",
   "vessel_bucket": "Secchio 10 L",
   "vessel_bowl": "Boccia dei pesci 20 L",
-
   "scene_concert": "Concerto",
   "scene_pub": "Pub",
   "scene_street": "Strada",
   "scene_metro": "Metro",
   "scene_cafe": "Caffè",
   "scene_abstract": "Astratto",
-
   "theme_golden-hour": "Ora d'Oro",
   "theme_nord-sky": "Cielo Nordico",
   "theme_forest-signal": "Segnale Foresta",
   "theme_rose-pulse": "Rosa Pulsante",
   "theme_cobalt-stage": "Palco Cobalto",
   "theme_graphite-lime": "Grafite Lime",
-
   "stage_caption": "Questo è il renderer vero, dal vivo nel tuo browser — il palco rivolto al pubblico che ogni fan vede durante il set. <strong>Ogni moneta è una mancia vera che piove nel barattolo.</strong>",
-
   "how_kicker": "Come funziona",
   "how_h2": "Dal soundcheck alla prima mancia in tre passi",
   "step1_h3": "Collega il tuo Stripe",
@@ -69,10 +60,9 @@
   "step2_p": "Stampa il poster, attaccalo alla custodia della chitarra, mettilo sul banco del merch. I fan scansionano, scelgono l'importo, lasciano un nome e un messaggio — al pagamento pensa Stripe.",
   "step3_h3": "Guarda il barattolo riempirsi dal vivo",
   "step3_p": "Il tuo tablet sul palco mostra ogni mancia in tempo reale rispetto all'obiettivo della serata — barattolo 3D, messaggi, coriandoli. Modifica l'obiettivo durante il set; blocca lo schermo mentre resta rivolto al pubblico.",
-
   "sec_kicker": "Sicurezza",
   "sec_h2": "Le tue chiavi, i tuoi soldi",
-  "sec_lede": "Non c'è nessun server live.tips tra i tuoi fan e il tuo conto in banca. L'app comunica con api.stripe.com — e con nient'altro.",
+  "sec_lede": "Con Stripe non c'è alcun server live.tips tra i tuoi fan e il tuo conto bancario: l'app parla con api.stripe.com e con nient'altro. Le mance opzionali via Revolut e MobilePay passano per un minuscolo relay open source che non conserva alcun dato di pagamento.",
   "sec1_h3": "Porta la tua chiave, tieni la tua chiave",
   "sec1_p": "La chiave con permessi limitati è salvata nel portachiavi del tuo dispositivo e viene inviata solo a Stripe, sempre tramite TLS. Le chiavi segrete live complete vengono rifiutate a priori.",
   "sec2_h3": "Privilegio minimo, per principio",
@@ -83,7 +73,6 @@
   "perm_read": "Lettura",
   "perm_write": "Scrittura",
   "perm_note": "Tutto il resto resta su «Nessuno» — niente versamenti, niente rimborsi, niente accesso ai saldi.",
-
   "mini_kicker": "Fatto per il palco",
   "mini_h2": "I dettagli che contano durante il set",
   "mini1_h3": "L'obiettivo della serata",
@@ -94,17 +83,13 @@
   "mini3_p": "Poster con QR in diversi temi e lingue, pronti per il banco del merch.",
   "mini4_h3": "Modalità demo",
   "mini4_p": "Prova una sessione simulata completa prima di collegare Stripe — senza bisogno di un account.",
-
   "cta_kicker": "Gratis e open source · MIT",
   "cta_h2": "I contanti sono spariti.<br>Gli applausi no.",
   "cta_p": "Oggi gira nel browser — senza installazione, senza registrazione. App native e altri metodi di pagamento sono in programma.",
   "cta_foot": "Fatto per musicisti di strada, band da locale e artisti di piazza — da uno di voi.",
-
   "foot_note": "Open source con licenza MIT. Le mance vanno dritte sull'account Stripe dell'artista — live.tips non tocca mai il denaro.",
-
   "a11y_dismiss": "Chiudi",
   "banner": "Questo sito è disponibile anche in italiano.",
-
   "goal_tmpl": "{done} di {goal} · {pct}% dell'obiettivo della serata",
   "tip_tmpl": "{name} ha lasciato {amount}",
   "theme": "Tema"

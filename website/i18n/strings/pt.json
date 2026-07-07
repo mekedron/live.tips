@@ -4,7 +4,6 @@
   "twitter_description": "Um código QR no palco — as gorjetas caem diretamente na tua própria conta Stripe. Sem plataforma, sem comissão.",
   "og_image_alt": "live.tips — o teu frasco de gorjetas ao vivo, no palco em minutos",
   "jsonld_description": "Frasco de gorjetas ao vivo e open source para artistas: um código QR no palco e cada gorjeta cai diretamente na conta Stripe do próprio artista — sem plataforma, sem comissão, sem intermediários.",
-
   "nav_jar": "O frasco",
   "nav_how": "Como funciona",
   "nav_security": "Segurança",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "Abrir a app",
   "a11y_lang": "Idioma",
-
   "hero_badge": "Open source · com o teu próprio Stripe",
   "hero_h1": "O teu frasco de gorjetas ao vivo.<br>No palco <em>em minutos.</em>",
   "hero_sub": "Um código QR no palco. O público lê-o, escolhe um valor, deixa um nome e uma mensagem — e cada gorjeta cai diretamente na <strong>tua própria conta Stripe</strong>. Sem plataforma, sem intermediários, sem comissão extra.",
   "hero_cta_run": "Experimenta no navegador",
   "hero_cta_source": "Ver o código",
   "hero_trust": "Sem conta, sem instalação — a tua chave Stripe nunca sai do teu dispositivo",
-
   "hud_live": "DEMO AO VIVO",
   "hud_watching": "A observar o Stripe",
   "tip_btn": "Atira uma gorjeta de demo",
   "a11y_zoom_in": "Ampliar",
   "a11y_zoom_out": "Reduzir",
-
   "ctrl_jar": "FRASCO",
   "ctrl_scene": "CENA",
   "ctrl_theme": "TEMA",
-
   "vessel_caviar": "Caviar 95 ml",
   "vessel_tin": "Lata 0,3 L",
   "vessel_mug": "Caneca 0,5 L",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Boião 5 L",
   "vessel_bucket": "Balde 10 L",
   "vessel_bowl": "Aquário 20 L",
-
   "scene_concert": "Concerto",
   "scene_pub": "Bar",
   "scene_street": "Rua",
   "scene_metro": "Metro",
   "scene_cafe": "Café",
   "scene_abstract": "Abstrato",
-
   "theme_golden-hour": "Hora Dourada",
   "theme_nord-sky": "Céu Nórdico",
   "theme_forest-signal": "Sinal da Floresta",
   "theme_rose-pulse": "Pulso Rosa",
   "theme_cobalt-stage": "Palco Cobalto",
   "theme_graphite-lime": "Grafite Lima",
-
   "stage_caption": "Este é o renderizador real, ao vivo no teu navegador — o palco que todo o público vê durante uma atuação. <strong>Cada moeda é uma gorjeta real a cair.</strong>",
-
   "how_kicker": "Como funciona",
   "how_h2": "Da passagem de som à primeira gorjeta em três passos",
   "step1_h3": "Liga o teu Stripe",
@@ -69,10 +60,9 @@
   "step2_p": "Imprime o cartaz, cola-o no estojo da guitarra, põe-no na mesa do merch. O público lê o código, escolhe um valor, deixa um nome e uma mensagem — o Stripe trata do pagamento.",
   "step3_h3": "Vê o frasco encher ao vivo",
   "step3_p": "O teu tablet no palco mostra cada gorjeta em tempo real face à meta desta noite — frasco 3D, mensagens, confetti. Edita a meta a meio da atuação; bloqueia o ecrã enquanto ele fica à vista do público.",
-
   "sec_kicker": "Segurança",
   "sec_h2": "As tuas chaves, o teu dinheiro",
-  "sec_lede": "Não há nenhum servidor live.tips entre o teu público e a tua conta bancária. A app comunica com api.stripe.com — e com mais nada.",
+  "sec_lede": "Com o Stripe não há nenhum servidor live.tips entre os seus fãs e a sua conta bancária — a app fala com api.stripe.com e com mais nada. As gorjetas opcionais por Revolut e MobilePay passam por um minúsculo relé de código aberto que não guarda nenhum dado de pagamento.",
   "sec1_h3": "Traz a tua chave, guarda a tua chave",
   "sec1_p": "A chave restrita é guardada no porta-chaves do teu dispositivo e só é enviada para o Stripe, sempre através de TLS. As chaves secretas completas de produção são recusadas de imediato.",
   "sec2_h3": "Privilégio mínimo por princípio",
@@ -83,7 +73,6 @@
   "perm_read": "Leitura",
   "perm_write": "Escrita",
   "perm_note": "Tudo o resto fica em «Nenhuma» — sem transferências, sem reembolsos, sem acesso a saldos.",
-
   "mini_kicker": "Feito para o palco",
   "mini_h2": "Os detalhes que contam a meio da atuação",
   "mini1_h3": "A meta desta noite",
@@ -94,17 +83,13 @@
   "mini3_p": "Cartazes com QR em vários temas e idiomas, prontos para a mesa do merch.",
   "mini4_h3": "Modo de demonstração",
   "mini4_p": "Experimenta uma sessão simulada completa antes de ligares o Stripe — sem precisar de conta.",
-
   "cta_kicker": "Grátis e open source · MIT",
   "cta_h2": "O dinheiro vivo acabou.<br>Os aplausos não.",
   "cta_p": "Já funciona no teu navegador — sem instalação, sem registo. Apps nativas e mais métodos de pagamento estão a caminho.",
   "cta_foot": "Feito para músicos de rua, bandas de bar e artistas de rua — por um de vocês.",
-
   "foot_note": "Open source sob a licença MIT. As gorjetas vão diretas para a conta Stripe do próprio artista — o live.tips nunca toca no dinheiro.",
-
   "a11y_dismiss": "Dispensar",
   "banner": "Este site também está disponível em Português.",
-
   "goal_tmpl": "{done} de {goal} · {pct}% da meta desta noite",
   "tip_tmpl": "{name} deixou {amount}",
   "theme": "Tema"

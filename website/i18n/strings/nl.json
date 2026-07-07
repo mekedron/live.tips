@@ -4,7 +4,6 @@
   "twitter_description": "Eén QR-code op het podium — fooien komen rechtstreeks binnen op je eigen Stripe-account. Geen platform, geen commissie.",
   "og_image_alt": "live.tips — jouw live-fooienpot, binnen enkele minuten op het podium",
   "jsonld_description": "Open source live-fooienpot voor artiesten: één QR-code op het podium en elke fooi komt rechtstreeks binnen op het eigen Stripe-account van de artiest — geen platform, geen commissie, geen tussenpersoon.",
-
   "nav_jar": "De pot",
   "nav_how": "Hoe het werkt",
   "nav_security": "Beveiliging",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "App openen",
   "a11y_lang": "Taal",
-
   "hero_badge": "Open source · draait op je eigen Stripe",
   "hero_h1": "Jouw live-fooienpot.<br>Op het podium <em>in enkele minuten.</em>",
   "hero_sub": "Eén QR-code op het podium. Fans scannen, kiezen een bedrag, laten een naam en een bericht achter — en elke fooi komt rechtstreeks binnen op <strong>je eigen Stripe-account</strong>. Geen platform, geen tussenpersoon, geen extra commissie.",
   "hero_cta_run": "Draai het in je browser",
   "hero_cta_source": "Bekijk de broncode",
   "hero_trust": "Geen account, geen installatie — je Stripe-sleutel verlaat nooit je apparaat",
-
   "hud_live": "LIVE DEMO",
   "hud_watching": "Stripe volgen",
   "tip_btn": "Gooi er een demofooi in",
   "a11y_zoom_in": "Inzoomen",
   "a11y_zoom_out": "Uitzoomen",
-
   "ctrl_jar": "POT",
   "ctrl_scene": "DECOR",
   "ctrl_theme": "THEMA",
-
   "vessel_caviar": "Kaviaar 95 ml",
   "vessel_tin": "Blik 0,3 L",
   "vessel_mug": "Mok 0,5 L",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Augurkenpot 5 L",
   "vessel_bucket": "Emmer 10 L",
   "vessel_bowl": "Vissenkom 20 L",
-
   "scene_concert": "Concert",
   "scene_pub": "Kroeg",
   "scene_street": "Straat",
   "scene_metro": "Metro",
   "scene_cafe": "Café",
   "scene_abstract": "Abstract",
-
   "theme_golden-hour": "Gouden uur",
   "theme_nord-sky": "Noorderlucht",
   "theme_forest-signal": "Bossignaal",
   "theme_rose-pulse": "Roze puls",
   "theme_cobalt-stage": "Kobaltpodium",
   "theme_graphite-lime": "Grafietlimoen",
-
   "stage_caption": "Dit is de echte renderer, live in je browser — het podium dat elke fan tijdens een set ziet. <strong>Elke munt is een echte fooi die binnenstroomt.</strong>",
-
   "how_kicker": "Hoe het werkt",
   "how_h2": "Van soundcheck tot eerste fooi in drie stappen",
   "step1_h3": "Koppel je Stripe",
@@ -69,10 +60,9 @@
   "step2_p": "Print de poster, plak hem op je gitaarkoffer, zet hem op de merchtafel. Fans scannen, kiezen een bedrag, laten een naam en een bericht achter — Stripe regelt de betaling.",
   "step3_h3": "Zie de pot live vollopen",
   "step3_p": "Je tablet op het podium toont elke fooi in realtime, afgezet tegen het doel van vanavond — 3D-pot, berichten, confetti. Pas het doel aan tijdens je set; vergrendel het scherm terwijl het vooraan staat.",
-
   "sec_kicker": "Beveiliging",
   "sec_h2": "Jouw sleutels, jouw geld",
-  "sec_lede": "Er staat geen live.tips-server tussen je fans en je bankrekening. De app praat met api.stripe.com — en verder met niets anders.",
+  "sec_lede": "Met Stripe staat er geen live.tips-server tussen je fans en je bankrekening — de app praat met api.stripe.com en met niets anders. Optionele fooien via Revolut en MobilePay lopen via een piepklein open-source-relay dat geen betaalgegevens opslaat.",
   "sec1_h3": "Neem je eigen sleutel mee, hou je eigen sleutel",
   "sec1_p": "De beperkte sleutel wordt bewaard in de sleutelhanger van je apparaat en alleen via TLS naar Stripe verstuurd. Volledige geheime live-sleutels worden botweg geweigerd.",
   "sec2_h3": "Minimale rechten, van meet af aan",
@@ -83,7 +73,6 @@
   "perm_read": "Lezen",
   "perm_write": "Schrijven",
   "perm_note": "Al het andere blijft op “Geen” staan — geen uitbetalingen, geen terugbetalingen, geen toegang tot je saldo.",
-
   "mini_kicker": "Gebouwd voor het podium",
   "mini_h2": "De details die tellen midden in je set",
   "mini1_h3": "Het doel van vanavond",
@@ -94,17 +83,13 @@
   "mini3_p": "QR-posters in verschillende thema's en talen, klaar voor de merchtafel.",
   "mini4_h3": "Demomodus",
   "mini4_p": "Probeer een volledig gesimuleerde sessie voordat je Stripe koppelt — geen account nodig.",
-
   "cta_kicker": "Gratis & open source · MIT",
   "cta_h2": "Contant geld verdwijnt.<br>Het applaus niet.",
   "cta_p": "Draait vandaag al in je browser — geen installatie, geen registratie. Native apps en meer betaalmethoden staan op de roadmap.",
   "cta_foot": "Gemaakt voor straatmuzikanten, kroegbands en straatartiesten — door één van jullie.",
-
   "foot_note": "Open source onder de MIT-licentie. Fooien gaan rechtstreeks naar het eigen Stripe-account van de artiest — live.tips raakt het geld nooit aan.",
-
   "a11y_dismiss": "Sluiten",
   "banner": "Deze website is ook beschikbaar in het Nederlands.",
-
   "goal_tmpl": "{done} van {goal} · {pct}% van het doel van vanavond",
   "tip_tmpl": "{name} gaf een fooi van {amount}",
   "theme": "Thema"

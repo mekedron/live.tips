@@ -4,7 +4,6 @@
   "twitter_description": "Un código QR en el escenario: las propinas llegan directamente a tu propia cuenta de Stripe. Sin plataforma, sin comisiones.",
   "og_image_alt": "live.tips — tu bote de propinas en directo, en el escenario en minutos",
   "jsonld_description": "Bote de propinas en directo y de código abierto para artistas: un código QR en el escenario y cada propina llega directamente a la propia cuenta de Stripe del artista. Sin plataforma, sin comisiones, sin intermediarios.",
-
   "nav_jar": "El bote",
   "nav_how": "Cómo funciona",
   "nav_security": "Seguridad",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "Abrir la app",
   "a11y_lang": "Idioma",
-
   "hero_badge": "Código abierto · con tu propia cuenta de Stripe",
   "hero_h1": "Tu bote de propinas en directo.<br>En el escenario <em>en minutos.</em>",
   "hero_sub": "Un código QR en el escenario. El público escanea, elige un importe y deja su nombre y un mensaje: cada propina llega directamente a <strong>tu propia cuenta de Stripe</strong>. Sin plataforma, sin intermediarios, sin comisiones extra.",
   "hero_cta_run": "Pruébalo en tu navegador",
   "hero_cta_source": "Ver el código",
   "hero_trust": "Sin cuenta, sin instalación: tu clave de Stripe nunca sale de tu dispositivo",
-
   "hud_live": "DEMO EN VIVO",
   "hud_watching": "Escuchando a Stripe",
   "tip_btn": "Echa una propina de prueba",
   "a11y_zoom_in": "Acercar",
   "a11y_zoom_out": "Alejar",
-
   "ctrl_jar": "BOTE",
   "ctrl_scene": "ESCENA",
   "ctrl_theme": "TEMA",
-
   "vessel_caviar": "Caviar 95 ml",
   "vessel_tin": "Lata 0,3 L",
   "vessel_mug": "Taza 0,5 L",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Pepinillos 5 L",
   "vessel_bucket": "Cubo 10 L",
   "vessel_bowl": "Pecera 20 L",
-
   "scene_concert": "Concierto",
   "scene_pub": "Pub",
   "scene_street": "Calle",
   "scene_metro": "Metro",
   "scene_cafe": "Café",
   "scene_abstract": "Abstracto",
-
   "theme_golden-hour": "Hora dorada",
   "theme_nord-sky": "Cielo nórdico",
   "theme_forest-signal": "Señal del bosque",
   "theme_rose-pulse": "Pulso rosa",
   "theme_cobalt-stage": "Escenario cobalto",
   "theme_graphite-lime": "Grafito lima",
-
   "stage_caption": "Este es el motor real, funcionando en directo en tu navegador: el escenario que ve el público durante cada actuación. <strong>Cada moneda es una propina real que cae al bote.</strong>",
-
   "how_kicker": "Cómo funciona",
   "how_h2": "De la prueba de sonido a la primera propina en tres pasos",
   "step1_h3": "Conecta tu Stripe",
@@ -69,10 +60,9 @@
   "step2_p": "Imprime el cartel, pégalo en la funda de la guitarra, ponlo en la mesa de merchandising. El público escanea, elige un importe y deja su nombre y un mensaje: Stripe se encarga del pago.",
   "step3_h3": "Mira cómo se llena el bote en directo",
   "step3_p": "Tu tablet en el escenario muestra cada propina en tiempo real frente a la meta de la noche: bote en 3D, mensajes, confeti. Edita la meta sobre la marcha y bloquea la pantalla mientras está a la vista del público.",
-
   "sec_kicker": "Seguridad",
   "sec_h2": "Tus claves, tu dinero",
-  "sec_lede": "No hay ningún servidor de live.tips entre tu público y tu cuenta bancaria. La app se comunica con api.stripe.com, y con nada más.",
+  "sec_lede": "Con Stripe no hay ningún servidor de live.tips entre tus fans y tu cuenta bancaria: la app habla con api.stripe.com y con nada más. Las propinas opcionales por Revolut y MobilePay pasan por un pequeño relé de código abierto que no guarda ningún dato de pago.",
   "sec1_h3": "Trae tu clave y sigue siendo tuya",
   "sec1_p": "La clave restringida se guarda en el llavero de tu dispositivo y solo se envía a Stripe a través de TLS. Las claves secretas completas de modo real se rechazan de plano.",
   "sec2_h3": "Mínimos privilegios por diseño",
@@ -83,7 +73,6 @@
   "perm_read": "Lectura",
   "perm_write": "Escritura",
   "perm_note": "Todo lo demás se queda en «Ninguno»: sin transferencias, sin reembolsos, sin acceso al saldo.",
-
   "mini_kicker": "Hecho para el escenario",
   "mini_h2": "Los detalles que importan en pleno directo",
   "mini1_h3": "La meta de la noche",
@@ -94,17 +83,13 @@
   "mini3_p": "Carteles con QR en varios temas e idiomas, listos para la mesa de merchandising.",
   "mini4_h3": "Modo demo",
   "mini4_p": "Prueba una sesión simulada completa antes de conectar Stripe, sin necesidad de cuenta.",
-
   "cta_kicker": "Gratis y de código abierto · MIT",
   "cta_h2": "El efectivo se acabó.<br>Los aplausos no.",
   "cta_p": "Hoy funciona en tu navegador, sin instalación ni registro. Las apps nativas y más métodos de pago están en camino.",
   "cta_foot": "Hecho para músicos callejeros, grupos de bar y artistas de calle, por uno de vosotros.",
-
   "foot_note": "Código abierto bajo la licencia MIT. Las propinas van directas a la propia cuenta de Stripe del artista; live.tips nunca toca el dinero.",
-
   "a11y_dismiss": "Descartar",
   "banner": "Este sitio también está disponible en español.",
-
   "goal_tmpl": "{done} de {goal} · {pct}% de la meta de la noche",
   "tip_tmpl": "{name} dejó {amount} de propina",
   "theme": "Tema"

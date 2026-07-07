@@ -4,7 +4,6 @@
   "twitter_description": "Sahnede tek bir QR kod — bahşişler doğrudan kendi Stripe hesabına düşer. Platform yok, komisyon yok.",
   "og_image_alt": "live.tips — canlı bahşiş kavanozun, dakikalar içinde sahnede",
   "jsonld_description": "Sahne sanatçıları için açık kaynaklı canlı bahşiş kavanozu: sahnede tek bir QR kod ve her bahşiş doğrudan sanatçının kendi Stripe hesabına düşer — platform yok, komisyon yok, aracı yok.",
-
   "nav_jar": "Kavanoz",
   "nav_how": "Nasıl çalışır",
   "nav_security": "Güvenlik",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "Uygulamayı aç",
   "a11y_lang": "Dil",
-
   "hero_badge": "Açık kaynak · kendi Stripe hesabınla çalışır",
   "hero_h1": "Canlı bahşiş kavanozun.<br>Sahnede <em>dakikalar içinde.</em>",
   "hero_sub": "Sahnede tek bir QR kod. Hayranlar okutur, tutarı seçer, ad ve mesaj bırakır — ve her bahşiş doğrudan <strong>kendi Stripe hesabına</strong> düşer. Platform yok, aracı yok, ekstra komisyon yok.",
   "hero_cta_run": "Tarayıcında çalıştır",
   "hero_cta_source": "Kaynağı görüntüle",
   "hero_trust": "Hesap yok, kurulum yok — Stripe anahtarın cihazından asla çıkmaz",
-
   "hud_live": "CANLI DEMO",
   "hud_watching": "Stripe izleniyor",
   "tip_btn": "Demo bahşiş at",
   "a11y_zoom_in": "Yakınlaştır",
   "a11y_zoom_out": "Uzaklaştır",
-
   "ctrl_jar": "KAVANOZ",
   "ctrl_scene": "SAHNE",
   "ctrl_theme": "TEMA",
-
   "vessel_caviar": "Havyar 95 ml",
   "vessel_tin": "Teneke 0,3 L",
   "vessel_mug": "Kupa 0,5 L",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Turşu 5 L",
   "vessel_bucket": "Kova 10 L",
   "vessel_bowl": "Fanus 20 L",
-
   "scene_concert": "Konser",
   "scene_pub": "Bar",
   "scene_street": "Sokak",
   "scene_metro": "Metro",
   "scene_cafe": "Kafe",
   "scene_abstract": "Soyut",
-
   "theme_golden-hour": "Altın Saat",
   "theme_nord-sky": "Kuzey Göğü",
   "theme_forest-signal": "Orman Sinyali",
   "theme_rose-pulse": "Gül Nabzı",
   "theme_cobalt-stage": "Kobalt Sahne",
   "theme_graphite-lime": "Grafit Limon",
-
   "stage_caption": "Bu, tarayıcında canlı çalışan gerçek görüntü motoru — performans sırasında her hayranın gördüğü, seyirciye dönük sahne. <strong>Her jeton gerçek bir bahşiş, kavanoza akıp geliyor.</strong>",
-
   "how_kicker": "Nasıl çalışır",
   "how_h2": "Ses provasından ilk bahşişe üç adımda",
   "step1_h3": "Stripe'ını bağla",
@@ -69,10 +60,9 @@
   "step2_p": "Afişi yazdır, gitar kutusuna yapıştır, ürün masasına koy. Hayranlar okutur, tutarı seçer, ad ve mesaj bırakır — ödemeyi Stripe halleder.",
   "step3_h3": "Kavanozun doluşunu canlı izle",
   "step3_p": "Sahnedeki tabletin, her bahşişi bu geceki hedefe göre anlık gösterir — 3D kavanoz, mesajlar, konfeti. Performans sürerken hedefi düzenle; tablet önde dururken ekranı kilitle.",
-
   "sec_kicker": "Güvenlik",
   "sec_h2": "Senin anahtarların, senin paran",
-  "sec_lede": "Hayranlarınla banka hesabın arasında hiçbir live.tips sunucusu yok. Uygulama yalnızca api.stripe.com ile konuşur — başka hiçbir yerle değil.",
+  "sec_lede": "Stripe ile hayranlarınızla banka hesabınız arasında hiçbir live.tips sunucusu yoktur — uygulama yalnızca api.stripe.com ile konuşur, başka hiçbir şeyle değil. İsteğe bağlı Revolut ve MobilePay bahşişleri, hiçbir ödeme verisi saklamayan minicik bir açık kaynak aktarıcıdan geçer.",
   "sec1_h3": "Kendi anahtarını getir, kendinde kalsın",
   "sec1_p": "Kısıtlı anahtar, cihazının anahtar zincirinde saklanır ve yalnızca TLS üzerinden Stripe'a gönderilir. Tam yetkili canlı gizli anahtarlar kesinlikle reddedilir.",
   "sec2_h3": "Tasarım gereği en az yetki",
@@ -83,7 +73,6 @@
   "perm_read": "Okuma",
   "perm_write": "Yazma",
   "perm_note": "Diğer her şey “Yok” kalır — ödeme aktarımı yok, iade yok, bakiye erişimi yok.",
-
   "mini_kicker": "Sahne için tasarlandı",
   "mini_h2": "Sahnedeyken fark yaratan detaylar",
   "mini1_h3": "Bu geceki hedef",
@@ -94,17 +83,13 @@
   "mini3_p": "Farklı tema ve dillerde, ürün masasına hazır QR afişleri.",
   "mini4_h3": "Demo modu",
   "mini4_p": "Stripe'ı bağlamadan önce tam simülasyonlu bir oturumu dene — hesap gerekmez.",
-
   "cta_kicker": "Ücretsiz ve açık kaynak · MIT",
   "cta_h2": "Nakit gitti.<br>Alkış gitmedi.",
   "cta_p": "Bugün tarayıcında çalışır — kurulum yok, kayıt yok. Yerel uygulamalar ve daha fazla ödeme yöntemi yol haritasında.",
   "cta_foot": "Sokak müzisyenleri, bar grupları ve sokak sanatçıları için — sizden biri yaptı.",
-
   "foot_note": "MIT lisansı altında açık kaynak. Bahşişler doğrudan sanatçının kendi Stripe hesabına gider — live.tips paraya asla dokunmaz.",
-
   "a11y_dismiss": "Kapat",
   "banner": "Bu site Türkçe olarak da mevcut.",
-
   "goal_tmpl": "{done} / {goal} · bu geceki hedefin %{pct}'i",
   "tip_tmpl": "{name}, {amount} bahşiş bıraktı",
   "theme": "Tema"

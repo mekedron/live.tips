@@ -1,8 +1,12 @@
 # Architecture
 
-One Flutter app, no backend. The artist's device talks straight to
-`api.stripe.com` with a restricted key created by the artist. This document
-explains the moving parts and the reasoning.
+One Flutter app, serverless by default. In the default Stripe-only mode the
+artist's device talks straight to `api.stripe.com` with a restricted key
+created by the artist — there is no live.tips backend. An **optional connected
+mode** adds Revolut/MobilePay via a minimal relay (`worker/`,
+`api.live.tips`); it is described in [Optional relay](#optional-relay-workerapilivetips)
+below and stores no donation data. This document explains the moving parts and
+the reasoning.
 
 ## The core loop: polling instead of webhooks
 
@@ -117,10 +121,41 @@ thing. The screen stays awake during sessions via `wakelock_plus`.
 - Restricted key, least privilege (5 permissions), verified per-permission at
   connect time with clear errors.
 - `sk_live_…` keys are refused outright; test keys get a loud banner.
-- No analytics, no third-party services, no network calls except
-  `api.stripe.com` and Stripe's own checkout page.
+- No analytics, no third-party services. In Stripe-only mode the app makes no
+  network calls except `api.stripe.com` and Stripe's own checkout page; in
+  connected mode it additionally talks to `api.live.tips` (see below).
 - Pinned `Stripe-Version: 2024-06-20` so parsing is stable regardless of the
   account's default API version.
+
+## Optional relay (`worker/`, api.live.tips)
+
+Revolut and MobilePay Box have no API to confirm a payment, so tips through
+them cannot be verified — but artists still want to accept them. The relay is
+the smallest server that makes this possible:
+
+- **One Durable Object per jar** stores ~1 KB of plain text: artist name,
+  message, currency, and validated payment *atoms* (a Stripe payment-link code,
+  a Revolut username, a MobilePay box UUID — never free-form URLs). A SHA-256
+  hash of the device's secret, never the secret itself.
+- The QR points to `live.tips/t/<jarId>` — a server-rendered page offering the
+  enabled methods. Revolut/MobilePay show a Turnstile-gated form (amount, name,
+  message). Submitting relays a `tip` event over a WebSocket to the artist's
+  device (first-message auth, hibernation-friendly), then redirects the fan to
+  the payment deep link. **No tip is ever stored server-side**; if the device
+  is offline the event is dropped by design.
+- The app treats relayed tips as **unverified**: they count toward the session
+  with a visible badge, never get the "big tipper" treatment, and History
+  labels them as reported-not-confirmed.
+- Lifecycle: the device pings `/seen` at most once a day; the jar's own alarm
+  deletes everything 90 days after the last activity. Deleting or regenerating
+  the link wipes it immediately. There is no account system.
+- Abuse controls: strict validation and length caps on every field, per-IP and
+  per-jar rate limits, duplicate suppression, Turnstile on the donor form, and
+  a maintainer-only registry (metadata + counters, no content) behind an admin
+  token.
+- The live session keeps two independent channels: the unchanged Stripe poller
+  and the relay WebSocket. Relay failures degrade to Stripe-only with a status
+  pill; they never block a session.
 
 ## Testing
 

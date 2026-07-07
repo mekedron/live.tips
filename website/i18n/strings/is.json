@@ -4,7 +4,6 @@
   "twitter_description": "Einn QR-kóði á sviðinu — þjórféð fer beint inn á þinn eigin Stripe-reikning. Enginn vettvangur, engin þóknun.",
   "og_image_alt": "live.tips — þjórfékrukkan þín í beinni, komin á svið á nokkrum mínútum",
   "jsonld_description": "Opinn hugbúnaður og þjórfékrukka í beinni fyrir tónlistarfólk: einn QR-kóði á sviðinu og hvert þjórfé fer beint inn á Stripe-reikning listamannsins sjálfs — enginn vettvangur, engin þóknun, enginn milliliður.",
-
   "nav_jar": "Krukkan",
   "nav_how": "Svona virkar það",
   "nav_security": "Öryggi",
@@ -15,24 +14,20 @@
   "bmc": "Buy me a coffee",
   "btn_open_app": "Opna appið",
   "a11y_lang": "Tungumál",
-
   "hero_badge": "Opinn hugbúnaður · knúinn af þínum eigin Stripe",
   "hero_h1": "Þjórfékrukkan þín í beinni.<br>Komin á svið <em>á nokkrum mínútum.</em>",
   "hero_sub": "Einn QR-kóði á sviðinu. Áhorfendur skanna, velja upphæð og skilja eftir nafn og skilaboð — og hvert þjórfé fer beint inn á <strong>þinn eigin Stripe-reikning</strong>. Enginn vettvangur, enginn milliliður, engin aukaþóknun.",
   "hero_cta_run": "Keyrðu í vafranum",
   "hero_cta_source": "Skoðaðu frumkóðann",
   "hero_trust": "Engin skráning, engin uppsetning — Stripe-lykillinn þinn fer aldrei úr tækinu þínu",
-
   "hud_live": "KYNNING Í BEINNI",
   "hud_watching": "Fylgist með Stripe",
   "tip_btn": "Skelltu inn prufuþjórfé",
   "a11y_zoom_in": "Þysja inn",
   "a11y_zoom_out": "Þysja út",
-
   "ctrl_jar": "KRUKKA",
   "ctrl_scene": "SVIÐSMYND",
   "ctrl_theme": "ÞEMA",
-
   "vessel_caviar": "Kavíar 95 ml",
   "vessel_tin": "Dós 0,3 l",
   "vessel_mug": "Krús 0,5 l",
@@ -44,23 +39,19 @@
   "vessel_jar5": "Gúrkukrukka 5 l",
   "vessel_bucket": "Fata 10 l",
   "vessel_bowl": "Fiskabúr 20 l",
-
   "scene_concert": "Tónleikar",
   "scene_pub": "Krá",
   "scene_street": "Gata",
   "scene_metro": "Metró",
   "scene_cafe": "Kaffihús",
   "scene_abstract": "Óhlutbundið",
-
   "theme_golden-hour": "Gyllt stund",
   "theme_nord-sky": "Norðurhiminn",
   "theme_forest-signal": "Skógarmerki",
   "theme_rose-pulse": "Rósapúls",
   "theme_cobalt-stage": "Kóbaltsvið",
   "theme_graphite-lime": "Grafítlímóna",
-
   "stage_caption": "Þetta er alvöru útgáfan, í beinni í vafranum þínum — sviðið sem hver einasti áhorfandi sér á tónleikunum. <strong>Hver einasti peningur er raunverulegt þjórfé að streyma inn.</strong>",
-
   "how_kicker": "Svona virkar það",
   "how_h2": "Frá hljóðprufu að fyrsta þjórfénu í þremur skrefum",
   "step1_h3": "Tengdu Stripe-reikninginn þinn",
@@ -69,10 +60,9 @@
   "step2_p": "Prentaðu plakatið, límdu það á gítarkassann, settu það á varningsborðið. Áhorfendur skanna, velja upphæð og skilja eftir nafn og skilaboð — Stripe sér um greiðsluna.",
   "step3_h3": "Fylgstu með krukkunni fyllast í beinni",
   "step3_p": "Spjaldtölvan á sviðinu sýnir hvert þjórfé í rauntíma miðað við markmið kvöldsins — þrívíddarkrukka, skilaboð, konfetti. Breyttu markmiðinu í miðju setti; læstu skjánum meðan hann stendur frammi.",
-
   "sec_kicker": "Öryggi",
   "sec_h2": "Þínir lyklar, þínir peningar",
-  "sec_lede": "Enginn live.tips-þjónn stendur á milli áhorfenda þinna og bankareikningsins. Appið talar við api.stripe.com — og hvergi annars staðar.",
+  "sec_lede": "Með Stripe er enginn live.tips-þjónn á milli aðdáenda þinna og bankareiknings þíns — appið talar við api.stripe.com og ekkert annað. Valfrjáls þjórfé um Revolut og MobilePay fer um örlítinn opinn millilið sem geymir engin greiðslugögn.",
   "sec1_h3": "Komdu með þinn eigin lykil — og hann helst þinn",
   "sec1_p": "Takmarkaði lykillinn er geymdur í lyklakippu tækisins þíns og aðeins sendur til Stripe um TLS. Fullgildum leynilyklum er hafnað umsvifalaust.",
   "sec2_h3": "Lágmarksréttindi frá grunni",
@@ -83,7 +73,6 @@
   "perm_read": "Lesa",
   "perm_write": "Skrifa",
   "perm_note": "Allt annað er áfram „Ekkert“ — engar útgreiðslur, engar endurgreiðslur, enginn aðgangur að innistæðum.",
-
   "mini_kicker": "Hannað fyrir sviðið",
   "mini_h2": "Smáatriðin sem skipta máli í miðju setti",
   "mini1_h3": "Markmið kvöldsins",
@@ -94,17 +83,13 @@
   "mini3_p": "QR-plaköt í ýmsum þemum og á mörgum tungumálum, tilbúin fyrir varningsborðið.",
   "mini4_h3": "Prufuhamur",
   "mini4_p": "Prófaðu heila hermilotu áður en þú tengir Stripe — þú þarft engan aðgang.",
-
   "cta_kicker": "Frítt og opinn hugbúnaður · MIT",
   "cta_h2": "Reiðuféð er horfið.<br>Lófatakið ekki.",
   "cta_p": "Keyrir í vafranum þínum strax í dag — engin uppsetning, engin skráning. Sérstök öpp og fleiri greiðsluleiðir eru á döfinni.",
   "cta_foot": "Gert fyrir götutónlistarfólk, krárhljómsveitir og götulistamenn — af einum úr ykkar röðum.",
-
   "foot_note": "Opinn hugbúnaður undir MIT-leyfinu. Þjórféð fer beint inn á Stripe-reikning listamannsins sjálfs — live.tips snertir peningana aldrei.",
-
   "a11y_dismiss": "Loka",
   "banner": "Þessi vefsíða er einnig í boði á íslensku.",
-
   "goal_tmpl": "{done} af {goal} · {pct}% af markmiði kvöldsins",
   "tip_tmpl": "{name} gaf {amount} í þjórfé",
   "theme": "Þema"

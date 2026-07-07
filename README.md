@@ -3,10 +3,18 @@
 **An open-source live tip jar for performers.** Cash is gone — the applause isn't.
 
 Musicians, buskers, and street artists put one QR code on stage. Fans scan it, pick an
-amount, leave a name and a message. Tips land **directly in the artist's own Stripe
-account** — there is no platform, no middleman, no extra cut, and no server anywhere
-in between. The artist's tablet or phone shows every tip live, with a goal progress
-bar, the latest message, and confetti.
+amount, leave a name and a message. With Stripe — the recommended default — tips land
+**directly in the artist's own Stripe account**, with no platform, no middleman, no
+extra cut, and no server anywhere in between. The artist's tablet or phone shows every
+tip live, with a goal progress bar, the latest message, and confetti.
+
+Artists can optionally also accept **Revolut** and **MobilePay Box** tips. Those two
+have no API to confirm a payment, so they route through a tiny open-source relay
+([`worker/`](worker/), `api.live.tips`) that forwards tip notifications to the artist's
+device and **stores no donation history and never touches money**. Tips from these
+methods are shown as *unverified* because live.tips cannot confirm they were actually
+paid. Stripe-only setups still talk to no live.tips server at all — see
+[Connected mode](#connected-mode-revolut--mobilepay) below.
 
 ## How it works
 
@@ -27,11 +35,34 @@ bar, the latest message, and confetti.
 - Refunds, payouts, and disputes stay where they belong: in the artist's own Stripe
   dashboard.
 
+## Connected mode (Revolut & MobilePay)
+
+Stripe is the default and needs no server. Artists who also want to accept **Revolut**
+or **MobilePay Box** tips can opt in during onboarding. Because those services offer no
+way to confirm a payment, this mode uses a minimal relay ([`worker/`](worker/), running
+on Cloudflare at `api.live.tips`):
+
+- The QR code points to a small hosted page (`live.tips/t/<id>`) that offers every
+  method the artist enabled. Card / Apple Pay / Google Pay still go straight to the
+  artist's Stripe link; Revolut and MobilePay open a short form (amount, name, message).
+- Submitting the form relays the tip to the artist's device over a WebSocket and
+  redirects the fan to the Revolut/MobilePay deep link. The relay **stores nothing** —
+  no donation history, no accounts, no analytics — and the artist's profile
+  (name, message, payment handles, all plain text) self-deletes after 90 days of
+  inactivity.
+- Revolut/MobilePay tips are shown as **unverified**: they appear the moment a fan
+  submits the form, whether or not the payment completes. The artist reconciles against
+  their own Revolut/MobilePay app.
+- If the relay is unreachable, the app falls back to Stripe-only automatically. All tip
+  history stays on the device regardless of mode — which is one more reason Stripe (the
+  only method with a real payment record) is recommended.
+
 ## Repository layout
 
 | Path | What it is |
 | --- | --- |
 | [`app/`](app/) | Flutter app (iPhone, iPad, Android phone/tablet, macOS, web; Windows/Linux scaffolded) |
+| [`worker/`](worker/) | Cloudflare Worker relay for optional Revolut/MobilePay tips (`api.live.tips`) |
 | [`docs/`](docs/) | Onboarding guide, architecture notes |
 | [`docs/stripe-app-plan.md`](docs/stripe-app-plan.md) | Plan for the phase-2 Stripe App Marketplace companion |
 | [`stripe-app/`](stripe-app/) | The future Stripe Apps (marketplace) companion — not started |
