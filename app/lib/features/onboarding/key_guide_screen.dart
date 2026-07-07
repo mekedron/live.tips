@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../core/external_link.dart';
 
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
@@ -60,10 +60,7 @@ class KeyGuideScreen extends StatelessWidget {
                         textStyle: outfitStyle(12, Colors.white),
                         minimumSize: Size.zero,
                       ),
-                      onPressed: () => launchUrl(
-                        Uri.parse(kCreateKeyUrl),
-                        mode: LaunchMode.externalApplication,
-                      ),
+                      onPressed: () => openExternal(kCreateKeyUrl),
                       child: const Text('Open form'),
                     ),
                   ],
@@ -159,10 +156,7 @@ class KeyGuideScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: () => launchUrl(
-                  Uri.parse(kApiKeysDashboardUrl),
-                  mode: LaunchMode.externalApplication,
-                ),
+                onPressed: () => openExternal(kApiKeysDashboardUrl),
                 icon: Icon(Icons.open_in_new_rounded,
                     size: 18, color: c.textSecondary),
                 label: const Text('Open dashboard.stripe.com/apikeys'),

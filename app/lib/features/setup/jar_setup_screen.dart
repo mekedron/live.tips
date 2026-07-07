@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../core/external_link.dart';
 
 import '../../core/currencies.dart';
 import '../../core/stripe_onboarding.dart';
@@ -305,10 +305,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () => launchUrl(
-              Uri.parse(kApiKeysDashboardUrl),
-              mode: LaunchMode.externalApplication,
-            ),
+            onPressed: () => openExternal(kApiKeysDashboardUrl),
             icon: Icon(Icons.open_in_new_rounded,
                 size: 18, color: c.textSecondary),
             label: const Text('Edit key permissions in Stripe'),

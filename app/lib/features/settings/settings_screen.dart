@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../core/external_link.dart';
 
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
@@ -184,10 +184,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 TextButton(
                   style: TextButton.styleFrom(
                       textStyle: outfitStyle(12, c.accent)),
-                  onPressed: () => launchUrl(
-                    Uri.parse(kProjectUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                  onPressed: () => openExternal(kProjectUrl),
                   child: const Text('Source code'),
                 ),
                 TextButton(

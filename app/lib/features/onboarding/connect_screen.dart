@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../core/external_link.dart';
 
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
@@ -188,10 +188,7 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                       children: [
                         Expanded(
                           child: FilledButton.tonalIcon(
-                            onPressed: () => launchUrl(
-                              Uri.parse(kCreateKeyUrl),
-                              mode: LaunchMode.externalApplication,
-                            ),
+                            onPressed: () => openExternal(kCreateKeyUrl),
                             icon: const Icon(Icons.open_in_new_rounded,
                                 size: 18),
                             label: const Text('Open pre-filled form'),

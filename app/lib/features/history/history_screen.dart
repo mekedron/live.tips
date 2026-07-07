@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../core/external_link.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
@@ -22,7 +22,7 @@ enum _HistoryTab { donations, sessions }
 void _openDonationInStripe(Donation donation) {
   final url = donation.stripeDashboardUrl;
   if (url == null) return;
-  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  openExternal(url);
 }
 
 /// The tap handler for a donation row, or null when it has no Stripe link
@@ -45,7 +45,7 @@ class _ViewInStripeButton extends StatelessWidget {
     final c = context.lt;
     return TextButton(
       onPressed: () =>
-          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+          openExternal(url),
       style: TextButton.styleFrom(
         foregroundColor: c.textSecondary,
         textStyle: outfitStyle(12.5, c.textSecondary, weight: FontWeight.w600),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../core/external_link.dart';
 
 import '../core/theme.dart';
 
@@ -17,8 +17,7 @@ Future<void> copyTipLink(BuildContext context, String url) async {
 }
 
 /// Open the tip link in the default browser.
-Future<void> openTipLink(String url) =>
-    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+Future<void> openTipLink(String url) => openExternal(url);
 
 /// White-backed QR block for the tip link — scannable from a dark screen.
 class QrBlock extends StatelessWidget {
