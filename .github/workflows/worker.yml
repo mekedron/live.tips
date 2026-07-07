@@ -46,6 +46,17 @@ jobs:
       CF_TOKEN_SET: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: ${{ env.CF_TOKEN_SET == 'true' }}
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      # Install the lockfile-pinned wrangler 4 — the action's bundled
+      # wrangler 3.x cannot read wrangler.jsonc ("Missing entry-point").
+      - run: npm ci
+        if: ${{ env.CF_TOKEN_SET == 'true' }}
+        working-directory: worker
       - uses: cloudflare/wrangler-action@v3
         # Skipped (not failed) until the one-time Cloudflare setup in
         # worker/README.md has provided the secrets.
