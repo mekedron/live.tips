@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../state/providers.dart';
+import '../../widgets/band_switcher.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../poster/poster_screen.dart';
@@ -264,7 +265,9 @@ class _SideRail extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 16),
+          const Align(alignment: Alignment.centerLeft, child: BandChip()),
+          const SizedBox(height: 16),
           for (final t in ShellTab.navTabs)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),

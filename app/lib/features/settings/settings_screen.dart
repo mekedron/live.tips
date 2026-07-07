@@ -13,7 +13,7 @@ import '../onboarding/connect_screen.dart';
 import '../onboarding/relay_setup_screen.dart';
 import '../shell/app_shell.dart';
 
-const _kAppVersion = '0.2.0';
+const _kAppVersion = '0.3.0';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -32,6 +32,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// Box ids are unreadable uuids — show enough to recognize, no more.
   String _shortBoxId(String id) =>
       id.length <= 12 ? id : '${id.substring(0, 8)}…';
+
+  /// 'Account — [AppState.displayName]' when the band is named, so a
+  /// multi-band user always knows whose key they're looking at.
+  String _accountHeader(AppState app) =>
+      app.displayName.isEmpty ? 'Account' : 'Account — ${app.displayName}';
 
   /// Revolut/MobilePay rows: edit the existing tip page, or start one with
   /// just the tapped method when none exists yet (the Stripe link rides
@@ -92,19 +97,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(appStateProvider.notifier).clearRelayJar();
   }
 
-  Future<void> _confirmDisconnect() async {
-    final hasStripe = ref.read(appStateProvider).hasStripe;
+  Future<void> _confirmRemoveBand() async {
+    final app = ref.read(appStateProvider);
+    if (ref.read(appStateProvider.notifier).accountActionsBlocked) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Stop the live session before removing a band.')));
+      return;
+    }
+    final hasOthers = app.accounts.length > 1;
+    final name = app.displayName.isEmpty ? 'this band' : app.displayName;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(hasStripe ? 'Disconnect Stripe?' : 'Disconnect & wipe?'),
+        title: Text('Remove $name from this device?'),
         content: Text(
-          hasStripe
-              ? 'Removes the API key and all local data from this device. '
-                  'Your Stripe account, payment link, and donations are '
-                  'untouched — you can reconnect any time.'
-              : 'Removes your live.tips page and all local data from this '
-                  'device. Session history can\'t be recovered.',
+          '${app.hasStripe ? 'Removes the API key and this band\'s local '
+              'data. Your Stripe account, payment link, and donations are '
+              'untouched — you can reconnect any time.' : 'Removes this '
+              'band\'s live.tips page and local data from this device. '
+              'Session history can\'t be recovered.'}'
+          '${hasOthers ? ' Your other bands stay.' : ''}',
         ),
         actions: [
           TextButton(
@@ -117,13 +129,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Disconnect'),
+            child: const Text('Remove'),
           ),
         ],
       ),
     );
     if (confirmed == true) {
-      await ref.read(appStateProvider.notifier).disconnect();
+      await ref
+          .read(appStateProvider.notifier)
+          .removeAccount(ref.read(appStateProvider).accountId);
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
@@ -161,7 +175,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // Relay-only: honest about the missing Stripe key without pushing
         // the (not-yet-built) payment-methods management UI.
         LtRowGroup(
-          header: 'Account',
+          header: _accountHeader(app),
           children: [
             const LtRow(
               icon: Icons.key_off_rounded,
@@ -172,16 +186,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             LtRow(
               icon: Icons.link_off_rounded,
               iconColor: c.danger,
-              title: 'Disconnect & wipe this device',
+              title: 'Remove this band from this device',
               titleColor: c.danger,
               chevron: true,
-              onTap: _confirmDisconnect,
+              onTap: _confirmRemoveBand,
             ),
           ],
         )
       else
         LtRowGroup(
-          header: 'Account',
+          header: _accountHeader(app),
           children: [
             LtRow(
               icon: Icons.key_rounded,
@@ -196,10 +210,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             LtRow(
               icon: Icons.link_off_rounded,
               iconColor: c.danger,
-              title: 'Disconnect & wipe this device',
+              title: 'Remove this band from this device',
               titleColor: c.danger,
               chevron: true,
-              onTap: _confirmDisconnect,
+              onTap: _confirmRemoveBand,
             ),
           ],
         ),

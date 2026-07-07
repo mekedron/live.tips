@@ -3,13 +3,17 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/app_settings.dart';
+import '../domain/band_account.dart';
+import '../domain/band_settings.dart';
 import '../domain/donation.dart';
 import '../domain/live_session.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
 
-/// Non-secret local persistence: tip jar config, settings, session history,
-/// and the active session (for crash/restart recovery).
+/// Non-secret local persistence. Two kinds of keys live here: device-wide
+/// ones (the accounts registry, device settings) and per-band ones — every
+/// band-owned blob (jars, histories, the active session, band settings) is
+/// stored under `<base>_<accountId>`, so bands never see each other's data.
 class LocalStore {
   LocalStore(this._prefs);
 
@@ -18,23 +22,101 @@ class LocalStore {
   static Future<LocalStore> init() async =>
       LocalStore(await SharedPreferences.getInstance());
 
-  static const _kTipJar = 'tip_jar_v1';
+  // Device-wide keys.
+  static const kAccounts = 'accounts_v1';
   static const _kSettings = 'settings_v1';
-  static const _kHistory = 'session_history_v1';
-  static const _kActiveSession = 'active_session_v1';
-  static const _kActiveCursor = 'active_session_cursor_v1';
-  static const _kRelayJar = 'relay_jar_v1';
-  static const _kRelaySeenAt = 'relay_seen_at_v1';
-  static const _kRelayHistory = 'relay_history_v1';
+  static const _kPendingSecretWipes = 'pending_secret_wipes_v1';
+
+  // Per-band key bases — suffixed with `_<accountId>`. The unsuffixed names
+  // are the pre-multi-band slots; the boot migration moves them.
+  static const kTipJarBase = 'tip_jar_v1';
+  static const kHistoryBase = 'session_history_v1';
+  static const kActiveSessionBase = 'active_session_v1';
+  static const kActiveCursorBase = 'active_session_cursor_v1';
+  static const kRelayJarBase = 'relay_jar_v1';
+  static const kRelaySeenAtBase = 'relay_seen_at_v1';
+  static const kRelayHistoryBase = 'relay_history_v1';
+  static const kBandSettingsBase = 'band_settings_v1';
+
+  /// Every per-band key base — the definition of "a band's local data" for
+  /// wipes, emptiness checks, and the migration.
+  static const accountKeyBases = [
+    kTipJarBase,
+    kHistoryBase,
+    kActiveSessionBase,
+    kActiveCursorBase,
+    kRelayJarBase,
+    kRelaySeenAtBase,
+    kRelayHistoryBase,
+    kBandSettingsBase,
+  ];
+
+  static String accountKey(String base, String accountId) =>
+      '${base}_$accountId';
 
   /// Relay tips are small, but SharedPreferences is not a database — beyond
   /// this many archived tips the oldest fall off.
   static const relayHistoryCap = 1000;
 
+  // --- Accounts registry ---
+
+  AccountsRegistry? readAccountsRegistry() {
+    final raw = _prefs.getString(kAccounts);
+    if (raw == null) return null;
+    try {
+      final registry = AccountsRegistry.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>);
+      return registry.accounts.isEmpty ? null : registry;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveAccountsRegistry(AccountsRegistry registry) =>
+      _prefs.setString(kAccounts, jsonEncode(registry.toJson()));
+
+  /// Whether this band has any local data at all — used by the switcher's
+  /// garbage collection of abandoned, never-configured bands. Deliberately
+  /// checks every per-band key (including the relay-tip archive, which is
+  /// the only record of those tips anywhere) so "empty" can never eat data.
+  bool accountHasData(String accountId) => accountKeyBases
+      .any((base) => _prefs.containsKey(accountKey(base, accountId)));
+
+  /// Removes every local blob belonging to [accountId].
+  Future<void> wipeAccount(String accountId) async {
+    for (final base in accountKeyBases) {
+      await _prefs.remove(accountKey(base, accountId));
+    }
+  }
+
+  /// Account ids whose keychain secrets still need deleting — recorded when
+  /// a band was removed while the keychain was locked, retried at boot.
+  /// Explicit tombstones, never inferred from registry absence: the keychain
+  /// outlives prefs across reinstalls, and inferring would destroy secrets a
+  /// fresh install merely doesn't know about yet.
+  List<String> readPendingSecretWipes() =>
+      _prefs.getStringList(_kPendingSecretWipes) ?? const [];
+
+  Future<void> addPendingSecretWipe(String accountId) async {
+    final wipes = readPendingSecretWipes();
+    if (wipes.contains(accountId)) return;
+    await _prefs.setStringList(_kPendingSecretWipes, [...wipes, accountId]);
+  }
+
+  Future<void> removePendingSecretWipe(String accountId) async {
+    final wipes =
+        readPendingSecretWipes().where((id) => id != accountId).toList();
+    if (wipes.isEmpty) {
+      await _prefs.remove(_kPendingSecretWipes);
+    } else {
+      await _prefs.setStringList(_kPendingSecretWipes, wipes);
+    }
+  }
+
   // --- Tip jar ---
 
-  TipJar? readTipJar() {
-    final raw = _prefs.getString(_kTipJar);
+  TipJar? readTipJar(String accountId) {
+    final raw = _prefs.getString(accountKey(kTipJarBase, accountId));
     if (raw == null) return null;
     try {
       return TipJar.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -43,17 +125,17 @@ class LocalStore {
     }
   }
 
-  Future<void> saveTipJar(TipJar jar) =>
-      _prefs.setString(_kTipJar, jsonEncode(jar.toJson()));
+  Future<void> saveTipJar(String accountId, TipJar jar) => _prefs.setString(
+      accountKey(kTipJarBase, accountId), jsonEncode(jar.toJson()));
 
-  Future<void> clearTipJar() async {
-    await _prefs.remove(_kTipJar);
+  Future<void> clearTipJar(String accountId) async {
+    await _prefs.remove(accountKey(kTipJarBase, accountId));
   }
 
   // --- Relay jar (connected mode) ---
 
-  RelayJar? readRelayJar() {
-    final raw = _prefs.getString(_kRelayJar);
+  RelayJar? readRelayJar(String accountId) {
+    final raw = _prefs.getString(accountKey(kRelayJarBase, accountId));
     if (raw == null) return null;
     try {
       return RelayJar.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -62,19 +144,22 @@ class LocalStore {
     }
   }
 
-  Future<void> saveRelayJar(RelayJar jar) =>
-      _prefs.setString(_kRelayJar, jsonEncode(jar.toJson()));
+  Future<void> saveRelayJar(String accountId, RelayJar jar) =>
+      _prefs.setString(
+          accountKey(kRelayJarBase, accountId), jsonEncode(jar.toJson()));
 
-  Future<void> clearRelayJar() async {
-    await _prefs.remove(_kRelayJar);
-    await _prefs.remove(_kRelaySeenAt);
+  Future<void> clearRelayJar(String accountId) async {
+    await _prefs.remove(accountKey(kRelayJarBase, accountId));
+    await _prefs.remove(accountKey(kRelaySeenAtBase, accountId));
   }
 
   /// When (ms since epoch) the relay was last told the artist had seen
-  /// everything — the keep-alive/seen marker.
-  int? readRelaySeenAt() => _prefs.getInt(_kRelaySeenAt);
+  /// everything — the keep-alive/seen marker for this band's jar.
+  int? readRelaySeenAt(String accountId) =>
+      _prefs.getInt(accountKey(kRelaySeenAtBase, accountId));
 
-  Future<void> writeRelaySeenAt(int ms) => _prefs.setInt(_kRelaySeenAt, ms);
+  Future<void> writeRelaySeenAt(String accountId, int ms) =>
+      _prefs.setInt(accountKey(kRelaySeenAtBase, accountId), ms);
 
   // --- Relay tip history (device-local tip-page archive) ---
 
@@ -84,8 +169,8 @@ class LocalStore {
   /// [purgeSimulatedData]: only real (livemode) tips are ever written (the
   /// session controller filters demo tips out at the write site), so there
   /// is nothing simulated to purge.
-  List<Donation> readRelayHistory() {
-    final raw = _prefs.getString(_kRelayHistory);
+  List<Donation> readRelayHistory(String accountId) {
+    final raw = _prefs.getString(accountKey(kRelayHistoryBase, accountId));
     if (raw == null) return [];
     try {
       return (jsonDecode(raw) as List)
@@ -99,9 +184,10 @@ class LocalStore {
   /// Prepends [donations] to the archive, skipping ids already stored (the
   /// relay redelivers and resumed sessions replay — same tip, same id),
   /// capped at [relayHistoryCap] with the oldest dropped beyond it.
-  Future<void> appendRelayHistory(List<Donation> donations) async {
+  Future<void> appendRelayHistory(
+      String accountId, List<Donation> donations) async {
     if (donations.isEmpty) return;
-    final existing = readRelayHistory();
+    final existing = readRelayHistory(accountId);
     final ids = existing.map((d) => d.id).toSet();
     final fresh = [
       for (final d in donations)
@@ -114,12 +200,12 @@ class LocalStore {
         ? merged.sublist(0, relayHistoryCap)
         : merged;
     await _prefs.setString(
-      _kRelayHistory,
+      accountKey(kRelayHistoryBase, accountId),
       jsonEncode([for (final d in capped) d.toJson()]),
     );
   }
 
-  // --- Settings ---
+  // --- Device settings ---
 
   AppSettings readSettings() {
     final raw = _prefs.getString(_kSettings);
@@ -134,10 +220,26 @@ class LocalStore {
   Future<void> saveSettings(AppSettings settings) =>
       _prefs.setString(_kSettings, jsonEncode(settings.toJson()));
 
+  // --- Band settings ---
+
+  BandSettings readBandSettings(String accountId) {
+    final raw = _prefs.getString(accountKey(kBandSettingsBase, accountId));
+    if (raw == null) return const BandSettings();
+    try {
+      return BandSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return const BandSettings();
+    }
+  }
+
+  Future<void> saveBandSettings(String accountId, BandSettings band) =>
+      _prefs.setString(
+          accountKey(kBandSettingsBase, accountId), jsonEncode(band.toJson()));
+
   // --- Session history ---
 
-  List<LiveSession> readSessionHistory() {
-    final raw = _prefs.getString(_kHistory);
+  List<LiveSession> readSessionHistory(String accountId) {
+    final raw = _prefs.getString(accountKey(kHistoryBase, accountId));
     if (raw == null) return [];
     try {
       return (jsonDecode(raw) as List)
@@ -148,18 +250,19 @@ class LocalStore {
     }
   }
 
-  Future<void> appendSessionToHistory(LiveSession session) async {
-    final history = readSessionHistory()..add(session);
+  Future<void> appendSessionToHistory(
+      String accountId, LiveSession session) async {
+    final history = readSessionHistory(accountId)..add(session);
     await _prefs.setString(
-      _kHistory,
+      accountKey(kHistoryBase, accountId),
       jsonEncode(history.map((s) => s.toJson()).toList()),
     );
   }
 
   // --- Active session (crash recovery) ---
 
-  LiveSession? readActiveSession() {
-    final raw = _prefs.getString(_kActiveSession);
+  LiveSession? readActiveSession(String accountId) {
+    final raw = _prefs.getString(accountKey(kActiveSessionBase, accountId));
     if (raw == null) return null;
     try {
       return LiveSession.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -168,18 +271,23 @@ class LocalStore {
     }
   }
 
-  String? readActiveCursor() => _prefs.getString(_kActiveCursor);
+  String? readActiveCursor(String accountId) =>
+      _prefs.getString(accountKey(kActiveCursorBase, accountId));
 
-  Future<void> saveActiveSession(LiveSession session, String? cursor) async {
-    await _prefs.setString(_kActiveSession, jsonEncode(session.toJson()));
+  Future<void> saveActiveSession(
+      String accountId, LiveSession session, String? cursor) async {
+    await _prefs.setString(
+      accountKey(kActiveSessionBase, accountId),
+      jsonEncode(session.toJson()),
+    );
     if (cursor != null) {
-      await _prefs.setString(_kActiveCursor, cursor);
+      await _prefs.setString(accountKey(kActiveCursorBase, accountId), cursor);
     }
   }
 
-  Future<void> clearActiveSession() async {
-    await _prefs.remove(_kActiveSession);
-    await _prefs.remove(_kActiveCursor);
+  Future<void> clearActiveSession(String accountId) async {
+    await _prefs.remove(accountKey(kActiveSessionBase, accountId));
+    await _prefs.remove(accountKey(kActiveCursorBase, accountId));
   }
 
   // --- Demo/test cleanup ---
@@ -193,20 +301,30 @@ class LocalStore {
   /// Scrubs locally cached demo/test sessions so a real (live) Stripe account
   /// never shows tips that weren't real money. Called when a real account
   /// connects, and once at startup for an already-connected live account.
-  Future<void> purgeSimulatedData() async {
-    final real =
-        readSessionHistory().where((s) => !_isSimulated(s)).toList();
-    await _prefs.setString(
-      _kHistory,
-      jsonEncode(real.map((s) => s.toJson()).toList()),
-    );
-    final active = readActiveSession();
+  Future<void> purgeSimulatedData(String accountId) async {
+    final all = readSessionHistory(accountId);
+    final real = all.where((s) => !_isSimulated(s)).toList();
+    // Write only when something actually changes: materializing an empty
+    // history key on a pristine band would make it look like it has data,
+    // which keeps the abandoned-band garbage collection from ever firing.
+    if (real.length != all.length ||
+        _prefs.containsKey(accountKey(kHistoryBase, accountId))) {
+      await _prefs.setString(
+        accountKey(kHistoryBase, accountId),
+        jsonEncode(real.map((s) => s.toJson()).toList()),
+      );
+    }
+    final active = readActiveSession(accountId);
     if (active != null && _isSimulated(active)) {
-      await clearActiveSession();
+      await clearActiveSession(accountId);
     }
   }
 
   Future<void> wipeAll() async {
     await _prefs.clear();
   }
+
+  /// Raw prefs access for the boot migration only — everything else goes
+  /// through the typed readers above.
+  SharedPreferences get prefs => _prefs;
 }

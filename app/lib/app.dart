@@ -38,19 +38,24 @@ class LiveTipsApp extends ConsumerWidget {
   }
 }
 
-/// Routes to the right top-level screen from app state alone:
+/// Routes to the right top-level screen from the ACTIVE band's state alone:
 /// signed out → welcome; Stripe connected but no tip jar yet → setup;
-/// else home (a relay-only install needs no Stripe jar setup).
+/// else home (a relay-only band needs no Stripe jar setup).
 class RootGate extends ConsumerWidget {
   const RootGate({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final app = ref.watch(appStateProvider);
-    if (!app.connected) return const WelcomeScreen();
-    if (app.hasStripe && app.effectiveTipJar == null) {
-      return const JarSetupScreen();
-    }
-    return const AppShell();
+    final screen = !app.connected
+        ? const WelcomeScreen()
+        : (app.hasStripe && app.effectiveTipJar == null)
+            ? const JarSetupScreen()
+            : const AppShell();
+    // Keyed by band: a switch remounts the whole subtree, so every widget-
+    // local cache (home's goal, History's Stripe pagination, prefilled
+    // forms) restarts from the new band's state instead of showing the old
+    // band's numbers.
+    return KeyedSubtree(key: ValueKey(app.accountId), child: screen);
   }
 }

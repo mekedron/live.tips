@@ -1,8 +1,9 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Everything secret lives in the platform keychain/keystore — the Stripe
-/// restricted key and the connected-mode relay jar secret. (The stage lock
-/// uses the device's own auth, so there's no app-managed secret for it.)
+/// Everything secret lives in the platform keychain/keystore — each band's
+/// Stripe restricted key and connected-mode relay jar secret, stored under
+/// keys suffixed with the band's account id. (The stage lock uses the
+/// device's own auth, so there's no app-managed secret for it.)
 class SecureStore {
   SecureStore([FlutterSecureStorage? storage])
       : _storage = storage ??
@@ -16,22 +17,48 @@ class SecureStore {
 
   final FlutterSecureStorage _storage;
 
-  static const _kApiKey = 'stripe_api_key';
-  static const _relaySecretKey = 'relay_jar_secret';
+  static const kApiKeyBase = 'stripe_api_key';
+  static const kRelaySecretBase = 'relay_jar_secret';
 
-  Future<String?> readApiKey() => _storage.read(key: _kApiKey);
+  static String _apiKey(String accountId) => '${kApiKeyBase}_$accountId';
+  static String _relaySecret(String accountId) =>
+      '${kRelaySecretBase}_$accountId';
 
-  Future<void> writeApiKey(String key) =>
-      _storage.write(key: _kApiKey, value: key.trim());
+  Future<String?> readApiKey(String accountId) =>
+      _storage.read(key: _apiKey(accountId));
 
-  Future<void> deleteApiKey() => _storage.delete(key: _kApiKey);
+  Future<void> writeApiKey(String accountId, String key) =>
+      _storage.write(key: _apiKey(accountId), value: key.trim());
 
-  Future<String?> readRelaySecret() => _storage.read(key: _relaySecretKey);
+  Future<void> deleteApiKey(String accountId) =>
+      _storage.delete(key: _apiKey(accountId));
 
-  Future<void> writeRelaySecret(String secret) =>
-      _storage.write(key: _relaySecretKey, value: secret.trim());
+  Future<String?> readRelaySecret(String accountId) =>
+      _storage.read(key: _relaySecret(accountId));
 
-  Future<void> deleteRelaySecret() => _storage.delete(key: _relaySecretKey);
+  Future<void> writeRelaySecret(String accountId, String secret) =>
+      _storage.write(key: _relaySecret(accountId), value: secret.trim());
+
+  Future<void> deleteRelaySecret(String accountId) =>
+      _storage.delete(key: _relaySecret(accountId));
+
+  /// Removes both of [accountId]'s secrets.
+  Future<void> wipeAccount(String accountId) async {
+    await deleteApiKey(accountId);
+    await deleteRelaySecret(accountId);
+  }
+
+  // --- Pre-multi-band slots (unsuffixed) — the boot migration's territory ---
+
+  Future<String?> readLegacyApiKey() => _storage.read(key: kApiKeyBase);
+
+  Future<String?> readLegacyRelaySecret() =>
+      _storage.read(key: kRelaySecretBase);
+
+  Future<void> deleteLegacySlots() async {
+    await _storage.delete(key: kApiKeyBase);
+    await _storage.delete(key: kRelaySecretBase);
+  }
 
   Future<void> wipeAll() => _storage.deleteAll();
 }

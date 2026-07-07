@@ -239,6 +239,12 @@ class _RelaySetupScreenState extends ConsumerState<RelaySetupScreen> {
           stripeUrl: app.tipJar?.url,
         );
         await ref.read(appStateProvider.notifier).updateRelayJarLocal(updated);
+        // The registry name is what home/stage/poster show — keep it in
+        // step when the edit renamed the act (only possible without a
+        // Stripe jar; with one the name field is locked to it).
+        if (name != app.displayName) {
+          await ref.read(appStateProvider.notifier).renameBand(name);
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Tip page updated')));

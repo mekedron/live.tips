@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/domain/donation.dart';
 import 'package:live_tips/domain/live_session.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'helpers.dart';
 
 Donation _tip(String id, {required bool livemode}) => Donation(
       id: id,
@@ -21,60 +21,57 @@ LiveSession _session(String id, List<Donation> donations) => LiveSession(
       donations: donations,
     );
 
-Future<LocalStore> _freshStore() async {
-  SharedPreferences.setMockInitialValues({});
-  return LocalStore(await SharedPreferences.getInstance());
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('purge keeps live sessions and drops demo/test ones, order intact',
       () async {
-    final store = await _freshStore();
+    final store = await seededStore();
     await store.appendSessionToHistory(
-        _session('demo', [_tip('demo_1', livemode: false)]));
+        kTestAccountId, _session('demo', [_tip('demo_1', livemode: false)]));
     await store.appendSessionToHistory(
-        _session('live', [_tip('cs_live_1', livemode: true)]));
+        kTestAccountId, _session('live', [_tip('cs_live_1', livemode: true)]));
     await store.appendSessionToHistory(
-        _session('test', [_tip('cs_test_1', livemode: false)]));
+        kTestAccountId, _session('test', [_tip('cs_test_1', livemode: false)]));
 
-    await store.purgeSimulatedData();
+    await store.purgeSimulatedData(kTestAccountId);
 
-    expect(store.readSessionHistory().map((s) => s.id), ['live']);
+    expect(store.readSessionHistory(kTestAccountId).map((s) => s.id), ['live']);
   });
 
   test('purge keeps an empty session — it may be a genuine zero-tip live set',
       () async {
-    final store = await _freshStore();
-    await store.appendSessionToHistory(_session('empty', const []));
+    final store = await seededStore();
     await store.appendSessionToHistory(
-        _session('demo', [_tip('demo_1', livemode: false)]));
+        kTestAccountId, _session('empty', const []));
+    await store.appendSessionToHistory(
+        kTestAccountId, _session('demo', [_tip('demo_1', livemode: false)]));
 
-    await store.purgeSimulatedData();
+    await store.purgeSimulatedData(kTestAccountId);
 
-    expect(store.readSessionHistory().map((s) => s.id), ['empty']);
+    expect(
+        store.readSessionHistory(kTestAccountId).map((s) => s.id), ['empty']);
   });
 
   test('purge discards a simulated active session and its cursor', () async {
-    final store = await _freshStore();
-    await store.saveActiveSession(
+    final store = await seededStore();
+    await store.saveActiveSession(kTestAccountId,
         _session('demo', [_tip('demo_1', livemode: false)]), 'cur_1');
 
-    await store.purgeSimulatedData();
+    await store.purgeSimulatedData(kTestAccountId);
 
-    expect(store.readActiveSession(), isNull);
-    expect(store.readActiveCursor(), isNull);
+    expect(store.readActiveSession(kTestAccountId), isNull);
+    expect(store.readActiveCursor(kTestAccountId), isNull);
   });
 
   test('purge preserves a live active session and its cursor', () async {
-    final store = await _freshStore();
-    await store.saveActiveSession(
+    final store = await seededStore();
+    await store.saveActiveSession(kTestAccountId,
         _session('live', [_tip('cs_live_1', livemode: true)]), 'cur_1');
 
-    await store.purgeSimulatedData();
+    await store.purgeSimulatedData(kTestAccountId);
 
-    expect(store.readActiveSession()!.id, 'live');
-    expect(store.readActiveCursor(), 'cur_1');
+    expect(store.readActiveSession(kTestAccountId)!.id, 'live');
+    expect(store.readActiveCursor(kTestAccountId), 'cur_1');
   });
 }

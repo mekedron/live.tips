@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/domain/app_settings.dart';
+import 'package:live_tips/domain/band_account.dart';
+import 'package:live_tips/domain/band_settings.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/domain/tip_jar.dart';
 import 'package:live_tips/state/providers.dart';
@@ -29,12 +31,17 @@ AppState _state({
   RelayJar? relayJar,
   QrMode qrMode = QrMode.connected,
   bool demo = false,
+  String accountId = '',
+  List<BandAccount> accounts = const [],
 }) =>
     AppState(
+      accountId: accountId,
+      accounts: accounts,
       apiKey: apiKey,
       tipJar: tipJar,
       relayJar: relayJar,
-      settings: AppSettings(qrMode: qrMode),
+      settings: const AppSettings(),
+      band: BandSettings(qrMode: qrMode),
       demo: demo,
     );
 
@@ -174,6 +181,36 @@ void main() {
 
     test('nothing configured → empty string', () {
       expect(_state().displayName, '');
+    });
+  });
+
+  group('registry-name precedence: active account name beats the jars', () {
+    test('the active account\'s registry name wins over both jar names', () {
+      final s = _state(
+        tipJar: _tipJar,
+        relayJar: _relayJar,
+        accountId: 'a',
+        accounts: const [BandAccount(id: 'a', name: 'Foxes', createdAtMs: 0)],
+      );
+      expect(s.displayName, 'Foxes');
+    });
+
+    test('an empty registry name falls through to the jar chain', () {
+      const unnamed = [BandAccount(id: 'a', name: '', createdAtMs: 0)];
+      expect(
+        _state(
+          tipJar: _tipJar,
+          relayJar: _relayJar,
+          accountId: 'a',
+          accounts: unnamed,
+        ).displayName,
+        _tipJar.displayName,
+      );
+      expect(
+        _state(relayJar: _relayJar, accountId: 'a', accounts: unnamed)
+            .displayName,
+        _relayJar.artistName,
+      );
     });
   });
 

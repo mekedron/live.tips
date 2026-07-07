@@ -9,7 +9,8 @@ import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'helpers.dart';
 
 /// Hands out pre-scripted batches, one per pollNew() call.
 class ScriptedSource extends DonationSource {
@@ -50,8 +51,7 @@ void main() {
   late ProviderContainer container;
 
   Future<void> setUpContainer(List<List<Donation>> batches) async {
-    SharedPreferences.setMockInitialValues({});
-    final store = LocalStore(await SharedPreferences.getInstance());
+    final store = await seededStore();
     container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
       donationSourceFactoryProvider.overrideWithValue(
@@ -97,7 +97,7 @@ void main() {
 
     // the crash-recovery snapshot carries the banked fields
     final stored =
-        container.read(localStoreProvider).readActiveSession()!;
+        container.read(localStoreProvider).readActiveSession(kTestAccountId)!;
     expect(stored.bankedJars, 1);
     expect(stored.bankedMinor, 20000);
   });
@@ -149,10 +149,9 @@ void main() {
       revolutUsername: 'foxy',
       createdAtMs: 1,
     );
-    SharedPreferences.setMockInitialValues({
-      'relay_jar_v1': jsonEncode(relayJar.toJson()),
+    final store = await seededStore(accountValues: {
+      LocalStore.kRelayJarBase: jsonEncode(relayJar.toJson()),
     });
-    final store = LocalStore(await SharedPreferences.getInstance());
     // Deliberately NOT overriding donationSourceFactoryProvider: the real
     // factory must hand out the silent NullDonationSource here — the demo
     // source would pour fake tips into a real set.
@@ -200,9 +199,9 @@ void main() {
       // A session left behind by a crash: nothing in this app run called
       // start() — it's just sitting on disk when the container boots, same
       // as "Resume interrupted session" finding it cold.
-      SharedPreferences.setMockInitialValues({});
-      final store = LocalStore(await SharedPreferences.getInstance());
+      final store = await seededStore();
       await store.saveActiveSession(
+        kTestAccountId,
         LiveSession(
           id: 'ses_crashed',
           startedAt: DateTime.utc(2026, 7, 3),
@@ -233,7 +232,7 @@ void main() {
           reason: 'a watcher must be notified — that is what makes the '
               'banner disappear without a refresh');
       expect(container.read(storedSessionProvider), isNull);
-      expect(store.readActiveSession(), isNull);
+      expect(store.readActiveSession(kTestAccountId), isNull);
     });
 
     test('stop() also clears it — no stale banner after a clean end',

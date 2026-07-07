@@ -95,7 +95,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
   LiveSession _seedSession() {
     final app = ref.read(appStateProvider);
     final currency = app.currency;
-    final goal = app.settings.lastGoalMinor;
+    final goal = app.band.lastGoalMinor;
     final now = DateTime.now();
     final session = LiveSession(
       id: 'preview',

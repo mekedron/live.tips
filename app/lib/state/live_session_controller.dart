@@ -82,6 +82,11 @@ class LiveSessionController extends Notifier<LiveState?> {
   bool _polling = false;
   int _skipTicks = 0;
 
+  /// The band this session belongs to, snapshotted at [_begin] alongside its
+  /// key and jars — every persistence write goes to this band's slots, so a
+  /// session can never leak data into another band's history.
+  String _accountId = '';
+
   @override
   LiveState? build() {
     ref.onDispose(_teardown);
@@ -91,8 +96,9 @@ class LiveSessionController extends Notifier<LiveState?> {
   Future<void> start({required int goalMinor}) async {
     final app = ref.read(appStateProvider);
     // Demo, Stripe, or a relay jar — any of them can host a session; only a
-    // fully unconfigured app has nothing to run one against.
-    if (!app.connected) return;
+    // fully unconfigured app has nothing to run one against. A band switch
+    // in flight means the state is about to be someone else's — refuse.
+    if (!app.connected || app.switching) return;
     final now = DateTime.now();
     final session = LiveSession(
       id: 'ses_${now.millisecondsSinceEpoch.toRadixString(36)}',
@@ -102,23 +108,27 @@ class LiveSessionController extends Notifier<LiveState?> {
     );
     unawaited(ref
         .read(appStateProvider.notifier)
-        .updateSettings(app.settings.copyWith(lastGoalMinor: goalMinor)));
+        .updateBand(app.band.copyWith(lastGoalMinor: goalMinor)));
     await _begin(session);
   }
 
   /// Restores the session persisted before a crash/app restart. The stored
   /// event cursor means donations made while the app was dead still count.
   Future<bool> resumeStored() async {
+    final app = ref.read(appStateProvider);
+    if (app.switching) return false;
     final local = ref.read(localStoreProvider);
-    final stored = local.readActiveSession();
+    final stored = local.readActiveSession(app.accountId);
     if (stored == null) return false;
     await _begin(stored,
-        resumeCursor: local.readActiveCursor(), resumed: true);
+        resumeCursor: local.readActiveCursor(app.accountId), resumed: true);
     return true;
   }
 
   Future<void> discardStored() async {
-    await ref.read(localStoreProvider).clearActiveSession();
+    await ref
+        .read(localStoreProvider)
+        .clearActiveSession(ref.read(appStateProvider).accountId);
     ref.read(storedSessionProvider.notifier).refresh();
   }
 
@@ -126,6 +136,7 @@ class LiveSessionController extends Notifier<LiveState?> {
       {String? resumeCursor, bool resumed = false}) async {
     _teardown();
     final app = ref.read(appStateProvider);
+    _accountId = app.accountId;
     // No tip jar is fine (relay-only): the factory returns a silent source.
     _source = ref.read(donationSourceFactoryProvider)(
         demo: app.demo, apiKey: app.apiKey, jar: app.effectiveTipJar);
@@ -141,7 +152,9 @@ class LiveSessionController extends Notifier<LiveState?> {
       session: session,
       relay: _relay == null ? null : RelayHealth.connecting,
     );
-    await ref.read(localStoreProvider).saveActiveSession(session, resumeCursor);
+    await ref
+        .read(localStoreProvider)
+        .saveActiveSession(_accountId, session, resumeCursor);
     ref.read(storedSessionProvider.notifier).refresh();
 
     // Subscribe BEFORE start(): broadcast streams don't replay, and the
@@ -213,7 +226,7 @@ class LiveSessionController extends Notifier<LiveState?> {
     );
     unawaited(ref
         .read(localStoreProvider)
-        .saveActiveSession(current.session, _source?.cursor));
+        .saveActiveSession(_accountId, current.session, _source?.cursor));
     // Tip-page (relay) tips exist nowhere but this device — archive them so
     // History still has them after the session ends. Real money only: demo
     // relay tips (livemode:false) must never enter the archive. Replays
@@ -227,7 +240,9 @@ class LiveSessionController extends Notifier<LiveState?> {
       // Fire-and-forget like saveActiveSession above. setString updates the
       // SharedPreferences in-memory cache synchronously, so the refresh
       // below already sees the new tips — only the disk write is deferred.
-      unawaited(ref.read(localStoreProvider).appendRelayHistory(relayTips));
+      unawaited(ref
+          .read(localStoreProvider)
+          .appendRelayHistory(_accountId, relayTips));
       ref.read(relayHistoryProvider.notifier).refresh();
     }
   }
@@ -251,11 +266,11 @@ class LiveSessionController extends Notifier<LiveState?> {
     state = current.copyWith(session: current.session);
     unawaited(ref
         .read(localStoreProvider)
-        .saveActiveSession(current.session, _source?.cursor));
+        .saveActiveSession(_accountId, current.session, _source?.cursor));
     final app = ref.read(appStateProvider);
     unawaited(ref
         .read(appStateProvider.notifier)
-        .updateSettings(app.settings.copyWith(lastGoalMinor: goalMinor)));
+        .updateBand(app.band.copyWith(lastGoalMinor: goalMinor)));
   }
 
   void setLocked(bool locked) {
@@ -269,8 +284,8 @@ class LiveSessionController extends Notifier<LiveState?> {
     _teardown();
     final session = current.session..endedAt = DateTime.now();
     final local = ref.read(localStoreProvider);
-    await local.appendSessionToHistory(session);
-    await local.clearActiveSession();
+    await local.appendSessionToHistory(_accountId, session);
+    await local.clearActiveSession(_accountId);
     state = null;
     ref.read(storedSessionProvider.notifier).refresh();
     // Tips that arrived during the set aren't in the home preview's cached
@@ -300,16 +315,23 @@ final liveSessionProvider =
     NotifierProvider<LiveSessionController, LiveState?>(
         LiveSessionController.new);
 
-/// The session persisted for crash/restart recovery — watched separately
-/// from [liveSessionProvider] because discarding/resuming it never changes
-/// [LiveState] (which stays null throughout), so nothing would tell widgets
-/// to rebuild. Refreshed explicitly wherever the active-session storage key
-/// is written or cleared.
+/// The active band's session persisted for crash/restart recovery — watched
+/// separately from [liveSessionProvider] because discarding/resuming it
+/// never changes [LiveState] (which stays null throughout), so nothing would
+/// tell widgets to rebuild. Refreshed explicitly wherever the active-session
+/// storage key is written or cleared; watching the account id rebuilds it on
+/// every band switch.
 class StoredSessionNotifier extends Notifier<LiveSession?> {
   @override
-  LiveSession? build() => ref.read(localStoreProvider).readActiveSession();
+  LiveSession? build() {
+    final accountId =
+        ref.watch(appStateProvider.select((s) => s.accountId));
+    return ref.read(localStoreProvider).readActiveSession(accountId);
+  }
 
-  void refresh() => state = ref.read(localStoreProvider).readActiveSession();
+  void refresh() => state = ref
+      .read(localStoreProvider)
+      .readActiveSession(ref.read(appStateProvider).accountId);
 }
 
 final storedSessionProvider =

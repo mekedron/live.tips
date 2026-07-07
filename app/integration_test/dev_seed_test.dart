@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/data/migrations.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/data/stripe/stripe_client.dart';
 import 'package:live_tips/data/stripe/stripe_requests.dart';
@@ -36,9 +37,10 @@ void main() {
         thankYouMessage: 'Thanks for the tip! 💛',
       );
 
-      await SecureStore().writeApiKey(_key);
       final local = await LocalStore.init();
-      await local.saveTipJar(jar);
+      final registry = await ensureAccountsRegistry(local);
+      await SecureStore().writeApiKey(registry.activeId, _key);
+      await local.saveTipJar(registry.activeId, jar);
       debugPrint('SEEDED_TIP_JAR_URL=${jar.url}');
       debugPrint('SEEDED_PAYMENT_LINK=${jar.paymentLinkId}');
     });

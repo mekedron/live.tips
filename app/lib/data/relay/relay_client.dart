@@ -27,7 +27,8 @@ class RelayApiException implements Exception {
           'or been deleted. Recreate it to reconnect.';
     }
     if (statusCode == 429) {
-      return 'The relay is rate-limiting requests — trying again more slowly.';
+      return 'The relay is rate-limiting requests — wait a minute and '
+          'try again.';
     }
     return message;
   }

@@ -12,6 +12,7 @@ import '../../domain/live_session.dart';
 import '../onboarding/relay_setup_screen.dart' show confirmAndRegenerateRelayJar;
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
+import '../../widgets/band_switcher.dart';
 import '../../widgets/donation_tile.dart';
 import '../../widgets/goal_editor.dart';
 import '../../widgets/lt_ui.dart';
@@ -51,7 +52,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
       });
     }
-    _goalMinor = ref.read(appStateProvider).settings.lastGoalMinor;
+    _goalMinor = ref.read(appStateProvider).band.lastGoalMinor;
   }
 
   void _setGoal(int minor) {
@@ -61,7 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final app = ref.read(appStateProvider);
     ref
         .read(appStateProvider.notifier)
-        .updateSettings(app.settings.copyWith(lastGoalMinor: minor));
+        .updateBand(app.band.copyWith(lastGoalMinor: minor));
   }
 
   Future<void> _editGoal(String currency) async {
@@ -75,7 +76,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _startSession() async {
     await ref.read(liveSessionProvider.notifier).start(goalMinor: _goalMinor);
-    if (mounted) _openLive();
+    // start() refuses quietly in edge states (mid band switch, nothing
+    // configured) — never open the stage over a session that isn't there.
+    if (mounted && ref.read(liveSessionProvider) != null) _openLive();
   }
 
   void _openLive() {
@@ -121,9 +124,10 @@ LtKeyStatus _keyStatus(AppState app) => app.demo
             ? LtKeyStatus.test
             : LtKeyStatus.live;
 
-/// The artist / band name with an inline pencil to rename it. Renaming changes
+/// The band name row: the name itself (with a chevron) opens the band
+/// switcher, and a small pencil beside it renames the band. Renaming changes
 /// only the *local* display name (home, stage, poster) — it never touches the
-/// Stripe link or its QR code, so it's safe any time. (Relay-only installs
+/// Stripe link or its QR code, so it's safe any time. (Relay-connected bands
 /// also push the new name to their live.tips page, best effort.) The pencil
 /// is hidden in demo mode (there's no real jar to name).
 class _EditableJarName extends ConsumerWidget {
@@ -140,38 +144,21 @@ class _EditableJarName extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
-    final style = outfitStyle(fontSize, c.text, weight: weight);
-    if (app.demo) return Text(app.displayName, style: style);
-    // The whole name is the tap target, mirroring the Tonight's-goal editor: an
-    // InkWell gives the grey hover highlight and the pointer cursor for free.
-    // Align(widthFactor/heightFactor) shrink-wraps the ink to the text so the
-    // highlight hugs the name (not the full row) under both the tight ListView
-    // width on phones and the unbounded header width on desktop. The pencil
-    // rides along as an inline WidgetSpan so long names still wrap.
-    return Align(
-      alignment: Alignment.centerLeft,
-      widthFactor: 1,
-      heightFactor: 1,
-      child: InkWell(
-        onTap: () => _editJarName(context, ref, app),
-        borderRadius: BorderRadius.circular(8),
-        child: Text.rich(
-          TextSpan(
-            text: app.displayName,
-            children: [
-              WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 6),
-                  child: Icon(Icons.edit_outlined,
-                      size: fontSize * 0.6, color: c.textMuted),
-                ),
-              ),
-            ],
-          ),
-          style: style,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Flexible(
+          child: BandNameButton(fontSize: fontSize, weight: weight),
         ),
-      ),
+        if (!app.demo)
+          IconButton(
+            tooltip: 'Rename',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.edit_outlined,
+                size: fontSize * 0.6, color: c.textMuted),
+            onPressed: () => _editJarName(context, ref, app),
+          ),
+      ],
     );
   }
 }
@@ -227,23 +214,23 @@ Future<void> _editJarName(
   // Dispose after the sheet's exit animation is fully done.
   Future.delayed(const Duration(seconds: 1), controller.dispose);
   if (saved == null || saved.isEmpty || saved == app.displayName) return;
-  final tipJar = app.tipJar;
-  if (tipJar != null) {
-    await notifier.setTipJar(tipJar.copyWith(displayName: saved));
-    return;
-  }
-  final relayJar = app.relayJar;
-  if (relayJar == null) return;
-  final renamed = relayJar.copyWith(artistName: saved);
-  await notifier.updateRelayJarLocal(renamed);
+  await notifier.renameBand(saved);
   // Best effort: keep the public live.tips page's name in sync. The local
   // rename already took; on failure the relay copy just drifts until the
-  // next successful update.
+  // next successful update. The Stripe URL rides along because the relay
+  // treats an update as a full profile replace — omitting it would wipe the
+  // donor page's card button.
+  final relayJar = app.relayJar;
   final secret = app.relaySecret;
-  if (secret == null) return;
+  if (relayJar == null || secret == null) return;
   final client = RelayClient();
   try {
-    await client.updateJar(jar: renamed, secret: secret, artistName: saved);
+    await client.updateJar(
+      jar: relayJar.copyWith(artistName: saved),
+      secret: secret,
+      artistName: saved,
+      stripeUrl: app.tipJar?.url,
+    );
   } catch (_) {
     // Offline or a rotated secret — purely cosmetic drift, ignore.
   } finally {
@@ -343,7 +330,8 @@ class _DesktopHome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final url = app.activeQrUrl;
-    final sessions = ref.read(localStoreProvider).readSessionHistory();
+    final sessions =
+        ref.read(localStoreProvider).readSessionHistory(app.accountId);
     final last = sessions.isEmpty ? null : sessions.last;
     final dateLine = DateFormat('EEEE, MMMM d').format(DateTime.now());
 
@@ -918,13 +906,13 @@ bool _showRecreate(AppState app) {
 }
 
 /// The Stripe-link ⇄ tip-page switch shown when both exist. Persisted in
-/// settings; every QR surface (home, stage, poster) follows it.
+/// the band's settings; every QR surface (home, stage, poster) follows it.
 class _QrModeToggle extends ConsumerWidget {
   const _QrModeToggle();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(appStateProvider.select((s) => s.settings));
+    final band = ref.watch(appStateProvider.select((s) => s.band));
     final mode = ref.watch(appStateProvider.select((s) => s.effectiveQrMode));
     return LtSegmented<QrMode>(
       values: QrMode.values,
@@ -932,7 +920,7 @@ class _QrModeToggle extends ConsumerWidget {
       labelOf: (m) => m.label,
       onChanged: (m) => ref
           .read(appStateProvider.notifier)
-          .updateSettings(settings.copyWith(qrMode: m)),
+          .updateBand(band.copyWith(qrMode: m)),
     );
   }
 }

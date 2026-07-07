@@ -153,9 +153,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       if (previous != null && next == null) _loadMore(reset: true);
     });
     final isRail = AppShellScope.of(context)?.isRail ?? false;
-    final sessions =
-        ref.watch(localStoreProvider).readSessionHistory().reversed.toList();
     final app = ref.watch(appStateProvider);
+    final sessions = ref
+        .watch(localStoreProvider)
+        .readSessionHistory(app.accountId)
+        .reversed
+        .toList();
     final jar = app.effectiveTipJar;
     final stripeAllUrl =
         (jar == null || jar.isDemo) ? null : jar.stripePaymentsUrl;

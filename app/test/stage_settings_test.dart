@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/domain/app_settings.dart';
+import 'package:live_tips/domain/band_settings.dart';
 import 'package:live_tips/domain/stage_settings.dart';
 
 void main() {
@@ -109,13 +110,15 @@ void main() {
     test('legacy settings_v1 blob without a stage key gets defaults', () {
       final legacy = {
         'pollIntervalSec': 6,
-        'lastGoalMinor': 20000,
+        'lastGoalMinor': 20000, // band-scoped now; AppSettings ignores it
         'preferDeviceAuth': false,
       };
       final s = AppSettings.fromJson(legacy);
       expect(s.pollIntervalSec, 6);
-      expect(s.lastGoalMinor, 20000);
       expect(s.stage, const StageSettings());
+      // The goal moved to BandSettings — the same legacy blob still decodes
+      // it in its new home (the boot migration lifts it into the first band).
+      expect(BandSettings.fromJson(legacy).lastGoalMinor, 20000);
     });
   });
 

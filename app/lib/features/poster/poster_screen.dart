@@ -46,7 +46,7 @@ class PosterScreen extends ConsumerWidget {
     }
 
     final artistName = app.displayName;
-    final posterSettings = app.settings.poster;
+    final posterSettings = app.band.poster;
     // The name actually printed: the poster's own override when set, else
     // the artist name from whichever jar is configured.
     final resolvedName = posterSettings.displayName.trim().isEmpty
@@ -61,8 +61,8 @@ class PosterScreen extends ConsumerWidget {
     // Reads fresh state at call time: the customize sheet outlives this
     // build, and consecutive edits must not clobber each other.
     void updatePoster(PosterSettings Function(PosterSettings) update) {
-      final current = ref.read(appStateProvider).settings;
-      ref.read(appStateProvider.notifier).updateSettings(
+      final current = ref.read(appStateProvider).band;
+      ref.read(appStateProvider.notifier).updateBand(
             current.copyWith(poster: update(current.poster)),
           );
     }

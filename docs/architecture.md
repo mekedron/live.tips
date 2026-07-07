@@ -53,6 +53,46 @@ The link URL (`donate.stripe.com/…`) is rendered as a QR code — on the home
 screen, fullscreen for printing, and on the live screen's side panel so the
 audience can scan straight from the stage display.
 
+## Bands (local multi-account)
+
+One artist, several acts: a solo set tonight, the band on Friday — each with
+its own links, so nothing gets re-generated or renamed between gigs. A
+**band** owns everything payment- and identity-shaped: the Stripe restricted
+key + tip jar, the relay jar (Revolut/MobilePay), QR mode, last goal, poster
+wording, session history, the relay-tip archive, and the resumable session.
+Device-wide preferences (theme, stage look, poll cadence) stay shared.
+
+Mechanically: a registry (`accounts_v1`: `{activeId, accounts:[{id,name,…}]}`)
+plus per-band namespacing — every per-band SharedPreferences key and keychain
+entry is suffixed with the band's account id (`tip_jar_v1_<id>`,
+`stripe_api_key_<id>`, …). `AppState` carries the active band; `RootGate`
+keys its subtree by account id so a switch remounts every screen. Switching
+loads the target band's secrets from the keychain at runtime; it is refused
+while a live session runs (a session is bound to its band's key and relay
+socket — the controller additionally snapshots the account id at start so
+its writes can't leak across bands). The relay keepalive pings **every**
+band's jar, not just the active one, so idle donor pages never hit the
+90-day expiry. Removing a band deletes its data + secrets (best-effort
+relay DELETE included); secrets that survive a locked keychain are
+tombstoned and wiped on a later boot.
+
+Migration from the single-band layout is crash-safe and two-phase: the prefs
+phase copies the legacy blobs into namespaced keys (type-aware, byte-
+identical, under an id persisted *before* anything moves), lifts the
+band-scoped fields out of `settings_v1`, commits by writing the registry,
+and only then deletes the legacy keys. The keychain phase is retried each
+boot until it succeeds (a locked keychain just means booting signed-out
+once, exactly like today) and adopts secrets surviving an app reinstall.
+Legacy keys written by a downgraded build are swept into a fresh band on
+the next boot instead of being ignored.
+
+The switcher lives where the band name shows: the name on Home (and a chip
+on the side rail, welcome, and jar-setup screens) opens a sheet listing
+every band with its configured methods, plus "Add a band" — which creates
+an empty active band and runs the normal onboarding, since every screen
+already reads "the active band". Abandoned, never-configured bands are
+garbage-collected on switch-away.
+
 ## Sessions & persistence
 
 `LiveSessionController` (Riverpod `Notifier`) owns the active session: polling
@@ -68,14 +108,14 @@ platform keychain/keystore via `flutter_secure_storage`.
 ```
 lib/
 ├── core/        # money/currency helpers, theme, onboarding constants
-├── domain/      # Donation, LiveSession, TipJar, AppSettings, StageSettings,
-│                # JarTipAttribution (pure Dart)
+├── domain/      # Donation, LiveSession, TipJar, BandAccount, BandSettings,
+│                # AppSettings, StageSettings, JarTipAttribution (pure Dart)
 ├── data/        # StripeClient (REST), StripeRequests (typed ops),
-│                # DonationSource (stripe poller + demo), stores
+│                # DonationSource (stripe poller + demo), stores, migrations
 ├── state/       # Riverpod providers, LiveSessionController
 ├── features/    # onboarding / setup / home / live / lock / history / settings
 │                # live/stage/ = the stage visualizations (see below)
-└── widgets/     # QR blocks, donation tiles, banners
+└── widgets/     # QR blocks, donation tiles, banners, band switcher
 ```
 
 ## The stage (live-screen visualization)

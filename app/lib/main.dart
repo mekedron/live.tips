@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'data/local_store.dart';
+import 'data/migrations.dart';
 import 'data/secure_store.dart';
 import 'state/providers.dart';
 
@@ -18,6 +19,12 @@ Future<void> main() async {
 
   final localStore = await LocalStore.init();
   final secureStore = SecureStore();
+
+  // Prefs-side migration/creation of the accounts registry. Never touches
+  // the keychain, so it can't block or fail transiently.
+  final registry = await ensureAccountsRegistry(localStore);
+  final activeId = registry.activeId;
+
   String? apiKey;
   String? relaySecret;
   if (kDebugMode && _devStripeKey.isNotEmpty) {
@@ -26,8 +33,11 @@ Future<void> main() async {
     apiKey = _devStripeKey;
   } else {
     try {
-      apiKey = await secureStore.readApiKey();
-      relaySecret = await secureStore.readRelaySecret();
+      // Keychain-side migration is retried each boot until it sticks; a
+      // locked/prompting keychain just means booting signed-out this once.
+      await migrateKeychainIfNeeded(localStore, secureStore, registry);
+      apiKey = await secureStore.readApiKey(activeId);
+      relaySecret = await secureStore.readRelaySecret(activeId);
     } catch (_) {
       // Keychain read can fail transiently (fresh installs, locked keychain);
       // treat as signed out rather than crashing before the first frame.
@@ -40,9 +50,9 @@ Future<void> main() async {
   // before that scrubbing existed. Test-mode sessions are the user's own
   // real integration tests, so they're left alone here.
   final hasRealAccount = (apiKey != null && !apiKey.contains('_test_')) ||
-      localStore.readRelayJar() != null;
+      localStore.readRelayJar(activeId) != null;
   if (hasRealAccount) {
-    await localStore.purgeSimulatedData();
+    await localStore.purgeSimulatedData(activeId);
   }
 
   runApp(

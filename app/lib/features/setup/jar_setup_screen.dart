@@ -15,6 +15,7 @@ import '../../domain/tip_jar.dart';
 import '../onboarding/relay_setup_screen.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
+import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
 import '../settings/stage_preview_screen.dart';
@@ -131,15 +132,46 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
       return;
     }
     // Fresh onboarding: RootGate swaps to the shell by itself. When the
-    // draft also wants Revolut/MobilePay, the relay step rides on top.
+    // draft also wants Revolut/MobilePay, the relay step rides on top —
+    // in edit mode when this band already has a relay jar, so a stale
+    // draft can never create a duplicate jar and orphan the old one.
     final draft = ref.read(onboardingDraftProvider);
     if (draft != null && draft.wantsRelay) {
+      final hasRelay = app.relayJar != null;
       navigator.push(
-        MaterialPageRoute(builder: (_) => const RelaySetupScreen()),
+        MaterialPageRoute(builder: (_) => RelaySetupScreen(edit: hasRelay)),
       );
     } else {
       ref.read(onboardingDraftProvider.notifier).clear();
     }
+  }
+
+  /// Backs out of Stripe setup: only the just-connected key goes away —
+  /// the band, its other methods, and its history all stay.
+  Future<void> _cancelSetup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Stripe setup?'),
+        content: const Text(
+          'The API key you just connected is removed from this device. '
+          'Nothing else changes — you can reconnect it any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep setting up'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Remove key'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    ref.read(onboardingDraftProvider.notifier).clear();
+    await ref.read(appStateProvider.notifier).cancelStripeSetup();
   }
 
   /// Tells the relay about the (re)created Stripe link so the donor page's
@@ -183,10 +215,16 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
                     child: Center(child: LtPill(label: 'Replaces the old link')),
                   )
                 else ...[
+                  if (ref.watch(appStateProvider
+                          .select((s) => s.accounts.length)) >
+                      1)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 4),
+                      child: Center(child: BandChip()),
+                    ),
                   TextButton(
-                    onPressed: () =>
-                        ref.read(appStateProvider.notifier).disconnect(),
-                    child: const Text('Disconnect'),
+                    onPressed: _cancelSetup,
+                    child: const Text('Cancel'),
                   ),
                   Padding(
                     padding: const EdgeInsets.only(right: 16, left: 4),

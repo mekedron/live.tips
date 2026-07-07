@@ -11,7 +11,8 @@ import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'helpers.dart';
 
 /// Hands out pre-scripted batches, one per pollNew() call (same scaffold as
 /// live_session_controller_test.dart).
@@ -91,10 +92,9 @@ void main() {
   /// Relay-only install: a relay jar + secret, NO Stripe key, NO demo.
   Future<void> setUpContainer(
       {List<List<Donation>> stripeBatches = const []}) async {
-    SharedPreferences.setMockInitialValues({
-      'relay_jar_v1': jsonEncode(relayJar.toJson()),
+    store = await seededStore(accountValues: {
+      LocalStore.kRelayJarBase: jsonEncode(relayJar.toJson()),
     });
-    store = LocalStore(await SharedPreferences.getInstance());
     channel = FakeRelayChannel();
     container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
@@ -132,7 +132,7 @@ void main() {
     expect(state.lastDonation!.id, 'relay_1751500000000_0');
 
     // Crash-recovery snapshot carries the relay tip.
-    final stored = store.readActiveSession()!;
+    final stored = store.readActiveSession(kTestAccountId)!;
     expect(stored.donations.map((d) => d.id), ['relay_1751500000000_0']);
     expect(stored.donations.single.method, TipMethod.mobilepay);
     expect(stored.donations.single.verified, isFalse);
@@ -235,7 +235,7 @@ void main() {
       await settle();
 
       // Persisted the moment it reached the live screen…
-      final archived = store.readRelayHistory().single;
+      final archived = store.readRelayHistory(kTestAccountId).single;
       expect(archived.id, 'relay_1751500000000_0');
       expect(archived.verified, isFalse);
       expect(archived.method, TipMethod.mobilepay);
@@ -244,7 +244,7 @@ void main() {
           'relay_1751500000000_0');
 
       await controller.stop();
-      expect(store.readRelayHistory(), hasLength(1),
+      expect(store.readRelayHistory(kTestAccountId), hasLength(1),
           reason: 'the archive outlives the session — that is its point');
     });
 
@@ -259,7 +259,7 @@ void main() {
       channel.tipsCtrl.add(relayTip(1));
       await settle();
 
-      expect(store.readRelayHistory().map((d) => d.id), [
+      expect(store.readRelayHistory(kTestAccountId).map((d) => d.id), [
         'relay_1751500000000_1',
         'relay_1751500000000_0',
       ]);
@@ -284,7 +284,7 @@ void main() {
       await settle();
 
       expect(container.read(liveSessionProvider)!.session.count, 2);
-      expect(store.readRelayHistory().map((d) => d.id),
+      expect(store.readRelayHistory(kTestAccountId).map((d) => d.id),
           ['relay_1751500000000_0'],
           reason: 'verified (Stripe) tips live in the Stripe account — only '
               'donor-declared tip-page tips belong to the device archive');
@@ -302,7 +302,7 @@ void main() {
 
       expect(container.read(liveSessionProvider)!.session.count, 1,
           reason: 'the demo tip still plays on the stage');
-      expect(store.readRelayHistory(), isEmpty,
+      expect(store.readRelayHistory(kTestAccountId), isEmpty,
           reason: 'pretend money must never enter the real archive');
     });
   });

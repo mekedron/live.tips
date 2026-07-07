@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/domain/app_settings.dart';
+import 'package:live_tips/domain/band_settings.dart';
 import 'package:live_tips/domain/poster.dart';
 
 void main() {
@@ -73,27 +73,30 @@ void main() {
     });
   });
 
-  group('AppSettings + poster', () {
+  group('BandSettings + poster', () {
     test('round-trips the nested poster settings', () {
-      const s = AppSettings(
+      const s = BandSettings(
         poster: PosterSettings(
           theme: PosterTheme.splitDuotone,
           paperSize: PosterPaperSize.a2,
         ),
       );
-      final revived = AppSettings.fromJson(s.toJson());
+      final revived = BandSettings.fromJson(s.toJson());
       expect(revived.poster.theme, PosterTheme.splitDuotone);
       expect(revived.poster.paperSize, PosterPaperSize.a2);
     });
 
-    test('legacy settings_v1 blob without a poster key gets defaults', () {
+    test('band-settings blob without a poster key gets defaults', () {
+      // A blob missing the poster key (or carrying retired extras) must
+      // decode cleanly with poster defaults — same tolerance the legacy
+      // settings_v1 blob used to guarantee before poster moved here.
       final legacy = {
-        'pollIntervalSec': 6,
         'lastGoalMinor': 20000,
         'preferDeviceAuth': false,
       };
-      final s = AppSettings.fromJson(legacy);
+      final s = BandSettings.fromJson(legacy);
       expect(s.poster, const PosterSettings());
+      expect(s.lastGoalMinor, 20000);
     });
   });
 }

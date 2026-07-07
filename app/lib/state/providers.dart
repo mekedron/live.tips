@@ -9,9 +9,13 @@ import '../data/secure_store.dart';
 import '../data/stripe/stripe_client.dart';
 import '../data/stripe/stripe_requests.dart';
 import '../domain/app_settings.dart';
+import '../domain/band_account.dart';
+import '../domain/band_settings.dart';
 import '../domain/donation.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
+import 'live_session_controller.dart';
+import 'onboarding_draft.dart';
 
 /// Overridden in main() with initialized instances.
 final localStoreProvider =
@@ -19,21 +23,33 @@ final localStoreProvider =
 final secureStoreProvider =
     Provider<SecureStore>((ref) => throw UnimplementedError());
 
-/// API key read from secure storage before the first frame.
+/// Active band's API key, read from secure storage before the first frame.
 final initialApiKeyProvider = Provider<String?>((ref) => null);
 
-/// Relay jar secret read from secure storage before the first frame.
+/// Active band's relay jar secret, read from secure storage before the
+/// first frame.
 final initialRelaySecretProvider = Provider<String?>((ref) => null);
 
 class AppState {
   const AppState({
+    this.accountId = '',
+    this.accounts = const [],
     this.apiKey,
     this.tipJar,
     this.relayJar,
     this.relaySecret,
     required this.settings,
+    this.band = const BandSettings(),
     this.demo = false,
+    this.switching = false,
   });
+
+  /// The active band — every jar/secret below belongs to it, and every
+  /// per-band storage read/write is keyed by it.
+  final String accountId;
+
+  /// All local bands, creation order (the switcher lists them as-is).
+  final List<BandAccount> accounts;
 
   final String? apiKey;
   final TipJar? tipJar;
@@ -42,8 +58,18 @@ class AppState {
   /// Either account — Stripe key or relay jar — is enough to run the app.
   final RelayJar? relayJar;
   final String? relaySecret;
+
+  /// Device-wide preferences (theme, stage look, poll cadence).
   final AppSettings settings;
+
+  /// The active band's own preferences (QR mode, goal, poster).
+  final BandSettings band;
+
   final bool demo;
+
+  /// True while a band switch is loading its keychain secrets — sessions
+  /// must not start and further switches are refused until it commits.
+  final bool switching;
 
   bool get hasStripe => apiKey != null;
   bool get hasRelay => relayJar != null;
@@ -52,9 +78,19 @@ class AppState {
   TipJar? get effectiveTipJar => demo ? TipJar.demo : tipJar;
   RelayJar? get effectiveRelayJar => demo ? RelayJar.demo : relayJar;
 
-  /// The name shown on home/stage/poster: the Stripe jar's display name when
-  /// one exists, else the relay jar's artist name, else empty.
+  BandAccount? get activeAccount {
+    for (final a in accounts) {
+      if (a.id == accountId) return a;
+    }
+    return null;
+  }
+
+  /// The name shown on home/stage/poster: the band's registry name when set,
+  /// else the Stripe jar's display name, else the relay jar's artist name.
   String get displayName {
+    if (demo) return TipJar.demo.displayName;
+    final bandName = activeAccount?.name.trim() ?? '';
+    if (bandName.isNotEmpty) return bandName;
     final jarName = effectiveTipJar?.displayName ?? '';
     if (jarName.isNotEmpty) return jarName;
     return effectiveRelayJar?.artistName ?? '';
@@ -63,11 +99,12 @@ class AppState {
   String get currency =>
       effectiveTipJar?.currency ?? effectiveRelayJar?.currency ?? 'usd';
 
-  /// [AppSettings.qrMode] clamped to what's actually configured: the setting
-  /// may name a mode whose jar doesn't exist (defaults, half-configured
-  /// installs), and every QR surface must still resolve to something real.
+  /// [BandSettings.qrMode] clamped to what's actually configured: the
+  /// setting may name a mode whose jar doesn't exist (defaults,
+  /// half-configured bands), and every QR surface must still resolve to
+  /// something real.
   QrMode get effectiveQrMode {
-    switch (settings.qrMode) {
+    switch (band.qrMode) {
       case QrMode.connected:
         return effectiveRelayJar != null ? QrMode.connected : QrMode.stripe;
       case QrMode.stripe:
@@ -86,147 +123,402 @@ class AppState {
   /// Whether the artist could actually toggle between the two QR modes.
   bool get hasBothQrModes =>
       effectiveTipJar != null && effectiveRelayJar != null;
+
+  static const _unset = Object();
+
+  AppState copyWith({
+    String? accountId,
+    List<BandAccount>? accounts,
+    Object? apiKey = _unset,
+    Object? tipJar = _unset,
+    Object? relayJar = _unset,
+    Object? relaySecret = _unset,
+    AppSettings? settings,
+    BandSettings? band,
+    bool? demo,
+    bool? switching,
+  }) =>
+      AppState(
+        accountId: accountId ?? this.accountId,
+        accounts: accounts ?? this.accounts,
+        apiKey: apiKey == _unset ? this.apiKey : apiKey as String?,
+        tipJar: tipJar == _unset ? this.tipJar : tipJar as TipJar?,
+        relayJar:
+            relayJar == _unset ? this.relayJar : relayJar as RelayJar?,
+        relaySecret: relaySecret == _unset
+            ? this.relaySecret
+            : relaySecret as String?,
+        settings: settings ?? this.settings,
+        band: band ?? this.band,
+        demo: demo ?? this.demo,
+        switching: switching ?? this.switching,
+      );
 }
 
 class AppStateNotifier extends Notifier<AppState> {
   @override
   AppState build() {
     final local = ref.read(localStoreProvider);
+    // main() migrates/creates the registry before runApp; the fallback here
+    // covers tests that wire a bare store straight into the ProviderScope.
+    var registry = local.readAccountsRegistry();
+    if (registry == null) {
+      final account = BandAccount(
+        id: BandAccount.newId(),
+        name: '',
+        createdAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      registry = AccountsRegistry(accounts: [account], activeId: account.id);
+      local.saveAccountsRegistry(registry); // fire-and-forget
+    }
+    final accountId = registry.activeId;
     return AppState(
+      accountId: accountId,
+      accounts: registry.accounts,
       apiKey: ref.read(initialApiKeyProvider),
-      tipJar: local.readTipJar(),
-      relayJar: local.readRelayJar(),
+      tipJar: local.readTipJar(accountId),
+      relayJar: local.readRelayJar(accountId),
       relaySecret: ref.read(initialRelaySecretProvider),
       settings: local.readSettings(),
+      band: local.readBandSettings(accountId),
     );
   }
 
+  AccountsRegistry get _registry =>
+      AccountsRegistry(accounts: state.accounts, activeId: state.accountId);
+
   Future<void> connect(String apiKey) async {
+    final accountId = state.accountId;
     final trimmed = apiKey.trim();
-    await ref.read(secureStoreProvider).writeApiKey(trimmed);
+    await ref.read(secureStoreProvider).writeApiKey(accountId, trimmed);
     // A newly connected account must not inherit demo/test tips from earlier
     // play — otherwise its history shows donations that never happened.
-    await ref.read(localStoreProvider).purgeSimulatedData();
-    state = AppState(
-      apiKey: trimmed,
-      tipJar: state.tipJar,
-      relayJar: state.relayJar,
-      relaySecret: state.relaySecret,
-      settings: state.settings,
-    );
+    await ref.read(localStoreProvider).purgeSimulatedData(accountId);
+    if (state.accountId != accountId) return; // switched bands mid-await
+    state = state.copyWith(apiKey: trimmed, demo: false);
   }
 
   void enterDemo() {
-    state = AppState(
-      apiKey: state.apiKey,
-      tipJar: state.tipJar,
-      relayJar: state.relayJar,
-      relaySecret: state.relaySecret,
-      settings: state.settings,
-      demo: true,
-    );
+    state = state.copyWith(demo: true);
   }
 
   void exitDemo() {
-    state = AppState(
-      apiKey: state.apiKey,
-      tipJar: state.tipJar,
-      relayJar: state.relayJar,
-      relaySecret: state.relaySecret,
-      settings: state.settings,
-    );
+    state = state.copyWith(demo: false);
   }
 
   Future<void> setTipJar(TipJar jar) async {
-    await ref.read(localStoreProvider).saveTipJar(jar);
-    state = AppState(
-      apiKey: state.apiKey,
-      tipJar: jar,
-      relayJar: state.relayJar,
-      relaySecret: state.relaySecret,
-      settings: state.settings,
-      demo: state.demo,
-    );
+    final accountId = state.accountId;
+    await ref.read(localStoreProvider).saveTipJar(accountId, jar);
+    // A jar names the band — adopt its display name as the registry name so
+    // the switcher never shows "Unnamed band" for a configured one.
+    await _renameInRegistry(accountId, jar.displayName);
+    if (state.accountId != accountId) return;
+    state = state.copyWith(tipJar: jar);
   }
 
   /// Adopts a freshly created relay jar: the secret goes to the keychain,
   /// the jar itself to local prefs. Like [connect], a real account must not
   /// inherit demo/test tips from earlier play.
   Future<void> setRelayJar(RelayJar jar, String secret) async {
-    await ref.read(secureStoreProvider).writeRelaySecret(secret);
-    await ref.read(localStoreProvider).saveRelayJar(jar);
-    await ref.read(localStoreProvider).purgeSimulatedData();
-    state = AppState(
-      apiKey: state.apiKey,
-      tipJar: state.tipJar,
-      relayJar: jar,
-      relaySecret: secret,
-      settings: state.settings,
-    );
+    final accountId = state.accountId;
+    await ref.read(secureStoreProvider).writeRelaySecret(accountId, secret);
+    await ref.read(localStoreProvider).saveRelayJar(accountId, jar);
+    await ref.read(localStoreProvider).purgeSimulatedData(accountId);
+    final current = _registry;
+    if (current.contains(accountId) &&
+        current.accounts.firstWhere((a) => a.id == accountId).name.isEmpty) {
+      await _renameInRegistry(accountId, jar.artistName);
+    }
+    if (state.accountId != accountId) return;
+    state = state.copyWith(relayJar: jar, relaySecret: secret, demo: false);
   }
 
   /// Saves an edited relay jar (rename etc.) locally — the secret is
   /// untouched and telling the relay itself is the caller's job.
   Future<void> updateRelayJarLocal(RelayJar jar) async {
-    await ref.read(localStoreProvider).saveRelayJar(jar);
-    state = AppState(
-      apiKey: state.apiKey,
-      tipJar: state.tipJar,
-      relayJar: jar,
-      relaySecret: state.relaySecret,
-      settings: state.settings,
-      demo: state.demo,
-    );
+    final accountId = state.accountId;
+    await ref.read(localStoreProvider).saveRelayJar(accountId, jar);
+    if (state.accountId != accountId) return;
+    state = state.copyWith(relayJar: jar);
   }
 
   /// Forgets the relay jar on this device. Deleting it on the relay itself
   /// (network DELETE) is the caller's job.
   Future<void> clearRelayJar() async {
-    await ref.read(secureStoreProvider).deleteRelaySecret();
-    await ref.read(localStoreProvider).clearRelayJar();
-    state = AppState(
-      apiKey: state.apiKey,
-      tipJar: state.tipJar,
-      settings: state.settings,
-      demo: state.demo,
-    );
+    final accountId = state.accountId;
+    await ref.read(secureStoreProvider).deleteRelaySecret(accountId);
+    await ref.read(localStoreProvider).clearRelayJar(accountId);
+    if (state.accountId != accountId) return;
+    state = state.copyWith(relayJar: null, relaySecret: null);
   }
 
   Future<void> updateSettings(AppSettings settings) async {
     await ref.read(localStoreProvider).saveSettings(settings);
-    state = AppState(
-      apiKey: state.apiKey,
-      tipJar: state.tipJar,
-      relayJar: state.relayJar,
-      relaySecret: state.relaySecret,
-      settings: settings,
-      demo: state.demo,
+    state = state.copyWith(settings: settings);
+  }
+
+  /// Persists the active band's own preferences (QR mode, goal, poster).
+  Future<void> updateBand(BandSettings band) async {
+    final accountId = state.accountId;
+    await ref.read(localStoreProvider).saveBandSettings(accountId, band);
+    if (state.accountId != accountId) return;
+    state = state.copyWith(band: band);
+  }
+
+  /// Renames the active band everywhere local: the registry (the switcher's
+  /// label) and both jars' embedded names. Pushing the new name to the relay
+  /// stays the caller's job (best effort, needs the network).
+  Future<void> renameBand(String name) async {
+    final accountId = state.accountId;
+    final local = ref.read(localStoreProvider);
+    await _renameInRegistry(accountId, name);
+    final tipJar = state.tipJar;
+    final relayJar = state.relayJar;
+    if (tipJar != null) {
+      await local.saveTipJar(accountId, tipJar.copyWith(displayName: name));
+    }
+    if (relayJar != null) {
+      await local.saveRelayJar(
+          accountId, relayJar.copyWith(artistName: name));
+    }
+    if (state.accountId != accountId) return;
+    state = state.copyWith(
+      tipJar: tipJar?.copyWith(displayName: name),
+      relayJar: relayJar?.copyWith(artistName: name),
+      accounts: _registry.withRenamed(accountId, name).accounts,
     );
   }
 
-  /// Removes the key and every trace of local data.
-  Future<void> disconnect() async {
-    // Best effort: retire the connected-mode jar on the relay so the public
-    // donor page dies with the local copy. Failures are ignored — the wipe
-    // must succeed even offline.
-    final relayJar = state.relayJar;
-    final relaySecret = state.relaySecret;
-    if (relayJar != null && relaySecret != null) {
+  Future<void> _renameInRegistry(String accountId, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final renamed = _registry.withRenamed(accountId, trimmed);
+    await ref.read(localStoreProvider).saveAccountsRegistry(renamed);
+    state = state.copyWith(accounts: renamed.accounts);
+  }
+
+  /// Whether bands can be switched/added/removed right now. A running
+  /// session is bound to its band's key, payment link, and relay socket —
+  /// the app must never show band B around band A's live numbers.
+  bool get accountActionsBlocked =>
+      state.switching || ref.read(liveSessionProvider) != null;
+
+  /// Makes [id] the active band. Returns false when refused (unknown id,
+  /// mid-switch, or a live session running). Exits demo mode — switching is
+  /// an explicit "work with this band now".
+  Future<bool> switchAccount(String id) async {
+    if (state.switching) return false;
+    if (id == state.accountId) {
+      // "Switch to the band I'm already on" while playing with demo mode
+      // means "back to the real thing".
+      if (state.demo) exitDemo();
+      return true;
+    }
+    if (!_registry.contains(id)) return false;
+    if (ref.read(liveSessionProvider) != null) return false;
+
+    final previousId = state.accountId;
+    state = state.copyWith(switching: true);
+    // A stale onboarding draft must never leak across bands — it would
+    // hijack the next band's setup flow with this band's method choices.
+    ref.read(onboardingDraftProvider.notifier).clear();
+
+    final local = ref.read(localStoreProvider);
+    final secure = ref.read(secureStoreProvider);
+    String? apiKey;
+    String? relaySecret;
+    var keychainOk = true;
+    try {
+      apiKey = await secure.readApiKey(id);
+      relaySecret = await secure.readRelaySecret(id);
+    } catch (_) {
+      // Locked/prompting keychain: the band opens signed-out this once,
+      // exactly like a failed boot read. Its data is untouched.
+      keychainOk = false;
+    }
+
+    // The guard ran before the awaits — re-check nothing slipped in.
+    if (ref.read(liveSessionProvider) != null) {
+      state = state.copyWith(switching: false);
+      return false;
+    }
+
+    await local.saveAccountsRegistry(_registry.withActive(id));
+    state = AppState(
+      accountId: id,
+      accounts: state.accounts,
+      apiKey: apiKey,
+      tipJar: local.readTipJar(id),
+      relayJar: local.readRelayJar(id),
+      relaySecret: relaySecret,
+      settings: state.settings,
+      band: local.readBandSettings(id),
+    );
+    if (keychainOk) {
+      await _maybeCollectAbandoned(previousId);
+    }
+    return true;
+  }
+
+  /// Creates a fresh unnamed band and makes it active — the caller sends the
+  /// user into onboarding (method select). Returns null when refused.
+  Future<BandAccount?> addAccount() async {
+    if (accountActionsBlocked) return null;
+    final account = BandAccount(
+      id: BandAccount.newId(),
+      name: '',
+      createdAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    final registry = _registry.withAccount(account).withActive(account.id);
+    await ref.read(localStoreProvider).saveAccountsRegistry(registry);
+    ref.read(onboardingDraftProvider.notifier).clear();
+    state = AppState(
+      accountId: account.id,
+      accounts: registry.accounts,
+      settings: state.settings,
+    );
+    return account;
+  }
+
+  /// Deletes [id]'s local data and secrets (and, best effort, its relay jar
+  /// on the server), then activates the first remaining band — or a fresh
+  /// empty one when it was the last. Refused during a live session.
+  Future<bool> removeAccount(String id) async {
+    if (accountActionsBlocked) return false;
+    if (!_registry.contains(id)) return false;
+    state = state.copyWith(switching: true);
+    ref.read(onboardingDraftProvider.notifier).clear();
+
+    final local = ref.read(localStoreProvider);
+    final secure = ref.read(secureStoreProvider);
+
+    // Best effort: retire the band's connected-mode jar on the relay so the
+    // public donor page dies with the local copy. Failures are ignored —
+    // the removal must succeed even offline.
+    final jar = local.readRelayJar(id);
+    String? secret;
+    if (id == state.accountId) {
+      secret = state.relaySecret;
+    } else {
+      try {
+        secret = await secure.readRelaySecret(id);
+      } catch (_) {}
+    }
+    if (jar != null && secret != null) {
       final client = RelayClient();
       try {
-        await client.deleteJar(jarId: relayJar.jarId, secret: relaySecret);
+        await client.deleteJar(jarId: jar.jarId, secret: secret);
       } catch (_) {
         // Offline, already gone, or a rotated secret — nothing more to do.
       } finally {
         client.close();
       }
     }
-    await ref.read(secureStoreProvider).wipeAll();
-    await ref.read(localStoreProvider).wipeAll();
-    // The wipe took relay_history_v1 with it — drop the in-memory copy too.
+
+    var registry = _registry.withoutAccount(id);
+    if (registry.accounts.isEmpty) {
+      final fresh = BandAccount(
+        id: BandAccount.newId(),
+        name: '',
+        createdAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      registry =
+          AccountsRegistry(accounts: [fresh], activeId: fresh.id);
+    }
+
+    // Load the successor BEFORE wiping, so the UI lands on coherent state.
+    final successorId = id == state.accountId
+        ? registry.accounts.first.id
+        : state.accountId;
+    String? apiKey;
+    String? relaySecret;
+    if (successorId == state.accountId) {
+      apiKey = state.apiKey;
+      relaySecret = state.relaySecret;
+    } else {
+      try {
+        apiKey = await secure.readApiKey(successorId);
+        relaySecret = await secure.readRelaySecret(successorId);
+      } catch (_) {}
+    }
+    await local.saveAccountsRegistry(registry.withActive(successorId));
+    state = AppState(
+      accountId: successorId,
+      accounts: registry.accounts,
+      apiKey: apiKey,
+      tipJar: local.readTipJar(successorId),
+      relayJar: local.readRelayJar(successorId),
+      relaySecret: relaySecret,
+      settings: state.settings,
+      band: local.readBandSettings(successorId),
+    );
+
+    await local.wipeAccount(id);
+    try {
+      await secure.wipeAccount(id);
+    } catch (_) {
+      // A locked keychain leaves the secrets behind — tombstone them so
+      // the boot-time retry deletes them once the keychain cooperates.
+      await local.addPendingSecretWipe(id);
+    }
     ref.invalidate(relayHistoryProvider);
-    state = const AppState(settings: AppSettings());
+    return true;
   }
+
+  /// Backs out of Stripe setup for the active band: removes only the just-
+  /// connected API key, leaving jars, history, and other bands untouched.
+  /// RootGate then falls back to the shell (relay-only band) or welcome.
+  Future<void> cancelStripeSetup() async {
+    final accountId = state.accountId;
+    try {
+      await ref.read(secureStoreProvider).deleteApiKey(accountId);
+    } catch (_) {
+      // Locked keychain: the in-memory key still goes away this session;
+      // the next boot re-reads the entry and the user can cancel again.
+    }
+    if (state.accountId != accountId) return;
+    state = state.copyWith(apiKey: null);
+  }
+
+  /// Drops a band the user walked away from without ever configuring:
+  /// no name, no local data, and (confirmed, not just unloaded) no secrets.
+  /// Any doubt — a keychain error, one leftover key — keeps the band.
+  Future<void> _maybeCollectAbandoned(String id) async {
+    final registry = _registry;
+    if (!registry.contains(id) || registry.accounts.length < 2) return;
+    if (registry.accounts
+        .firstWhere((a) => a.id == id)
+        .name
+        .trim()
+        .isNotEmpty) {
+      return;
+    }
+    final local = ref.read(localStoreProvider);
+    if (local.accountHasData(id)) return;
+    try {
+      final secure = ref.read(secureStoreProvider);
+      if (await secure.readApiKey(id) != null) return;
+      if (await secure.readRelaySecret(id) != null) return;
+    } catch (_) {
+      return;
+    }
+    // Prune from the registry as it is NOW — the keychain awaits above are
+    // wide enough for another add/switch to have changed it, and saving a
+    // stale snapshot would clobber their entries.
+    final current = _registry;
+    if (!current.contains(id) ||
+        current.activeId == id ||
+        current.accounts.length < 2) {
+      return;
+    }
+    final pruned = current.withoutAccount(id);
+    await local.saveAccountsRegistry(pruned);
+    state = state.copyWith(accounts: pruned.accounts);
+  }
+
+  /// Removes the active band and every local trace of it. Kept as the
+  /// last-band form of [removeAccount] for the settings screen.
+  Future<void> disconnect() => removeAccount(state.accountId);
 }
 
 final appStateProvider =
@@ -301,16 +593,23 @@ final recentDonationsProvider =
   return page.donations;
 });
 
-/// The device-local archive of tip-page (Revolut/MobilePay) tips, newest
-/// first. This device is the only witness to these tips — the Stripe API
-/// never sees them — so every list that mixes them in reads this. Mirrors
-/// StoredSessionNotifier: SharedPreferences can't notify, so the session
-/// controller refreshes this explicitly after each write.
+/// The device-local archive of tip-page (Revolut/MobilePay) tips for the
+/// ACTIVE band, newest first. This device is the only witness to these tips
+/// — the Stripe API never sees them — so every list that mixes them in
+/// reads this. Mirrors StoredSessionNotifier: SharedPreferences can't
+/// notify, so the session controller refreshes this explicitly after each
+/// write; watching the account id rebuilds it on every band switch.
 class RelayHistoryNotifier extends Notifier<List<Donation>> {
   @override
-  List<Donation> build() => ref.read(localStoreProvider).readRelayHistory();
+  List<Donation> build() {
+    final accountId =
+        ref.watch(appStateProvider.select((s) => s.accountId));
+    return ref.read(localStoreProvider).readRelayHistory(accountId);
+  }
 
-  void refresh() => state = ref.read(localStoreProvider).readRelayHistory();
+  void refresh() => state = ref
+      .read(localStoreProvider)
+      .readRelayHistory(ref.read(appStateProvider).accountId);
 }
 
 final relayHistoryProvider =

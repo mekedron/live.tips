@@ -9,7 +9,8 @@ import 'package:live_tips/domain/app_settings.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/domain/tip_jar.dart';
 import 'package:live_tips/state/providers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'helpers.dart';
 
 const _tipJar = TipJar(
   productId: 'prod_1',
@@ -34,11 +35,10 @@ void main() {
   testWidgets(
       'home shows the QR toggle with both jars; switching persists the mode',
       (tester) async {
-    SharedPreferences.setMockInitialValues({
-      'tip_jar_v1': jsonEncode(_tipJar.toJson()),
-      'relay_jar_v1': jsonEncode(_relayJar.toJson()),
+    final localStore = await seededStore(accountValues: {
+      LocalStore.kTipJarBase: jsonEncode(_tipJar.toJson()),
+      LocalStore.kRelayJarBase: jsonEncode(_relayJar.toJson()),
     });
-    final localStore = await LocalStore.init();
 
     await tester.pumpWidget(
       ProviderScope(
@@ -66,8 +66,9 @@ void main() {
     await tester.tap(find.text('Stripe only'));
     await tester.pumpAndSettle();
 
-    // The switch is persisted, the caption yields to the Stripe URL.
-    expect(localStore.readSettings().qrMode, QrMode.stripe);
+    // The switch is persisted into the band's settings, the caption yields
+    // to the Stripe URL.
+    expect(localStore.readBandSettings(kTestAccountId).qrMode, QrMode.stripe);
     expect(
       find.text('Fans pick Stripe, Revolut or MobilePay on your tip page.'),
       findsNothing,
@@ -77,14 +78,16 @@ void main() {
     // And back.
     await tester.tap(find.text('All methods'));
     await tester.pumpAndSettle();
-    expect(localStore.readSettings().qrMode, QrMode.connected);
+    expect(
+      localStore.readBandSettings(kTestAccountId).qrMode,
+      QrMode.connected,
+    );
   });
 
   testWidgets('single-mode installs get no toggle', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      'relay_jar_v1': jsonEncode(_relayJar.toJson()),
+    final localStore = await seededStore(accountValues: {
+      LocalStore.kRelayJarBase: jsonEncode(_relayJar.toJson()),
     });
-    final localStore = await LocalStore.init();
 
     await tester.pumpWidget(
       ProviderScope(

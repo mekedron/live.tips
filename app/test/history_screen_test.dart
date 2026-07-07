@@ -11,7 +11,8 @@ import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/features/history/history_screen.dart';
 import 'package:live_tips/state/providers.dart';
 import 'package:live_tips/widgets/donation_tile.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'helpers.dart';
 
 const relayJar = RelayJar(
   jarId: 'jar_relay',
@@ -33,19 +34,18 @@ Donation relayTip(int serial) => Donation.relayTip(
     );
 
 /// Boots the screen over a store seeded straight through prefs — the same
-/// bytes a real device would have.
+/// bytes a real device would have (per-band keys plus the registry).
 Future<void> pumpHistory(
   WidgetTester tester, {
   List<Donation> relayHistory = const [],
   bool withRelayJar = false,
 }) async {
-  SharedPreferences.setMockInitialValues({
-    if (withRelayJar) 'relay_jar_v1': jsonEncode(relayJar.toJson()),
+  final store = await seededStore(accountValues: {
+    if (withRelayJar) LocalStore.kRelayJarBase: jsonEncode(relayJar.toJson()),
     if (relayHistory.isNotEmpty)
-      'relay_history_v1':
+      LocalStore.kRelayHistoryBase:
           jsonEncode([for (final d in relayHistory) d.toJson()]),
   });
-  final store = LocalStore(await SharedPreferences.getInstance());
   await tester.pumpWidget(ProviderScope(
     overrides: [localStoreProvider.overrideWithValue(store)],
     child: MaterialApp(

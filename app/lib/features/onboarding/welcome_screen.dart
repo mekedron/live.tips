@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/install_prompt.dart';
 import '../../core/theme.dart';
 import '../../state/providers.dart';
+import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import 'install_hint_screen.dart';
 import 'method_select_screen.dart';
@@ -14,7 +15,22 @@ class WelcomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
+    // A brand-new band mid-add lands here (it has nothing configured yet) —
+    // the chip is the way back to the bands that already work.
+    final hasOtherBands =
+        ref.watch(appStateProvider.select((s) => s.accounts.length)) > 1;
     return Scaffold(
+      appBar: hasOtherBands
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              actions: const [
+                Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: Center(child: BandChip()),
+                ),
+              ],
+            )
+          : null,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

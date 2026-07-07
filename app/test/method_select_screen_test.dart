@@ -25,22 +25,36 @@ bool _continueEnabled(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byType(FilledButton)).onPressed != null;
 
 void main() {
-  testWidgets('Stripe is preselected and recommended; no warning yet',
+  testWidgets('nothing is preselected; Stripe is recommended',
       (tester) async {
     await _pump(tester);
 
     expect(find.text('Recommended'), findsOneWidget);
-    // Exactly one selected card — the Stripe one.
+    expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+    expect(find.byIcon(Icons.radio_button_unchecked_rounded), findsNWidgets(3));
+    expect(find.text(_warningTitle), findsNothing);
+    expect(_continueEnabled(tester), isFalse,
+        reason: 'no method picked yet — nothing to continue with');
+  });
+
+  testWidgets('selecting Stripe alone shows no warning and enables Continue',
+      (tester) async {
+    await _pump(tester);
+
+    await tester.tap(find.text('Stripe'));
+    await tester.pump();
+
     expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.radio_button_unchecked_rounded), findsNWidgets(2));
     expect(find.text(_warningTitle), findsNothing);
     expect(_continueEnabled(tester), isTrue);
   });
 
-  testWidgets('selecting Revolut surfaces the honest warning',
+  testWidgets('selecting Revolut alongside Stripe surfaces the honest warning',
       (tester) async {
     await _pump(tester);
 
+    await tester.tap(find.text('Stripe'));
+    await tester.pump();
     await tester.tap(find.text('Revolut'));
     await tester.pump();
 
@@ -51,12 +65,11 @@ void main() {
         findsNothing);
   });
 
-  testWidgets('dropping Stripe appends the stronger warning', (tester) async {
+  testWidgets('a relay method without Stripe gets the stronger warning',
+      (tester) async {
     await _pump(tester);
 
     await tester.tap(find.text('MobilePay'));
-    await tester.pump();
-    await tester.tap(find.text('Stripe'));
     await tester.pump();
 
     expect(find.text(_warningTitle), findsOneWidget);
@@ -66,9 +79,11 @@ void main() {
         reason: 'MobilePay alone is still a valid selection');
   });
 
-  testWidgets('empty selection disables Continue', (tester) async {
+  testWidgets('deselecting back to empty disables Continue', (tester) async {
     await _pump(tester);
 
+    await tester.tap(find.text('Stripe'));
+    await tester.pump();
     await tester.tap(find.text('Stripe'));
     await tester.pump();
 
