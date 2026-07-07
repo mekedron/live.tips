@@ -65,7 +65,8 @@ export function escapeHtml(text: string): string {
 // Payment-method atoms. The phishing/open-redirect gate: the donor page only
 // ever links to URLs composed from these validated pieces.
 
-const STRIPE_URL = /^https:\/\/(?:buy|donate)\.stripe\.com\/[A-Za-z0-9]{1,64}$/;
+// Underscore included: test-mode Payment Links look like /test_<code>.
+const STRIPE_URL = /^https:\/\/(?:buy|donate)\.stripe\.com\/[A-Za-z0-9_]{1,64}$/;
 const REVOLUT_USERNAME = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 const MOBILEPAY_BOX_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CURRENCY = /^[a-z]{3}$/;

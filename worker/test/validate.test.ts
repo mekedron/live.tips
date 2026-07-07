@@ -59,9 +59,20 @@ describe("validateProfile", () => {
     "http://buy.stripe.com/abc",
     "https://buy.stripe.com/",
     "https://user@buy.stripe.com/abc",
+    "https://buy.stripe.com/abc/def",
   ])("rejects non-allowlisted stripe URL %s", (stripeUrl) => {
     const r = validateProfile({ ...baseProfile, methods: { stripeUrl } });
     expect(r.ok).toBe(false);
+  });
+
+  it("accepts live and test-mode payment links", () => {
+    for (const stripeUrl of [
+      "https://buy.stripe.com/9AQ3cw2gO0uHeIM144",
+      "https://donate.stripe.com/test_9AQ3cw2gO0uHeIM144",
+      "https://buy.stripe.com/test_abc123XYZ",
+    ]) {
+      expect(validateProfile({ ...baseProfile, methods: { stripeUrl } }).ok).toBe(true);
+    }
   });
 
   it("rejects free-form junk in usernames", () => {
