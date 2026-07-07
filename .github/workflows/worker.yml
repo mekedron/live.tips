@@ -34,7 +34,9 @@ jobs:
           cache-dependency-path: worker/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
-      - run: npx vitest run
+      # One retry: vitest-pool-workers occasionally trips over a SQLite WAL
+      # race ("isolated storage" -shm assertion) on Linux runners.
+      - run: npx vitest run || npx vitest run
 
   deploy:
     needs: test

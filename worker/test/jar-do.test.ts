@@ -1,7 +1,7 @@
 /// Durable Object behavior: WebSocket auth handshake, relay delivery,
 /// hibernation ping/pong, socket caps, self-destruct alarm, creation quota.
 
-import { SELF, env, fetchMock, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
+import { SELF, env, fetchMock, runInDurableObject } from "cloudflare:test";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createJar } from "./helpers";
 
@@ -165,26 +165,27 @@ describe("socket cap", () => {
     const { jarId, secret } = await createJar();
     const first = await authedSocket(jarId, secret);
     const evicted = nextClose(first, 4_000);
-    await authedSocket(jarId, secret);
-    await authedSocket(jarId, secret);
-    await authedSocket(jarId, secret); // 4th connection → oldest goes
+    const rest = [
+      await authedSocket(jarId, secret),
+      await authedSocket(jarId, secret),
+      await authedSocket(jarId, secret), // 4th connection → oldest goes
+    ];
     expect((await evicted).code).toBe(1008);
+    for (const ws of rest) ws.close();
   });
 });
 
 describe("self-destruct alarm", () => {
+  // The alarm handler is invoked directly on the instance: scheduling real
+  // alarms through runDurableObjectAlarm races vitest-pool-workers' isolated
+  // storage teardown (SQLite WAL) and flakes the whole file.
   it("wipes storage 90 days after last activity", async () => {
     const { jarId } = await createJar();
     const stub = env.JAR.get(env.JAR.idFromName(jarId));
 
-    await runInDurableObject(stub, async (_instance, state) => {
+    await runInDurableObject(stub, async (instance, state) => {
       await state.storage.put("lastSeenDay", Math.floor(Date.now() / DAY_MS) - 91);
-      await state.storage.setAlarm(Date.now() + 1);
-    });
-
-    expect(await runDurableObjectAlarm(stub)).toBe(true);
-
-    await runInDurableObject(stub, async (_instance, state) => {
+      await instance.alarm();
       expect(await state.storage.get("profile")).toBeUndefined();
       expect(await state.storage.get("secretHash")).toBeUndefined();
       expect(await state.storage.getAlarm()).toBeNull();
@@ -197,12 +198,8 @@ describe("self-destruct alarm", () => {
     const { jarId } = await createJar();
     const stub = env.JAR.get(env.JAR.idFromName(jarId));
 
-    await runInDurableObject(stub, async (_instance, state) => {
-      await state.storage.setAlarm(Date.now() + 1);
-    });
-    expect(await runDurableObjectAlarm(stub)).toBe(true);
-
-    await runInDurableObject(stub, async (_instance, state) => {
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.alarm();
       expect(await state.storage.get("profile")).toBeDefined();
       const alarm = await state.storage.getAlarm();
       expect(alarm).not.toBeNull();

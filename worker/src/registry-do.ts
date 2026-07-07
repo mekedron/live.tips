@@ -54,6 +54,17 @@ export class RegistryDO extends DurableObject<Env> {
     this.ctx.storage.sql.exec(`DELETE FROM jars WHERE jarId = ?`, jarId);
   }
 
+  /**
+   * Existence gate for all `/t/*` and `/v1/jars/:id/*` routes. Checking here
+   * keeps random-id probes from lazily instantiating a JarDO per guess —
+   * unknown ids cost one registry lookup and nothing else.
+   */
+  async has(jarId: string): Promise<boolean> {
+    return this.ctx.storage.sql
+      .exec(`SELECT 1 FROM jars WHERE jarId = ?`, jarId)
+      .toArray().length > 0;
+  }
+
   async touch(jarId: string, day: number): Promise<void> {
     this.ctx.storage.sql.exec(`UPDATE jars SET lastSeenDay = ? WHERE jarId = ?`, day, jarId);
   }

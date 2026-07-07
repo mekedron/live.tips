@@ -93,7 +93,10 @@ export default {
     if (donorMatch) {
       const jarId = donorMatch[1]!;
       const isTips = donorMatch[2] === "/tips";
-      if (!isValidJarId(jarId)) {
+      // The registry is the existence gate: unknown ids never instantiate a
+      // JarDO, so id-guessing costs one registry lookup and nothing else.
+      if (!isValidJarId(jarId) || !(await registryStub(env).has(jarId))) {
+        if (isTips) return json({ error: "not found" }, 404);
         return htmlPage(renderNotFoundPage(), 404, await donorPageCsp());
       }
 
@@ -182,17 +185,15 @@ export default {
       const created = await jarStub(env, jarId).init(jarId, profile.value, await sha256Hex(secret));
       if (created !== "ok") return json({ error: "please retry" }, 500, cors);
 
-      ctx.waitUntil(
-        registryStub(env)
-          .upsert({
-            jarId,
-            artistName: profile.value.artistName,
-            methods: methodsSummary(profile.value),
-            createdAt: Date.now(),
-            lastSeenDay: Math.floor(Date.now() / 86_400_000),
-          })
-          .catch(() => {}),
-      );
+      // Awaited (not waitUntil): the registry gates existence for every
+      // other route, so it must know the jar before the client does.
+      await registryStub(env).upsert({
+        jarId,
+        artistName: profile.value.artistName,
+        methods: methodsSummary(profile.value),
+        createdAt: Date.now(),
+        lastSeenDay: Math.floor(Date.now() / 86_400_000),
+      });
 
       return json({ jarId, secret, donateUrl: `${DONATE_URL_BASE}${jarId}` }, 201, cors);
     }
@@ -202,7 +203,9 @@ export default {
       const cors = corsHeaders(request);
       const jarId = jarMatch[1]!;
       const sub = jarMatch[2] ?? "";
-      if (!isValidJarId(jarId)) return json({ error: "not found" }, 404, cors);
+      if (!isValidJarId(jarId) || !(await registryStub(env).has(jarId))) {
+        return json({ error: "not found" }, 404, cors);
+      }
       const stub = jarStub(env, jarId);
 
       if (sub === "/ws" && request.method === "GET") {
@@ -253,7 +256,8 @@ export default {
       if (sub === "" && request.method === "DELETE") {
         const r = await stub.destroy(secret);
         if (r !== "ok") return fail(r);
-        ctx.waitUntil(registryStub(env).remove(jarId).catch(() => {}));
+        // Awaited so the donate URL is dead the moment the app hears 204.
+        await registryStub(env).remove(jarId);
         return new Response(null, { status: 204, headers: cors });
       }
 

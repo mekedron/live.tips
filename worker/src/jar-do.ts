@@ -112,8 +112,7 @@ export class JarDO extends DurableObject<Env> {
     await this.ctx.storage.deleteAll();
     await this.ctx.storage.deleteAlarm();
     if (jarId) {
-      const registry = this.registry();
-      this.ctx.waitUntil(registry.remove(jarId).catch(() => {}));
+      await this.registry().remove(jarId).catch(() => {});
     }
   }
 
@@ -175,8 +174,7 @@ export class JarDO extends DurableObject<Env> {
       }
       const jarId = await this.ctx.storage.get<string>("jarId");
       if (jarId) {
-        const registry = this.registry();
-        this.ctx.waitUntil(registry.bumpTips(jarId, Math.floor(now / DAY_MS)).catch(() => {}));
+        await this.registry().bumpTips(jarId, Math.floor(now / DAY_MS)).catch(() => {});
       }
       // A connected device is proof the artist is active.
       if (delivered > 0) await this.touch();
@@ -309,8 +307,10 @@ export class JarDO extends DurableObject<Env> {
     if (current === null || current > expireAt) await this.ctx.storage.setAlarm(expireAt);
     const jarId = await this.ctx.storage.get<string>("jarId");
     if (jarId) {
-      const registry = this.registry();
-      this.ctx.waitUntil(registry.touch(jarId, today).catch(() => {}));
+      // Awaited (not waitUntil): unfinished background storage access is
+      // exactly what the vitest isolated-storage checker flags, and the
+      // registry should be consistent before we answer anyway.
+      await this.registry().touch(jarId, today).catch(() => {});
     }
   }
 }
