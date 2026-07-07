@@ -93,11 +93,29 @@ describe("WebSocket auth", () => {
     ws.close();
   });
 
-  it("refuses to upgrade for a jar that does not exist", async () => {
+  it("completes the upgrade then closes 4410 for a gone jar (terminal re-link signal)", async () => {
+    const { jarId, secret } = await createJar();
+    await SELF.fetch(`https://api.live.tips/v1/jars/${jarId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${secret}` },
+    });
+    const res = await SELF.fetch(`https://api.live.tips/v1/jars/${jarId}/ws`, {
+      headers: { Upgrade: "websocket" },
+    });
+    expect(res.status).toBe(101);
+    const ws = res.webSocket!;
+    ws.accept();
+    expect((await nextClose(ws)).code).toBe(4410);
+  });
+
+  it("also closes 4410 for a never-existed jar id (no DO instantiated)", async () => {
     const res = await SELF.fetch("https://api.live.tips/v1/jars/abcdefghjkmnpqrstvwxyz0123/ws", {
       headers: { Upgrade: "websocket" },
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(101);
+    const ws = res.webSocket!;
+    ws.accept();
+    expect((await nextClose(ws)).code).toBe(4410);
   });
 });
 
@@ -161,7 +179,7 @@ describe("tip relay to connected device", () => {
 });
 
 describe("socket cap", () => {
-  it("evicts the oldest connection beyond the limit", async () => {
+  it("evicts the oldest authed connection beyond the limit", async () => {
     const { jarId, secret } = await createJar();
     const first = await authedSocket(jarId, secret);
     const evicted = nextClose(first, 4_000);
@@ -172,6 +190,58 @@ describe("socket cap", () => {
     ];
     expect((await evicted).code).toBe(1008);
     for (const ws of rest) ws.close();
+  });
+
+  it("never evicts the artist's authed socket to admit an anonymous flood", async () => {
+    const { jarId, secret } = await createJar();
+    const artist = await authedSocket(jarId, secret);
+    let artistClosed = false;
+    artist.addEventListener("close", () => { artistClosed = true; });
+
+    // Flood with silent, never-authenticating sockets.
+    for (let i = 0; i < 6; i++) {
+      const flood = await openSocket(jarId);
+      await new Promise((r) => setTimeout(r, 20));
+      // Each is allowed to be closed (1008) — that's the point.
+      flood.addEventListener("error", () => {});
+    }
+    await new Promise((r) => setTimeout(r, 50));
+    expect(artistClosed).toBe(false);
+
+    // The artist can still receive a relayed tip.
+    const incoming = nextMessage(artist);
+    mockTurnstile();
+    await SELF.fetch(`https://live.tips/t/${jarId}/tips`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "CF-Connecting-IP": "198.51.100.9" },
+      body: JSON.stringify({ method: "revolut", amountMinor: 500, name: "Ada", message: "hi", turnstileToken: "t" }),
+    });
+    expect(JSON.parse(await incoming).method).toBe("revolut");
+    artist.close();
+  });
+});
+
+describe("no donor content at rest", () => {
+  it("stores only a hash of the dedupe signature, never the name/message", async () => {
+    const { jarId } = await createJar();
+    mockTurnstile();
+    await SELF.fetch(`https://live.tips/t/${jarId}/tips`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "CF-Connecting-IP": "198.51.100.11" },
+      body: JSON.stringify({
+        method: "revolut",
+        amountMinor: 500,
+        name: "SecretName",
+        message: "SecretMessage",
+        turnstileToken: "t",
+      }),
+    });
+    const stub = env.JAR.get(env.JAR.idFromName(jarId));
+    await runInDurableObject(stub, async (_instance, state) => {
+      const dump = JSON.stringify([...(await state.storage.list()).entries()]);
+      expect(dump).not.toContain("SecretName");
+      expect(dump).not.toContain("SecretMessage");
+    });
   });
 });
 

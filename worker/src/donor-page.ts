@@ -150,8 +150,8 @@ export function renderDonorPage(profile: JarProfile, siteKey: string): string {
   <textarea id="f-message" maxlength="200"></textarea>
   <div class="turnstile-slot"><div class="cf-turnstile" data-sitekey="${escapeHtml(siteKey)}"></div></div>
   <button id="f-submit" type="submit">Continue to payment</button>
-  <p id="f-error" hidden></p>
-  <div id="f-fallback" hidden>${fallbackLinks.join("")}</div>
+  <p id="f-error" role="alert" aria-live="assertive" hidden></p>
+  <div id="f-fallback" role="group" aria-live="polite" hidden>${fallbackLinks.join("")}</div>
 </form>
 <noscript><p>JavaScript is off — you can still pay directly:</p>${fallbackLinks.join("")}</noscript>`
     : "";

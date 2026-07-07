@@ -59,6 +59,16 @@ function bearer(request: Request): string | null {
   return header.startsWith("Bearer ") ? header.slice(7) : null;
 }
 
+/** Accept the WS upgrade then immediately close 4410 — the "jar gone" signal. */
+function closeGoneWebSocket(): Response {
+  const pair = new WebSocketPair();
+  const client = pair[0];
+  const server = pair[1];
+  server.accept();
+  server.close(4410, "jar deleted");
+  return new Response(null, { status: 101, webSocket: client });
+}
+
 function jarStub(env: Env, jarId: string) {
   return env.JAR.get(env.JAR.idFromName(jarId));
 }
@@ -203,17 +213,22 @@ export default {
       const cors = corsHeaders(request);
       const jarId = jarMatch[1]!;
       const sub = jarMatch[2] ?? "";
-      if (!isValidJarId(jarId) || !(await registryStub(env).has(jarId))) {
-        return json({ error: "not found" }, 404, cors);
-      }
-      const stub = jarStub(env, jarId);
+      const known = isValidJarId(jarId) && (await registryStub(env).has(jarId));
 
       if (sub === "/ws" && request.method === "GET") {
         if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
           return json({ error: "expected websocket" }, 426);
         }
-        return stub.fetch(request);
+        // A gone jar must still speak the WS terminal-close contract: complete
+        // the upgrade, then close 4410 — so the artist's app hears "re-link"
+        // instead of an HTTP 404 it reads as a transient blip and retries on
+        // forever. No Durable Object is touched for an unknown id.
+        if (!known) return closeGoneWebSocket();
+        return jarStub(env, jarId).fetch(request);
       }
+
+      if (!known) return json({ error: "not found" }, 404, cors);
+      const stub = jarStub(env, jarId);
 
       const secret = bearer(request);
       if (!secret) return json({ error: "unauthorized" }, 401, cors);
