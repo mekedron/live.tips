@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/donation_source.dart';
+import '../data/relay/relay_tip_channel.dart';
 import '../data/stripe/stripe_client.dart';
 import '../domain/donation.dart';
 import '../domain/live_session.dart';
@@ -21,11 +22,17 @@ class LiveState {
     this.lastDonation,
     this.confettiTick = 0,
     this.newTips = const [],
+    this.relay,
   });
 
   final LiveSession session;
   final PollHealth health;
   final String? lastError;
+
+  /// Health of the relay tip feed (MobilePay/Revolut donor page), or null
+  /// when this session runs without a relay channel — the stage shows no
+  /// second pill then. Never returns to null within a session.
+  final RelayHealth? relay;
 
   /// Stage lock: input is blocked until the artist authenticates.
   final bool locked;
@@ -50,6 +57,7 @@ class LiveState {
     Donation? lastDonation,
     int? confettiTick,
     List<JarTipAttribution>? newTips,
+    RelayHealth? relay,
   }) =>
       LiveState(
         session: session ?? this.session,
@@ -59,6 +67,7 @@ class LiveState {
         lastDonation: lastDonation ?? this.lastDonation,
         confettiTick: confettiTick ?? this.confettiTick,
         newTips: newTips ?? this.newTips,
+        relay: relay ?? this.relay,
       );
 }
 
@@ -67,6 +76,9 @@ class LiveState {
 class LiveSessionController extends Notifier<LiveState?> {
   Timer? _timer;
   DonationSource? _source;
+  RelayTipChannel? _relay;
+  StreamSubscription<Donation>? _relayTipsSub;
+  StreamSubscription<RelayHealth>? _relayStatusSub;
   bool _polling = false;
   int _skipTicks = 0;
 
@@ -120,9 +132,27 @@ class LiveSessionController extends Notifier<LiveState?> {
     // A restored session may owe rollovers (goal edits, older builds).
     session.applyRollovers();
 
-    state = LiveState(session: session);
+    // The relay tip feed (MobilePay/Revolut donor page) — null when this
+    // session has none (demo, or no connected-mode jar).
+    _relay = ref.read(relayChannelFactoryProvider)(
+        demo: app.demo, jar: app.effectiveRelayJar, secret: app.relaySecret);
+
+    state = LiveState(
+      session: session,
+      relay: _relay == null ? null : RelayHealth.connecting,
+    );
     await ref.read(localStoreProvider).saveActiveSession(session, resumeCursor);
     ref.read(storedSessionProvider.notifier).refresh();
+
+    // Subscribe BEFORE start(): broadcast streams don't replay, and the
+    // first status transition arrives as soon as the socket opens.
+    final relay = _relay;
+    if (relay != null) {
+      _relayTipsSub = relay.tips.listen((donation) => _ingest([donation]));
+      _relayStatusSub = relay.status
+          .listen((health) => state = state?.copyWith(relay: health));
+      relay.start();
+    }
 
     try {
       await _source!.prime(session.startedAt,
@@ -148,35 +178,42 @@ class LiveSessionController extends Notifier<LiveState?> {
       final fresh = await _source!.pollNew();
       final current = state;
       if (current == null) return;
-      if (fresh.isEmpty) {
-        if (current.health != PollHealth.ok) {
-          state = current.copyWith(health: PollHealth.ok, clearError: true);
-        }
-        return;
+      if (current.health != PollHealth.ok) {
+        state = current.copyWith(health: PollHealth.ok, clearError: true);
       }
-      final tips = <JarTipAttribution>[];
-      for (final donation in fresh) {
-        final tip = current.session.addDonationAttributed(donation);
-        if (tip != null) tips.add(tip);
-      }
-      debugPrint('live poll: +${tips.length} donation(s), '
-          'total ${current.session.totalMinor}');
-      state = current.copyWith(
-        health: PollHealth.ok,
-        clearError: true,
-        lastDonation: tips.isEmpty ? current.lastDonation : tips.last.donation,
-        confettiTick: current.confettiTick + tips.length,
-        newTips: tips,
-      );
-      await ref
-          .read(localStoreProvider)
-          .saveActiveSession(current.session, _source?.cursor);
+      _ingest(fresh);
     } catch (e) {
       if (e is StripeApiException && e.isRateLimited) _skipTicks = 3;
       _reportError(e);
     } finally {
       _polling = false;
     }
+  }
+
+  /// Applies freshly arrived donations — from the Stripe poll OR the relay
+  /// channel — to the session: attribution (fill deltas, rollovers), the
+  /// newTips batch + confettiTick celebration serial, and the crash-recovery
+  /// snapshot. Duplicates (same donation id) are dropped by the session, so
+  /// at-least-once feeds are safe to replay through here.
+  void _ingest(List<Donation> fresh) {
+    final current = state;
+    if (current == null || fresh.isEmpty) return;
+    final tips = <JarTipAttribution>[];
+    for (final donation in fresh) {
+      final tip = current.session.addDonationAttributed(donation);
+      if (tip != null) tips.add(tip);
+    }
+    if (tips.isEmpty) return; // every one a duplicate — nothing changed
+    debugPrint('live ingest: +${tips.length} donation(s), '
+        'total ${current.session.totalMinor}');
+    state = current.copyWith(
+      lastDonation: tips.last.donation,
+      confettiTick: current.confettiTick + tips.length,
+      newTips: tips,
+    );
+    unawaited(ref
+        .read(localStoreProvider)
+        .saveActiveSession(current.session, _source?.cursor));
   }
 
   void _reportError(Object e) {
@@ -231,6 +268,13 @@ class LiveSessionController extends Notifier<LiveState?> {
     _timer = null;
     _source?.dispose();
     _source = null;
+    _relayTipsSub?.cancel();
+    _relayTipsSub = null;
+    _relayStatusSub?.cancel();
+    _relayStatusSub = null;
+    final relay = _relay;
+    _relay = null;
+    if (relay != null) unawaited(relay.dispose());
     _polling = false;
     _skipTicks = 0;
   }

@@ -7,11 +7,13 @@ import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../domain/donation.dart';
 import '../../domain/live_session.dart';
+import '../../domain/tip_method.dart';
 import '../../features/live/live_screen.dart' show formatDuration;
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/donation_tile.dart';
 import '../../widgets/lt_ui.dart';
+import '../../widgets/method_badges.dart';
 import '../shell/app_shell.dart';
 
 enum _HistoryTab { donations, sessions }
@@ -732,6 +734,14 @@ class _TableRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (donation.method != TipMethod.stripe) ...[
+                  const SizedBox(width: 6),
+                  MethodBadge(donation.method),
+                ],
+                if (!donation.verified) ...[
+                  const SizedBox(width: 6),
+                  const UnverifiedTag(),
+                ],
                 if (!donation.viaService) ...[
                   const SizedBox(width: 6),
                   const ExternalTag(),

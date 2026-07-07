@@ -11,6 +11,7 @@ JarTipAttribution tip(
   String? message,
   int amount = 500,
   double delta = 0.05,
+  bool verified = true,
 }) =>
     JarTipAttribution(
       donation: Donation(
@@ -21,6 +22,7 @@ JarTipAttribution tip(
         name: name,
         message: message,
         livemode: false,
+        verified: verified,
       ),
       deltaPct: delta,
       jarPctAfter: 0.5,
@@ -130,6 +132,28 @@ void main() {
           host([tip('cs_1', name: 'Anna', amount: 5000, delta: 0.25)], 1));
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.textContaining('👑'), findsOneWidget);
+    });
+
+    testWidgets(
+        'an unverified (donor-declared) tip shows ~ before the amount and '
+        'NEVER gets the crown, however big', (tester) async {
+      await tester.pumpWidget(host(const [], 0));
+      await tester.pumpWidget(host([
+        tip('relay_1',
+            name: 'Anna', amount: 5000, delta: 0.25, verified: false),
+      ], 1));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.textContaining('👑'), findsNothing,
+          reason: 'the crown must stay worth trusting');
+      expect(find.textContaining('tipped ~'), findsOneWidget);
+    });
+
+    testWidgets('a verified tip shows the plain amount, no ~',
+        (tester) async {
+      await tester.pumpWidget(host(const [], 0));
+      await tester.pumpWidget(host([tip('cs_1', name: 'Anna')], 1));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.textContaining('~'), findsNothing);
     });
   });
 

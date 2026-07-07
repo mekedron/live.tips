@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import '../core/money.dart';
 import '../core/theme.dart';
 import '../domain/donation.dart';
+import '../domain/tip_method.dart';
 import 'lt_ui.dart';
+import 'method_badges.dart';
 
 /// One donation row in the design language: tinted initial avatar, name,
 /// message (or relative time), coral Outfit amount. Used on Home, in
@@ -57,6 +59,14 @@ class DonationTile extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (donation.method != TipMethod.stripe) ...[
+                      const SizedBox(width: 6),
+                      MethodBadge(donation.method),
+                    ],
+                    if (!donation.verified) ...[
+                      const SizedBox(width: 6),
+                      const UnverifiedTag(),
+                    ],
                     if (!donation.viaService) ...[
                       const SizedBox(width: 6),
                       const ExternalTag(),

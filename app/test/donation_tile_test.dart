@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/widgets/donation_tile.dart';
 
 Donation tip({String? paymentIntentId}) => Donation(
@@ -37,5 +38,32 @@ void main() {
 
     expect(find.byIcon(Icons.open_in_new_rounded), findsNothing);
     expect(find.byType(InkWell), findsNothing);
+  });
+
+  testWidgets('a relay tip carries the method badge and the unverified pill',
+      (tester) async {
+    final donation = Donation(
+      id: 'relay_1',
+      amountMinor: 500,
+      currency: 'eur',
+      createdAt: DateTime.utc(2026, 7, 4),
+      name: 'Maya',
+      method: TipMethod.mobilepay,
+      verified: false,
+    );
+    await tester.pumpWidget(host(DonationTile(donation: donation)));
+
+    expect(find.text('MobilePay'), findsOneWidget);
+    expect(find.byIcon(Icons.smartphone), findsOneWidget);
+    expect(find.text('unverified'), findsOneWidget);
+  });
+
+  testWidgets('an ordinary Stripe tip shows neither badge', (tester) async {
+    await tester.pumpWidget(host(DonationTile(donation: tip())));
+
+    expect(find.text('unverified'), findsNothing);
+    expect(find.byIcon(Icons.smartphone), findsNothing);
+    expect(find.byIcon(Icons.credit_card), findsNothing,
+        reason: 'card is the norm — only the exceptions get badged');
   });
 }

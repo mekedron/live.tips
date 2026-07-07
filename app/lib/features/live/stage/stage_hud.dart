@@ -248,8 +248,9 @@ class StageMiniFeed extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      formatAmount(
-                          tips[i].amountMinor, tips[i].currency),
+                      // "~" flags an unverified (donor-declared) amount.
+                      '${tips[i].verified ? '' : '~'}'
+                      '${formatAmount(tips[i].amountMinor, tips[i].currency)}',
                       style: const TextStyle(
                         fontFamily: kFontOutfit,
                         fontSize: 13,
@@ -405,7 +406,9 @@ class _TipBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = tip.donation;
-    final big = tip.deltaPct >= 0.1; // a tenth of tonight's goal in one tip
+    // A tenth of tonight's goal in one tip — but never crown a donor-declared
+    // (unverified) relay tip: the crown must stay worth trusting.
+    final big = tip.deltaPct >= 0.1 && d.verified;
     final anonymous = d.name == null || d.name!.trim().isEmpty;
     return Container(
       constraints: const BoxConstraints(maxWidth: 460),
@@ -464,7 +467,9 @@ class _TipBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
+                  // "~" flags an unverified (donor-declared) amount.
                   '${big ? '👑 ' : ''}${d.displayName} tipped '
+                  '${d.verified ? '' : '~'}'
                   '${formatAmount(d.amountMinor, d.currency)}',
                   style: TextStyle(
                     fontFamily: kFontOutfit,

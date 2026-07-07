@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../core/fullscreen.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
+import '../../data/relay/relay_tip_channel.dart';
 import '../../domain/live_session.dart';
 import '../../domain/stage_settings.dart';
 import '../../state/live_session_controller.dart';
@@ -212,6 +213,12 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
             builder: (context, constraints) {
               final wide = constraints.maxWidth > 780;
               final safeTop = MediaQuery.paddingOf(context).top;
+              // Relay-only session with the feed down = the artist may be
+              // playing to a dead stage without knowing — full-width banner,
+              // not a subtle pill. With Stripe still polling, a pill is
+              // honest enough.
+              final relayBanner =
+                  live.relay == RelayHealth.down && !app.hasStripe;
               return Stack(
                 children: [
                   // ---- the stage itself, edge to edge ----
@@ -259,8 +266,9 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                   SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: Row(
-                        children: [
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Row(
+                          children: [
                           StageGlassButton(
                             icon: Icons.stop_rounded,
                             iconColor: const Color(0xFFFF6B5E),
@@ -288,6 +296,23 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                               dotOnly: true,
                             ),
                           ],
+                          // Second pill: the relay tip feed — only when this
+                          // session has one; the banner below replaces it
+                          // when the situation deserves more than a pill.
+                          if (live.relay != null && !relayBanner)
+                            if (wide) ...[
+                              const SizedBox(width: 8),
+                              _RelayPill(
+                                  health: live.relay!,
+                                  hasStripe: app.hasStripe),
+                            ] else if (live.relay != RelayHealth.ok) ...[
+                              const SizedBox(width: 8),
+                              _RelayPill(
+                                health: live.relay!,
+                                hasStripe: app.hasStripe,
+                                dotOnly: true,
+                              ),
+                            ],
                           const Spacer(),
                           if (wide) ...[
                             StageGlassButton(
@@ -314,8 +339,10 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                               size: wide ? 44 : 40,
                               onTap: _lock,
                             ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        if (relayBanner) const _RelayDownBanner(),
+                      ]),
                     ),
                   ),
                   // ---- mobile: bottom glass action bar ----
@@ -534,6 +561,62 @@ class _HealthPill extends StatelessWidget {
       PollHealth.error =>
         (const Color(0xFFFF6B5E), error ?? 'Connection trouble'),
     };
+    return _StatusPill(color: color, label: label, dotOnly: dotOnly);
+  }
+}
+
+/// Second health pill: the relay tip feed (the MobilePay/Revolut donor
+/// page). Rendered only for sessions that actually have a relay channel.
+class _RelayPill extends StatelessWidget {
+  const _RelayPill({
+    required this.health,
+    required this.hasStripe,
+    this.dotOnly = false,
+  });
+
+  final RelayHealth health;
+
+  /// With Stripe still being polled, an offline relay only loses PART of the
+  /// feed — the wording must not read like the whole night went dark.
+  final bool hasStripe;
+  final bool dotOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, label) = switch (health) {
+      RelayHealth.connecting =>
+        (const Color(0xFF9BA3AB), 'Tip page connecting…'),
+      RelayHealth.ok => (const Color(0xFF4FCB8D), 'Tip page live'),
+      RelayHealth.down => (
+          const Color(0xFFFFC24D),
+          hasStripe
+              ? 'Tip page offline — card tips still tracked'
+              : 'Tip page offline — retrying…'
+        ),
+      RelayHealth.unauthorized => (
+          const Color(0xFFFF6B5E),
+          'Tip page disconnected — create a new link in Settings'
+        ),
+    };
+    return _StatusPill(color: color, label: label, dotOnly: dotOnly);
+  }
+}
+
+/// The glass status pill both health indicators share: glowing dot + label
+/// (or dot only on narrow screens, with the label in the tooltip).
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({
+    required this.color,
+    required this.label,
+    this.dotOnly = false,
+  });
+
+  final Color color;
+  final String label;
+  final bool dotOnly;
+
+  @override
+  Widget build(BuildContext context) {
     final dot = Container(
       width: 8,
       height: 8,
@@ -570,6 +653,42 @@ class _HealthPill extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Full-width banner for the worst case: a relay-only session whose feed is
+/// down. Fans can still pay (the donor page itself is fine) but NOTHING will
+/// appear on stage until the socket comes back — the artist must know, so
+/// this is deliberately louder than a pill.
+class _RelayDownBanner extends StatelessWidget {
+  const _RelayDownBanner();
+
+  static const _amber = Color(0xFFFFC24D);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: kStageGlass,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _amber.withValues(alpha: 0.55), width: 1.2),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off_rounded, size: 18, color: _amber),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Can\'t reach live.tips — fans can still pay, tips won\'t '
+              'show here until reconnected. Retrying…',
+              style: outfitStyle(13, Colors.white.withValues(alpha: 0.9)),
+            ),
+          ),
+        ],
       ),
     );
   }

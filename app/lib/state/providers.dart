@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/donation_source.dart';
 import '../data/local_store.dart';
 import '../data/relay/relay_client.dart';
+import '../data/relay/relay_config.dart';
+import '../data/relay/relay_tip_channel.dart';
 import '../data/secure_store.dart';
 import '../data/stripe/stripe_client.dart';
 import '../data/stripe/stripe_requests.dart';
@@ -254,6 +256,24 @@ final donationSourceFactoryProvider = Provider<DonationSourceFactory>(
       paymentLinkId: jar.paymentLinkId,
       onDispose: client.close,
     );
+  },
+);
+
+/// Builds the relay WebSocket tip feed for a session — a seam mirroring
+/// [donationSourceFactoryProvider] so controller tests can hand in a fake
+/// channel. Null means "this session has no relay feed": demo sessions
+/// synthesize their tips, and without a jar + secret there is nothing to
+/// authenticate against.
+typedef RelayChannelFactory = RelayTipChannel? Function({
+  required bool demo,
+  required RelayJar? jar,
+  required String? secret,
+});
+
+final relayChannelFactoryProvider = Provider<RelayChannelFactory>(
+  (ref) => ({required demo, required jar, required secret}) {
+    if (demo || jar == null || secret == null) return null;
+    return RelayTipChannel(wsUri: relayWsUri(jar.jarId), secret: secret);
   },
 );
 
