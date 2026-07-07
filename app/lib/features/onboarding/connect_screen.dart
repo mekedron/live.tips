@@ -188,7 +188,8 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                       children: [
                         Expanded(
                           child: FilledButton.tonalIcon(
-                            onPressed: () => openExternal(kCreateKeyUrl),
+                            onPressed: () =>
+                                openExternal(kCreateKeyUrl, safari: true),
                             icon: const Icon(Icons.open_in_new_rounded,
                                 size: 18),
                             label: const Text('Open pre-filled form'),

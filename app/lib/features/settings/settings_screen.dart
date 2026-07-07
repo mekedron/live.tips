@@ -110,16 +110,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ],
         ),
-      // ------------------------------------------------------- links ---
-      // Installed iOS PWAs trap links in the in-app Safari view, whose session
-      // is walled off from the real Safari app — which breaks Stripe's email
-      // device-verification during onboarding. Offer an opt-in escape hatch,
-      // but only where the trap exists (an installed iOS PWA).
-      if (safariEscapeApplicable)
-        LtRowGroup(
-          header: 'Links',
-          children: const [_SafariLinkToggle()],
-        ),
       // ---------------------------------------------------- appearance ---
       LtCard(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
@@ -259,37 +249,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Opt-in toggle that reroutes outbound links through the real Safari app
-/// (via the `x-safari-https` scheme) instead of the in-app Safari view, so a
-/// Stripe sign-in and its emailed verification link land in the same session.
-/// Only built on an installed iOS PWA — see [safariEscapeApplicable].
-class _SafariLinkToggle extends StatefulWidget {
-  const _SafariLinkToggle();
-
-  @override
-  State<_SafariLinkToggle> createState() => _SafariLinkToggleState();
-}
-
-class _SafariLinkToggleState extends State<_SafariLinkToggle> {
-  bool _on = preferSafariEscape;
-
-  void _set(bool value) => setState(() {
-        _on = value;
-        preferSafariEscape = value;
-      });
-
-  @override
-  Widget build(BuildContext context) {
-    return LtRow(
-      icon: Icons.open_in_browser_rounded,
-      title: 'Open links in Safari',
-      subtitle: 'Fixes Stripe sign-in — sends links to the real Safari app',
-      onTap: () => _set(!_on),
-      trailing: Switch.adaptive(value: _on, onChanged: _set),
     );
   }
 }

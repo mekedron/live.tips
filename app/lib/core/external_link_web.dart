@@ -1,26 +1,5 @@
 import 'package:web/web.dart' as web;
 
-const _safariEscapeKey = 'lt_open_links_in_safari';
-
-/// Whether the "open links in Safari" workaround is even relevant. Only an
-/// installed iOS Home-Screen PWA traps outbound links in the in-app Safari
-/// view; on desktop or in a normal mobile browser there is nothing to escape,
-/// so the Settings toggle stays hidden there.
-bool get safariEscapeApplicable => _isIOS && _isStandalone;
-
-/// Whether the visitor has opted to route outbound links through the real
-/// Safari app. Persisted per-device in localStorage. See [openExternal].
-bool get preferSafariEscape =>
-    web.window.localStorage.getItem(_safariEscapeKey) == '1';
-
-set preferSafariEscape(bool value) {
-  if (value) {
-    web.window.localStorage.setItem(_safariEscapeKey, '1');
-  } else {
-    web.window.localStorage.removeItem(_safariEscapeKey);
-  }
-}
-
 /// Open [url] in the browser from the web build.
 ///
 /// By default this synthesises a real, user-clicked `<a target="_blank">`,
@@ -28,20 +7,20 @@ set preferSafariEscape(bool value) {
 /// keeps its own cookie jar — separate from the real Safari app — so a sign-in
 /// begun there can't be finished by a verification link the user opens from
 /// their email, which lands in the real Safari app. Stripe onboarding hits
-/// exactly this wall: sign in, get a device-verification email, tap its link
-/// in Safari, and the session never matches.
+/// exactly this wall: sign in, get a device-verification email, tap its link in
+/// Safari, and the session never matches the sign-in.
 ///
-/// With [preferSafariEscape] on we rewrite the URL with the `x-safari-https://`
-/// scheme, which asks iOS to hand the link to the real Safari app so the
-/// sign-in and the email link share one session. That scheme is
-/// version-dependent (it may prompt, or fail outright on older iOS), so it's
-/// opt-in rather than the default.
+/// Pass [safari] `true` for links that must survive that round-trip (the Stripe
+/// key-setup links). On an installed iOS PWA we then rewrite the URL with the
+/// `x-safari-https://` scheme, which asks iOS to hand it to the *real* Safari
+/// app, so the sign-in and the email link share one session. Where the trap
+/// doesn't exist — desktop, Android, a normal browser tab — [safari] is a no-op
+/// and the link opens normally, so an unsupported scheme can never break it.
 ///
 /// The click must fire synchronously inside the tap gesture — no `await` before
-/// `.click()`, or iOS drops the user activation and falls back to trapping the
-/// link inside the PWA.
-Future<void> openExternal(String url) async {
-  final href = preferSafariEscape ? _toSafariScheme(url) : url;
+/// `.click()`, or iOS drops the user activation and traps the link in the PWA.
+Future<void> openExternal(String url, {bool safari = false}) async {
+  final href = (safari && _isInstalledIOS) ? _toSafariScheme(url) : url;
   final anchor = web.document.createElement('a') as web.HTMLAnchorElement
     ..href = href
     ..target = '_blank'
@@ -57,6 +36,11 @@ String _toSafariScheme(String url) =>
     (url.startsWith('https://') || url.startsWith('http://'))
         ? 'x-safari-$url'
         : url;
+
+/// Only an installed iOS Home-Screen PWA traps outbound links in the in-app
+/// Safari view — the one place the `x-safari-https` escape is both needed and
+/// safe. In a normal browser tab the link already opens in the real browser.
+bool get _isInstalledIOS => _isIOS && _isStandalone;
 
 String get _ua => web.window.navigator.userAgent;
 

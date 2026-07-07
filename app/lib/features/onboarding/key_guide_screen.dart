@@ -60,7 +60,8 @@ class KeyGuideScreen extends StatelessWidget {
                         textStyle: outfitStyle(12, Colors.white),
                         minimumSize: Size.zero,
                       ),
-                      onPressed: () => openExternal(kCreateKeyUrl),
+                      onPressed: () =>
+                          openExternal(kCreateKeyUrl, safari: true),
                       child: const Text('Open form'),
                     ),
                   ],
@@ -156,7 +157,8 @@ class KeyGuideScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: () => openExternal(kApiKeysDashboardUrl),
+                onPressed: () =>
+                    openExternal(kApiKeysDashboardUrl, safari: true),
                 icon: Icon(Icons.open_in_new_rounded,
                     size: 18, color: c.textSecondary),
                 label: const Text('Open dashboard.stripe.com/apikeys'),
