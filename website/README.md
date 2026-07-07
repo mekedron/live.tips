@@ -68,8 +68,10 @@ to `website/`.
 | `index.html`, `<code>/index.html`, `sitemap.xml` | `python3 scripts/build_site.py --out _site` (run by the deploy) |
 
 Icons in the template are inline Material Symbols SVG paths (`svg.ms`) — there
-is deliberately no icon font. `robots.txt` is hand-edited; `sitemap.xml` is
-generated, so don't commit one by hand.
+is deliberately no icon font. `robots.txt` and `llms.txt` (an LLM-facing
+description of the project, per <https://llmstxt.org/>, English-only) are
+hand-edited static files served from the site root; `sitemap.xml` is generated,
+so don't commit one by hand.
 
 ## Preview locally
 
