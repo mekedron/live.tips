@@ -305,7 +305,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () => openExternal(kApiKeysDashboardUrl, safari: true),
+            onPressed: () => openExternal(kApiKeysDashboardUrl),
             icon: Icon(Icons.open_in_new_rounded,
                 size: 18, color: c.textSecondary),
             label: const Text('Edit key permissions in Stripe'),
