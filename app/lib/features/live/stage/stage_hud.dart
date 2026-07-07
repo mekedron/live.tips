@@ -48,10 +48,12 @@ class StageHud extends StatelessWidget {
       builder: (context, constraints) {
         final wide = constraints.maxWidth > 780;
         final barWidth = wide ? 320.0 : 220.0;
-        // Tablet: the money shares the top band with the corner controls.
+        // Tablet: the money clears the top control row — the LIVE / status
+        // pills (44px tall) flank the centred total, so drop it below them
+        // instead of letting them sit on top of the number.
         // Phone: it drops below the 40px control row.
         final topOffset =
-            MediaQuery.paddingOf(context).top + (wide ? 24.0 : 72.0);
+            MediaQuery.paddingOf(context).top + (wide ? 68.0 : 72.0);
         return Column(
           children: [
             Padding(
@@ -358,9 +360,10 @@ class _TipBannerLayerState extends State<TipBannerLayer> {
       return Align(
       alignment: Alignment.topCenter,
       child: Padding(
-        // just below the HUD numbers, over the jar's headroom
+        // just below the HUD numbers, over the jar's headroom — follows the
+        // total's tablet drop (see StageHud.topOffset) so it stays clear of it
         padding: EdgeInsets.only(
-            top: MediaQuery.paddingOf(context).top + (wide ? 160 : 188)),
+            top: MediaQuery.paddingOf(context).top + (wide ? 204 : 188)),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 480),
           reverseDuration: const Duration(milliseconds: 320),
