@@ -78,13 +78,14 @@ class LiveSessionController extends Notifier<LiveState?> {
 
   Future<void> start({required int goalMinor}) async {
     final app = ref.read(appStateProvider);
-    final jar = app.effectiveTipJar;
-    if (jar == null) return;
+    // Demo, Stripe, or a relay jar — any of them can host a session; only a
+    // fully unconfigured app has nothing to run one against.
+    if (!app.connected) return;
     final now = DateTime.now();
     final session = LiveSession(
       id: 'ses_${now.millisecondsSinceEpoch.toRadixString(36)}',
       startedAt: now,
-      currency: jar.currency,
+      currency: app.currency,
       goalMinor: goalMinor,
     );
     unawaited(ref
@@ -113,9 +114,9 @@ class LiveSessionController extends Notifier<LiveState?> {
       {String? resumeCursor, bool resumed = false}) async {
     _teardown();
     final app = ref.read(appStateProvider);
-    final jar = app.effectiveTipJar!;
+    // No tip jar is fine (relay-only): the factory returns a silent source.
     _source = ref.read(donationSourceFactoryProvider)(
-        demo: app.demo, apiKey: app.apiKey, jar: jar);
+        demo: app.demo, apiKey: app.apiKey, jar: app.effectiveTipJar);
     // A restored session may owe rollovers (goal edits, older builds).
     session.applyRollovers();
 

@@ -106,6 +106,22 @@ class StripeDonationSource extends DonationSource {
   }
 }
 
+/// A source that never produces anything — for live sessions with no Stripe
+/// account to poll (relay-only installs). Deliberately NOT the demo source:
+/// a real session must never be fed fake tips. Relay tips arrive over their
+/// own channel, wired into the session separately.
+class NullDonationSource extends DonationSource {
+  @override
+  String? get cursor => null;
+
+  @override
+  Future<void> prime(DateTime sessionStart,
+      {String? resumeCursor, bool backfill = false}) async {}
+
+  @override
+  Future<List<Donation>> pollNew() async => const [];
+}
+
 /// Generates believable donations so the whole app can be experienced
 /// without a Stripe account.
 class DemoDonationSource extends DonationSource {

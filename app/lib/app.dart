@@ -36,7 +36,8 @@ class LiveTipsApp extends ConsumerWidget {
 }
 
 /// Routes to the right top-level screen from app state alone:
-/// signed out → welcome; connected but no tip jar yet → setup; else home.
+/// signed out → welcome; Stripe connected but no tip jar yet → setup;
+/// else home (a relay-only install needs no Stripe jar setup).
 class RootGate extends ConsumerWidget {
   const RootGate({super.key});
 
@@ -44,7 +45,9 @@ class RootGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final app = ref.watch(appStateProvider);
     if (!app.connected) return const WelcomeScreen();
-    if (app.effectiveTipJar == null) return const JarSetupScreen();
+    if (app.hasStripe && app.effectiveTipJar == null) {
+      return const JarSetupScreen();
+    }
     return const AppShell();
   }
 }

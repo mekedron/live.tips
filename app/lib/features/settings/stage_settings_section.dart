@@ -66,8 +66,7 @@ class StageSettingsSection extends ConsumerWidget {
           .updateSettings(settings.copyWith(stage: next));
     }
 
-    final currency =
-        ref.watch(appStateProvider).effectiveTipJar?.currency ?? 'eur';
+    final currency = ref.watch(appStateProvider).currency;
     String fits(JarVessel v) =>
         formatAmount(v.capacityMajor * minorUnitsPerMajor(currency), currency);
 

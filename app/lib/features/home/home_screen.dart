@@ -5,8 +5,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
+import '../../data/relay/relay_client.dart';
 import '../../domain/live_session.dart';
-import '../../domain/tip_jar.dart';
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/donation_tile.dart';
@@ -84,23 +84,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final app = ref.watch(appStateProvider);
     final live = ref.watch(liveSessionProvider);
-    final jar = app.effectiveTipJar!;
     final isRail = AppShellScope.of(context)?.isRail ?? false;
 
     final goalCard = _GoalCard(
       goalMinor: _goalMinor,
-      currency: jar.currency,
+      currency: app.currency,
       live: live,
-      onEditGoal: () => _editGoal(jar.currency),
+      onEditGoal: () => _editGoal(app.currency),
       onBump: _setGoal,
       onStart: _startSession,
       onReturn: _openLive,
     );
 
     if (isRail) {
-      return _DesktopHome(jar: jar, app: app, goalCard: goalCard);
+      return _DesktopHome(app: app, goalCard: goalCard);
     }
-    return _MobileHome(jar: jar, app: app, goalCard: goalCard);
+    return _MobileHome(app: app, goalCard: goalCard);
   }
 }
 
@@ -113,24 +112,25 @@ String _greeting() {
 
 LtKeyStatus _keyStatus(AppState app) => app.demo
     ? LtKeyStatus.demo
-    : app.isTestMode
-        ? LtKeyStatus.test
-        : LtKeyStatus.live;
+    : !app.hasStripe && app.hasRelay
+        ? LtKeyStatus.relay
+        : app.isTestMode
+            ? LtKeyStatus.test
+            : LtKeyStatus.live;
 
 /// The artist / band name with an inline pencil to rename it. Renaming changes
 /// only the *local* display name (home, stage, poster) — it never touches the
-/// Stripe link or its QR code, so it's safe any time. The pencil is hidden in
-/// demo mode (there's no real jar to name).
+/// Stripe link or its QR code, so it's safe any time. (Relay-only installs
+/// also push the new name to their live.tips page, best effort.) The pencil
+/// is hidden in demo mode (there's no real jar to name).
 class _EditableJarName extends ConsumerWidget {
   const _EditableJarName({
-    required this.jar,
-    required this.demo,
+    required this.app,
     required this.fontSize,
     required this.weight,
   });
 
-  final TipJar jar;
-  final bool demo;
+  final AppState app;
   final double fontSize;
   final FontWeight weight;
 
@@ -138,7 +138,7 @@ class _EditableJarName extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final style = outfitStyle(fontSize, c.text, weight: weight);
-    if (demo) return Text(jar.displayName, style: style);
+    if (app.demo) return Text(app.displayName, style: style);
     // The whole name is the tap target, mirroring the Tonight's-goal editor: an
     // InkWell gives the grey hover highlight and the pointer cursor for free.
     // Align(widthFactor/heightFactor) shrink-wraps the ink to the text so the
@@ -150,11 +150,11 @@ class _EditableJarName extends ConsumerWidget {
       widthFactor: 1,
       heightFactor: 1,
       child: InkWell(
-        onTap: () => _editJarName(context, ref, jar),
+        onTap: () => _editJarName(context, ref, app),
         borderRadius: BorderRadius.circular(8),
         child: Text.rich(
           TextSpan(
-            text: jar.displayName,
+            text: app.displayName,
             children: [
               WidgetSpan(
                 alignment: PlaceholderAlignment.middle,
@@ -177,9 +177,9 @@ class _EditableJarName extends ConsumerWidget {
 /// link untouched (see [_EditableJarName]). Opens as a bottom sheet, matching
 /// the Tonight's-goal editor.
 Future<void> _editJarName(
-    BuildContext context, WidgetRef ref, TipJar jar) async {
+    BuildContext context, WidgetRef ref, AppState app) async {
   final notifier = ref.read(appStateProvider.notifier);
-  final controller = TextEditingController(text: jar.displayName);
+  final controller = TextEditingController(text: app.displayName);
   final saved = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
@@ -224,8 +224,28 @@ Future<void> _editJarName(
   );
   // Dispose after the sheet's exit animation is fully done.
   Future.delayed(const Duration(seconds: 1), controller.dispose);
-  if (saved != null && saved.isNotEmpty && saved != jar.displayName) {
-    await notifier.setTipJar(jar.copyWith(displayName: saved));
+  if (saved == null || saved.isEmpty || saved == app.displayName) return;
+  final tipJar = app.tipJar;
+  if (tipJar != null) {
+    await notifier.setTipJar(tipJar.copyWith(displayName: saved));
+    return;
+  }
+  final relayJar = app.relayJar;
+  if (relayJar == null) return;
+  final renamed = relayJar.copyWith(artistName: saved);
+  await notifier.updateRelayJarLocal(renamed);
+  // Best effort: keep the public live.tips page's name in sync. The local
+  // rename already took; on failure the relay copy just drifts until the
+  // next successful update.
+  final secret = app.relaySecret;
+  if (secret == null) return;
+  final client = RelayClient();
+  try {
+    await client.updateJar(jar: renamed, secret: secret, artistName: saved);
+  } catch (_) {
+    // Offline or a rotated secret — purely cosmetic drift, ignore.
+  } finally {
+    client.close();
   }
 }
 
@@ -235,18 +255,17 @@ Future<void> _editJarName(
 
 class _MobileHome extends StatelessWidget {
   const _MobileHome({
-    required this.jar,
     required this.app,
     required this.goalCard,
   });
 
-  final TipJar jar;
   final AppState app;
   final Widget goalCard;
 
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
+    final url = app.activeQrUrl;
     // Phones skip Recent tips — History sits one tap away in the nav. Tablets
     // keep it to fill out the roomier canvas.
     final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
@@ -281,15 +300,19 @@ class _MobileHome extends StatelessWidget {
                           fontSize: 14,
                           color: c.textSecondary)),
                   _EditableJarName(
-                    jar: jar,
-                    demo: app.demo,
+                    app: app,
                     fontSize: 24,
                     weight: FontWeight.w700,
                   ),
                   const SizedBox(height: 14),
                   goalCard,
-                  const SizedBox(height: 14),
-                  _TipLinkRowCard(url: jar.url),
+                  if (url != null) ...[
+                    const SizedBox(height: 14),
+                    _TipLinkRowCard(
+                      url: url,
+                      showRecreate: app.demo || app.hasStripe,
+                    ),
+                  ],
                   if (isTablet) ...[
                     const SizedBox(height: 14),
                     _RecentTipsCard(compact: true),
@@ -310,18 +333,17 @@ class _MobileHome extends StatelessWidget {
 
 class _DesktopHome extends ConsumerWidget {
   const _DesktopHome({
-    required this.jar,
     required this.app,
     required this.goalCard,
   });
 
-  final TipJar jar;
   final AppState app;
   final Widget goalCard;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
+    final url = app.activeQrUrl;
     final sessions = ref.read(localStoreProvider).readSessionHistory();
     final last = sessions.isEmpty ? null : sessions.last;
     final dateLine = DateFormat('EEEE, MMMM d').format(DateTime.now());
@@ -346,8 +368,7 @@ class _DesktopHome extends ConsumerWidget {
                               fontSize: 15,
                               color: c.textSecondary)),
                       _EditableJarName(
-                        jar: jar,
-                        demo: app.demo,
+                        app: app,
                         fontSize: 32,
                         weight: FontWeight.w800,
                       ),
@@ -387,8 +408,13 @@ class _DesktopHome extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _DesktopTipLinkCard(url: jar.url),
-                        const SizedBox(height: 24),
+                        if (url != null) ...[
+                          _DesktopTipLinkCard(
+                            url: url,
+                            showRecreate: app.demo || app.hasStripe,
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                         if (last != null) _LastSessionCard(session: last),
                       ],
                     ),
@@ -779,9 +805,13 @@ Future<_StoredSessionChoice?> _confirmStartOverStored(
 // ---------------------------------------------------------------------------
 
 class _TipLinkRowCard extends StatelessWidget {
-  const _TipLinkRowCard({required this.url});
+  const _TipLinkRowCard({required this.url, this.showRecreate = true});
 
   final String url;
+
+  /// "Create new tip link" recreates the *Stripe* payment link — hidden for
+  /// relay-only installs, where there's no Stripe link to recreate.
+  final bool showRecreate;
 
   @override
   Widget build(BuildContext context) {
@@ -857,8 +887,10 @@ class _TipLinkRowCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const _NewTipLinkButton(),
+          if (showRecreate) ...[
+            const SizedBox(height: 12),
+            const _NewTipLinkButton(),
+          ],
         ],
       ),
     );
@@ -866,9 +898,12 @@ class _TipLinkRowCard extends StatelessWidget {
 }
 
 class _DesktopTipLinkCard extends StatelessWidget {
-  const _DesktopTipLinkCard({required this.url});
+  const _DesktopTipLinkCard({required this.url, this.showRecreate = true});
 
   final String url;
+
+  /// See [_TipLinkRowCard.showRecreate].
+  final bool showRecreate;
 
   @override
   Widget build(BuildContext context) {
@@ -946,8 +981,10 @@ class _DesktopTipLinkCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const _NewTipLinkButton(),
+          if (showRecreate) ...[
+            const SizedBox(height: 12),
+            const _NewTipLinkButton(),
+          ],
         ],
       ),
     );

@@ -26,14 +26,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _confirmDisconnect() async {
+    final hasStripe = ref.read(appStateProvider).hasStripe;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Disconnect Stripe?'),
-        content: const Text(
-          'Removes the API key and all local data from this device. '
-          'Your Stripe account, payment link, and donations are untouched — '
-          'you can reconnect any time.',
+        title: Text(hasStripe ? 'Disconnect Stripe?' : 'Disconnect & wipe?'),
+        content: Text(
+          hasStripe
+              ? 'Removes the API key and all local data from this device. '
+                  'Your Stripe account, payment link, and donations are '
+                  'untouched — you can reconnect any time.'
+              : 'Removes your live.tips page and all local data from this '
+                  'device. Session history can\'t be recovered.',
         ),
         actions: [
           TextButton(
@@ -83,6 +87,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ref.read(appStateProvider.notifier).exitDemo();
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },
+            ),
+          ],
+        )
+      else if (!app.hasStripe)
+        // Relay-only: honest about the missing Stripe key without pushing
+        // the (not-yet-built) payment-methods management UI.
+        LtRowGroup(
+          header: 'Account',
+          children: [
+            const LtRow(
+              icon: Icons.key_off_rounded,
+              title: 'No Stripe connected',
+              subtitle: 'Tips arrive through your live.tips page',
+              trailing: StatusPill(status: LtKeyStatus.relay, compact: true),
+            ),
+            LtRow(
+              icon: Icons.link_off_rounded,
+              iconColor: c.danger,
+              title: 'Disconnect & wipe this device',
+              titleColor: c.danger,
+              chevron: true,
+              onTap: _confirmDisconnect,
             ),
           ],
         )

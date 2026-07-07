@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/donation_source.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/domain/donation.dart';
 import 'package:live_tips/domain/live_session.dart';
+import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -133,6 +136,50 @@ void main() {
     expect(s2.confettiTick, 1, reason: 'serial unchanged');
     expect(s2.newTips, hasLength(1),
         reason: 'batch is carried — consumers must gate on the serial');
+  });
+
+  test(
+      'relay-only (no Stripe key, no tip jar): the session starts, polls the '
+      'null source, and never sees a fake tip', () async {
+    const relayJar = RelayJar(
+      jarId: 'jar_relay',
+      donateUrl: 'https://live.tips/t/jar_relay',
+      artistName: 'Foxy Live',
+      currency: 'eur',
+      revolutUsername: 'foxy',
+      createdAtMs: 1,
+    );
+    SharedPreferences.setMockInitialValues({
+      'relay_jar_v1': jsonEncode(relayJar.toJson()),
+    });
+    final store = LocalStore(await SharedPreferences.getInstance());
+    // Deliberately NOT overriding donationSourceFactoryProvider: the real
+    // factory must hand out the silent NullDonationSource here — the demo
+    // source would pour fake tips into a real set.
+    container = ProviderContainer(overrides: [
+      localStoreProvider.overrideWithValue(store),
+    ]);
+    addTearDown(container.dispose);
+
+    final app = container.read(appStateProvider);
+    expect(app.hasRelay, isTrue);
+    expect(app.hasStripe, isFalse);
+    expect(app.effectiveTipJar, isNull);
+    expect(app.connected, isTrue);
+
+    final controller = container.read(liveSessionProvider.notifier);
+    await controller.start(goalMinor: 10000);
+    await settle();
+
+    final state = container.read(liveSessionProvider);
+    expect(state, isNotNull, reason: 'the session must start without a jar');
+    expect(state!.health, PollHealth.ok);
+    expect(state.session.currency, 'eur',
+        reason: 'currency comes from the relay jar');
+    expect(state.session.donations, isEmpty,
+        reason: 'no Stripe, no demo — nothing may appear on its own');
+    expect(state.confettiTick, 0);
+    expect(state.lastError, isNull);
   });
 
   group('storedSessionProvider (resume/discard banner reactivity)', () {

@@ -175,4 +175,18 @@ void main() {
     expect(first.single.amountMinor, greaterThan(0));
     expect(first.single.livemode, isFalse);
   });
+
+  test('null source never produces donations (relay-only sessions)', () async {
+    final source = NullDonationSource();
+    await source.prime(DateTime.now());
+    expect(await source.pollNew(), isEmpty);
+    expect(await source.pollNew(), isEmpty, reason: 'stays empty forever');
+    expect(source.cursor, isNull);
+
+    // Resume paths must be no-ops too, and dispose must not throw.
+    await source.prime(DateTime.now(),
+        resumeCursor: 'evt_stored', backfill: true);
+    expect(await source.pollNew(), isEmpty);
+    source.dispose();
+  });
 }

@@ -158,7 +158,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       List<LiveSession> sessions) {
     final currency = sessions.isNotEmpty
         ? sessions.first.currency
-        : ref.read(appStateProvider).effectiveTipJar?.currency ?? 'usd';
+        : ref.read(appStateProvider).currency;
     final total = sessions.fold(0, (sum, s) => sum + s.totalMinor);
     final tips = sessions.fold(0, (sum, s) => sum + s.count);
     return (
@@ -239,6 +239,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   Widget _buildDesktop(List<LiveSession> sessions, String? stripeAllUrl) {
     final c = context.lt;
+    final app = ref.watch(appStateProvider);
     final stats = _stats(sessions);
     return SingleChildScrollView(
       controller: _scrollController,
@@ -254,8 +255,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   Text('History',
                       style: outfitStyle(32, c.text, weight: FontWeight.w800)),
                   const Spacer(),
-                  if (!ref.watch(appStateProvider).demo &&
-                      stripeAllUrl != null)
+                  if (!app.demo && stripeAllUrl != null)
                     _ViewInStripeButton(stripeAllUrl),
                 ],
               ),
@@ -285,7 +285,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   Expanded(
                     flex: 17,
                     child: _DonationsTable(
-                      demo: ref.watch(appStateProvider).demo,
+                      demo: app.demo,
+                      relayOnly: !app.demo && !app.hasStripe,
                       donations: _donations,
                       loading: _loading,
                       hasMore: _hasMore,
@@ -346,6 +347,24 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           child: Text(
             'Demo mode has no Stripe history.\nConnect your account to see '
             'every donation you\'ve ever received.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontFamily: kFontBody,
+                fontSize: 13.5,
+                height: 1.5,
+                color: c.textSecondary),
+          ),
+        ),
+      ];
+    }
+    if (!app.hasStripe) {
+      // Relay-only: there's no Stripe account to list donations from.
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            'Revolut & MobilePay tips appear in Sessions — they never '
+            'leave this device.',
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontFamily: kFontBody,
@@ -554,6 +573,7 @@ const double _kStripeColWidth = 32;
 class _DonationsTable extends StatelessWidget {
   const _DonationsTable({
     required this.demo,
+    required this.relayOnly,
     required this.donations,
     required this.loading,
     required this.hasMore,
@@ -562,6 +582,9 @@ class _DonationsTable extends StatelessWidget {
   });
 
   final bool demo;
+
+  /// Connected-mode jar without a Stripe key: no account to list from.
+  final bool relayOnly;
   final List<Donation> donations;
   final bool loading;
   final bool hasMore;
@@ -598,6 +621,19 @@ class _DonationsTable extends StatelessWidget {
               child: Text(
                 'Demo mode has no Stripe history. Connect your account to '
                 'see every donation you\'ve ever received.',
+                style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 13.5,
+                    height: 1.5,
+                    color: c.textSecondary),
+              ),
+            )
+          else if (relayOnly)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'Revolut & MobilePay tips appear in Sessions — they never '
+                'leave this device.',
                 style: TextStyle(
                     fontFamily: kFontBody,
                     fontSize: 13.5,

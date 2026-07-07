@@ -10,14 +10,19 @@ import 'poster_paper.dart';
 import 'poster_strings.dart';
 import 'poster_templates.dart';
 
-/// Renders a print-ready poster PDF for [jar]'s tip link.
+/// Renders a print-ready poster PDF for a tip QR.
 ///
-/// [displayName], when non-empty, overrides [TipJar.displayName] on the
-/// poster — e.g. a shorter or friendlier name than the one used for the
-/// payment link. [headline]/[subline]/[footer], when non-empty, override
-/// the default caption text ([kDefaultPosterStrings] in poster_strings.dart).
+/// [qrData] is whatever the poster's QR should encode — the Stripe payment
+/// link or the connected-mode live.tips page; it defaults to [jar]'s URL,
+/// and at least one of the two must be given. [displayName], when non-empty,
+/// overrides [TipJar.displayName] on the poster — e.g. a shorter or
+/// friendlier name than the one used for the payment link (and the only name
+/// source when there is no jar). [headline]/[subline]/[footer], when
+/// non-empty, override the default caption text ([kDefaultPosterStrings] in
+/// poster_strings.dart).
 Future<Uint8List> buildPosterPdf({
-  required TipJar jar,
+  TipJar? jar,
+  String? qrData,
   required PosterTheme theme,
   required PosterPaperSize paperSize,
   String displayName = '',
@@ -25,13 +30,17 @@ Future<Uint8List> buildPosterPdf({
   String subline = '',
   String footer = '',
 }) async {
+  final resolvedQr = qrData ?? jar?.url;
+  if (resolvedQr == null) {
+    throw ArgumentError('buildPosterPdf needs qrData or a jar');
+  }
   final fonts = await loadPosterFonts();
   final format = posterPageFormats[paperSize]!;
   const defaults = kDefaultPosterStrings;
   final data = PosterData(
-    qrData: jar.url,
+    qrData: resolvedQr,
     artistName: displayName.trim().isEmpty
-        ? jar.displayName
+        ? (jar?.displayName ?? '')
         : displayName.trim(),
     strings: PosterStrings(
       headline: headline.trim().isEmpty ? defaults.headline : headline.trim(),

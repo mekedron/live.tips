@@ -76,20 +76,20 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
   /// instant the preview opens — just like walking up to a set in progress.
   LiveSession _seedSession() {
     final app = ref.read(appStateProvider);
-    final jar = app.effectiveTipJar ?? TipJar.demo;
+    final currency = app.currency;
     final goal = app.settings.lastGoalMinor;
     final now = DateTime.now();
     final session = LiveSession(
       id: 'preview',
       startedAt: now.subtract(const Duration(minutes: 37)),
-      currency: jar.currency,
+      currency: currency,
       goalMinor: goal,
     );
     for (final s in _seedTips) {
       final donation = Donation(
         id: 'preview_seed_${s.minutesAgo}',
         amountMinor: (s.goalFraction * goal).round().clamp(1, goal),
-        currency: jar.currency,
+        currency: currency,
         createdAt: now.subtract(Duration(minutes: s.minutesAgo)),
         name: s.name,
         message: s.message,
@@ -180,7 +180,11 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
   Widget build(BuildContext context) {
     final app = ref.watch(appStateProvider);
     final stageConfig = app.settings.stage;
-    final jar = app.effectiveTipJar ?? TipJar.demo;
+    // Whatever QR is actually configured (Stripe link or live.tips page);
+    // a fully unconfigured preview falls back to the demo jar's.
+    final qrUrl = app.activeQrUrl ?? TipJar.demo.url;
+    final artistName =
+        app.displayName.isEmpty ? TipJar.demo.displayName : app.displayName;
     final snapshot = StageSnapshot.fromState(
       LiveState(session: _session, lastDonation: _lastDonation),
     );
@@ -231,8 +235,8 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                     bottom: 16,
                     width: kStageRailWidth,
                     child: StageQrPanel(
-                      url: jar.url,
-                      name: jar.displayName,
+                      url: qrUrl,
+                      name: artistName,
                       messages: _session.donations.reversed
                           .where((d) => d.hasMessage)
                           .take(3)
@@ -324,7 +328,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                             StageGlassSquare(
                               icon: Icons.qr_code_2_rounded,
                               tooltip: 'Show QR',
-                              onTap: () => showFullscreenQr(context, jar.url),
+                              onTap: () => showFullscreenQr(context, qrUrl),
                             ),
                             const SizedBox(width: 8),
                             StageGlassSquare(

@@ -159,7 +159,13 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   Widget build(BuildContext context) {
     final live = ref.watch(liveSessionProvider);
     final app = ref.watch(appStateProvider);
-    final jar = app.effectiveTipJar;
+    // The one QR every stage surface shows; null only when nothing is
+    // configured (then the affordances hide rather than crash).
+    final qrUrl = app.activeQrUrl;
+    // Without a Stripe key nothing is being watched (relay feed comes in a
+    // later step) — the health pill must not claim otherwise.
+    final okLabel =
+        app.hasStripe || app.demo ? 'Watching Stripe' : 'Session running';
     final stageConfig = app.settings.stage;
     // The stage can only be locked where the device itself can authenticate —
     // no Face ID / device unlock (e.g. the browser) → no lock button.
@@ -184,7 +190,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     // Forced dark regardless of the app's light/dark setting: the stage is
     // meant to be read from a distance during a live performance, not to
     // match the device's ambient chrome.
-    if (live == null || jar == null) {
+    if (live == null) {
       // Session just ended (summary flow pops us) — render nothing.
       return Theme(
         data: buildDarkTheme(),
@@ -234,15 +240,15 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                           ),
                   ),
                   // ---- wide: floating QR + messages panel ----
-                  if (wide)
+                  if (wide && qrUrl != null)
                     Positioned(
                       right: 16,
                       top: safeTop + 76,
                       bottom: 16,
                       width: kStageRailWidth,
                       child: StageQrPanel(
-                        url: jar.url,
-                        name: jar.displayName,
+                        url: qrUrl,
+                        name: app.displayName,
                         messages: live.session.donations.reversed
                             .where((d) => d.hasMessage)
                             .take(3)
@@ -270,12 +276,15 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                           if (wide) ...[
                             const SizedBox(width: 8),
                             _HealthPill(
-                                health: live.health, error: live.lastError),
+                                health: live.health,
+                                error: live.lastError,
+                                okLabel: okLabel),
                           ] else if (live.health != PollHealth.ok) ...[
                             const SizedBox(width: 8),
                             _HealthPill(
                               health: live.health,
                               error: live.lastError,
+                              okLabel: okLabel,
                               dotOnly: true,
                             ),
                           ],
@@ -326,48 +335,52 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                           ),
                           child: Row(
                             children: [
-                              Expanded(
-                                // Web: the jar renders as an <iframe> platform
-                                // view that swallows pointer events, so ANY
-                                // control floating over it must be wrapped in a
-                                // PointerInterceptor — otherwise its taps fall
-                                // through to the iframe and nothing happens. That
-                                // was the "Show QR doesn't work in live mode" bug:
-                                // the glass buttons wrap themselves, but this
-                                // hand-rolled coral button has to opt in here.
-                                // (Harmless no-op on native platforms.)
-                                child: PointerInterceptor(
-                                  child: Material(
-                                    color: kStageAccent,
-                                    borderRadius: BorderRadius.circular(12),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: InkWell(
-                                      onTap: () =>
-                                          showFullscreenQr(context, jar.url),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 11),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            const Icon(Icons.qr_code_2_rounded,
-                                                size: 19,
-                                                color: Color(0xFF40160A)),
-                                            const SizedBox(width: 7),
-                                            Text(
-                                              'Show QR',
-                                              style: outfitStyle(
-                                                  14, const Color(0xFF40160A),
-                                                  weight: FontWeight.w700),
-                                            ),
-                                          ],
+                              if (qrUrl != null) ...[
+                                Expanded(
+                                  // Web: the jar renders as an <iframe> platform
+                                  // view that swallows pointer events, so ANY
+                                  // control floating over it must be wrapped in a
+                                  // PointerInterceptor — otherwise its taps fall
+                                  // through to the iframe and nothing happens. That
+                                  // was the "Show QR doesn't work in live mode" bug:
+                                  // the glass buttons wrap themselves, but this
+                                  // hand-rolled coral button has to opt in here.
+                                  // (Harmless no-op on native platforms.)
+                                  child: PointerInterceptor(
+                                    child: Material(
+                                      color: kStageAccent,
+                                      borderRadius: BorderRadius.circular(12),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: InkWell(
+                                        onTap: () =>
+                                            showFullscreenQr(context, qrUrl),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 11),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              const Icon(
+                                                  Icons.qr_code_2_rounded,
+                                                  size: 19,
+                                                  color: Color(0xFF40160A)),
+                                              const SizedBox(width: 7),
+                                              Text(
+                                                'Show QR',
+                                                style: outfitStyle(14,
+                                                    const Color(0xFF40160A),
+                                                    weight: FontWeight.w700),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
+                              ] else
+                                const Spacer(),
                               const SizedBox(width: 8),
                               StageGlassSquare(
                                 icon: Icons.flag_rounded,
@@ -498,16 +511,25 @@ class _PulsingDotState extends State<_PulsingDot>
 }
 
 class _HealthPill extends StatelessWidget {
-  const _HealthPill({required this.health, this.error, this.dotOnly = false});
+  const _HealthPill({
+    required this.health,
+    this.error,
+    this.dotOnly = false,
+    this.okLabel = 'Watching Stripe',
+  });
 
   final PollHealth health;
   final String? error;
   final bool dotOnly;
 
+  /// What "everything is fine" means for this session — "Watching Stripe"
+  /// when a Stripe key is polled, honest neutral wording otherwise.
+  final String okLabel;
+
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (health) {
-      PollHealth.ok => (const Color(0xFF4FCB8D), 'Watching Stripe'),
+      PollHealth.ok => (const Color(0xFF4FCB8D), okLabel),
       PollHealth.connecting => (const Color(0xFFFFC24D), 'Connecting…'),
       PollHealth.error =>
         (const Color(0xFFFF6B5E), error ?? 'Connection trouble'),

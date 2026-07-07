@@ -2,11 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/donation_source.dart';
 import '../data/local_store.dart';
+import '../data/relay/relay_client.dart';
 import '../data/secure_store.dart';
 import '../data/stripe/stripe_client.dart';
 import '../data/stripe/stripe_requests.dart';
 import '../domain/app_settings.dart';
 import '../domain/donation.dart';
+import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
 
 /// Overridden in main() with initialized instances.
@@ -18,22 +20,70 @@ final secureStoreProvider =
 /// API key read from secure storage before the first frame.
 final initialApiKeyProvider = Provider<String?>((ref) => null);
 
+/// Relay jar secret read from secure storage before the first frame.
+final initialRelaySecretProvider = Provider<String?>((ref) => null);
+
 class AppState {
   const AppState({
     this.apiKey,
     this.tipJar,
+    this.relayJar,
+    this.relaySecret,
     required this.settings,
     this.demo = false,
   });
 
   final String? apiKey;
   final TipJar? tipJar;
+
+  /// Connected-mode jar on the live.tips relay (MobilePay/Revolut tips).
+  /// Either account — Stripe key or relay jar — is enough to run the app.
+  final RelayJar? relayJar;
+  final String? relaySecret;
   final AppSettings settings;
   final bool demo;
 
-  bool get connected => demo || apiKey != null;
+  bool get hasStripe => apiKey != null;
+  bool get hasRelay => relayJar != null;
+  bool get connected => demo || hasStripe || hasRelay;
   bool get isTestMode => demo || (apiKey?.contains('_test_') ?? false);
   TipJar? get effectiveTipJar => demo ? TipJar.demo : tipJar;
+  RelayJar? get effectiveRelayJar => demo ? RelayJar.demo : relayJar;
+
+  /// The name shown on home/stage/poster: the Stripe jar's display name when
+  /// one exists, else the relay jar's artist name, else empty.
+  String get displayName {
+    final jarName = effectiveTipJar?.displayName ?? '';
+    if (jarName.isNotEmpty) return jarName;
+    return effectiveRelayJar?.artistName ?? '';
+  }
+
+  String get currency =>
+      effectiveTipJar?.currency ?? effectiveRelayJar?.currency ?? 'usd';
+
+  /// [AppSettings.qrMode] clamped to what's actually configured: the setting
+  /// may name a mode whose jar doesn't exist (defaults, half-configured
+  /// installs), and every QR surface must still resolve to something real.
+  QrMode get effectiveQrMode {
+    switch (settings.qrMode) {
+      case QrMode.connected:
+        return effectiveRelayJar != null ? QrMode.connected : QrMode.stripe;
+      case QrMode.stripe:
+        if (effectiveTipJar != null) return QrMode.stripe;
+        return effectiveRelayJar != null ? QrMode.connected : QrMode.stripe;
+    }
+  }
+
+  /// The one URL every QR surface encodes — Stripe payment link or the
+  /// connected-mode donor page, per [effectiveQrMode]. Null only when
+  /// nothing is configured at all.
+  String? get activeQrUrl => effectiveQrMode == QrMode.connected
+      ? effectiveRelayJar?.donateUrl
+      : effectiveTipJar?.url;
+
+  /// Whether the artist could actually toggle between the two QR modes.
+  bool get hasBothQrModes =>
+      effectiveTipJar != null && effectiveRelayJar != null;
 }
 
 class AppStateNotifier extends Notifier<AppState> {
@@ -43,6 +93,8 @@ class AppStateNotifier extends Notifier<AppState> {
     return AppState(
       apiKey: ref.read(initialApiKeyProvider),
       tipJar: local.readTipJar(),
+      relayJar: local.readRelayJar(),
+      relaySecret: ref.read(initialRelaySecretProvider),
       settings: local.readSettings(),
     );
   }
@@ -56,6 +108,8 @@ class AppStateNotifier extends Notifier<AppState> {
     state = AppState(
       apiKey: trimmed,
       tipJar: state.tipJar,
+      relayJar: state.relayJar,
+      relaySecret: state.relaySecret,
       settings: state.settings,
     );
   }
@@ -64,6 +118,8 @@ class AppStateNotifier extends Notifier<AppState> {
     state = AppState(
       apiKey: state.apiKey,
       tipJar: state.tipJar,
+      relayJar: state.relayJar,
+      relaySecret: state.relaySecret,
       settings: state.settings,
       demo: true,
     );
@@ -73,6 +129,8 @@ class AppStateNotifier extends Notifier<AppState> {
     state = AppState(
       apiKey: state.apiKey,
       tipJar: state.tipJar,
+      relayJar: state.relayJar,
+      relaySecret: state.relaySecret,
       settings: state.settings,
     );
   }
@@ -82,6 +140,51 @@ class AppStateNotifier extends Notifier<AppState> {
     state = AppState(
       apiKey: state.apiKey,
       tipJar: jar,
+      relayJar: state.relayJar,
+      relaySecret: state.relaySecret,
+      settings: state.settings,
+      demo: state.demo,
+    );
+  }
+
+  /// Adopts a freshly created relay jar: the secret goes to the keychain,
+  /// the jar itself to local prefs. Like [connect], a real account must not
+  /// inherit demo/test tips from earlier play.
+  Future<void> setRelayJar(RelayJar jar, String secret) async {
+    await ref.read(secureStoreProvider).writeRelaySecret(secret);
+    await ref.read(localStoreProvider).saveRelayJar(jar);
+    await ref.read(localStoreProvider).purgeSimulatedData();
+    state = AppState(
+      apiKey: state.apiKey,
+      tipJar: state.tipJar,
+      relayJar: jar,
+      relaySecret: secret,
+      settings: state.settings,
+    );
+  }
+
+  /// Saves an edited relay jar (rename etc.) locally — the secret is
+  /// untouched and telling the relay itself is the caller's job.
+  Future<void> updateRelayJarLocal(RelayJar jar) async {
+    await ref.read(localStoreProvider).saveRelayJar(jar);
+    state = AppState(
+      apiKey: state.apiKey,
+      tipJar: state.tipJar,
+      relayJar: jar,
+      relaySecret: state.relaySecret,
+      settings: state.settings,
+      demo: state.demo,
+    );
+  }
+
+  /// Forgets the relay jar on this device. Deleting it on the relay itself
+  /// (network DELETE) is the caller's job.
+  Future<void> clearRelayJar() async {
+    await ref.read(secureStoreProvider).deleteRelaySecret();
+    await ref.read(localStoreProvider).clearRelayJar();
+    state = AppState(
+      apiKey: state.apiKey,
+      tipJar: state.tipJar,
       settings: state.settings,
       demo: state.demo,
     );
@@ -92,6 +195,8 @@ class AppStateNotifier extends Notifier<AppState> {
     state = AppState(
       apiKey: state.apiKey,
       tipJar: state.tipJar,
+      relayJar: state.relayJar,
+      relaySecret: state.relaySecret,
       settings: settings,
       demo: state.demo,
     );
@@ -99,6 +204,21 @@ class AppStateNotifier extends Notifier<AppState> {
 
   /// Removes the key and every trace of local data.
   Future<void> disconnect() async {
+    // Best effort: retire the connected-mode jar on the relay so the public
+    // donor page dies with the local copy. Failures are ignored — the wipe
+    // must succeed even offline.
+    final relayJar = state.relayJar;
+    final relaySecret = state.relaySecret;
+    if (relayJar != null && relaySecret != null) {
+      final client = RelayClient();
+      try {
+        await client.deleteJar(jarId: relayJar.jarId, secret: relaySecret);
+      } catch (_) {
+        // Offline, already gone, or a rotated secret — nothing more to do.
+      } finally {
+        client.close();
+      }
+    }
     await ref.read(secureStoreProvider).wipeAll();
     await ref.read(localStoreProvider).wipeAll();
     state = const AppState(settings: AppSettings());
@@ -116,12 +236,18 @@ final appStateProvider =
 typedef DonationSourceFactory = DonationSource Function({
   required bool demo,
   required String? apiKey,
-  required TipJar jar,
+  required TipJar? jar,
 });
 
 final donationSourceFactoryProvider = Provider<DonationSourceFactory>(
   (ref) => ({required demo, required apiKey, required jar}) {
-    if (demo || apiKey == null) return DemoDonationSource();
+    if (demo) return DemoDonationSource();
+    // No Stripe key or no real payment link (relay-only installs): a live
+    // session must NEVER pour fake tips, so poll a silent no-op source.
+    // Relay tips arrive over their own channel, wired in a later step.
+    if (apiKey == null || jar == null || jar.isDemo) {
+      return NullDonationSource();
+    }
     final client = StripeClient(apiKey);
     return StripeDonationSource(
       StripeRequests(client),

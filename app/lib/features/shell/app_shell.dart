@@ -319,10 +319,14 @@ class _RailKeyChip extends StatelessWidget {
     final c = context.lt;
     final (bg, dot, fg, label) = app.demo
         ? (c.chip, c.textMuted, c.textSecondary, 'Demo — simulated tips')
-        : app.isTestMode
-            ? (c.accentSoft, c.accent, c.onAccentSoft, 'Test key — simulated')
-            : (c.successContainer, c.success, c.onSuccessContainer,
-                'Live key connected');
+        : !app.hasStripe && app.hasRelay
+            ? (c.chip, c.textMuted, c.textSecondary,
+                'live.tips page — no Stripe')
+            : app.isTestMode
+                ? (c.accentSoft, c.accent, c.onAccentSoft,
+                    'Test key — simulated')
+                : (c.successContainer, c.success, c.onSuccessContainer,
+                    'Live key connected');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(

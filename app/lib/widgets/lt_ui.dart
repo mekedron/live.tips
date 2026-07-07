@@ -53,8 +53,9 @@ class LtSectionLabel extends StatelessWidget {
   }
 }
 
-/// Status of the connected key: green Live, soft-accent Test, neutral Demo.
-enum LtKeyStatus { live, test, demo }
+/// Status of the connected account: green Live, soft-accent Test, neutral
+/// Demo, amber-dotted Relay (a live.tips jar with no Stripe key).
+enum LtKeyStatus { live, test, demo, relay }
 
 class StatusPill extends StatelessWidget {
   const StatusPill({super.key, required this.status, this.compact = false});
@@ -69,11 +70,13 @@ class StatusPill extends StatelessWidget {
       LtKeyStatus.live => (c.successContainer, c.onSuccessContainer, 'Live key'),
       LtKeyStatus.test => (c.accentSoft, c.onAccentSoft, 'Test key'),
       LtKeyStatus.demo => (c.chip, c.textSecondary, 'Demo'),
+      LtKeyStatus.relay => (c.chip, c.textSecondary, 'No Stripe'),
     };
     final dot = switch (status) {
       LtKeyStatus.live => c.success,
       LtKeyStatus.test => c.accent,
       LtKeyStatus.demo => c.textMuted,
+      LtKeyStatus.relay => kGold,
     };
     return Container(
       padding: EdgeInsets.symmetric(

@@ -19,6 +19,7 @@ Future<void> main() async {
   final localStore = await LocalStore.init();
   final secureStore = SecureStore();
   String? apiKey;
+  String? relaySecret;
   if (kDebugMode && _devStripeKey.isNotEmpty) {
     assert(_devStripeKey.contains('_test_'),
         'DEV_STRIPE_KEY must be a test-mode key');
@@ -26,18 +27,21 @@ Future<void> main() async {
   } else {
     try {
       apiKey = await secureStore.readApiKey();
+      relaySecret = await secureStore.readRelaySecret();
     } catch (_) {
       // Keychain read can fail transiently (fresh installs, locked keychain);
       // treat as signed out rather than crashing before the first frame.
-      apiKey = null;
     }
   }
 
-  // A real (live) account must never surface tips left over from demo or
-  // test play. connect() scrubs on the way in; this covers accounts that were
-  // already connected before that scrubbing existed. Test-mode sessions are
-  // the user's own real integration tests, so they're left alone here.
-  if (apiKey != null && !apiKey.contains('_test_')) {
+  // A real account — live Stripe key or a connected relay jar — must never
+  // surface tips left over from demo or test play. connect()/setRelayJar()
+  // scrub on the way in; this covers accounts that were already connected
+  // before that scrubbing existed. Test-mode sessions are the user's own
+  // real integration tests, so they're left alone here.
+  final hasRealAccount = (apiKey != null && !apiKey.contains('_test_')) ||
+      localStore.readRelayJar() != null;
+  if (hasRealAccount) {
     await localStore.purgeSimulatedData();
   }
 
@@ -47,6 +51,7 @@ Future<void> main() async {
         localStoreProvider.overrideWithValue(localStore),
         secureStoreProvider.overrideWithValue(secureStore),
         initialApiKeyProvider.overrideWithValue(apiKey),
+        initialRelaySecretProvider.overrideWithValue(relaySecret),
       ],
       child: const LiveTipsApp(),
     ),

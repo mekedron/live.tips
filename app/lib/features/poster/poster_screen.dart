@@ -11,7 +11,6 @@ import '../../core/poster/poster_paper.dart';
 import '../../core/poster/poster_strings.dart';
 import '../../core/theme.dart';
 import '../../domain/poster.dart';
-import '../../domain/tip_jar.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../shell/app_shell.dart';
@@ -38,15 +37,21 @@ class PosterScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
-    final jar = app.effectiveTipJar;
+    final qrData = app.activeQrUrl;
 
-    if (jar == null) {
-      // Shouldn't happen (every entry point already requires a jar), but
+    if (qrData == null) {
+      // Shouldn't happen (every entry point already requires some jar), but
       // mirrors LiveScreen's defensive guard rather than crashing.
       return const SizedBox();
     }
 
+    final artistName = app.displayName;
     final posterSettings = app.settings.poster;
+    // The name actually printed: the poster's own override when set, else
+    // the artist name from whichever jar is configured.
+    final resolvedName = posterSettings.displayName.trim().isEmpty
+        ? artistName
+        : posterSettings.displayName.trim();
     // In the shell it follows the rail; opened as a modal route (no shell
     // scope) it falls back to the screen width, so desktop keeps the wide
     // layout there too.
@@ -114,7 +119,7 @@ class PosterScreen extends ConsumerWidget {
             onTap: () => _showCustomizeSheet(
               context,
               settings: posterSettings,
-              jarDisplayName: jar.displayName,
+              jarDisplayName: artistName,
               updatePoster: updatePoster,
             ),
           ),
@@ -126,13 +131,13 @@ class PosterScreen extends ConsumerWidget {
       label: 'Print / Save PDF',
       icon: Icons.print_rounded,
       onPressed: () => Printing.layoutPdf(
-        name: _pdfName(posterSettings, jar),
+        name: _pdfName(resolvedName),
         onLayout: (format) => buildPosterPdf(
-          jar: jar,
+          qrData: qrData,
           theme: posterSettings.theme,
           paperSize:
               posterPaperSizeForFormat(format) ?? posterSettings.paperSize,
-          displayName: posterSettings.displayName,
+          displayName: resolvedName,
           headline: posterSettings.headline,
           subline: posterSettings.subline,
           footer: posterSettings.footer,
@@ -143,22 +148,26 @@ class PosterScreen extends ConsumerWidget {
     final shareButton = OutlinedButton.icon(
       onPressed: () async {
         final bytes = await buildPosterPdf(
-          jar: jar,
+          qrData: qrData,
           theme: posterSettings.theme,
           paperSize: posterSettings.paperSize,
-          displayName: posterSettings.displayName,
+          displayName: resolvedName,
           headline: posterSettings.headline,
           subline: posterSettings.subline,
           footer: posterSettings.footer,
         );
         await Printing.sharePdf(
-            bytes: bytes, filename: _pdfName(posterSettings, jar));
+            bytes: bytes, filename: _pdfName(resolvedName));
       },
       icon: Icon(Icons.ios_share_rounded, size: 18, color: c.textSecondary),
       label: const Text('Share PDF'),
     );
 
-    final preview = _PosterViewport(jar: jar, settings: posterSettings);
+    final preview = _PosterViewport(
+      qrData: qrData,
+      displayName: resolvedName,
+      settings: posterSettings,
+    );
 
     if (isRail) {
       return Padding(
@@ -254,12 +263,7 @@ class PosterScreen extends ConsumerWidget {
     );
   }
 
-  String _pdfName(PosterSettings settings, TipJar jar) {
-    final name = settings.displayName.trim().isEmpty
-        ? jar.displayName
-        : settings.displayName.trim();
-    return '$name-tip-poster.pdf';
-  }
+  String _pdfName(String resolvedName) => '$resolvedName-tip-poster.pdf';
 
   void _showCustomizeSheet(
     BuildContext context, {
@@ -419,9 +423,17 @@ class _ValueText extends StatelessWidget {
 /// Replaces the printing package's `PdfPreview`, whose built-in multi-page
 /// scroller renders cramped and off-center on wide desktop layouts.
 class _PosterViewport extends StatefulWidget {
-  const _PosterViewport({required this.jar, required this.settings});
+  const _PosterViewport({
+    required this.qrData,
+    required this.displayName,
+    required this.settings,
+  });
 
-  final TipJar jar;
+  final String qrData;
+
+  /// Already resolved by the caller: the poster's custom name when set,
+  /// else the configured jar's artist name.
+  final String displayName;
   final PosterSettings settings;
 
   @override
@@ -444,7 +456,9 @@ class _PosterViewportState extends State<_PosterViewport> {
   @override
   void didUpdateWidget(covariant _PosterViewport old) {
     super.didUpdateWidget(old);
-    if (old.settings != widget.settings || old.jar.url != widget.jar.url) {
+    if (old.settings != widget.settings ||
+        old.qrData != widget.qrData ||
+        old.displayName != widget.displayName) {
       // Typing in the customize sheet fires many rebuilds a second — collapse
       // them so pdf.js doesn't re-rasterize on every keystroke.
       _debounce?.cancel();
@@ -455,13 +469,12 @@ class _PosterViewportState extends State<_PosterViewport> {
   Future<void> _rasterize() async {
     final token = ++_rasterToken;
     final settings = widget.settings;
-    final jar = widget.jar;
     try {
       final bytes = await buildPosterPdf(
-        jar: jar,
+        qrData: widget.qrData,
         theme: settings.theme,
         paperSize: settings.paperSize,
-        displayName: settings.displayName,
+        displayName: widget.displayName,
         headline: settings.headline,
         subline: settings.subline,
         footer: settings.footer,
