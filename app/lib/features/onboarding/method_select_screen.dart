@@ -8,9 +8,9 @@ import '../../widgets/lt_ui.dart';
 import 'connect_screen.dart';
 import 'relay_setup_screen.dart';
 
-/// First onboarding step: pick how tips reach you. Stripe is preselected and
-/// recommended; Revolut/MobilePay ride through the live.tips relay and come
-/// with an honest warning about what "unverified" means.
+/// First onboarding step: pick how tips reach you. Nothing is preselected;
+/// Stripe is recommended, and Revolut/MobilePay ride through the live.tips
+/// relay and come with an honest warning about what "unverified" means.
 class MethodSelectScreen extends ConsumerStatefulWidget {
   const MethodSelectScreen({super.key});
 
@@ -20,7 +20,7 @@ class MethodSelectScreen extends ConsumerStatefulWidget {
 }
 
 class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
-  final Set<TipMethod> _selected = {TipMethod.stripe};
+  final Set<TipMethod> _selected = {};
 
   void _toggle(TipMethod method) {
     setState(() {
