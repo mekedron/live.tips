@@ -42,6 +42,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cloudflare/wrangler-action@v3
+        # Skipped (not failed) until the one-time Cloudflare setup in
+        # worker/README.md has provided the secrets.
+        if: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN != '' }}
         with:
           workingDirectory: worker
           apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
