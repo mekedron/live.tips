@@ -12,12 +12,8 @@ import type { JarProfile, TipRequest } from "./types";
 export const MOBILEPAY_AMOUNT_UNIT: "minor" = "minor";
 
 /**
- * revolut.me parameters are entirely undocumented. Nikita's own demo link
- * used `amount=500` for a €5 tip, so we start from "minor" — but this MUST
- * be re-verified with a real Revolut account before launch (open
- * revolut.me/<user>?amount=500&currency=eur and check the prefilled figure).
- * Worst case we flip this constant or stop prefilling; the WS event — not
- * the deep link — is what drives the stage.
+ * VERIFIED empirically (2026-07-07, real revolut.me page): `amount=500`
+ * with `currency=eur` prefills €5 — the parameter is in minor units.
  */
 export const REVOLUT_AMOUNT_UNIT: "major" | "minor" = "minor";
 
@@ -25,13 +21,16 @@ export const REVOLUT_AMOUNT_UNIT: "major" | "minor" = "minor";
 export const REVOLUT_MIN_MINOR = 100;
 
 /**
- * Undocumented; MobilePay shows the message on its hosted page. Probe the
- * real limit before launch and adjust — conservative until then.
+ * VERIFIED empirically (2026-07-07): qr.mobilepay.fi renders a 200-char
+ * `message` untruncated, so the full message + packed name fits.
  */
-export const MOBILEPAY_MESSAGE_MAX = 100;
+export const MOBILEPAY_MESSAGE_MAX = 200;
 
-/** Equally undocumented for revolut.me notes — conservative until probed. */
-export const REVOLUT_NOTE_MAX = 140;
+/**
+ * VERIFIED empirically (2026-07-07): the revolut.me note field shows a
+ * hard "n / 64" character counter — clamp to what actually fits.
+ */
+export const REVOLUT_NOTE_MAX = 64;
 
 /** `"name: message"` — the colon is why names must not contain one. */
 export function packNote(name: string, message: string): string {
