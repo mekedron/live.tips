@@ -106,3 +106,33 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # live.tips is proxied through Cloudflare (orange cloud), which caches the
+  # Pages assets at the edge. A GitHub Pages deploy doesn't notify Cloudflare,
+  # so without this the edge keeps serving the previous build until the cache
+  # TTL expires. Purge everything after a successful deploy so the new build is
+  # visible immediately. Needs the CLOUDFLARE_* repo secrets (a zone-scoped
+  # Cache Purge token); no GITHUB_TOKEN permissions are required.
+  purge-cache:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Purge Cloudflare cache
+        env:
+          CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          response="$(curl --silent --show-error --fail-with-body \
+            -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}')"
+          status=$?
+          echo "$response"
+          if [ $status -ne 0 ] || ! echo "$response" | jq -e '.success == true' >/dev/null; then
+            echo "::error::Cloudflare cache purge failed"
+            exit 1
+          fi
+          echo "Cloudflare cache purged for live.tips."
