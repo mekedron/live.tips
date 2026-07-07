@@ -60,6 +60,8 @@
   "step2_p": "Skriv ut plakaten, teip den på gitarkassen, sett den på salgsbordet. Publikum skanner, velger et beløp og legger igjen navn og en hilsen — Stripe tar seg av betalingen.",
   "step3_h3": "Se krukka fylles opp live",
   "step3_p": "Nettbrettet på scenen viser hvert tips i sanntid mot kveldens mål — 3D-krukke, hilsener, konfetti. Endre målet midt i settet, og lås skjermen mens den står vendt mot publikum.",
+  "alt_pay_h3": "Tar også imot Revolut og MobilePay",
+  "alt_pay_p": "Valgfritt ved siden av Stripe: slå dem på, så åpner QR-koden din en liten tipsside med alle betalingsmåtene du tar imot. Tips via Revolut og MobilePay dukker opp på sceneskjermen med én gang, mens fansen betaler i appen sin — merket som uverifiserte, fordi de appene ikke kan bekrefte betalingen.",
   "sec_kicker": "Sikkerhet",
   "sec_h2": "Dine nøkler, dine penger",
   "sec_lede": "Med Stripe står ingen live.tips-server mellom fansen din og bankkontoen din — appen snakker med api.stripe.com og ikke noe annet. Valgfrie tips via Revolut og MobilePay går gjennom et bitte lite åpen kildekode-relé som ikke lagrer noen betalingsdata.",

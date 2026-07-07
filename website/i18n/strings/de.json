@@ -60,6 +60,8 @@
   "step2_p": "Poster ausdrucken, an den Gitarrenkoffer kleben, auf den Merch-Tisch stellen. Fans scannen, wählen einen Betrag, hinterlassen Namen und Nachricht — Stripe wickelt die Zahlung ab.",
   "step3_h3": "Dem Glas live beim Füllen zusehen",
   "step3_p": "Dein Tablet auf der Bühne zeigt jedes Trinkgeld in Echtzeit, gemessen am Ziel für heute Abend — 3D-Glas, Nachrichten, Konfetti. Passe das Ziel mitten im Set an; sperre den Bildschirm, während das Tablet vorne steht.",
+  "alt_pay_h3": "Akzeptiert auch Revolut & MobilePay",
+  "alt_pay_p": "Optional neben Stripe: Schalte sie ein, und dein QR-Code öffnet eine kleine Trinkgeldseite mit allen Zahlungsmethoden, die du akzeptierst. Revolut- und MobilePay-Trinkgelder erscheinen sofort auf dem Bühnenbildschirm, während der Fan in seiner App bezahlt — als unverifiziert markiert, weil diese Apps die Zahlung nicht bestätigen können.",
   "sec_kicker": "Sicherheit",
   "sec_h2": "Deine Schlüssel, dein Geld",
   "sec_lede": "Mit Stripe steht zwischen deinen Fans und deinem Bankkonto kein live.tips-Server. Die App kommuniziert mit api.stripe.com — und mit sonst nichts. Optionale Trinkgelder über Revolut und MobilePay laufen über ein winziges Open-Source-Relay, das keine Zahlungsdaten speichert.",

@@ -60,6 +60,8 @@
   "step2_p": "Imprime el cartel, pégalo en la funda de la guitarra, ponlo en la mesa de merchandising. El público escanea, elige un importe y deja su nombre y un mensaje: Stripe se encarga del pago.",
   "step3_h3": "Mira cómo se llena el bote en directo",
   "step3_p": "Tu tablet en el escenario muestra cada propina en tiempo real frente a la meta de la noche: bote en 3D, mensajes, confeti. Edita la meta sobre la marcha y bloquea la pantalla mientras está a la vista del público.",
+  "alt_pay_h3": "También acepta Revolut y MobilePay",
+  "alt_pay_p": "Opcionales, junto a Stripe: actívalos y tu QR abre una pequeña página de propinas con todos los métodos de pago que aceptas. Las propinas por Revolut y MobilePay aparecen al instante en la pantalla del escenario mientras el fan paga en su app; se muestran como no verificadas, porque esas apps no pueden confirmar el pago.",
   "sec_kicker": "Seguridad",
   "sec_h2": "Tus claves, tu dinero",
   "sec_lede": "Con Stripe no hay ningún servidor de live.tips entre tus fans y tu cuenta bancaria: la app habla con api.stripe.com y con nada más. Las propinas opcionales por Revolut y MobilePay pasan por un pequeño relé de código abierto que no guarda ningún dato de pago.",

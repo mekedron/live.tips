@@ -367,6 +367,18 @@
   .step .num .ms { font-size: 23px; color: var(--accent); }
   .step h3 { font-size: 19px; font-weight: 700; }
   .step p { margin: 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.55; }
+  .how-note {
+    display: flex; gap: 16px; align-items: flex-start;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 20px 24px; margin-top: 20px;
+  }
+  .how-note .ico {
+    width: 40px; height: 40px; border-radius: 50%; background: var(--soft);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .how-note .ico .ms { font-size: 20px; color: var(--accent); }
+  .how-note h3 { font-size: 16.5px; font-weight: 700; }
+  .how-note p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; max-width: 760px; }
 
   /* security */
   .sec-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 44px; align-items: center; margin-top: 40px; }
@@ -652,6 +664,13 @@
         <div class="num"><svg class="ms" viewBox="0 -960 960 960" aria-hidden="true"><path d="m108-160 151-420q5-13 15.5-20t22.5-7q8 0 15 3t13 9l270 270q6 6 9 13t3 15q0 12-7 22.5T580-259L160-108q-12 5-23 1.5T118-118q-8-8-11.5-19t1.5-23Zm813-519q-9 9-21 9t-21-9l-3-3q-14-14-35-14t-35 14L603-479q-9 9-21 9t-21-9q-9-9-9-21t9-21l203-203q32-32 77-32t77 32l3 3q9 9 9 21t-9 21ZM399-799q9-9 21-9t21 9l5 5q32 32 32 76t-32 76l-3 3q-9 9-21 9t-21-9q-9-9-9-21t9-21l3-3q14-14 14-34t-14-34l-5-5q-9-9-9-21t9-21Zm162-80q9-9 21-9t21 9l43 43q32 32 32 77t-32 77L523-559q-9 9-21 9t-21-9q-9-9-9-21t9-21l123-123q14-14 14-35t-14-35l-43-43q-9-9-9-21t9-21Zm320 480q-9 9-21 9t-21-9l-43-43q-14-14-35-14t-35 14l-43 43q-9 9-21 9t-21-9q-9-9-9-21t9-21l43-43q32-32 77-32t77 32l43 43q9 9 9 21t-9 21Z"/></svg></div>
         <h3>{{step3_h3}}</h3>
         <p>{{step3_p}}</p>
+      </div>
+    </div>
+    <div class="how-note">
+      <div class="ico"><svg class="ms" viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760H520q-71 0-115.5 44.5T360-600v240q0 71 44.5 115.5T520-200h320q0 33-23.5 56.5T760-120H200Zm320-160q-33 0-56.5-23.5T440-360v-240q0-33 23.5-56.5T520-680h280q33 0 56.5 23.5T880-600v240q0 33-23.5 56.5T800-280H520Zm163-157q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Z"/></svg></div>
+      <div>
+        <h3>{{alt_pay_h3}}</h3>
+        <p>{{alt_pay_p}}</p>
       </div>
     </div>
   </section>

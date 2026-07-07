@@ -60,6 +60,8 @@
   "step2_p": "Prentaðu plakatið, límdu það á gítarkassann, settu það á varningsborðið. Áhorfendur skanna, velja upphæð og skilja eftir nafn og skilaboð — Stripe sér um greiðsluna.",
   "step3_h3": "Fylgstu með krukkunni fyllast í beinni",
   "step3_p": "Spjaldtölvan á sviðinu sýnir hvert þjórfé í rauntíma miðað við markmið kvöldsins — þrívíddarkrukka, skilaboð, konfetti. Breyttu markmiðinu í miðju setti; læstu skjánum meðan hann stendur frammi.",
+  "alt_pay_h3": "Tekur líka við Revolut og MobilePay",
+  "alt_pay_p": "Valfrjálst við hlið Stripe: kveiktu á þeim og QR-kóðinn þinn opnar litla þjórfjársíðu með öllum greiðsluleiðum sem þú tekur við. Þjórfé um Revolut og MobilePay birtist samstundis á sviðsskjánum meðan aðdáandinn borgar í sínu appi — merkt sem óstaðfest, því þessi öpp geta ekki staðfest greiðsluna.",
   "sec_kicker": "Öryggi",
   "sec_h2": "Þínir lyklar, þínir peningar",
   "sec_lede": "Með Stripe er enginn live.tips-þjónn á milli aðdáenda þinna og bankareiknings þíns — appið talar við api.stripe.com og ekkert annað. Valfrjáls þjórfé um Revolut og MobilePay fer um örlítinn opinn millilið sem geymir engin greiðslugögn.",

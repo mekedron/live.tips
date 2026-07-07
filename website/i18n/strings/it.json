@@ -60,6 +60,8 @@
   "step2_p": "Stampa il poster, attaccalo alla custodia della chitarra, mettilo sul banco del merch. I fan scansionano, scelgono l'importo, lasciano un nome e un messaggio — al pagamento pensa Stripe.",
   "step3_h3": "Guarda il barattolo riempirsi dal vivo",
   "step3_p": "Il tuo tablet sul palco mostra ogni mancia in tempo reale rispetto all'obiettivo della serata — barattolo 3D, messaggi, coriandoli. Modifica l'obiettivo durante il set; blocca lo schermo mentre resta rivolto al pubblico.",
+  "alt_pay_h3": "Accetta anche Revolut e MobilePay",
+  "alt_pay_p": "Opzionali, accanto a Stripe: attivali e il tuo QR apre una piccola pagina delle mance con tutti i metodi di pagamento che accetti. Le mance via Revolut e MobilePay compaiono all'istante sullo schermo del palco mentre il fan paga nella sua app — segnalate come non verificate, perché quelle app non possono confermare il pagamento.",
   "sec_kicker": "Sicurezza",
   "sec_h2": "Le tue chiavi, i tuoi soldi",
   "sec_lede": "Con Stripe non c'è alcun server live.tips tra i tuoi fan e il tuo conto bancario: l'app parla con api.stripe.com e con nient'altro. Le mance opzionali via Revolut e MobilePay passano per un minuscolo relay open source che non conserva alcun dato di pagamento.",

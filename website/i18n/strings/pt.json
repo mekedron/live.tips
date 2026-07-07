@@ -60,6 +60,8 @@
   "step2_p": "Imprime o cartaz, cola-o no estojo da guitarra, põe-no na mesa do merch. O público lê o código, escolhe um valor, deixa um nome e uma mensagem — o Stripe trata do pagamento.",
   "step3_h3": "Vê o frasco encher ao vivo",
   "step3_p": "O teu tablet no palco mostra cada gorjeta em tempo real face à meta desta noite — frasco 3D, mensagens, confetti. Edita a meta a meio da atuação; bloqueia o ecrã enquanto ele fica à vista do público.",
+  "alt_pay_h3": "Também aceita Revolut e MobilePay",
+  "alt_pay_p": "Opcionais, ao lado do Stripe: ativa-os e o teu QR abre uma pequena página de gorjetas com todos os métodos de pagamento que aceitas. As gorjetas por Revolut e MobilePay aparecem de imediato no ecrã do palco enquanto o fã paga na sua app — marcadas como não verificadas, porque essas apps não conseguem confirmar o pagamento.",
   "sec_kicker": "Segurança",
   "sec_h2": "As tuas chaves, o teu dinheiro",
   "sec_lede": "Com o Stripe não há nenhum servidor live.tips entre os seus fãs e a sua conta bancária — a app fala com api.stripe.com e com mais nada. As gorjetas opcionais por Revolut e MobilePay passam por um minúsculo relé de código aberto que não guarda nenhum dado de pagamento.",
