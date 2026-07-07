@@ -16,8 +16,20 @@ const INLINE_SCRIPT = `(function () {
   var methodInput = document.getElementById('f-method');
   var amountEl = document.getElementById('f-amount');
   var errEl = document.getElementById('f-error');
+  var successEl = document.getElementById('f-success');
+  var redirected = false;
   function show(el) { el.removeAttribute('hidden'); }
   function hide(el) { el.setAttribute('hidden', ''); }
+  function showSuccess() {
+    var app = methodInput.value === 'mobilepay' ? 'MobilePay' : 'Revolut';
+    document.getElementById('f-success-app').textContent = app;
+    hide(form);
+    show(successEl);
+    successEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (redirected && document.visibilityState === 'visible') showSuccess();
+  });
   Array.prototype.forEach.call(document.querySelectorAll('button[data-method]'), function (btn) {
     btn.addEventListener('click', function () {
       methodInput.value = btn.getAttribute('data-method');
@@ -69,6 +81,7 @@ const INLINE_SCRIPT = `(function () {
       if (!res.ok) throw new Error('http ' + res.status);
       return res.json();
     }).then(function (data) {
+      redirected = true;
       location.href = data.redirectUrl;
     }).catch(function () {
       btn.disabled = false;
@@ -101,6 +114,9 @@ textarea { resize: vertical; min-height: 60px; }
 #f-submit:disabled { opacity: 0.6; }
 #f-error { color: #c0392b; margin-top: 10px; font-size: 0.9rem; }
 #f-fallback a { display: block; margin-top: 8px; color: var(--accent); }
+#f-success { margin-top: 20px; padding: 20px 16px; border: 1px solid var(--accent); border-radius: 14px; background: var(--card); }
+#f-success h2 { font-size: 1.2rem; margin-bottom: 8px; }
+#f-success p { color: var(--muted); overflow-wrap: anywhere; }
 .turnstile-slot { margin-top: 14px; min-height: 66px; }
 footer { margin-top: 28px; font-size: 0.75rem; color: var(--muted); }
 footer a { color: inherit; }
@@ -153,6 +169,10 @@ export function renderDonorPage(profile: JarProfile, siteKey: string): string {
   <p id="f-error" role="alert" aria-live="assertive" hidden></p>
   <div id="f-fallback" role="group" aria-live="polite" hidden>${fallbackLinks.join("")}</div>
 </form>
+<div id="f-success" role="status" aria-live="polite" hidden>
+  <h2>Thanks! 🎉</h2>
+  <p>Your message is on its way to the performer's screen. Finish the payment in <span id="f-success-app">the app</span> to complete your tip — you can close this page once you're done.</p>
+</div>
 <noscript><p>JavaScript is off — you can still pay directly:</p>${fallbackLinks.join("")}</noscript>`
     : "";
 
