@@ -181,7 +181,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Disconnect Stripe?'),
         content: const Text(
-          'Removes the Stripe key and tip link from this band on this device. '
+          'Removes the Stripe key and tip link from this account on this device. '
           'Your Stripe account and its payments stay in Stripe — you can '
           'reconnect a key any time.',
         ),

@@ -38,21 +38,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final app = ref.read(appStateProvider);
     if (ref.read(appStateProvider.notifier).accountActionsBlocked) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Stop the live session before removing a band.')));
+          content: Text('Stop the live session before removing an account.')));
       return;
     }
     final hasOthers = app.accounts.length > 1;
-    final name = app.displayName.isEmpty ? 'this band' : app.displayName;
+    final name = app.displayName.isEmpty ? 'this account' : app.displayName;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Remove $name from this device?'),
         content: Text(
-          '${app.hasStripe ? 'Removes the API key and this band\'s local '
+          '${app.hasStripe ? 'Removes the API key and this account\'s local '
               'data. This action can\'t be undone.' : 'Removes this '
-              'band\'s live.tips page and local data from this device. '
+              'account\'s live.tips page and local data from this device. '
               'This action can\'t be undone.'}'
-          '${hasOthers ? ' Your other bands stay.' : ''}',
+          '${hasOthers ? ' Your other accounts stay.' : ''}',
         ),
         actions: [
           TextButton(
@@ -113,7 +113,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             LtRow(
               icon: Icons.badge_rounded,
-              title: app.displayName.isEmpty ? 'Your band' : app.displayName,
+              title: app.displayName.isEmpty ? 'Your account' : app.displayName,
               subtitle: 'Name, currency and thank-you message',
               chevron: true,
               onTap: () => Navigator.of(context).push(
@@ -124,7 +124,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             LtRow(
               icon: Icons.swap_horiz_rounded,
               title: 'Switch account',
-              subtitle: 'Work with another band on this device',
+              subtitle: 'Work with another account on this device',
               chevron: true,
               onTap: () => showBandSwitcherSheet(context, ref),
             ),

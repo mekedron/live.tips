@@ -41,7 +41,7 @@ class BandNameButton extends ConsumerWidget {
     final app = ref.watch(appStateProvider);
     final style = outfitStyle(fontSize, c.text, weight: weight);
     final name =
-        app.displayName.isEmpty ? 'Your band' : app.displayName;
+        app.displayName.isEmpty ? 'Your account' : app.displayName;
     // Demo has no real band to switch unless others already exist — the
     // escape hatch back to a real band must stay reachable.
     if (app.demo && app.accounts.length < 2) {
@@ -84,7 +84,7 @@ class BandChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
-    final name = app.displayName.isEmpty ? 'New band' : app.displayName;
+    final name = app.displayName.isEmpty ? 'New account' : app.displayName;
     return Material(
       color: c.chip,
       borderRadius: BorderRadius.circular(999),
@@ -135,14 +135,54 @@ class _BandSwitcherSheet extends ConsumerWidget {
   Future<void> _switchTo(
       BuildContext context, WidgetRef ref, BandAccount account) async {
     final messenger = ScaffoldMessenger.of(context);
-    final ok = await ref
-        .read(appStateProvider.notifier)
-        .switchAccount(account.id);
+    final notifier = ref.read(appStateProvider.notifier);
+    final app = ref.read(appStateProvider);
+
+    // Leaving a half-finished new account behind — one that was named on the
+    // details step but never got a payment method, and holds no data? It has
+    // no home in the app (RootGate parks it on Welcome), and no way to remove
+    // it short of finishing onboarding. Offer to discard it on the way out.
+    final leavingId = app.accountId;
+    final abandoning = account.id != leavingId &&
+        !app.connected &&
+        !ref.read(localStoreProvider).accountHasData(leavingId);
+    if (abandoning) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Discard this unfinished account?'),
+          content: const Text(
+            'You started this account but didn\'t add a payment method, so '
+            'there\'s nothing to keep. Switching away deletes it.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Keep editing'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Discard & switch'),
+            ),
+          ],
+        ),
+      );
+      if (discard != true) return;
+    }
+
+    final ok = await notifier.switchAccount(account.id);
     if (!ok) {
       messenger.showSnackBar(const SnackBar(
-          content: Text('Stop the live session before switching bands.')));
+          content: Text('Stop the live session before switching accounts.')));
       return;
     }
+    // The unfinished account is no longer active — remove it now that we've
+    // landed safely on the chosen one.
+    if (abandoning) await notifier.removeAccount(leavingId);
     // Only close the sheet if it is still up — the user may have swiped it
     // away during the keychain read, and popping then would eat whatever
     // route sits underneath.
@@ -178,7 +218,7 @@ class _BandSwitcherSheet extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-              child: Text('Your bands',
+              child: Text('Your accounts',
                   style: outfitStyle(18, c.text, weight: FontWeight.w700)),
             ),
             if (blocked)
@@ -186,7 +226,7 @@ class _BandSwitcherSheet extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
                 child: Text(
                   live != null
-                      ? 'A live session is running — stop it to switch bands.'
+                      ? 'A live session is running — stop it to switch accounts.'
                       : 'Switching…',
                   style: TextStyle(
                       fontFamily: kFontBody,
@@ -236,7 +276,7 @@ class _BandRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
-    final name = account.name.isEmpty ? 'Unnamed band' : account.name;
+    final name = account.name.isEmpty ? 'Unnamed account' : account.name;
     final subtitle = bandMethodsSummary(ref, account.id);
     final dim = enabled ? 1.0 : 0.45;
     return Material(
@@ -329,11 +369,11 @@ class _AddBandRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Add a band',
+                      Text('Add an account',
                           style: outfitStyle(15, c.text,
                               weight: FontWeight.w600)),
                       Text(
-                        'Another act with its own links, goal and history.',
+                        'Another account with its own links, goal and history.',
                         style: TextStyle(
                             fontFamily: kFontBody,
                             fontSize: 12.5,
