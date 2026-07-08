@@ -27,11 +27,11 @@ Future<void> main() async {
   // resolved to the nearest shipped locale).
   final settings = localStore.readSettings();
   var savedLocaleCode = settings.localeCode;
-  // Opened from a localized landing page (…/app/?lang=fi)? Adopt that language
-  // on first launch so the app matches the page the visitor came from. An
-  // explicit in-app choice (localeCode already set) always wins; an unknown or
-  // absent code leaves us on the device language.
-  if (savedLocaleCode == null && kIsWeb) {
+  // Opened from a localized landing page (…/app/?lang=fi)? Select that language
+  // and remember it, so the app matches the page the visitor came from. A
+  // valid `lang` always wins; an unknown/absent code leaves the saved (or
+  // device) language untouched.
+  if (kIsWeb) {
     final adopted = localeCodeFromLandingParam(
         savedLocaleCode, Uri.base.queryParameters['lang']);
     if (adopted != null) {

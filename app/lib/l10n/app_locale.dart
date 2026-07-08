@@ -56,15 +56,13 @@ AppLocale appLocaleFor(String? code) {
 }
 
 /// The locale code to adopt from a landing page's `?lang=` param, or null to
-/// keep following the saved/device language. Only adopts when the user hasn't
-/// already chosen a language ([savedCode] null) and [urlLang] is a shipped
-/// locale — so a Finnish landing page opens the app in Finnish, while an
-/// explicit in-app choice or an unknown code is left untouched.
-String? localeCodeFromLandingParam(String? savedCode, String? urlLang) {
-  if (savedCode != null) return null;
-  if (urlLang != null && kAppLocales.any((l) => l.code == urlLang)) {
-    return urlLang;
-  }
+/// keep the current language. A present, shipped code always wins — arriving
+/// from the Finnish landing page selects Finnish, even over an earlier choice,
+/// so the app matches the language of the page they came from. Returns null
+/// when the param is absent, unknown, or already the active language (no-op).
+String? localeCodeFromLandingParam(String? currentCode, String? urlLang) {
+  if (urlLang == null || urlLang == currentCode) return null;
+  if (kAppLocales.any((l) => l.code == urlLang)) return urlLang;
   return null;
 }
 
