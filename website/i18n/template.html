@@ -480,6 +480,17 @@
   .foot-links a.bmc { background: #FFDD00; color: #000; padding: 5px 12px; border-radius: 999px; }
   .foot-links a.bmc:hover { color: #000; opacity: .82; }
   .foot-note { color: var(--ink-3); font-size: 12.5px; margin-top: 14px; }
+  .ph-badge { display: inline-flex; }
+  .ph-badge img { display: block; }
+  .ph-badge .ph-dark { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .ph-badge .ph-light { display: none; }
+    :root:not([data-theme="light"]) .ph-badge .ph-dark { display: block; }
+  }
+  :root[data-theme="dark"] .ph-badge .ph-light { display: none; }
+  :root[data-theme="dark"] .ph-badge .ph-dark { display: block; }
+  :root[data-theme="light"] .ph-badge .ph-light { display: block; }
+  :root[data-theme="light"] .ph-badge .ph-dark { display: none; }
 
   @media (max-width: 860px) {
     .steps { grid-template-columns: 1fr; }
@@ -870,6 +881,10 @@
         <a href="{{app_href}}" target="_blank" rel="noopener">{{btn_open_app}}</a>
         <a href="https://github.com/mekedron/live.tips" target="_blank" rel="noopener">GitHub</a>
         <a class="bmc" href="https://buymeacoffee.com/mekedron" target="_blank" rel="noopener">{{bmc}}</a>
+        <a class="ph-badge" href="https://www.producthunt.com/products/live-tips?utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-live-tips" target="_blank" rel="noopener">
+          <img class="ph-light" alt="live.tips - Streamers get live tip alerts. Now the stage does too. | Product Hunt" width="250" height="54" loading="lazy" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1191308&amp;theme=light">
+          <img class="ph-dark" alt="live.tips - Streamers get live tip alerts. Now the stage does too. | Product Hunt" width="250" height="54" loading="lazy" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1191308&amp;theme=dark">
+        </a>
       </div>
     </div>
     <div class="foot-note">{{foot_note}}</div>

@@ -1,5 +1,7 @@
 # live.tips
 
+[![live.tips on Product Hunt](https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1191308&theme=light)](https://www.producthunt.com/products/live-tips?utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-live-tips)
+
 **An open-source live tip jar for performers.** Cash is gone — the applause isn't.
 
 Musicians, buskers, and street artists put one QR code on stage. Fans scan it, pick an
