@@ -1,0 +1,92 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: 'Outfit'; src: url(data:font/woff2;base64,@@OUTFIT@@) format('woff2'); font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'Noto Sans'; src: url(data:font/woff2;base64,@@NOTO@@) format('woff2'); font-weight: 100 900; font-display: block; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #FAF6F1; --ink: #221D18; --accent: #E8542F;
+  --pill-bg: #FDE7DF; --pill-ink: #8A2E14;
+  --muted: rgba(34,29,24,.56); --line: rgba(34,29,24,.12);
+}
+html, body { width: 1200px; height: 1500px; overflow: hidden; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: 'Noto Sans', sans-serif;
+  display: flex; flex-direction: column;
+  padding: 84px 92px 72px;
+}
+.head { display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 20px; }
+.brand img { width: 68px; height: 68px; border-radius: 17px; }
+.brand span { font-family: 'Outfit'; font-weight: 700; font-size: 42px; letter-spacing: -0.5px; }
+.badge {
+  background: var(--pill-bg); color: var(--pill-ink);
+  font-family: 'Outfit'; font-weight: 600; font-size: 26px;
+  padding: 14px 30px; border-radius: 999px;
+}
+.eyebrow {
+  margin-top: 48px;
+  font-family: 'Outfit'; font-weight: 600; font-size: 26px;
+  letter-spacing: 3.5px; color: var(--muted); text-transform: uppercase;
+}
+h1 {
+  margin-top: 14px;
+  font-family: 'Outfit'; font-weight: 800; font-size: 86px;
+  letter-spacing: -2px; line-height: 1.04;
+}
+.rows { margin-top: 40px; display: flex; flex-direction: column; }
+.row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 32px 8px;
+  border-top: 2px solid var(--line);
+}
+.row .who { max-width: 72%; font-family: 'Outfit'; font-weight: 600; font-size: 44px; color: rgba(34,29,24,.78); }
+.row .who small { display: block; font-family: 'Noto Sans'; font-weight: 400; font-size: 25px; color: var(--muted); margin-top: 10px; }
+.row .keep { font-family: 'Outfit'; font-weight: 800; font-size: 94px; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+.row.hero {
+  border-top: none; margin-top: 20px;
+  background: var(--pill-bg); border-radius: 32px;
+  padding: 38px 44px;
+  align-items: center;
+}
+.row.hero .who { color: var(--ink); }
+.row.hero .who small { color: rgba(138,46,20,.85); font-weight: 600; font-size: 27px; }
+.row.hero .keep { color: var(--accent); font-size: 110px; }
+.foot { margin-top: auto; }
+.foot .note { font-size: 24px; line-height: 1.5; color: var(--muted); max-width: 980px; }
+.foot .url {
+  margin-top: 28px; display: flex; align-items: baseline; justify-content: space-between;
+}
+.foot .url b { font-family: 'Outfit'; font-weight: 700; font-size: 34px; color: var(--accent); }
+.foot .url span { font-family: 'Outfit'; font-weight: 500; font-size: 26px; color: var(--muted); }
+</style></head>
+<body>
+  <div class="head">
+    <div class="brand"><img src="data:image/png;base64,@@LOGO@@" alt=""><span>live.tips</span></div>
+    <div class="badge">Open source · MIT</div>
+  </div>
+
+  <div class="eyebrow">Published platform fees · July 2026</div>
+  <h1>Out of every €100<br>fans tip, the platform<br>keeps…</h1>
+
+  <div class="rows">
+    <div class="row">
+      <div class="who">Patreon<small>8–12% platform fee</small></div>
+      <div class="keep">€8–12</div>
+    </div>
+    <div class="row">
+      <div class="who">Buy Me a Coffee<small>5% platform fee</small></div>
+      <div class="keep">€5</div>
+    </div>
+    <div class="row hero">
+      <div class="who">live.tips<small>Tips land in your own Stripe. No middleman to pay.</small></div>
+      <div class="keep">€0</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="note">Card processing (Stripe & co.) applies on every platform and goes to the processor — never to the tip jar.</div>
+    <div class="url"><b>live.tips</b><span>the open-source live tip jar for performers</span></div>
+  </div>
+</body></html>

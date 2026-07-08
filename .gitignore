@@ -7,3 +7,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# LinkedIn kit working files (final assets live in marketing/linkedin/)
+.li-post-tmp/
+marketing/linkedin/sources/*.final.html

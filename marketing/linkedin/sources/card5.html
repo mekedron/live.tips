@@ -1,0 +1,105 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: 'Outfit'; src: url(data:font/woff2;base64,@@OUTFIT@@) format('woff2'); font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'Noto Sans'; src: url(data:font/woff2;base64,@@NOTO@@) format('woff2'); font-weight: 100 900; font-display: block; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #FAF6F1; --ink: #221D18; --accent: #E8542F;
+  --pill-bg: #FDE7DF; --pill-ink: #8A2E14;
+  --muted: rgba(34,29,24,.56); --line: rgba(34,29,24,.12);
+}
+html, body { width: 1200px; height: 1500px; overflow: hidden; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: 'Noto Sans', sans-serif;
+  display: flex; flex-direction: column;
+  padding: 84px 92px 72px;
+}
+.head { display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 20px; }
+.brand img { width: 68px; height: 68px; border-radius: 17px; }
+.brand span { font-family: 'Outfit'; font-weight: 700; font-size: 42px; letter-spacing: -0.5px; }
+.badge {
+  background: var(--pill-bg); color: var(--pill-ink);
+  font-family: 'Outfit'; font-weight: 600; font-size: 26px;
+  padding: 14px 30px; border-radius: 999px;
+}
+.eyebrow {
+  margin-top: 48px;
+  font-family: 'Outfit'; font-weight: 600; font-size: 26px;
+  letter-spacing: 3.5px; color: var(--muted); text-transform: uppercase;
+}
+h1 {
+  margin-top: 14px;
+  font-family: 'Outfit'; font-weight: 800; font-size: 92px;
+  letter-spacing: -2px; line-height: 1.04;
+}
+h1 em { font-style: normal; color: var(--accent); }
+.qr-line { margin-top: 44px; display: flex; align-items: center; gap: 34px; }
+.qr {
+  flex: none; width: 190px; height: 190px; border-radius: 26px;
+  background: #fff; border: 3px solid rgba(34,29,24,.14);
+  display: grid; place-items: center;
+}
+.qr svg { width: 142px; height: 142px; }
+.qr-line p { font-size: 29px; line-height: 1.45; color: rgba(34,29,24,.75); max-width: 760px; }
+.qr-line p b { font-family: 'Outfit'; color: var(--ink); }
+.group { margin-top: 52px; }
+.group .label {
+  font-family: 'Outfit'; font-weight: 600; font-size: 26px;
+  letter-spacing: 3px; color: var(--muted); text-transform: uppercase;
+  margin-bottom: 22px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 18px; }
+.chip {
+  font-family: 'Outfit'; font-weight: 700; font-size: 34px;
+  padding: 20px 40px; border-radius: 999px;
+  border: 3px solid rgba(34,29,24,.22);
+}
+.chip.hot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip.soon { border-style: dashed; color: var(--muted); font-weight: 600; }
+.group .note { margin-top: 20px; font-size: 27px; color: rgba(34,29,24,.72); line-height: 1.45; max-width: 940px; }
+.group .note b { font-family: 'Outfit'; color: var(--pill-ink); }
+.zero {
+  margin-top: 56px; background: var(--pill-bg); border-radius: 32px; padding: 40px 46px;
+  display: flex; align-items: center; gap: 40px;
+}
+.zero b { font-family: 'Outfit'; font-weight: 800; font-size: 76px; color: var(--accent); letter-spacing: -2px; white-space: nowrap; }
+.zero span { font-size: 29px; line-height: 1.4; color: var(--pill-ink); }
+.foot { margin-top: auto; display: flex; align-items: baseline; justify-content: space-between; }
+.foot b { font-family: 'Outfit'; font-weight: 700; font-size: 34px; color: var(--accent); }
+.foot span { font-family: 'Outfit'; font-weight: 500; font-size: 26px; color: var(--muted); }
+</style></head>
+<body>
+  <div class="head">
+    <div class="brand"><img src="data:image/png;base64,@@LOGO@@" alt=""><span>live.tips</span></div>
+    <div class="badge">Open source · MIT</div>
+  </div>
+
+  <div class="eyebrow">Fans pay with what they already have</div>
+  <h1>One QR code.<br><em>Every way to pay.</em></h1>
+
+  <div class="qr-line">
+    <div class="qr">@@QR@@</div>
+    <p>The audience scans <b>one code</b> and picks whatever is already on their phone. No app to install, no account to create. <b>This one is real — try it.</b></p>
+  </div>
+
+  <div class="group">
+    <div class="label">Straight into your Stripe</div>
+    <div class="chips"><span class="chip">Card</span><span class="chip">Apple Pay</span><span class="chip">Google Pay</span></div>
+  </div>
+
+  <div class="group">
+    <div class="label">App-to-app · person to person</div>
+    <div class="chips"><span class="chip hot">Revolut</span><span class="chip hot">MobilePay</span><span class="chip soon">more coming</span></div>
+    <div class="note">These move money <b>directly between people</b> — with no card processing fee in between at all.</div>
+  </div>
+
+  <div class="zero">
+    <b>€0.00</b>
+    <span>of every app-to-app tip goes to fees. The whole amount lands with the artist — and we still see none of it.</span>
+  </div>
+
+  <div class="foot"><b>live.tips</b><span>the open-source live tip jar for performers</span></div>
+</body></html>

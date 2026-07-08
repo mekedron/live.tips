@@ -1,0 +1,117 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: 'Outfit'; src: url(data:font/woff2;base64,@@OUTFIT@@) format('woff2'); font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'Noto Sans'; src: url(data:font/woff2;base64,@@NOTO@@) format('woff2'); font-weight: 100 900; font-display: block; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #FAF6F1; --ink: #221D18; --accent: #E8542F;
+  --pill-bg: #FDE7DF; --pill-ink: #8A2E14;
+  --muted: rgba(34,29,24,.56); --line: rgba(34,29,24,.12);
+}
+html, body { width: 1200px; height: 1500px; overflow: hidden; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: 'Noto Sans', sans-serif;
+  display: flex; flex-direction: column;
+  padding: 84px 92px 72px;
+}
+.head { display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 20px; }
+.brand img { width: 68px; height: 68px; border-radius: 17px; }
+.brand span { font-family: 'Outfit'; font-weight: 700; font-size: 42px; letter-spacing: -0.5px; }
+.badge {
+  background: var(--pill-bg); color: var(--pill-ink);
+  font-family: 'Outfit'; font-weight: 600; font-size: 26px;
+  padding: 14px 30px; border-radius: 999px;
+}
+.eyebrow {
+  margin-top: 48px;
+  font-family: 'Outfit'; font-weight: 600; font-size: 26px;
+  letter-spacing: 3.5px; color: var(--muted); text-transform: uppercase;
+}
+h1 {
+  margin-top: 14px;
+  font-family: 'Outfit'; font-weight: 800; font-size: 84px;
+  letter-spacing: -2px; line-height: 1.06;
+}
+h1 em { font-style: normal; color: var(--accent); }
+.stage-unused {
+  margin-top: 44px;
+  border-radius: 36px;
+  background: radial-gradient(120% 90% at 50% -10%, #4A2422 0%, #33191B 45%, #241214 100%);
+  padding: 48px 54px 50px;
+  color: #FAF6F1;
+  position: relative;
+  overflow: hidden;
+}
+.stage::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(38% 55% at 50% 0%, rgba(255,190,140,.22), transparent 70%);
+}
+.stage > * { position: relative; }
+.hud { display: flex; justify-content: space-between; align-items: center; }
+.hud .pill {
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Outfit'; font-weight: 600; font-size: 22px; letter-spacing: 1.5px;
+  background: rgba(0,0,0,.35); border-radius: 999px; padding: 12px 24px;
+}
+.dot { width: 14px; height: 14px; border-radius: 50%; }
+.dot.red { background: #FF6B57; } .dot.green { background: #4CD07D; }
+.amount {
+  text-align: center; font-family: 'Outfit'; font-weight: 800;
+  font-size: 130px; letter-spacing: -2px; margin-top: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.bar { margin: 26px auto 0; width: 62%; height: 12px; border-radius: 999px; background: rgba(255,255,255,.16); }
+.bar i { display: block; width: 72%; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #E8542F, #FF9A63); }
+.goal {
+  text-align: center; font-family: 'Outfit'; font-weight: 600;
+  font-size: 26px; color: rgba(250,246,241,.75); margin-top: 18px;
+}
+.toast {
+  margin: 40px auto 6px; width: 78%;
+  background: rgba(20,9,10,.72); border: 2px solid rgba(255,255,255,.14);
+  border-radius: 26px; padding: 26px 34px;
+  display: flex; gap: 24px; align-items: center;
+}
+.toast .ava {
+  flex: none; width: 62px; height: 62px; border-radius: 50%;
+  background: #E8542F; color: #fff;
+  font-family: 'Outfit'; font-weight: 700; font-size: 30px;
+  display: flex; align-items: center; justify-content: center;
+}
+.toast b { font-family: 'Outfit'; font-weight: 700; font-size: 32px; display: block; }
+.toast span { font-size: 26px; color: rgba(250,246,241,.72); font-style: italic; }
+.shot { margin: 34px 0 0; }
+.shot img { width: 100%; display: block; border-radius: 36px; }
+.shot figcaption { margin-top: 14px; font-size: 24px; color: var(--muted); text-align: center; }
+.rows { margin-top: 32px; display: flex; flex-direction: column; gap: 22px; }
+.rows .r { display: flex; gap: 20px; align-items: baseline; font-size: 29px; color: rgba(34,29,24,.8); }
+.rows .r::before { content: '●'; color: var(--accent); font-size: 20px; }
+.rows .r b { font-family: 'Outfit'; font-weight: 700; color: var(--ink); }
+.foot { margin-top: auto; padding-top: 30px; display: flex; align-items: baseline; justify-content: space-between; }
+.foot b { font-family: 'Outfit'; font-weight: 700; font-size: 34px; color: var(--accent); }
+.foot span { font-family: 'Outfit'; font-weight: 500; font-size: 26px; color: var(--muted); }
+</style></head>
+<body>
+  <div class="head">
+    <div class="brand"><img src="data:image/png;base64,@@LOGO@@" alt=""><span>live.tips</span></div>
+    <div class="badge">Open source · MIT</div>
+  </div>
+
+  <div class="eyebrow">The part no other tip jar has</div>
+  <h1>Streamers get live<br>tip alerts. <em>Now the<br>stage does too.</em></h1>
+
+  <figure class="shot">
+    <img src="data:image/png;base64,@@STAGE@@" alt="live.tips stage demo">
+    <figcaption>The actual live demo at live.tips — the real renderer, running in the browser.</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="r"><div><b>Name, message, confetti</b> — every tip pops up the moment it lands, and tonight's goal fills up in front of the audience.</div></div>
+    <div class="r"><div><b>No OBS, no stream, no account</b> — a tablet on stage is the whole setup.</div></div>
+  </div>
+
+  <div class="foot"><b>live.tips</b><span>the open-source live tip jar for performers</span></div>
+</body></html>
