@@ -72,6 +72,15 @@ jobs:
           # flutter_service_worker.js resolve from the wrong root (white screen).
           flutter build web --release --base-href "/app/"
 
+      # Stamp a per-build ?v=<commit> onto the Flutter entry points
+      # (flutter_bootstrap.js + main.dart.js). Both ship under stable URLs that
+      # Cloudflare hands to browsers with a long cache TTL, so without this an
+      # installed iOS PWA keeps running the main.dart.js it cached weeks ago and
+      # only a manual "Clear Website Data" fixes it (edge purge can't reach the
+      # copy already in Safari). The query string makes every deploy a fresh URL.
+      - name: Cache-bust web entry points
+        run: scripts/cache_bust_web.sh app/build/web "$GITHUB_SHA"
+
       - name: Assemble site
         run: |
           set -euo pipefail
