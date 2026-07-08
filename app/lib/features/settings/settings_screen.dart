@@ -14,8 +14,6 @@ import 'account_details_screen.dart';
 import 'relay_method_screen.dart';
 import 'stripe_key_screen.dart';
 
-const _kAppVersion = '0.3.0';
-
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -257,7 +255,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Column(
           children: [
             Text(
-              'live.tips v$_kAppVersion · open source — your keys, your money',
+              'live.tips · open source — your keys, your money',
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontFamily: kFontBody, fontSize: 12, color: c.textMuted),
@@ -277,7 +275,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onPressed: () => showLicensePage(
                     context: context,
                     applicationName: 'live.tips',
-                    applicationVersion: _kAppVersion,
                   ),
                   child: const Text('Licenses'),
                 ),
