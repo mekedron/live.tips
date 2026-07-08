@@ -246,6 +246,49 @@ class LtPrimaryButton extends StatelessWidget {
   }
 }
 
+/// Full-width destructive secondary action — red outline, quieter than the
+/// coral primary. Shared by the payment-method editors ("Disconnect Stripe",
+/// "Remove Revolut", …) so every method screen removes the same way.
+class LtDangerButton extends StatelessWidget {
+  const LtDangerButton({
+    super.key,
+    required this.label,
+    this.icon = Icons.link_off_rounded,
+    this.onPressed,
+    this.busy = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: busy ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: c.danger,
+          side: BorderSide(color: c.danger.withValues(alpha: 0.5)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+        icon: busy
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.2, color: c.danger),
+              )
+            : Icon(icon, size: 18),
+        label: Text(label),
+      ),
+    );
+  }
+}
+
 /// 36px round accent-soft icon button — the copy/share/print trio.
 class LtIconCircleButton extends StatelessWidget {
   const LtIconCircleButton({

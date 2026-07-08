@@ -480,6 +480,24 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(apiKey: null);
   }
 
+  /// Disconnects Stripe from the active band: forgets the API key and the tip
+  /// jar on this device, leaving relay methods, history, and other bands
+  /// intact. The artist's Stripe account and past payments are untouched —
+  /// deactivating the old payment link and dropping it from the relay donor
+  /// page is the caller's job (best effort, needs the network).
+  Future<void> disconnectStripe() async {
+    final accountId = state.accountId;
+    try {
+      await ref.read(secureStoreProvider).deleteApiKey(accountId);
+    } catch (_) {
+      // Locked keychain: the in-memory key still goes away this session; the
+      // next boot re-reads the entry and the user can disconnect again.
+    }
+    await ref.read(localStoreProvider).clearTipJar(accountId);
+    if (state.accountId != accountId) return;
+    state = state.copyWith(apiKey: null, tipJar: null);
+  }
+
   /// Drops a band the user walked away from without ever configuring:
   /// no name, no local data, and (confirmed, not just unloaded) no secrets.
   /// Any doubt — a keychain error, one leftover key — keeps the band.

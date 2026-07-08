@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
@@ -28,6 +29,7 @@ class RelayMethodScreen extends ConsumerStatefulWidget {
 class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
   final _controller = TextEditingController();
   bool _busy = false;
+  bool _removing = false;
   String? _error;
 
   bool get _isRevolut => widget.method == TipMethod.revolut;
@@ -46,13 +48,25 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
     super.dispose();
   }
 
-  /// Clears the field and immediately saves — the removal affordance.
-  void _clearAndSave() {
-    _controller.clear();
-    _save();
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData('text/plain');
+    final text = data?.text?.trim();
+    if (text != null && text.isNotEmpty) {
+      setState(() {
+        _controller.text = text;
+        _error = null;
+      });
+    }
   }
 
-  Future<void> _save() async {
+  /// Clears the field and saves — the removal affordance, from the separate
+  /// "Remove …" button so every method screen removes the same way.
+  Future<void> _remove() async {
+    _controller.clear();
+    await _save(removing: true);
+  }
+
+  Future<void> _save({bool removing = false}) async {
     final app = ref.read(appStateProvider);
     final notifier = ref.read(appStateProvider.notifier);
     final jar = app.relayJar;
@@ -135,6 +149,7 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
 
     setState(() {
       _busy = true;
+      _removing = removing;
       _error = null;
     });
     final client = RelayClient();
@@ -194,7 +209,12 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
       if (mounted) setState(() => _error = e.message);
     } finally {
       client.close();
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _removing = false;
+        });
+      }
     }
   }
 
@@ -205,9 +225,18 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
     Navigator.of(context).pop();
   }
 
+  Widget _pasteButton(LtColors c) => IconButton(
+        tooltip: 'Paste',
+        icon: Icon(Icons.content_paste_rounded, size: 20, color: c.accent),
+        onPressed: _pasteFromClipboard,
+      );
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
+    final jar = ref.watch(appStateProvider).relayJar;
+    final currentlySet =
+        _isRevolut ? (jar?.hasRevolut ?? false) : (jar?.hasMobilePay ?? false);
     return Scaffold(
       appBar: AppBar(title: Text(widget.method.label)),
       body: Center(
@@ -235,70 +264,46 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
                   children: [
                     _FieldLabel(
                         _isRevolut ? 'Revolut username' : 'MobilePay Box'),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _isRevolut
-                              ? TextField(
-                                  controller: _controller,
-                                  autocorrect: false,
-                                  enableSuggestions: false,
-                                  decoration: InputDecoration(
-                                    prefixText: '@',
-                                    hintText: 'username',
-                                    errorText: _error,
-                                    errorMaxLines: 3,
-                                  ),
-                                  onChanged: (_) {
-                                    if (_error != null) {
-                                      setState(() => _error = null);
-                                    }
-                                  },
-                                )
-                              : TextField(
-                                  controller: _controller,
-                                  autocorrect: false,
-                                  enableSuggestions: false,
-                                  style: const TextStyle(
-                                      fontFamily: 'monospace', fontSize: 13.5),
-                                  decoration: InputDecoration(
-                                    hintText: 'https://qr.mobilepay.fi/box/…',
-                                    errorText: _error,
-                                    errorMaxLines: 3,
-                                  ),
-                                  onChanged: (_) {
-                                    if (_error != null) {
-                                      setState(() => _error = null);
-                                    }
-                                  },
-                                ),
-                        ),
-                        const SizedBox(width: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: IconButton(
-                            tooltip: 'Clear & remove this method',
-                            onPressed: _busy ? null : _clearAndSave,
-                            style: IconButton.styleFrom(
-                              backgroundColor: c.danger.withValues(alpha: 0.10),
-                              foregroundColor: c.danger,
+                    _isRevolut
+                        ? TextField(
+                            controller: _controller,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            decoration: InputDecoration(
+                              prefixText: '@',
+                              hintText: 'username',
+                              errorText: _error,
+                              errorMaxLines: 3,
+                              suffixIcon: _pasteButton(c),
                             ),
-                            icon: const Icon(Icons.delete_outline_rounded),
+                            onChanged: (_) {
+                              if (_error != null) setState(() => _error = null);
+                            },
+                          )
+                        : TextField(
+                            controller: _controller,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            style: const TextStyle(
+                                fontFamily: 'monospace', fontSize: 13.5),
+                            decoration: InputDecoration(
+                              hintText: 'https://qr.mobilepay.fi/box/…',
+                              errorText: _error,
+                              errorMaxLines: 3,
+                              suffixIcon: _pasteButton(c),
+                            ),
+                            onChanged: (_) {
+                              if (_error != null) setState(() => _error = null);
+                            },
                           ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 8),
                     Text(
                       _isRevolut
                           ? 'In the Revolut app: tap your profile → your '
-                              '@username is under your name. Clear the field '
-                              'to remove Revolut.'
+                              '@username is under your name.'
                           : 'In MobilePay: open your Box → Share → paste the '
                               'whole link or just the code. MobilePay Boxes '
-                              'are EUR only. Clear the field to remove '
-                              'MobilePay.',
+                              'are EUR only.',
                       style: TextStyle(
                           fontFamily: kFontBody,
                           fontSize: 12,
@@ -311,9 +316,17 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
               const SizedBox(height: 20),
               LtPrimaryButton(
                 label: 'Save',
-                busy: _busy,
-                onPressed: _save,
+                busy: _busy && !_removing,
+                onPressed: _busy ? null : _save,
               ),
+              if (currentlySet) ...[
+                const SizedBox(height: 12),
+                LtDangerButton(
+                  label: 'Remove ${widget.method.label}',
+                  onPressed: _busy ? null : _remove,
+                  busy: _removing,
+                ),
+              ],
             ],
           ),
         ),

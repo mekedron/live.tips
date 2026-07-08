@@ -29,6 +29,7 @@ class StripeKeyScreen extends ConsumerStatefulWidget {
 class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
   final _keyController = TextEditingController();
   bool _busy = false;
+  bool _removing = false;
   String? _error;
   KeyCheckResult? _checks;
 
@@ -163,6 +164,89 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
     } finally {
       probe.close();
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Forgets the Stripe key + tip jar for this band. The payment link is
+  /// retired and dropped from the connected-mode donor page (both best
+  /// effort). The Stripe account itself is untouched.
+  Future<void> _disconnect() async {
+    final app = ref.read(appStateProvider);
+    final oldJar = app.tipJar;
+    final relayJar = app.relayJar;
+    final relaySecret = app.relaySecret;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disconnect Stripe?'),
+        content: const Text(
+          'Removes the Stripe key and tip link from this band on this device. '
+          'Your Stripe account and its payments stay in Stripe — you can '
+          'reconnect a key any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() {
+      _busy = true;
+      _removing = true;
+      _error = null;
+    });
+    try {
+      // Retire the payment link while the key is still on the device.
+      final requests = ref.read(stripeRequestsProvider);
+      if (oldJar != null && !oldJar.isDemo) {
+        try {
+          await requests?.deactivatePaymentLink(oldJar.paymentLinkId);
+        } catch (_) {
+          // Best effort — forgetting the key locally matters more.
+        }
+      }
+      // Drop the card button from the connected-mode donor page.
+      if (relayJar != null && relaySecret != null) {
+        final client = RelayClient();
+        try {
+          await client.updateJar(
+            jar: relayJar,
+            secret: relaySecret,
+            artistName: relayJar.artistName,
+            message: relayJar.message,
+            stripeUrl: null,
+          );
+        } catch (_) {
+        } finally {
+          client.close();
+        }
+      }
+      await ref.read(appStateProvider.notifier).disconnectStripe();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Stripe disconnected')));
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _removing = false;
+        });
+      }
     }
   }
 
@@ -333,12 +417,20 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                     const SizedBox(height: 14),
                     LtPrimaryButton(
                       label: connected ? 'Verify & replace' : 'Verify & connect',
-                      busy: _busy,
-                      onPressed: _save,
+                      busy: _busy && !_removing,
+                      onPressed: _busy ? null : _save,
                     ),
                   ],
                 ),
               ),
+              if (connected) ...[
+                const SizedBox(height: 12),
+                LtDangerButton(
+                  label: 'Disconnect Stripe',
+                  onPressed: _busy ? null : _disconnect,
+                  busy: _removing,
+                ),
+              ],
               if (_checks != null) ...[
                 const SizedBox(height: 14),
                 LtCard(

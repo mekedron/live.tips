@@ -90,19 +90,23 @@ void main() {
       (tester) async {
     await _pumpSettings(tester, withStripe: true);
 
-    // Stripe is now a tappable full page.
+    // Stripe is now a tappable full page with a paste button and a disconnect.
     await tester.tap(find.text('Stripe'));
     await tester.pumpAndSettle();
     expect(find.text('Verify & replace'), findsOneWidget);
+    expect(find.byTooltip('Paste'), findsOneWidget);
+    expect(find.text('Disconnect Stripe'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
 
-    // Revolut opens its own single-method editor with the clear/remove button.
+    // Revolut opens its own single-method editor with a Paste button and a
+    // separate Remove button (shown because the jar already has Revolut set).
     await tester.tap(find.text('Revolut'));
     await tester.pumpAndSettle();
     expect(find.text('Revolut username'), findsOneWidget);
-    expect(find.byTooltip('Clear & remove this method'), findsOneWidget);
+    expect(find.byTooltip('Paste'), findsOneWidget);
+    expect(find.text('Remove Revolut'), findsOneWidget);
     // Prefilled from the stored jar.
     expect(find.text('foxy'), findsOneWidget);
   });
