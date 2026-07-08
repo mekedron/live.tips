@@ -26,24 +26,75 @@ class SeenPingService {
         gap;
   }
 
-  /// Pings when the last successful ping is older than [gap] (or never
-  /// happened). Every failure is swallowed and leaves the timestamp
-  /// untouched, so the next launch/resume simply retries.
+  /// Once per [gap], re-pushes the band's full profile to the relay. This is
+  /// the keep-alive (the update resets the jar's 90-day timer server-side)
+  /// AND a self-heal: [stripeUrl] is re-sent every time, so a card link that
+  /// failed to sync when it was first created (or changed) repairs itself on
+  /// the next launch — no reprint, same link.
+  ///
+  /// Every failure is swallowed and leaves the timestamp untouched, so the
+  /// next launch/resume simply retries. When the relay reports the jar is
+  /// gone (404) or the secret is stale (401) and [onRelinked] is supplied,
+  /// a replacement jar is created from the same profile and handed back so
+  /// the caller can persist it and warn the artist to reprint.
   Future<void> maybePing({
     required LocalStore store,
     required String accountId,
     required RelayJar jar,
     required String secret,
     required RelayClient client,
+    String? stripeUrl,
+    Future<void> Function(RelayJar newJar, String newSecret, String oldDonateUrl)?
+        onRelinked,
     DateTime Function()? now,
   }) async {
     if (!isDue(store: store, accountId: accountId, now: now)) return;
+    final nowMs = (now ?? DateTime.now)().millisecondsSinceEpoch;
     try {
-      await client.markSeen(jarId: jar.jarId, secret: secret);
-      await store.writeRelaySeenAt(
-          accountId, (now ?? DateTime.now)().millisecondsSinceEpoch);
+      await client.updateJar(
+        jar: jar,
+        secret: secret,
+        artistName: jar.artistName,
+        message: jar.message,
+        stripeUrl: stripeUrl,
+      );
+      await store.writeRelaySeenAt(accountId, nowMs);
+    } on RelayApiException catch (e) {
+      // A gone jar or dead secret is the only thing worth recreating — a 422
+      // (rejected profile) or 429 (rate limit) must NEVER trigger a recreate,
+      // or a transient server rule would silently churn everyone's links.
+      if (onRelinked != null && (e.isNotFound || e.isAuthError)) {
+        await _relink(store, accountId, jar, client, stripeUrl, onRelinked,
+            nowMs);
+      }
+      // Otherwise swallow: retry on the next resume, timestamp untouched.
     } catch (_) {
-      // Offline, rotated secret, expired jar — retry on the next resume.
+      // Offline / timeout — retry on the next resume.
+    }
+  }
+
+  Future<void> _relink(
+    LocalStore store,
+    String accountId,
+    RelayJar jar,
+    RelayClient client,
+    String? stripeUrl,
+    Future<void> Function(RelayJar, String, String) onRelinked,
+    int nowMs,
+  ) async {
+    try {
+      final created = await client.createJar(
+        artistName: jar.artistName,
+        message: jar.message,
+        currency: jar.currency,
+        stripeUrl: stripeUrl,
+        revolutUsername: jar.revolutUsername,
+        mobilepayBoxId: jar.mobilepayBoxId,
+      );
+      await onRelinked(created.jar, created.secret, jar.donateUrl);
+      await store.writeRelaySeenAt(accountId, nowMs);
+    } catch (_) {
+      // Recreate failed (offline, rate-limited) — try again next launch.
     }
   }
 }
@@ -113,6 +164,10 @@ class _RelayKeepaliveState extends ConsumerState<RelayKeepalive>
             jar: jar,
             secret: secret,
             client: client,
+            stripeUrl: store.readTipJar(account.id)?.url,
+            onRelinked: (newJar, newSecret, oldUrl) => ref
+                .read(appStateProvider.notifier)
+                .adoptRelinkedJar(account.id, newJar, newSecret, oldUrl),
           );
         } catch (_) {
           // Keychain hiccup or network failure — this band retries on the

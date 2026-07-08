@@ -248,8 +248,38 @@ class AppStateNotifier extends Notifier<AppState> {
     final accountId = state.accountId;
     await ref.read(secureStoreProvider).deleteRelaySecret(accountId);
     await ref.read(localStoreProvider).clearRelayJar(accountId);
+    await ref.read(localStoreProvider).clearRelayLinkReplaced(accountId);
+    ref.read(relayLinkNoticeProvider.notifier).refresh();
     if (state.accountId != accountId) return;
     state = state.copyWith(relayJar: null, relaySecret: null);
+  }
+
+  /// Persists a replacement jar minted by the keep-alive when the old one was
+  /// gone (404) or its secret was stale (401), for [accountId] (which may not
+  /// be the active band). Records the old donate URL so the artist is told to
+  /// reprint, and updates live state when it's the active band's jar.
+  Future<void> adoptRelinkedJar(
+    String accountId,
+    RelayJar jar,
+    String secret,
+    String oldDonateUrl,
+  ) async {
+    await ref.read(secureStoreProvider).writeRelaySecret(accountId, secret);
+    await ref.read(localStoreProvider).saveRelayJar(accountId, jar);
+    await ref
+        .read(localStoreProvider)
+        .writeRelayLinkReplaced(accountId, oldDonateUrl);
+    ref.read(relayLinkNoticeProvider.notifier).refresh();
+    if (state.accountId == accountId) {
+      state = state.copyWith(relayJar: jar, relaySecret: secret);
+    }
+  }
+
+  /// Dismisses the "your tip page link changed, please reprint" notice.
+  Future<void> dismissRelayLinkNotice() async {
+    final accountId = state.accountId;
+    await ref.read(localStoreProvider).clearRelayLinkReplaced(accountId);
+    ref.read(relayLinkNoticeProvider.notifier).refresh();
   }
 
   Future<void> updateSettings(AppSettings settings) async {
@@ -633,3 +663,23 @@ class RelayHistoryNotifier extends Notifier<List<Donation>> {
 final relayHistoryProvider =
     NotifierProvider<RelayHistoryNotifier, List<Donation>>(
         RelayHistoryNotifier.new);
+
+/// The old donate URL of the active band's auto-replaced tip page, or null
+/// when there's nothing to warn about. Home shows a "please reprint" card
+/// while this is set; [AppStateNotifier.dismissRelayLinkNotice] clears it.
+class RelayLinkNoticeNotifier extends Notifier<String?> {
+  @override
+  String? build() {
+    final accountId =
+        ref.watch(appStateProvider.select((s) => s.accountId));
+    return ref.read(localStoreProvider).readRelayLinkReplaced(accountId);
+  }
+
+  void refresh() => state = ref
+      .read(localStoreProvider)
+      .readRelayLinkReplaced(ref.read(appStateProvider).accountId);
+}
+
+final relayLinkNoticeProvider =
+    NotifierProvider<RelayLinkNoticeNotifier, String?>(
+        RelayLinkNoticeNotifier.new);

@@ -36,6 +36,7 @@ class LocalStore {
   static const kRelayJarBase = 'relay_jar_v1';
   static const kRelaySeenAtBase = 'relay_seen_at_v1';
   static const kRelayHistoryBase = 'relay_history_v1';
+  static const kRelayLinkReplacedBase = 'relay_link_replaced_v1';
   static const kBandSettingsBase = 'band_settings_v1';
 
   /// Every per-band key base — the definition of "a band's local data" for
@@ -48,6 +49,7 @@ class LocalStore {
     kRelayJarBase,
     kRelaySeenAtBase,
     kRelayHistoryBase,
+    kRelayLinkReplacedBase,
     kBandSettingsBase,
   ];
 
@@ -160,6 +162,19 @@ class LocalStore {
 
   Future<void> writeRelaySeenAt(String accountId, int ms) =>
       _prefs.setInt(accountKey(kRelaySeenAtBase, accountId), ms);
+
+  /// The donate URL of a jar that stopped working and was auto-replaced, kept
+  /// until the artist dismisses the "please reprint" notice. Null when there
+  /// is nothing to warn about.
+  String? readRelayLinkReplaced(String accountId) =>
+      _prefs.getString(accountKey(kRelayLinkReplacedBase, accountId));
+
+  Future<void> writeRelayLinkReplaced(String accountId, String oldDonateUrl) =>
+      _prefs.setString(
+          accountKey(kRelayLinkReplacedBase, accountId), oldDonateUrl);
+
+  Future<void> clearRelayLinkReplaced(String accountId) =>
+      _prefs.remove(accountKey(kRelayLinkReplacedBase, accountId));
 
   // --- Relay tip history (device-local tip-page archive) ---
 

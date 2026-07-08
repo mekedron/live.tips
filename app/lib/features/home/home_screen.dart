@@ -113,6 +113,72 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
+/// Shown when the keep-alive had to auto-replace a dead tip-page link. Warns
+/// the artist that printed QR codes now point at the old (dead) link and
+/// offers the fresh QR to reprint. Renders nothing when there's no notice.
+class _ReprintNoticeCard extends ConsumerWidget {
+  const _ReprintNoticeCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final oldUrl = ref.watch(relayLinkNoticeProvider);
+    if (oldUrl == null) return const SizedBox.shrink();
+    final c = context.lt;
+    final url = ref.watch(appStateProvider).activeQrUrl;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: kGold.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kGold.withValues(alpha: 0.45)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 20, color: c.text),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    context.s.t('home.reprint.title'),
+                    style: outfitStyle(14, c.text, weight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              context.s.t('home.reprint.body'),
+              style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (url != null)
+                  TextButton(
+                    onPressed: () => showFullscreenQr(context, url),
+                    child: Text(context.s.t('home.reprint.show_qr')),
+                  ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => ref
+                      .read(appStateProvider.notifier)
+                      .dismissRelayLinkNotice(),
+                  child: Text(context.s.t('home.reprint.dismiss')),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Mobile · 390-style single column with the logo top bar
 // ---------------------------------------------------------------------------
@@ -156,6 +222,7 @@ class _MobileHome extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 children: [
                   const BandNameButton(fontSize: 24, weight: FontWeight.w700),
+                  const _ReprintNoticeCard(),
                   const SizedBox(height: 14),
                   goalCard,
                   if (url != null) ...[
@@ -203,6 +270,7 @@ class _DesktopHome extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const BandNameButton(fontSize: 32, weight: FontWeight.w800),
+              const _ReprintNoticeCard(),
               const SizedBox(height: 28),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
