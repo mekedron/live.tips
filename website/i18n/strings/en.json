@@ -23,6 +23,7 @@
   "hud_live": "LIVE DEMO",
   "hud_watching": "Watching Stripe",
   "tip_btn": "Toss in a demo tip",
+  "stage_loading": "Loading demo…",
   "a11y_zoom_in": "Zoom in",
   "a11y_zoom_out": "Zoom out",
   "ctrl_jar": "JAR",

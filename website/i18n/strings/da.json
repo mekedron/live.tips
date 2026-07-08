@@ -23,6 +23,7 @@
   "hud_live": "LIVE-DEMO",
   "hud_watching": "Holder øje med Stripe",
   "tip_btn": "Smid en demo-skilling i",
+  "stage_loading": "Indlæser demo…",
   "a11y_zoom_in": "Zoom ind",
   "a11y_zoom_out": "Zoom ud",
   "ctrl_jar": "KRUKKE",

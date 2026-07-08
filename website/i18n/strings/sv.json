@@ -23,6 +23,7 @@
   "hud_live": "LIVEDEMO",
   "hud_watching": "Bevakar Stripe",
   "tip_btn": "Släng in en demodricks",
+  "stage_loading": "Laddar demo…",
   "a11y_zoom_in": "Zooma in",
   "a11y_zoom_out": "Zooma ut",
   "ctrl_jar": "BURK",

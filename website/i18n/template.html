@@ -316,6 +316,19 @@
      stays click-through; only its three controls opt back into taps. */
   .stage-shield { position: absolute; inset: 0; pointer-events: auto; touch-action: manipulation; }
   .stage-hud { position: absolute; inset: 0; pointer-events: none; touch-action: manipulation; }
+  /* Shown over the black backdrop until the stage's own `ready` message says
+     the first WebGL frame is on screen. Covers the gap before the first
+     gesture/intersection fires the lazy load, and stays up for good for
+     crawlers and no-JS visits, where /stage/ never loads at all (see
+     robots.txt) — better than a backdrop that looks broken or empty. */
+  .stage-placeholder {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    gap: 9px; color: rgba(255,255,255,.55); font-family: Outfit, 'Noto Sans', sans-serif;
+    font-weight: 600; font-size: 13px; letter-spacing: .2px; pointer-events: none;
+    opacity: 1; transition: opacity .5s ease;
+  }
+  .stage-placeholder .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.55); animation: lt-pulse 1.6s ease-in-out infinite; }
+  .stage-placeholder.is-hidden { opacity: 0; }
   .hud-pill {
     display: inline-flex; align-items: center; gap: 8px;
     background: rgba(20,17,20,.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -684,6 +697,7 @@
           <button class="btn btn-primary btn-tip" id="tip-btn"><svg class="ms" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm23.5-130.5Q514-221 514-235v-15q50-9 86-39t36-89q0-42-24-77t-96-61q-60-20-83-35t-23-41q0-26 18.5-41t53.5-15q20 0 35 7t25 19q10 12 22.5 16.5t23.5-.5q15-6 20.5-20.5T606-653q-16-23-39.5-39T516-710v-15q0-14-10.5-24.5T481-760q-14 0-24.5 10.5T446-725v15q-50 11-78 44t-28 74q0 47 27.5 76t86.5 50q63 23 87.5 41t24.5 47q0 33-23.5 48.5T486-314q-26 0-47-12.5T404-364q-8-14-21-19t-26 0q-14 5-20.5 19t-.5 27q16 34 43 55.5t65 29.5v17q0 14 10.5 24.5T479-200q14 0 24.5-10.5Z"/></svg>{{tip_btn}}</button>
         </div>
       </div>
+      <div class="stage-placeholder" id="stage-placeholder" aria-hidden="true"><span class="dot"></span>{{stage_loading}}</div>
     </div>
     </div>
     <div class="stage-controls">
@@ -1023,6 +1037,10 @@
     var msg;
     try { msg = JSON.parse(raw); } catch (err) { return; }
     if (msg.type === 'hello') { inited = false; sendInit(); }
+    if (msg.type === 'ready') {
+      var placeholder = document.getElementById('stage-placeholder');
+      if (placeholder) placeholder.classList.add('is-hidden');
+    }
   });
   frame.addEventListener('load', sendInit);
   sendInit();
