@@ -62,34 +62,43 @@ void main() {
       (tester) async {
     await pumpHistory(tester);
 
+    expect(find.text('Sessions'), findsOneWidget);
     expect(find.text('Donations'), findsOneWidget);
-    expect(find.text('Tip page'), findsNothing);
+    expect(find.text('MobilePay'), findsNothing);
+    expect(find.text('Revolut'), findsNothing);
     expect(find.text('Stripe'), findsNothing);
   });
 
   testWidgets(
-      'a connected-mode jar brings the third tab, and the donations tab '
-      'is relabelled Stripe', (tester) async {
+      'a connected-mode jar (Revolut) brings a second tab, and the '
+      'donations tab is relabelled Stripe', (tester) async {
     await pumpHistory(tester, withRelayJar: true);
 
+    expect(find.text('Sessions'), findsOneWidget);
     expect(find.text('Stripe'), findsOneWidget);
-    expect(find.text('Tip page'), findsOneWidget);
+    expect(find.text('Revolut'), findsOneWidget);
+    expect(find.text('MobilePay'), findsNothing);
     expect(find.text('Donations'), findsNothing);
 
     // No archived tips yet → the honest empty state.
-    await tester.tap(find.text('Tip page'));
+    await tester.tap(find.text('Revolut'));
     await tester.pump();
     expect(find.textContaining('after your next live session'),
         findsOneWidget);
   });
 
   testWidgets(
-      'the Tip page tab lists archived tips as badged DonationTiles under '
+      'the MobilePay tab lists archived tips as badged DonationTiles under '
       'the recorded-on-this-device note', (tester) async {
     await pumpHistory(tester,
         withRelayJar: true, relayHistory: [relayTip(0)]);
 
-    await tester.tap(find.text('Tip page'));
+    // The jar's Revolut tab and the archived MobilePay tip's own tab both
+    // show up.
+    expect(find.text('Revolut'), findsOneWidget);
+    expect(find.text('MobilePay'), findsOneWidget);
+
+    await tester.tap(find.text('MobilePay'));
     await tester.pump();
 
     expect(find.textContaining('Recorded on this device'), findsOneWidget);
@@ -97,7 +106,8 @@ void main() {
     expect(tile, findsOneWidget);
     expect(find.text('Maya'), findsOneWidget);
     expect(find.text('Encore!'), findsOneWidget);
-    expect(find.text('MobilePay'), findsOneWidget);
+    // The MobilePay tab label plus the tile's own method badge.
+    expect(find.text('MobilePay'), findsNWidgets(2));
     expect(find.text('unverified'), findsOneWidget);
     // No Stripe transaction behind it → the row must be inert.
     expect(
@@ -107,10 +117,11 @@ void main() {
   });
 
   testWidgets(
-      'relay history alone (jar since deleted) still shows the third tab — '
+      'relay history alone (jar since deleted) still shows its tab — '
       'the tips must stay reachable', (tester) async {
     await pumpHistory(tester, relayHistory: [relayTip(0)]);
 
-    expect(find.text('Tip page'), findsOneWidget);
+    expect(find.text('MobilePay'), findsOneWidget);
+    expect(find.text('Revolut'), findsNothing);
   });
 }

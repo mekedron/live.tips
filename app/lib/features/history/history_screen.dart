@@ -16,16 +16,19 @@ import '../../widgets/lt_ui.dart';
 import '../../widgets/method_badges.dart';
 import '../shell/app_shell.dart';
 
-enum _HistoryTab { donations, relay, sessions }
+// Session-first, then the relay methods artists lean on day to day, with
+// Stripe last — it's the recommended path but the least-used tab in
+// practice.
+enum _HistoryTab { sessions, mobilepay, revolut, donations }
 
-/// Header note over the device-local tip-page list — honesty first: these
+/// Header note over the device-local tip-page lists — honesty first: these
 /// rows are donor-declared, not settled payments.
 const _kRelayHistoryNote =
     'Recorded on this device when tips reach your live screen — '
     'not confirmed payments.';
 
-const _kRelayHistoryEmpty =
-    'Tips from your tip page will appear here after your next live session.';
+String _relayHistoryEmpty(TipMethod method) =>
+    'Tips from ${method.label} will appear here after your next live session.';
 
 /// Opens the donation's transaction in the artist's Stripe Dashboard (a new
 /// browser tab on web). No-op for tips that have no link — demo tips, or
@@ -86,7 +89,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
-  _HistoryTab _tab = _HistoryTab.donations;
+  _HistoryTab _tab = _HistoryTab.sessions;
   final List<Donation> _donations = [];
   bool _hasMore = true;
   bool _loading = false;
@@ -162,18 +165,48 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final jar = app.effectiveTipJar;
     final stripeAllUrl =
         (jar == null || jar.isDemo) ? null : jar.stripePaymentsUrl;
-    // The tip-page tab exists for anyone with a connected-mode jar, and for
-    // anyone whose device still remembers tips from one (jar deleted, tips
+    // Each relay-method tab exists for anyone whose jar offers it, and for
+    // anyone whose device still remembers tips from it (jar deleted, tips
     // kept). Stripe-only installs keep the familiar two tabs untouched.
     final relayHistory = ref.watch(relayHistoryProvider);
-    final showRelay = app.hasRelay || relayHistory.isNotEmpty;
-    if (!showRelay && _tab == _HistoryTab.relay) {
-      _tab = _HistoryTab.donations; // the tab just vanished under us
+    final relayJar = app.effectiveRelayJar;
+    final showMobilePay = (relayJar?.hasMobilePay ?? false) ||
+        relayHistory.any((d) => d.method == TipMethod.mobilepay);
+    final showRevolut = (relayJar?.hasRevolut ?? false) ||
+        relayHistory.any((d) => d.method == TipMethod.revolut);
+    if (_tab == _HistoryTab.mobilepay && !showMobilePay) {
+      _tab = _HistoryTab.sessions; // the tab just vanished under us
+    }
+    if (_tab == _HistoryTab.revolut && !showRevolut) {
+      _tab = _HistoryTab.sessions;
     }
     return isRail
-        ? _buildDesktop(sessions, stripeAllUrl, showRelay, relayHistory)
-        : _buildMobile(sessions, stripeAllUrl, showRelay, relayHistory);
+        ? _buildDesktop(
+            sessions, stripeAllUrl, showMobilePay, showRevolut, relayHistory)
+        : _buildMobile(
+            sessions, stripeAllUrl, showMobilePay, showRevolut, relayHistory);
   }
+
+  /// Tabs in fixed left-to-right order (Sessions, then relay methods, then
+  /// Stripe last — it's recommended but the least-used tab in practice),
+  /// filtered to the ones that currently apply.
+  List<_HistoryTab> _visibleTabs(bool showMobilePay, bool showRevolut) => [
+        _HistoryTab.sessions,
+        if (showMobilePay) _HistoryTab.mobilepay,
+        if (showRevolut) _HistoryTab.revolut,
+        _HistoryTab.donations,
+      ];
+
+  String _tabLabel(_HistoryTab t, bool showMobilePay, bool showRevolut) =>
+      switch (t) {
+        _HistoryTab.sessions => 'Sessions',
+        _HistoryTab.mobilepay => 'MobilePay',
+        _HistoryTab.revolut => 'Revolut',
+        // 'Stripe' only makes sense next to a relay tab — alone it stays
+        // 'Donations', so Stripe-only users see no churn.
+        _HistoryTab.donations =>
+          (showMobilePay || showRevolut) ? 'Stripe' : 'Donations',
+      };
 
   // -------------------------------------------------------------- stats ---
 
@@ -195,7 +228,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   // ------------------------------------------------------------- mobile ---
 
   Widget _buildMobile(List<LiveSession> sessions, String? stripeAllUrl,
-      bool showRelay, List<Donation> relayHistory) {
+      bool showMobilePay, bool showRevolut, List<Donation> relayHistory) {
     final c = context.lt;
     final stats = _stats(sessions);
     return Center(
@@ -238,24 +271,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 14),
               LtSegmented<_HistoryTab>(
-                values: showRelay
-                    ? _HistoryTab.values
-                    : const [_HistoryTab.donations, _HistoryTab.sessions],
+                values: _visibleTabs(showMobilePay, showRevolut),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
-                labelOf: (t) => switch (t) {
-                  // 'Stripe' only makes sense next to 'Tip page' — alone it
-                  // stays 'Donations', so Stripe-only users see no churn.
-                  _HistoryTab.donations => showRelay ? 'Stripe' : 'Donations',
-                  _HistoryTab.relay => 'Tip page',
-                  _HistoryTab.sessions => 'Sessions',
-                },
+                labelOf: (t) => _tabLabel(t, showMobilePay, showRevolut),
               ),
               const SizedBox(height: 14),
               if (_tab == _HistoryTab.donations) ...[
                 ..._donationGroups(),
-              ] else if (_tab == _HistoryTab.relay)
-                ..._relayGroups(relayHistory)
+              ] else if (_tab == _HistoryTab.mobilepay)
+                ..._relayGroups(relayHistory, TipMethod.mobilepay)
+              else if (_tab == _HistoryTab.revolut)
+                ..._relayGroups(relayHistory, TipMethod.revolut)
               else
                 ..._sessionCards(sessions),
             ],
@@ -268,7 +295,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   // ------------------------------------------------------------ desktop ---
 
   Widget _buildDesktop(List<LiveSession> sessions, String? stripeAllUrl,
-      bool showRelay, List<Donation> relayHistory) {
+      bool showMobilePay, bool showRevolut, List<Donation> relayHistory) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
     final stats = _stats(sessions);
@@ -286,7 +313,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   Text('History',
                       style: outfitStyle(32, c.text, weight: FontWeight.w800)),
                   const Spacer(),
-                  if (!app.demo && stripeAllUrl != null)
+                  if (_tab == _HistoryTab.donations &&
+                      !app.demo &&
+                      stripeAllUrl != null)
                     _ViewInStripeButton(stripeAllUrl),
                 ],
               ),
@@ -311,23 +340,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 24),
               LtSegmented<_HistoryTab>(
-                values: showRelay
-                    ? _HistoryTab.values
-                    : const [_HistoryTab.donations, _HistoryTab.sessions],
+                values: _visibleTabs(showMobilePay, showRevolut),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
-                labelOf: (t) => switch (t) {
-                  // 'Stripe' only makes sense next to 'Tip page' — alone it
-                  // stays 'Donations', so Stripe-only users see no churn.
-                  _HistoryTab.donations => showRelay ? 'Stripe' : 'Donations',
-                  _HistoryTab.relay => 'Tip page',
-                  _HistoryTab.sessions => 'Sessions',
-                },
+                labelOf: (t) => _tabLabel(t, showMobilePay, showRevolut),
               ),
               const SizedBox(height: 24),
               if (_tab == _HistoryTab.donations)
                 _DonationsTable(
-                  title: showRelay ? 'Stripe' : 'Donations',
+                  title: (showMobilePay || showRevolut)
+                      ? 'Stripe'
+                      : 'Donations',
                   demo: app.demo,
                   relayOnly: !app.demo && !app.hasStripe,
                   donations: _donations,
@@ -336,8 +359,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   error: _error,
                   onLoadMore: _loadMore,
                 )
-              else if (_tab == _HistoryTab.relay)
-                _RelayTable(donations: relayHistory)
+              else if (_tab == _HistoryTab.mobilepay)
+                _RelayTable(
+                  title: 'MobilePay',
+                  method: TipMethod.mobilepay,
+                  donations: _byMethod(relayHistory, TipMethod.mobilepay),
+                )
+              else if (_tab == _HistoryTab.revolut)
+                _RelayTable(
+                  title: 'Revolut',
+                  method: TipMethod.revolut,
+                  donations: _byMethod(relayHistory, TipMethod.revolut),
+                )
               else if (sessions.isEmpty)
                 Text(
                   'No sessions yet — hit “Go live” before the first song!',
@@ -394,7 +427,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            'Your Revolut & MobilePay tips are in the Tip page tab. '
+            'Your Revolut & MobilePay tips are in their own tabs. '
             'Connect a Stripe account to take card tips too.',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -506,14 +539,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // --------------------------------------------------- tip-page history ---
 
-  List<Widget> _relayGroups(List<Donation> relayHistory) {
+  List<Donation> _byMethod(List<Donation> donations, TipMethod method) =>
+      donations.where((d) => d.method == method).toList();
+
+  List<Widget> _relayGroups(List<Donation> relayHistory, TipMethod method) {
     final c = context.lt;
-    if (relayHistory.isEmpty) {
+    final donations = _byMethod(relayHistory, method);
+    if (donations.isEmpty) {
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            _kRelayHistoryEmpty,
+            _relayHistoryEmpty(method),
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontFamily: kFontBody,
@@ -536,7 +573,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               color: c.textMuted),
         ),
       ),
-      ..._dayGroupedTiles(relayHistory),
+      ..._dayGroupedTiles(donations),
     ];
   }
 
@@ -789,13 +826,20 @@ class _DonationsTable extends StatelessWidget {
   }
 }
 
-/// Desktop table for the device-local tip-page (Revolut/MobilePay) archive.
-/// Same columns as the Stripe table; the trailing link column stays empty —
-/// these tips have no Stripe transaction to open.
+/// Desktop table for one relay method's (Revolut or MobilePay) device-local
+/// archive. Same columns as the Stripe table; the trailing link column stays
+/// empty — these tips have no Stripe transaction to open.
 class _RelayTable extends StatelessWidget {
-  const _RelayTable({required this.donations});
+  const _RelayTable({
+    required this.title,
+    required this.method,
+    required this.donations,
+  });
 
-  /// Newest first, straight from [relayHistoryProvider].
+  final String title;
+  final TipMethod method;
+
+  /// Newest first, already filtered to [method].
   final List<Donation> donations;
 
   @override
@@ -807,7 +851,7 @@ class _RelayTable extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Revolut & MobilePay',
+          Text(title,
               style: outfitStyle(17, c.text, weight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(
@@ -823,7 +867,7 @@ class _RelayTable extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                _kRelayHistoryEmpty,
+                _relayHistoryEmpty(method),
                 style: TextStyle(
                     fontFamily: kFontBody,
                     fontSize: 13.5,
