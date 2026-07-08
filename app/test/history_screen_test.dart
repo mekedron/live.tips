@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/donation.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/domain/tip_method.dart';
@@ -39,6 +40,7 @@ Future<void> pumpHistory(
   WidgetTester tester, {
   List<Donation> relayHistory = const [],
   bool withRelayJar = false,
+  bool withStripe = false,
 }) async {
   final store = await seededStore(
     accountValues: {
@@ -51,7 +53,13 @@ Future<void> pumpHistory(
   );
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [localStoreProvider.overrideWithValue(store)],
+      overrides: [
+        localStoreProvider.overrideWithValue(store),
+        secureStoreProvider.overrideWithValue(SecureStore()),
+        initialApiKeyProvider.overrideWithValue(
+          withStripe ? 'rk_test_0123456789abcd' : null,
+        ),
+      ],
       child: MaterialApp(
         localizationsDelegates: kTestL10nDelegates,
         locale: const Locale('en'),
@@ -66,9 +74,10 @@ Future<void> pumpHistory(
 
 void main() {
   testWidgets(
-    'no relay anywhere → exactly the familiar two tabs, untouched labels',
+    'Stripe connected, no relay anywhere → exactly the familiar two tabs, '
+    'untouched labels',
     (tester) async {
-      await pumpHistory(tester);
+      await pumpHistory(tester, withStripe: true);
 
       expect(find.text('Sessions'), findsOneWidget);
       expect(find.text('Donations'), findsOneWidget);
@@ -78,9 +87,22 @@ void main() {
     },
   );
 
+  testWidgets(
+    'no Stripe key and no relay history → only the Sessions tab',
+    (tester) async {
+      await pumpHistory(tester);
+
+      expect(find.text('Sessions'), findsOneWidget);
+      expect(find.text('Donations'), findsNothing);
+      expect(find.text('Stripe'), findsNothing);
+      expect(find.text('MobilePay'), findsNothing);
+      expect(find.text('Revolut'), findsNothing);
+    },
+  );
+
   testWidgets('a connected-mode jar (Revolut) brings a second tab, and the '
       'donations tab is relabelled Stripe', (tester) async {
-    await pumpHistory(tester, withRelayJar: true);
+    await pumpHistory(tester, withRelayJar: true, withStripe: true);
 
     expect(find.text('Sessions'), findsOneWidget);
     expect(find.text('Stripe'), findsOneWidget);
@@ -93,6 +115,19 @@ void main() {
     await tester.pump();
     expect(find.textContaining('after your next live session'), findsOneWidget);
   });
+
+  testWidgets(
+    'a connected-mode jar (Revolut) with no Stripe key → Revolut tab only, '
+    'no Stripe/Donations tab',
+    (tester) async {
+      await pumpHistory(tester, withRelayJar: true);
+
+      expect(find.text('Sessions'), findsOneWidget);
+      expect(find.text('Revolut'), findsOneWidget);
+      expect(find.text('Stripe'), findsNothing);
+      expect(find.text('Donations'), findsNothing);
+    },
+  );
 
   testWidgets(
     'the MobilePay tab lists archived tips as badged DonationTiles under '

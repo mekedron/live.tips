@@ -177,10 +177,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final showRevolut =
         (relayJar?.hasRevolut ?? false) ||
         relayHistory.any((d) => d.method == TipMethod.revolut);
+    // Demo mode has no real key but still previews the Stripe tab (with its
+    // own explanatory empty state below); a real, key-less account gets no
+    // tab at all — there's nothing to fetch and nothing archived locally.
+    final showDonations = app.demo || app.hasStripe;
     if (_tab == _HistoryTab.mobilepay && !showMobilePay) {
       _tab = _HistoryTab.sessions; // the tab just vanished under us
     }
     if (_tab == _HistoryTab.revolut && !showRevolut) {
+      _tab = _HistoryTab.sessions;
+    }
+    if (_tab == _HistoryTab.donations && !showDonations) {
       _tab = _HistoryTab.sessions;
     }
     return isRail
@@ -189,6 +196,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             stripeAllUrl,
             showMobilePay,
             showRevolut,
+            showDonations,
             relayHistory,
           )
         : _buildMobile(
@@ -196,6 +204,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             stripeAllUrl,
             showMobilePay,
             showRevolut,
+            showDonations,
             relayHistory,
           );
   }
@@ -203,11 +212,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   /// Tabs in fixed left-to-right order (Sessions, then relay methods, then
   /// Stripe last — it's recommended but the least-used tab in practice),
   /// filtered to the ones that currently apply.
-  List<_HistoryTab> _visibleTabs(bool showMobilePay, bool showRevolut) => [
+  List<_HistoryTab> _visibleTabs(
+    bool showMobilePay,
+    bool showRevolut,
+    bool showDonations,
+  ) => [
     _HistoryTab.sessions,
     if (showMobilePay) _HistoryTab.mobilepay,
     if (showRevolut) _HistoryTab.revolut,
-    _HistoryTab.donations,
+    if (showDonations) _HistoryTab.donations,
   ];
 
   String _tabLabel(
@@ -252,6 +265,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     String? stripeAllUrl,
     bool showMobilePay,
     bool showRevolut,
+    bool showDonations,
     List<Donation> relayHistory,
   ) {
     final c = context.lt;
@@ -307,7 +321,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 14),
               LtSegmented<_HistoryTab>(
-                values: _visibleTabs(showMobilePay, showRevolut),
+                values: _visibleTabs(showMobilePay, showRevolut, showDonations),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
                 labelOf: (t) =>
@@ -336,6 +350,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     String? stripeAllUrl,
     bool showMobilePay,
     bool showRevolut,
+    bool showDonations,
     List<Donation> relayHistory,
   ) {
     final c = context.lt;
@@ -397,7 +412,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 24),
               LtSegmented<_HistoryTab>(
-                values: _visibleTabs(showMobilePay, showRevolut),
+                values: _visibleTabs(showMobilePay, showRevolut, showDonations),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
                 labelOf: (t) =>
