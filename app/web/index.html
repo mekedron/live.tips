@@ -51,14 +51,39 @@
 
   <style>
     /* Stop the browser turning a horizontal overscroll into history
-       navigation — the two-finger swipe (macOS trackpad) and edge swipe
-       (iOS) otherwise fire back/forward mid-session and tear down open
-       modals. Flutter drives its own scrolling, so blocking the x-axis
-       navigation gesture here has no effect on in-app scrolling. */
+       navigation — the two-finger swipe (macOS trackpad, Chromium) otherwise
+       fires back/forward mid-session and tears down open modals. Flutter
+       drives its own scrolling, so blocking the x-axis navigation gesture
+       here has no effect on in-app scrolling. WebKit ignores this property
+       for its edge-swipe gesture, so iOS Safari is handled by the script
+       below instead. */
     html, body {
       overscroll-behavior-x: none;
     }
   </style>
+
+  <script>
+    // iOS/iPadOS Safari — including a home-screen PWA — reads a swipe from the
+    // very left or right screen edge as a back/forward history navigation, and
+    // WebKit ignores `overscroll-behavior-x` for it. Because tab switches don't
+    // push history entries, that swipe hits the root of history: Safari runs its
+    // page-transition animation, peels the Flutter view off the canvas, and
+    // leaves it blank until the next repaint. Cancel the gesture at its source —
+    // swallow single-finger touches that begin inside a thin edge strip before
+    // Safari can start the transition. Multi-finger touches and anything that
+    // starts away from the edge are untouched, so in-app scrolling and taps keep
+    // working (the app has no horizontal swipe gestures of its own).
+    (function () {
+      var EDGE_PX = 24;
+      document.addEventListener('touchstart', function (e) {
+        if (e.touches.length !== 1) return;
+        var x = e.touches[0].clientX;
+        if (x <= EDGE_PX || x >= window.innerWidth - EDGE_PX) {
+          e.preventDefault();
+        }
+      }, { capture: true, passive: false });
+    })();
+  </script>
 </head>
 <body>
   <!--
