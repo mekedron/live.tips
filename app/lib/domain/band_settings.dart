@@ -8,7 +8,7 @@ import 'poster.dart';
 class BandSettings {
   const BandSettings({
     this.qrMode = QrMode.connected,
-    this.lastGoalMinor = 10000,
+    this.lastGoalMinor = 5000,
     this.poster = const PosterSettings(),
   });
 
@@ -40,7 +40,7 @@ class BandSettings {
 
   factory BandSettings.fromJson(Map<String, dynamic> json) => BandSettings(
         qrMode: QrMode.fromWire(json['qrMode'] as String?),
-        lastGoalMinor: (json['lastGoalMinor'] as num?)?.toInt() ?? 10000,
+        lastGoalMinor: (json['lastGoalMinor'] as num?)?.toInt() ?? 5000,
         poster: json['poster'] is Map
             ? PosterSettings.fromJson(
                 Map<String, dynamic>.from(json['poster'] as Map),

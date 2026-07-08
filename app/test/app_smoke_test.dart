@@ -32,6 +32,5 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Go live'), findsOneWidget);
-    expect(find.text('Demo'), findsOneWidget);
   });
 }

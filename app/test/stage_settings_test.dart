@@ -5,14 +5,17 @@ import 'package:live_tips/domain/stage_settings.dart';
 
 void main() {
   group('StageSettings', () {
-    test('defaults: 3D plain 2 L jar, abstract set, golden hour, sound on', () {
+    test(
+        'defaults: 3D tin can, abstract set, golden hour, coin sound off, '
+        'fanfare on', () {
       const s = StageSettings();
       expect(s.style, StageStyle.jar3d);
-      expect(s.vessel, JarVessel.jar2);
+      expect(s.vessel, JarVessel.tin);
       expect(s.scene, JarScene.abstractGlow);
       expect(s.theme, JarTheme.goldenHour);
       expect(s.showNotes, isFalse, reason: 'paper money is opt-in');
-      expect(s.soundEnabled, isTrue);
+      expect(s.soundEnabled, isFalse,
+          reason: 'coin clinks are opt-in; the fanfare alone is enough');
       expect(
         s.tipSoundEnabled,
         isTrue,

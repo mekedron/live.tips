@@ -54,8 +54,8 @@ void main() {
       expect(const BandSettings().qrMode, QrMode.connected);
     });
 
-    test('lastGoalMinor defaults to 10000', () {
-      expect(const BandSettings().lastGoalMinor, 10000);
+    test('lastGoalMinor defaults to 5000', () {
+      expect(const BandSettings().lastGoalMinor, 5000);
       expect(const BandSettings().poster, const PosterSettings());
     });
 

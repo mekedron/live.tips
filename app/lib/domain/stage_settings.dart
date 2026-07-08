@@ -55,7 +55,7 @@ enum JarVessel {
   final int capacityMajor;
 
   static JarVessel fromWire(String? wire,
-          {JarVessel fallback = JarVessel.jar2}) =>
+          {JarVessel fallback = JarVessel.tin}) =>
       values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
 
   /// Vessels the picker offers. [stage] is intentionally left out — it stays a
@@ -134,11 +134,11 @@ enum StageQuality {
 class StageSettings {
   const StageSettings({
     this.style = StageStyle.jar3d,
-    this.vessel = JarVessel.jar2,
+    this.vessel = JarVessel.tin,
     this.scene = JarScene.abstractGlow,
     this.theme = JarTheme.goldenHour,
     this.showNotes = false,
-    this.soundEnabled = true,
+    this.soundEnabled = false,
     this.tipSoundEnabled = true,
     this.quality = StageQuality.auto,
     this.railWidth = kStageRailDefaultWidth,
@@ -215,7 +215,7 @@ class StageSettings {
         scene: JarScene.fromWire(json['scene'] as String?),
         theme: JarTheme.fromWire(json['theme'] as String?),
         showNotes: json['showNotes'] as bool? ?? false,
-        soundEnabled: json['soundEnabled'] as bool? ?? true,
+        soundEnabled: json['soundEnabled'] as bool? ?? false,
         tipSoundEnabled: json['tipSoundEnabled'] as bool? ?? true,
         quality: StageQuality.fromWire(json['quality'] as String?),
         railWidth: ((json['railWidth'] as num?)?.toDouble() ??

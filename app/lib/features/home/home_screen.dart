@@ -108,14 +108,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-LtKeyStatus _keyStatus(AppState app) => app.demo
-    ? LtKeyStatus.demo
-    : !app.hasStripe && app.hasRelay
-        ? LtKeyStatus.relay
-        : app.isTestMode
-            ? LtKeyStatus.test
-            : LtKeyStatus.live;
-
 // ---------------------------------------------------------------------------
 // Mobile · 390-style single column with the logo top bar
 // ---------------------------------------------------------------------------
@@ -148,8 +140,6 @@ class _MobileHome extends StatelessWidget {
                 const SizedBox(width: 10),
                 Text('live.tips',
                     style: outfitStyle(17, c.text, weight: FontWeight.w700)),
-                const Spacer(),
-                StatusPill(status: _keyStatus(app)),
               ],
             ),
           ),
