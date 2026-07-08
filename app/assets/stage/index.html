@@ -26,6 +26,28 @@
 </head>
 <body>
 <div id="stage"></div>
+<script>
+  // The stage fills the screen edge to edge inside a same-origin <iframe>, so
+  // a swipe from the left/right screen edge lands HERE, not on the host page —
+  // its own edge-swipe guard (app/web/index.html) never sees these touches.
+  // iOS/iPadOS Safari reads that swipe as history back/forward (touch-action
+  // above doesn't cover this system gesture), which tears the stage off the
+  // canvas and leaves it blank. The stage is meant to be left only by the Stop
+  // button (live) or the on-screen back arrow (preview), so cancel the gesture
+  // at its source: swallow single-finger touches that begin in a thin edge
+  // strip before Safari can start the transition. Orbit drags start well
+  // inside the scene, so they're untouched.
+  (function () {
+    var EDGE_PX = 24;
+    document.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      var x = e.touches[0].clientX;
+      if (x <= EDGE_PX || x >= window.innerWidth - EDGE_PX) {
+        e.preventDefault();
+      }
+    }, { capture: true, passive: false });
+  })();
+</script>
 <script src="stage.js"></script>
 </body>
 </html>
