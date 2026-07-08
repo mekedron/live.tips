@@ -7,6 +7,7 @@ import 'package:live_tips/features/live/stage/stage_resolver.dart';
 import 'package:live_tips/features/settings/stage_preview_screen.dart';
 import 'package:live_tips/state/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'helpers.dart';
 
 /// Drives the real preview: open the form, fill name/message/amount, submit,
 /// and after the ~1 s beat the tip lands on the stage exactly like a live one.
@@ -23,7 +24,11 @@ Future<ProviderScope> _host() async {
       initialApiKeyProvider.overrideWithValue(null),
       stageCapabilityProvider.overrideWithValue(false),
     ],
-    child: const MaterialApp(home: StagePreviewScreen()),
+    child: const MaterialApp(
+      localizationsDelegates: kTestL10nDelegates,
+      locale: Locale('en'),
+      home: StagePreviewScreen(),
+    ),
   );
 }
 
@@ -41,8 +46,9 @@ void main() {
     expect(find.text('Watching Stripe'), findsNothing);
   });
 
-  testWidgets('a pretend tip lands on the stage after the processing beat',
-      (tester) async {
+  testWidgets('a pretend tip lands on the stage after the processing beat', (
+    tester,
+  ) async {
     await tester.pumpWidget(await _host());
     await tester.pumpAndSettle();
 
@@ -59,10 +65,16 @@ void main() {
     await tester.tap(find.text('Drop it in the jar'));
     // Let the sheet close and the pending beat begin.
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('Adding your tip…'), findsOneWidget,
-        reason: 'the ~1 s beat before the tip lands');
-    expect(find.textContaining('Nadia tipped'), findsNothing,
-        reason: 'not until the beat is over');
+    expect(
+      find.text('Adding your tip…'),
+      findsOneWidget,
+      reason: 'the ~1 s beat before the tip lands',
+    );
+    expect(
+      find.textContaining('Nadia tipped'),
+      findsNothing,
+      reason: 'not until the beat is over',
+    );
 
     // The beat elapses → the tip lands with its name, amount and message.
     await tester.pump(const Duration(seconds: 1));
@@ -72,8 +84,9 @@ void main() {
     expect(find.text('“Loved it!”'), findsAtLeastNWidgets(1));
   });
 
-  testWidgets('mobile lays out its bottom bar without overflow',
-      (tester) async {
+  testWidgets('mobile lays out its bottom bar without overflow', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);

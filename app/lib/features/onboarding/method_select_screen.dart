@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../domain/tip_method.dart';
+import '../../l10n/app_localizations.dart';
 import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
 import 'onboarding_flow.dart';
@@ -16,8 +17,7 @@ class MethodSelectScreen extends ConsumerStatefulWidget {
   const MethodSelectScreen({super.key});
 
   @override
-  ConsumerState<MethodSelectScreen> createState() =>
-      _MethodSelectScreenState();
+  ConsumerState<MethodSelectScreen> createState() => _MethodSelectScreenState();
 }
 
 class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
@@ -32,16 +32,17 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
   void _continue() {
     if (_selected.isEmpty) return;
     // Keep the details captured on the previous step; only set the methods.
-    ref.read(onboardingDraftProvider.notifier).update(
-          (d) => d.copyWith(methods: Set.unmodifiable({..._selected})),
-        );
+    ref
+        .read(onboardingDraftProvider.notifier)
+        .update((d) => d.copyWith(methods: Set.unmodifiable({..._selected})));
     pushOnboardingStep(context, ref);
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
-    final nonStripe = _selected.contains(TipMethod.revolut) ||
+    final nonStripe =
+        _selected.contains(TipMethod.revolut) ||
         _selected.contains(TipMethod.mobilepay);
     // The pill previews the flow length for the current selection: details +
     // this step + one per chosen method.
@@ -49,11 +50,17 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Get tipped'),
+        title: Text(context.s.t('onboarding.method_select.title')),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Center(child: LtPill(label: 'Step 2 of $total')),
+            child: Center(
+              child: LtPill(
+                label: context.s.t('onboarding.method_select.step_pill', {
+                  'total': total,
+                }),
+              ),
+            ),
           ),
         ],
       ),
@@ -65,11 +72,13 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
             children: [
               LtProgressSegments(total: total, filled: 2),
               const SizedBox(height: 16),
-              Text('How do you want to get tipped?',
-                  style: outfitStyle(22, c.text, weight: FontWeight.w800)),
+              Text(
+                context.s.t('onboarding.method_select.heading'),
+                style: outfitStyle(22, c.text, weight: FontWeight.w800),
+              ),
               const SizedBox(height: 6),
               Text(
-                'Pick everything you use — fans get one QR either way.',
+                context.s.t('onboarding.method_select.subtitle'),
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 14,
@@ -83,9 +92,10 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
                 selected: _selected.contains(TipMethod.stripe),
                 dominant: true,
                 title: 'Stripe',
-                pill: 'Recommended',
-                subtitle: 'Card, Apple Pay, Google Pay — verified payments '
-                    'straight to your own Stripe account.',
+                pill: context.s.t('onboarding.method_select.stripe_pill'),
+                subtitle: context.s.t(
+                  'onboarding.method_select.stripe_subtitle',
+                ),
                 onTap: () => _toggle(TipMethod.stripe),
               ),
               const SizedBox(height: 12),
@@ -93,8 +103,9 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
                 method: TipMethod.revolut,
                 selected: _selected.contains(TipMethod.revolut),
                 title: 'Revolut',
-                subtitle: 'Fans pay you in the Revolut app. Unverified — '
-                    'see the note below.',
+                subtitle: context.s.t(
+                  'onboarding.method_select.revolut_subtitle',
+                ),
                 onTap: () => _toggle(TipMethod.revolut),
               ),
               const SizedBox(height: 12),
@@ -102,18 +113,20 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
                 method: TipMethod.mobilepay,
                 selected: _selected.contains(TipMethod.mobilepay),
                 title: 'MobilePay',
-                subtitle: 'Fans pay into your MobilePay Box. Unverified — '
-                    'see the note below.',
+                subtitle: context.s.t(
+                  'onboarding.method_select.mobilepay_subtitle',
+                ),
                 onTap: () => _toggle(TipMethod.mobilepay),
               ),
               if (nonStripe) ...[
                 const SizedBox(height: 16),
                 _RelayWarningCard(
-                    stripeDropped: !_selected.contains(TipMethod.stripe)),
+                  stripeDropped: !_selected.contains(TipMethod.stripe),
+                ),
               ],
               const SizedBox(height: 20),
               LtPrimaryButton(
-                label: 'Continue',
+                label: context.s.t('onboarding.method_select.continue'),
                 trailingIcon: Icons.arrow_forward_rounded,
                 onPressed: _selected.isEmpty ? null : _continue,
               ),
@@ -172,11 +185,14 @@ class _MethodCard extends StatelessWidget {
                 height: dominant ? 44 : 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                    color: selected ? c.accentSoft : c.chip,
-                    shape: BoxShape.circle),
-                child: Icon(method.icon,
-                    size: dominant ? 23 : 21,
-                    color: selected ? c.accent : c.textSecondary),
+                  color: selected ? c.accentSoft : c.chip,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  method.icon,
+                  size: dominant ? 23 : 21,
+                  color: selected ? c.accent : c.textSecondary,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -185,9 +201,14 @@ class _MethodCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(title,
-                            style: outfitStyle(dominant ? 17 : 15, c.text,
-                                weight: FontWeight.w700)),
+                        Text(
+                          title,
+                          style: outfitStyle(
+                            dominant ? 17 : 15,
+                            c.text,
+                            weight: FontWeight.w700,
+                          ),
+                        ),
                         if (pill != null) ...[
                           const SizedBox(width: 8),
                           LtPill(label: pill!),
@@ -236,18 +257,22 @@ class _RelayWarningCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     final bodyStyle = TextStyle(
-        fontFamily: kFontBody, fontSize: 13, height: 1.45, color: c.text);
+      fontFamily: kFontBody,
+      fontSize: 13,
+      height: 1.45,
+      color: c.text,
+    );
 
     Widget bullet(String text) => Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('•  ', style: bodyStyle),
-              Expanded(child: Text(text, style: bodyStyle)),
-            ],
-          ),
-        );
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('•  ', style: bodyStyle),
+          Expanded(child: Text(text, style: bodyStyle)),
+        ],
+      ),
+    );
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -264,24 +289,22 @@ class _RelayWarningCard extends StatelessWidget {
               Icon(Icons.warning_amber_rounded, size: 20, color: c.text),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('Before you add Revolut or MobilePay',
-                    style: outfitStyle(14, c.text, weight: FontWeight.w700)),
+                child: Text(
+                  context.s.t('onboarding.method_select.relay_warning_title'),
+                  style: outfitStyle(14, c.text, weight: FontWeight.w700),
+                ),
               ),
             ],
           ),
-          bullet('Tips can\'t be verified. A tip shows up the moment a fan '
-              'submits the form — whether or not they finish paying.'),
-          bullet('Your QR points to a page on live.tips and tips reach your '
-              'screen through the live.tips server. Stripe-only setups talk '
-              'to no server at all.'),
-          bullet('Your history stays on this device either way — live.tips '
-              'stores nothing.'),
+          bullet(
+            context.s.t('onboarding.method_select.relay_bullet_unverified'),
+          ),
+          bullet(context.s.t('onboarding.method_select.relay_bullet_server')),
+          bullet(context.s.t('onboarding.method_select.relay_bullet_history')),
           if (stripeDropped) ...[
             const SizedBox(height: 8),
             Text(
-              'Without Stripe there\'s no payment record anywhere except '
-              'this device. We strongly recommend keeping Stripe — it\'s '
-              'also the only method every fan can use.',
+              context.s.t('onboarding.method_select.relay_stripe_dropped'),
               style: bodyStyle.copyWith(fontWeight: FontWeight.w600),
             ),
           ],

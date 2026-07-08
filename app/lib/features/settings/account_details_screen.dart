@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../domain/tip_jar.dart';
+import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../onboarding/relay_setup_screen.dart' show mobilePayCurrencyError;
@@ -33,8 +34,7 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
   late String _currency;
   bool _busy = false;
   String? _error;
-
-  static const _defaultThanks = 'Thank you! 💛';
+  bool _seededThanks = false;
 
   @override
   void initState() {
@@ -42,8 +42,18 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
     final app = ref.read(appStateProvider);
     _nameController.text = app.displayName;
     _currency = app.currency;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_seededThanks) return;
+    _seededThanks = true;
+    final app = ref.read(appStateProvider);
     _thanksController.text =
-        app.tipJar?.thankYouMessage ?? app.relayJar?.message ?? _defaultThanks;
+        app.tipJar?.thankYouMessage ??
+        app.relayJar?.message ??
+        context.s.t('settings.account_details.default_thanks');
   }
 
   @override
@@ -54,21 +64,24 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
   }
 
   Future<void> _save() async {
+    final s = context.s;
     final app = ref.read(appStateProvider);
     final notifier = ref.read(appStateProvider.notifier);
     final name = _nameController.text.trim();
     final currency = _currency;
     final thankYou = _thanksController.text.trim().isEmpty
-        ? _defaultThanks
+        ? s.t('settings.account_details.default_thanks')
         : _thanksController.text.trim();
 
     if (name.isEmpty) {
-      setState(() => _error = 'Add your artist or band name — fans will see it.');
+      setState(
+        () => _error = s.t('settings.account_details.error_name_required'),
+      );
       return;
     }
     final relayJar = app.relayJar;
     if (relayJar?.hasMobilePay ?? false) {
-      final err = mobilePayCurrencyError(currency);
+      final err = mobilePayCurrencyError(currency, context: context);
       if (err != null) {
         setState(() => _error = err);
         return;
@@ -84,20 +97,22 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Replace your Stripe link?'),
-          content: const Text(
-            'Stripe can\'t change a link\'s currency, so switching it creates '
-            'a new payment link. Printed QR codes with the old Stripe-only '
-            'link stop working. Your tip page QR is unaffected.',
+          title: Text(
+            context.s.t('settings.account_details.replace_link_title'),
+          ),
+          content: Text(
+            context.s.t('settings.account_details.replace_link_body'),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(context.s.t('settings.account_details.cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Replace link'),
+              child: Text(
+                context.s.t('settings.account_details.replace_link_confirm'),
+              ),
             ),
           ],
         ),
@@ -116,7 +131,9 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
         final requests = ref.read(stripeRequestsProvider);
         if (currencyChanged) {
           if (requests == null) {
-            throw const StripeNetworkException('Stripe key unavailable.');
+            throw StripeNetworkException(
+              s.t('settings.account_details.error_stripe_key_unavailable'),
+            );
           }
           newTipJar = await requests.createTipJar(
             currency: currency,
@@ -175,7 +192,8 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Account details updated')));
+          SnackBar(content: Text(s.t('settings.account_details.saved_snack'))),
+        );
         Navigator.of(context).pop();
       }
     } on StripeApiException catch (e) {
@@ -195,12 +213,15 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
-    final currencyReplacesLink = app.tipJar != null &&
+    final currencyReplacesLink =
+        app.tipJar != null &&
         !(app.tipJar!.isDemo) &&
         app.tipJar!.currency != _currency;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Account details')),
+      appBar: AppBar(
+        title: Text(context.s.t('settings.account_details.title')),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -208,45 +229,55 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
               Text(
-                'The name, currency and thank-you message you set at sign-up. '
-                'Changes sync to your Stripe link and your tip page.',
+                context.s.t('settings.account_details.intro'),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 14,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 14,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
               const SizedBox(height: 20),
               LtCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const _FieldLabel('Artist or band name'),
+                    _FieldLabel(
+                      context.s.t('settings.account_details.name_label'),
+                    ),
                     TextField(
                       controller: _nameController,
                       textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                          hintText: 'The Midnight Foxes'),
+                      decoration: InputDecoration(
+                        hintText: context.s.t(
+                          'settings.account_details.name_hint',
+                        ),
+                      ),
                       onChanged: (_) {
                         if (_error != null) setState(() => _error = null);
                       },
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Fans see this on your tip page, the stage and posters.',
+                      context.s.t('settings.account_details.name_help'),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12,
-                          color: c.textMuted),
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        color: c.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    const _FieldLabel('Currency'),
+                    _FieldLabel(
+                      context.s.t('settings.account_details.currency_label'),
+                    ),
                     InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () async {
                         final picked = await showLtPicker<String>(
                           context: context,
-                          title: 'Currency',
+                          title: context.s.t(
+                            'settings.account_details.currency_picker_title',
+                          ),
                           values: kSupportedCurrencies,
                           selected: _currency,
                           labelOf: currencyLabel,
@@ -260,7 +291,9 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 13),
+                          horizontal: 14,
+                          vertical: 13,
+                        ),
                         decoration: BoxDecoration(
                           color: c.bg,
                           border: Border.all(color: c.border, width: 1.5),
@@ -272,38 +305,47 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
                               child: Text(
                                 currencyLabel(_currency),
                                 style: TextStyle(
-                                    fontFamily: kFontBody,
-                                    fontSize: 15,
-                                    color: c.text),
+                                  fontFamily: kFontBody,
+                                  fontSize: 15,
+                                  color: c.text,
+                                ),
                               ),
                             ),
-                            Icon(Icons.expand_more_rounded,
-                                size: 22, color: c.textSecondary),
+                            Icon(
+                              Icons.expand_more_rounded,
+                              size: 22,
+                              color: c.textSecondary,
+                            ),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const _FieldLabel('Thank-you message'),
+                    _FieldLabel(
+                      context.s.t('settings.account_details.thanks_label'),
+                    ),
                     TextField(
                       controller: _thanksController,
                       maxLength: 200,
                       maxLines: 2,
                       minLines: 1,
-                      buildCounter: (context,
-                              {required currentLength,
-                              required isFocused,
-                              maxLength}) =>
-                          null,
+                      buildCounter:
+                          (
+                            context, {
+                            required currentLength,
+                            required isFocused,
+                            maxLength,
+                          }) => null,
                       decoration: const InputDecoration(counterText: ''),
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Shown after a Stripe tip and on your tip page.',
+                      context.s.t('settings.account_details.thanks_help'),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12,
-                          color: c.textMuted),
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        color: c.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -319,18 +361,23 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
-                          size: 20, color: c.danger),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 20,
+                        color: c.danger,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Changing the currency creates a new Stripe link — '
-                          'the old Stripe-only QR stops working.',
+                          context.s.t(
+                            'settings.account_details.currency_warning',
+                          ),
                           style: TextStyle(
-                              fontFamily: kFontBody,
-                              fontSize: 13,
-                              height: 1.4,
-                              color: c.text),
+                            fontFamily: kFontBody,
+                            fontSize: 13,
+                            height: 1.4,
+                            color: c.text,
+                          ),
                         ),
                       ),
                     ],
@@ -342,15 +389,16 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
                 Text(
                   _error!,
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13,
-                      height: 1.45,
-                      color: c.danger),
+                    fontFamily: kFontBody,
+                    fontSize: 13,
+                    height: 1.45,
+                    color: c.danger,
+                  ),
                 ),
               ],
               const SizedBox(height: 20),
               LtPrimaryButton(
-                label: 'Save changes',
+                label: context.s.t('settings.account_details.save_button'),
                 busy: _busy,
                 onPressed: _save,
               ),

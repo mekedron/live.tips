@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
+import '../l10n/app_localizations.dart';
 
 /// Shared live.tips 2.0 building blocks: cards, pills, chips, segmented
 /// controls, list rows — the vocabulary every screen speaks.
@@ -47,8 +48,12 @@ class LtSectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: outfitStyle(11, color ?? context.lt.textMuted,
-          weight: FontWeight.w700, letterSpacing: 1.2),
+      style: outfitStyle(
+        11,
+        color ?? context.lt.textMuted,
+        weight: FontWeight.w700,
+        letterSpacing: 1.2,
+      ),
     );
   }
 }
@@ -67,10 +72,26 @@ class StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     final (bg, fg, label) = switch (status) {
-      LtKeyStatus.live => (c.successContainer, c.onSuccessContainer, 'Live key'),
-      LtKeyStatus.test => (c.warningContainer, c.onWarningContainer, 'Test key'),
-      LtKeyStatus.demo => (c.chip, c.textSecondary, 'Demo'),
-      LtKeyStatus.relay => (c.chip, c.textSecondary, 'No Stripe'),
+      LtKeyStatus.live => (
+        c.successContainer,
+        c.onSuccessContainer,
+        context.s.t('widgets.lt_ui.status_live'),
+      ),
+      LtKeyStatus.test => (
+        c.warningContainer,
+        c.onWarningContainer,
+        context.s.t('widgets.lt_ui.status_test'),
+      ),
+      LtKeyStatus.demo => (
+        c.chip,
+        c.textSecondary,
+        context.s.t('widgets.lt_ui.status_demo'),
+      ),
+      LtKeyStatus.relay => (
+        c.chip,
+        c.textSecondary,
+        context.s.t('widgets.lt_ui.status_relay'),
+      ),
     };
     final dot = switch (status) {
       LtKeyStatus.live => c.success,
@@ -80,7 +101,9 @@ class StatusPill extends StatelessWidget {
     };
     return Container(
       padding: EdgeInsets.symmetric(
-          horizontal: compact ? 10 : 12, vertical: compact ? 4 : 5),
+        horizontal: compact ? 10 : 12,
+        vertical: compact ? 4 : 5,
+      ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),
@@ -127,8 +150,10 @@ class LtPill extends StatelessWidget {
     final fg = soft ? c.onAccentSoft : c.textSecondary;
     final pill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -152,7 +177,11 @@ class LtPill extends StatelessWidget {
 
 /// Two-step onboarding progress: filled coral segments on a warm track.
 class LtProgressSegments extends StatelessWidget {
-  const LtProgressSegments({super.key, required this.total, required this.filled});
+  const LtProgressSegments({
+    super.key,
+    required this.total,
+    required this.filled,
+  });
 
   final int total;
   final int filled;
@@ -205,7 +234,9 @@ class LtPrimaryButton extends StatelessWidget {
             width: 22,
             height: 22,
             child: CircularProgressIndicator(
-                strokeWidth: 2.5, color: c.onAccent),
+              strokeWidth: 2.5,
+              color: c.onAccent,
+            ),
           )
         : Row(
             mainAxisSize: MainAxisSize.min,
@@ -216,8 +247,11 @@ class LtPrimaryButton extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               Flexible(
-                child: Text(label,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               if (trailingIcon != null) ...[
                 const SizedBox(width: 8),
@@ -238,10 +272,7 @@ class LtPrimaryButton extends StatelessWidget {
               ]
             : const [],
       ),
-      child: FilledButton(
-        onPressed: busy ? null : onPressed,
-        child: child,
-      ),
+      child: FilledButton(onPressed: busy ? null : onPressed, child: child),
     );
   }
 }
@@ -280,7 +311,9 @@ class LtDangerButton extends StatelessWidget {
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2.2, color: c.danger),
+                  strokeWidth: 2.2,
+                  color: c.danger,
+                ),
               )
             : Icon(icon, size: 18),
         label: Text(label),
@@ -344,15 +377,18 @@ class InitialAvatar extends StatelessWidget {
     final c = context.lt;
     final bg = anonymous ? c.chip : c.accentSoft;
     final fg = anonymous ? c.textSecondary : c.onAccentSoft;
-    final initial =
-        name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
+    final initial = name.trim().isEmpty
+        ? '?'
+        : name.trim().characters.first.toUpperCase();
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-      child: Text(initial,
-          style: outfitStyle(size * 0.39, fg, weight: FontWeight.w700)),
+      child: Text(
+        initial,
+        style: outfitStyle(size * 0.39, fg, weight: FontWeight.w700),
+      ),
     );
   }
 }
@@ -413,15 +449,19 @@ class LtSegmented<T> extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (iconOf?.call(v) != null) ...[
-                          Icon(iconOf!(v),
-                              size: 17,
-                              color: v == selected ? c.text : c.textSecondary),
+                          Icon(
+                            iconOf!(v),
+                            size: 17,
+                            color: v == selected ? c.text : c.textSecondary,
+                          ),
                           const SizedBox(width: 6),
                         ],
                         Text(
                           labelOf(v),
                           style: outfitStyle(
-                              13, v == selected ? c.text : c.textSecondary),
+                            13,
+                            v == selected ? c.text : c.textSecondary,
+                          ),
                         ),
                       ],
                     ),
@@ -568,8 +608,10 @@ Future<T?> showLtPicker<T>({
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 4, 24, 10),
-                child: Text(title,
-                    style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+                child: Text(
+                  title,
+                  style: outfitStyle(18, c.text, weight: FontWeight.w700),
+                ),
               ),
               Flexible(
                 child: ListView(
@@ -582,7 +624,9 @@ Future<T?> showLtPicker<T>({
                         onTap: () => Navigator.of(context).pop(v),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 12),
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             color: v == selected
                                 ? c.accentSoft
@@ -593,8 +637,7 @@ Future<T?> showLtPicker<T>({
                             children: [
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       labelOf(v),
@@ -622,8 +665,11 @@ Future<T?> showLtPicker<T>({
                                 ),
                               ),
                               if (v == selected)
-                                Icon(Icons.check_rounded,
-                                    size: 20, color: c.onAccentSoft),
+                                Icon(
+                                  Icons.check_rounded,
+                                  size: 20,
+                                  color: c.onAccentSoft,
+                                ),
                             ],
                           ),
                         ),
@@ -654,9 +700,10 @@ class LtStepNumber extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: c.accentSoft, shape: BoxShape.circle),
-      child: Text('$number',
-          style: outfitStyle(size * 0.5, c.onAccentSoft,
-              weight: FontWeight.w700)),
+      child: Text(
+        '$number',
+        style: outfitStyle(size * 0.5, c.onAccentSoft, weight: FontWeight.w700),
+      ),
     );
   }
 }

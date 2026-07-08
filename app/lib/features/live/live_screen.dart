@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/fullscreen.dart';
 import '../../core/money.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/theme.dart';
 import '../../data/relay/relay_tip_channel.dart';
 import '../../domain/live_session.dart';
@@ -52,7 +53,9 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     if (width == null) return;
     final settings = ref.read(appStateProvider).settings;
     if (settings.stage.railWidth == width) return;
-    await ref.read(appStateProvider.notifier).updateSettings(
+    await ref
+        .read(appStateProvider.notifier)
+        .updateSettings(
           settings.copyWith(stage: settings.stage.copyWith(railWidth: width)),
         );
   }
@@ -84,18 +87,16 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Stop this session?'),
-        content: const Text(
-          'The session is saved to history with all its stats.',
-        ),
+        title: Text(context.s.t('live.stop_confirm_title')),
+        content: Text(context.s.t('live.stop_confirm_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep going'),
+            child: Text(context.s.t('live.keep_going')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Stop'),
+            child: Text(context.s.t('live.stop')),
           ),
         ],
       ),
@@ -120,23 +121,20 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Leave the stage screen?'),
-        content: const Text(
-          'The session keeps collecting in the background — you can '
-          'return from the home screen.',
-        ),
+        title: Text(context.s.t('live.leave_title')),
+        content: Text(context.s.t('live.leave_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop('stay'),
-            child: const Text('Cancel'),
+            child: Text(context.s.t('live.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop('stop'),
-            child: const Text('Stop session'),
+            child: Text(context.s.t('live.stop_session')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop('leave'),
-            child: const Text('Keep running'),
+            child: Text(context.s.t('live.keep_running')),
           ),
         ],
       ),
@@ -167,7 +165,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
       context,
       initialMinor: session.goalMinor,
       currency: session.currency,
-      title: 'Adjust tonight\'s goal',
+      title: context.s.t('live.adjust_goal_title'),
     );
     if (newGoal != null) {
       ref.read(liveSessionProvider.notifier).editGoal(newGoal);
@@ -183,8 +181,9 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     final qrUrl = app.activeQrUrl;
     // Without a Stripe key nothing is being watched (relay feed comes in a
     // later step) — the health pill must not claim otherwise.
-    final okLabel =
-        app.hasStripe || app.demo ? 'Watching Stripe' : 'Session running';
+    final okLabel = app.hasStripe || app.demo
+        ? context.s.t('live.watching_stripe')
+        : context.s.t('live.session_running');
     final stageConfig = app.settings.stage;
     // The stage can only be locked where the device itself can authenticate —
     // no Face ID / device unlock (e.g. the browser) → no lock button.
@@ -213,8 +212,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
       // Session just ended (summary flow pops us) — render nothing.
       return Theme(
         data: buildDarkTheme(),
-        child:
-            const Scaffold(backgroundColor: kStageBlack, body: SizedBox()),
+        child: const Scaffold(backgroundColor: kStageBlack, body: SizedBox()),
       );
     }
 
@@ -302,83 +300,88 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                   SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Row(
-                          children: [
-                          StageGlassButton(
-                            icon: Icons.stop_rounded,
-                            iconColor: const Color(0xFFFF6B5E),
-                            tooltip: 'Stop session',
-                            size: wide ? 44 : 40,
-                            onTap: _confirmStop,
-                          ),
-                          const SizedBox(width: 8),
-                          _LivePill(
-                            startedAt: live.session.startedAt,
-                            compact: !wide,
-                          ),
-                          if (wide) ...[
-                            const SizedBox(width: 8),
-                            _HealthPill(
-                                health: live.health,
-                                error: live.lastError,
-                                okLabel: okLabel),
-                          ] else if (live.health != PollHealth.ok) ...[
-                            const SizedBox(width: 8),
-                            _HealthPill(
-                              health: live.health,
-                              error: live.lastError,
-                              okLabel: okLabel,
-                              dotOnly: true,
-                            ),
-                          ],
-                          // Second pill: the relay tip feed — only when this
-                          // session has one; the banner below replaces it
-                          // when the situation deserves more than a pill.
-                          if (live.relay != null && !relayBanner)
-                            if (wide) ...[
-                              const SizedBox(width: 8),
-                              _RelayPill(
-                                  health: live.relay!,
-                                  hasStripe: app.hasStripe),
-                            ] else if (live.relay != RelayHealth.ok) ...[
-                              const SizedBox(width: 8),
-                              _RelayPill(
-                                health: live.relay!,
-                                hasStripe: app.hasStripe,
-                                dotOnly: true,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              StageGlassButton(
+                                icon: Icons.stop_rounded,
+                                iconColor: const Color(0xFFFF6B5E),
+                                tooltip: context.s.t('live.stop_session'),
+                                size: wide ? 44 : 40,
+                                onTap: _confirmStop,
                               ),
+                              const SizedBox(width: 8),
+                              _LivePill(
+                                startedAt: live.session.startedAt,
+                                compact: !wide,
+                              ),
+                              if (wide) ...[
+                                const SizedBox(width: 8),
+                                _HealthPill(
+                                  health: live.health,
+                                  error: live.lastError,
+                                  okLabel: okLabel,
+                                ),
+                              ] else if (live.health != PollHealth.ok) ...[
+                                const SizedBox(width: 8),
+                                _HealthPill(
+                                  health: live.health,
+                                  error: live.lastError,
+                                  okLabel: okLabel,
+                                  dotOnly: true,
+                                ),
+                              ],
+                              // Second pill: the relay tip feed — only when this
+                              // session has one; the banner below replaces it
+                              // when the situation deserves more than a pill.
+                              if (live.relay != null && !relayBanner)
+                                if (wide) ...[
+                                  const SizedBox(width: 8),
+                                  _RelayPill(
+                                    health: live.relay!,
+                                    hasStripe: app.hasStripe,
+                                  ),
+                                ] else if (live.relay != RelayHealth.ok) ...[
+                                  const SizedBox(width: 8),
+                                  _RelayPill(
+                                    health: live.relay!,
+                                    hasStripe: app.hasStripe,
+                                    dotOnly: true,
+                                  ),
+                                ],
+                              const Spacer(),
+                              if (wide) ...[
+                                StageGlassButton(
+                                  icon: Icons.flag_rounded,
+                                  tooltip: context.s.t('live.adjust_goal'),
+                                  onTap: _editGoal,
+                                ),
+                                const SizedBox(width: 8),
+                                StageGlassButton(
+                                  icon: Icons.palette_rounded,
+                                  tooltip: context.s.t('live.stage_look'),
+                                  onTap: () => showStageLookSheet(context),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              if (fullscreenAvailable) ...[
+                                StageFullscreenButton(size: wide ? 44 : 40),
+                                const SizedBox(width: 8),
+                              ],
+                              if (canLock)
+                                StageGlassButton(
+                                  icon: Icons.lock_outline_rounded,
+                                  tooltip: context.s.t('live.lock'),
+                                  size: wide ? 44 : 40,
+                                  onTap: _lock,
+                                ),
                             ],
-                          const Spacer(),
-                          if (wide) ...[
-                            StageGlassButton(
-                              icon: Icons.flag_rounded,
-                              tooltip: 'Adjust goal',
-                              onTap: _editGoal,
-                            ),
-                            const SizedBox(width: 8),
-                            StageGlassButton(
-                              icon: Icons.palette_rounded,
-                              tooltip: 'Stage look',
-                              onTap: () => showStageLookSheet(context),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          if (fullscreenAvailable) ...[
-                            StageFullscreenButton(size: wide ? 44 : 40),
-                            const SizedBox(width: 8),
-                          ],
-                          if (canLock)
-                            StageGlassButton(
-                              icon: Icons.lock_outline_rounded,
-                              tooltip: 'Lock stage screen',
-                              size: wide ? 44 : 40,
-                              onTap: _lock,
-                            ),
-                          ],
-                        ),
-                        if (relayBanner) const _RelayDownBanner(),
-                      ]),
+                          ),
+                          if (relayBanner) const _RelayDownBanner(),
+                        ],
+                      ),
                     ),
                   ),
                   // ---- mobile: bottom glass action bar ----
@@ -393,8 +396,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                             color: kStageGlassSoft,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                                color:
-                                    Colors.white.withValues(alpha: 0.08)),
+                              color: Colors.white.withValues(alpha: 0.08),
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -419,21 +422,25 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                                             showFullscreenQr(context, qrUrl),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(
-                                              vertical: 11),
+                                            vertical: 11,
+                                          ),
                                           child: Row(
                                             mainAxisAlignment:
                                                 MainAxisAlignment.center,
                                             children: [
                                               const Icon(
-                                                  Icons.qr_code_2_rounded,
-                                                  size: 19,
-                                                  color: Color(0xFF40160A)),
+                                                Icons.qr_code_2_rounded,
+                                                size: 19,
+                                                color: Color(0xFF40160A),
+                                              ),
                                               const SizedBox(width: 7),
                                               Text(
-                                                'Show QR',
-                                                style: outfitStyle(14,
-                                                    const Color(0xFF40160A),
-                                                    weight: FontWeight.w700),
+                                                context.s.t('live.show_qr'),
+                                                style: outfitStyle(
+                                                  14,
+                                                  const Color(0xFF40160A),
+                                                  weight: FontWeight.w700,
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -447,13 +454,13 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                               const SizedBox(width: 8),
                               StageGlassSquare(
                                 icon: Icons.flag_rounded,
-                                tooltip: 'Adjust goal',
+                                tooltip: context.s.t('live.adjust_goal'),
                                 onTap: _editGoal,
                               ),
                               const SizedBox(width: 8),
                               StageGlassSquare(
                                 icon: Icons.palette_rounded,
-                                tooltip: 'Stage look',
+                                tooltip: context.s.t('live.stage_look'),
                                 onTap: () => showStageLookSheet(context),
                               ),
                             ],
@@ -514,9 +521,13 @@ class _LivePill extends StatelessWidget {
           const _PulsingDot(color: Color(0xFFFF6B5E)),
           SizedBox(width: compact ? 8 : 9),
           Text(
-            'LIVE',
-            style: outfitStyle(compact ? 12 : 13, Colors.white,
-                weight: FontWeight.w700, letterSpacing: 1),
+            context.s.t('live.live_badge'),
+            style: outfitStyle(
+              compact ? 12 : 13,
+              Colors.white,
+              weight: FontWeight.w700,
+              letterSpacing: 1,
+            ),
           ),
           if (!compact) ...[
             const SizedBox(width: 10),
@@ -560,14 +571,14 @@ class _PulsingDotState extends State<_PulsingDot>
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
-      opacity: Tween<double>(begin: 1, end: 0.35).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-      ),
+      opacity: Tween<double>(
+        begin: 1,
+        end: 0.35,
+      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)),
       child: Container(
         width: 8,
         height: 8,
-        decoration:
-            BoxDecoration(color: widget.color, shape: BoxShape.circle),
+        decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
       ),
     );
   }
@@ -578,7 +589,7 @@ class _HealthPill extends StatelessWidget {
     required this.health,
     this.error,
     this.dotOnly = false,
-    this.okLabel = 'Watching Stripe',
+    required this.okLabel,
   });
 
   final PollHealth health;
@@ -593,9 +604,14 @@ class _HealthPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final (color, label) = switch (health) {
       PollHealth.ok => (const Color(0xFF4FCB8D), okLabel),
-      PollHealth.connecting => (const Color(0xFFFFC24D), 'Connecting…'),
-      PollHealth.error =>
-        (const Color(0xFFFF6B5E), error ?? 'Connection trouble'),
+      PollHealth.connecting => (
+        const Color(0xFFFFC24D),
+        context.s.t('live.connecting'),
+      ),
+      PollHealth.error => (
+        const Color(0xFFFF6B5E),
+        error ?? context.s.t('live.connection_trouble'),
+      ),
     };
     return _StatusPill(color: color, label: label, dotOnly: dotOnly);
   }
@@ -620,19 +636,24 @@ class _RelayPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (health) {
-      RelayHealth.connecting =>
-        (const Color(0xFF9BA3AB), 'Tip page connecting…'),
-      RelayHealth.ok => (const Color(0xFF4FCB8D), 'Tip page live'),
+      RelayHealth.connecting => (
+        const Color(0xFF9BA3AB),
+        context.s.t('live.tip_page_connecting'),
+      ),
+      RelayHealth.ok => (
+        const Color(0xFF4FCB8D),
+        context.s.t('live.tip_page_live'),
+      ),
       RelayHealth.down => (
-          const Color(0xFFFFC24D),
-          hasStripe
-              ? 'Tip page offline — card tips still tracked'
-              : 'Tip page offline — retrying…'
-        ),
+        const Color(0xFFFFC24D),
+        hasStripe
+            ? context.s.t('live.tip_page_offline_stripe')
+            : context.s.t('live.tip_page_offline_retry'),
+      ),
       RelayHealth.unauthorized => (
-          const Color(0xFFFF6B5E),
-          'Tip page disconnected — create a new link in Settings'
-        ),
+        const Color(0xFFFF6B5E),
+        context.s.t('live.tip_page_unauthorized'),
+      ),
     };
     return _StatusPill(color: color, label: label, dotOnly: dotOnly);
   }
@@ -683,8 +704,7 @@ class _StatusPill extends StatelessWidget {
               const SizedBox(width: 7),
               Text(
                 label,
-                style: outfitStyle(
-                    12, Colors.white.withValues(alpha: 0.6)),
+                style: outfitStyle(12, Colors.white.withValues(alpha: 0.6)),
               ),
             ],
           ],
@@ -719,8 +739,7 @@ class _RelayDownBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Can\'t reach live.tips — fans can still pay, tips won\'t '
-              'show here until reconnected. Retrying…',
+              context.s.t('live.relay_down_banner'),
               style: outfitStyle(13, Colors.white.withValues(alpha: 0.9)),
             ),
           ),
@@ -808,19 +827,25 @@ class _LockOverlay extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: kStageGlass,
                   borderRadius: BorderRadius.circular(999),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock_rounded,
-                        size: 17, color: Colors.white.withValues(alpha: 0.75)),
+                    Icon(
+                      Icons.lock_rounded,
+                      size: 17,
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
                     const SizedBox(width: 8),
                     Text(
-                      'Locked · hold to unlock',
+                      context.s.t('live.locked_hold'),
                       style: outfitStyle(
-                          13.5, Colors.white.withValues(alpha: 0.8)),
+                        13.5,
+                        Colors.white.withValues(alpha: 0.8),
+                      ),
                     ),
                   ],
                 ),
@@ -847,7 +872,11 @@ class _SessionSummaryDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     return AlertDialog(
-      title: Text(session.goalReached ? '🎉 Goal reached!' : 'Session done'),
+      title: Text(
+        session.goalReached
+            ? context.s.t('live.goal_reached_title')
+            : context.s.t('live.session_done'),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -857,39 +886,49 @@ class _SessionSummaryDialog extends StatelessWidget {
             style: moneyStyle(36, c.accent),
           ),
           const SizedBox(height: 14),
-          _SummaryRow(label: 'Tips', value: '${session.count}'),
           _SummaryRow(
-            label: 'Duration',
+            label: context.s.t('live.summary_tips'),
+            value: '${session.count}',
+          ),
+          _SummaryRow(
+            label: context.s.t('live.summary_duration'),
             value: formatDuration(session.elapsed()),
           ),
           _SummaryRow(
-            label: 'Goal',
+            label: context.s.t('live.summary_goal'),
             value:
                 '${formatAmount(session.goalMinor, session.currency)} · ${_overallPct(session)}%',
           ),
           if (session.bankedJars > 0)
             _SummaryRow(
-              label: 'Full jars',
-              value:
-                  '🏆 ${session.bankedJars} · ${formatAmount(session.bankedMinor, session.currency)} banked',
+              label: context.s.t('live.summary_full_jars'),
+              value: context.s.t('live.summary_jars_value', {
+                'count': session.bankedJars,
+                'amount': formatAmount(session.bankedMinor, session.currency),
+              }),
             ),
           if (session.count > 0)
             _SummaryRow(
-              label: 'Average tip',
+              label: context.s.t('live.summary_avg'),
               value: formatAmount(session.averageMinor, session.currency),
             ),
           if (session.biggest != null)
             _SummaryRow(
-              label: 'Biggest tip',
-              value:
-                  '${formatAmount(session.biggest!.amountMinor, session.currency)} from ${session.biggest!.displayName}',
+              label: context.s.t('live.summary_biggest'),
+              value: context.s.t('live.summary_biggest_value', {
+                'amount': formatAmount(
+                  session.biggest!.amountMinor,
+                  session.currency,
+                ),
+                'name': session.biggest!.displayName,
+              }),
             ),
         ],
       ),
       actions: [
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
+          child: Text(context.s.t('live.done')),
         ),
       ],
     );
@@ -915,9 +954,10 @@ class _SummaryRow extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                  fontFamily: kFontBody,
-                  fontSize: 14,
-                  color: c.textSecondary),
+                fontFamily: kFontBody,
+                fontSize: 14,
+                color: c.textSecondary,
+              ),
             ),
           ),
           Expanded(

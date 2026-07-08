@@ -4,13 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../domain/band_account.dart';
 import '../features/onboarding/onboarding_details_screen.dart';
+import '../l10n/app_localizations.dart';
 import '../state/live_session_controller.dart';
 import '../state/providers.dart';
 import 'lt_ui.dart';
 
 /// The label under a band row: which payment methods it has configured,
 /// read straight from the band's stored jars (cheap prefs lookups).
-String bandMethodsSummary(WidgetRef ref, String accountId) {
+String bandMethodsSummary(
+  BuildContext context,
+  WidgetRef ref,
+  String accountId,
+) {
   final store = ref.read(localStoreProvider);
   final tipJar = store.readTipJar(accountId);
   final relayJar = store.readRelayJar(accountId);
@@ -19,7 +24,9 @@ String bandMethodsSummary(WidgetRef ref, String accountId) {
     if (relayJar?.hasRevolut ?? false) 'Revolut',
     if (relayJar?.hasMobilePay ?? false) 'MobilePay',
   ];
-  return methods.isEmpty ? 'Not set up yet' : methods.join(' · ');
+  return methods.isEmpty
+      ? context.s.t('widgets.band_switcher.not_set_up')
+      : methods.join(' · ');
 }
 
 /// The band name as a tap target with a chevron — tapping opens the
@@ -40,8 +47,9 @@ class BandNameButton extends ConsumerWidget {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
     final style = outfitStyle(fontSize, c.text, weight: weight);
-    final name =
-        app.displayName.isEmpty ? 'Your account' : app.displayName;
+    final name = app.displayName.isEmpty
+        ? context.s.t('widgets.band_switcher.your_account')
+        : app.displayName;
     // Demo has no real band to switch unless others already exist — the
     // escape hatch back to a real band must stay reachable.
     if (app.demo && app.accounts.length < 2) {
@@ -62,8 +70,11 @@ class BandNameButton extends ConsumerWidget {
                 alignment: PlaceholderAlignment.middle,
                 child: Padding(
                   padding: const EdgeInsets.only(left: 4),
-                  child: Icon(Icons.expand_more_rounded,
-                      size: fontSize * 0.8, color: c.textMuted),
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    size: fontSize * 0.8,
+                    color: c.textMuted,
+                  ),
                 ),
               ),
             ],
@@ -84,7 +95,9 @@ class BandChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
-    final name = app.displayName.isEmpty ? 'New account' : app.displayName;
+    final name = app.displayName.isEmpty
+        ? context.s.t('widgets.band_switcher.new_account')
+        : app.displayName;
     return Material(
       color: c.chip,
       borderRadius: BorderRadius.circular(999),
@@ -103,13 +116,15 @@ class BandChip extends ConsumerWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: outfitStyle(13, c.textSecondary,
-                      weight: FontWeight.w600),
+                  style: outfitStyle(
+                    13,
+                    c.textSecondary,
+                    weight: FontWeight.w600,
+                  ),
                 ),
               ),
               const SizedBox(width: 2),
-              Icon(Icons.expand_more_rounded,
-                  size: 16, color: c.textMuted),
+              Icon(Icons.expand_more_rounded, size: 16, color: c.textMuted),
             ],
           ),
         ),
@@ -133,32 +148,36 @@ class _BandSwitcherSheet extends ConsumerWidget {
   const _BandSwitcherSheet();
 
   Future<void> _switchTo(
-      BuildContext context, WidgetRef ref, BandAccount account) async {
+    BuildContext context,
+    WidgetRef ref,
+    BandAccount account,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(appStateProvider.notifier);
     final app = ref.read(appStateProvider);
+    final stopSessionMsg = context.s.t(
+      'widgets.band_switcher.stop_session_switch',
+    );
 
     // Leaving a half-finished new account behind — one that was named on the
     // details step but never got a payment method, and holds no data? It has
     // no home in the app (RootGate parks it on Welcome), and no way to remove
     // it short of finishing onboarding. Offer to discard it on the way out.
     final leavingId = app.accountId;
-    final abandoning = account.id != leavingId &&
+    final abandoning =
+        account.id != leavingId &&
         !app.connected &&
         !ref.read(localStoreProvider).accountHasData(leavingId);
     if (abandoning) {
       final discard = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Discard this unfinished account?'),
-          content: const Text(
-            'You started this account but didn\'t add a payment method, so '
-            'there\'s nothing to keep. Switching away deletes it.',
-          ),
+          title: Text(context.s.t('widgets.band_switcher.discard_title')),
+          content: Text(context.s.t('widgets.band_switcher.discard_body')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Keep editing'),
+              child: Text(context.s.t('widgets.band_switcher.keep_editing')),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -166,7 +185,7 @@ class _BandSwitcherSheet extends ConsumerWidget {
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Discard & switch'),
+              child: Text(context.s.t('widgets.band_switcher.discard_switch')),
             ),
           ],
         ),
@@ -176,8 +195,7 @@ class _BandSwitcherSheet extends ConsumerWidget {
 
     final ok = await notifier.switchAccount(account.id);
     if (!ok) {
-      messenger.showSnackBar(const SnackBar(
-          content: Text('Stop the live session before switching accounts.')));
+      messenger.showSnackBar(SnackBar(content: Text(stopSessionMsg)));
       return;
     }
     // The unfinished account is no longer active — remove it now that we've
@@ -218,20 +236,23 @@ class _BandSwitcherSheet extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-              child: Text('Your accounts',
-                  style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+              child: Text(
+                context.s.t('widgets.band_switcher.title'),
+                style: outfitStyle(18, c.text, weight: FontWeight.w700),
+              ),
             ),
             if (blocked)
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
                 child: Text(
                   live != null
-                      ? 'A live session is running — stop it to switch accounts.'
-                      : 'Switching…',
+                      ? context.s.t('widgets.band_switcher.live_running_hint')
+                      : context.s.t('widgets.band_switcher.switching'),
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 12.5,
-                      color: c.textMuted),
+                    fontFamily: kFontBody,
+                    fontSize: 12.5,
+                    color: c.textMuted,
+                  ),
                 ),
               ),
             Flexible(
@@ -249,10 +270,7 @@ class _BandSwitcherSheet extends ConsumerWidget {
               ),
             ),
             Divider(height: 16, color: c.divider),
-            _AddBandRow(
-              enabled: !blocked,
-              onTap: () => _addBand(context, ref),
-            ),
+            _AddBandRow(enabled: !blocked, onTap: () => _addBand(context, ref)),
           ],
         ),
       ),
@@ -276,8 +294,10 @@ class _BandRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
-    final name = account.name.isEmpty ? 'Unnamed account' : account.name;
-    final subtitle = bandMethodsSummary(ref, account.id);
+    final name = account.name.isEmpty
+        ? context.s.t('widgets.band_switcher.unnamed_account')
+        : account.name;
+    final subtitle = bandMethodsSummary(context, ref, account.id);
     final dim = enabled ? 1.0 : 0.45;
     return Material(
       color: active ? c.accentSoft : Colors.transparent,
@@ -288,8 +308,7 @@ class _BandRow extends ConsumerWidget {
         child: Opacity(
           opacity: dim,
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
                 InitialAvatar(
@@ -306,25 +325,27 @@ class _BandRow extends ConsumerWidget {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: outfitStyle(15, c.text,
-                            weight:
-                                active ? FontWeight.w700 : FontWeight.w600),
+                        style: outfitStyle(
+                          15,
+                          c.text,
+                          weight: active ? FontWeight.w700 : FontWeight.w600,
+                        ),
                       ),
                       Text(
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontFamily: kFontBody,
-                            fontSize: 12.5,
-                            color: c.textSecondary),
+                          fontFamily: kFontBody,
+                          fontSize: 12.5,
+                          color: c.textSecondary,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 if (active)
-                  Icon(Icons.check_circle_rounded,
-                      size: 22, color: c.accent),
+                  Icon(Icons.check_circle_rounded, size: 22, color: c.accent),
               ],
             ),
           ),
@@ -352,8 +373,7 @@ class _AddBandRow extends StatelessWidget {
         child: Opacity(
           opacity: enabled ? 1.0 : 0.45,
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               children: [
                 Container(
@@ -361,7 +381,9 @@ class _AddBandRow extends StatelessWidget {
                   height: 38,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                      color: c.accentSoft, shape: BoxShape.circle),
+                    color: c.accentSoft,
+                    shape: BoxShape.circle,
+                  ),
                   child: Icon(Icons.add_rounded, size: 22, color: c.accent),
                 ),
                 const SizedBox(width: 12),
@@ -369,15 +391,19 @@ class _AddBandRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Add an account',
-                          style: outfitStyle(15, c.text,
-                              weight: FontWeight.w600)),
                       Text(
-                        'Another account with its own links, goal and history.',
+                        context.s.t('widgets.band_switcher.add_account'),
+                        style: outfitStyle(15, c.text, weight: FontWeight.w600),
+                      ),
+                      Text(
+                        context.s.t(
+                          'widgets.band_switcher.add_account_subtitle',
+                        ),
                         style: TextStyle(
-                            fontFamily: kFontBody,
-                            fontSize: 12.5,
-                            color: c.textSecondary),
+                          fontFamily: kFontBody,
+                          fontSize: 12.5,
+                          color: c.textSecondary,
+                        ),
                       ),
                     ],
                   ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
 import '../../../domain/donation.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../widgets/donation_tile.dart';
 import 'stage_hud.dart' show kStageAccent, kStageAmount;
 import 'stage_types.dart';
@@ -39,8 +40,10 @@ class ClassicStage extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'of ${formatAmount(snapshot.goalMinor, snapshot.currency)} goal · '
-          '${(snapshot.progress * 100).round()}%',
+          context.s.t('stage.of_goal', {
+            'goal': formatAmount(snapshot.goalMinor, snapshot.currency),
+            'pct': (snapshot.progress * 100).round(),
+          }),
           textAlign: TextAlign.center,
           style: outfitStyle(16, Colors.white.withValues(alpha: 0.6)),
         ),
@@ -55,21 +58,26 @@ class ClassicStage extends StatelessWidget {
           children: [
             _StatChip(
               icon: Icons.favorite_rounded,
-              label: '${snapshot.count} tips',
+              label: context.s.t('stage.tips_count', {'count': snapshot.count}),
             ),
             if (snapshot.bankedJars > 0) ...[
               const SizedBox(width: 10),
               _StatChip(
                 icon: Icons.emoji_events_rounded,
-                label: '${snapshot.bankedJars} full '
-                    '${snapshot.bankedJars == 1 ? 'jar' : 'jars'}',
+                label: context.s.t('stage.full_jars', {
+                  'count': snapshot.bankedJars,
+                }),
               ),
             ] else if (snapshot.biggest != null) ...[
               const SizedBox(width: 10),
               _StatChip(
                 icon: Icons.emoji_events_rounded,
-                label:
-                    'top ${formatAmount(snapshot.biggest!.amountMinor, snapshot.currency)}',
+                label: context.s.t('stage.top_amount', {
+                  'amount': formatAmount(
+                    snapshot.biggest!.amountMinor,
+                    snapshot.currency,
+                  ),
+                }),
               ),
             ],
           ],
@@ -81,10 +89,11 @@ class ClassicStage extends StatelessWidget {
           child: donations.isEmpty
               ? Center(
                   child: Text(
-                    'Waiting for the first tip…\nthe QR code is doing its thing',
+                    context.s.t('stage.waiting_first_tip_qr'),
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(color: Colors.white38),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white38,
+                    ),
                   ),
                 )
               : ListView.builder(
@@ -162,8 +171,10 @@ class _StatChip extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: kStageAccent),
           const SizedBox(width: 6),
-          Text(label,
-              style: outfitStyle(13.5, Colors.white.withValues(alpha: 0.75))),
+          Text(
+            label,
+            style: outfitStyle(13.5, Colors.white.withValues(alpha: 0.75)),
+          ),
         ],
       ),
     );
@@ -202,15 +213,22 @@ class LastDonationHero extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                    color: kStageAccent.withValues(alpha: 0.6), width: 1.5),
+                  color: kStageAccent.withValues(alpha: 0.6),
+                  width: 1.5,
+                ),
                 color: kStageAccent.withValues(alpha: compact ? 0.16 : 0.08),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '${donation!.displayName} tipped '
-                    '${formatAmount(donation!.amountMinor, donation!.currency)}',
+                    context.s.t('stage.tipped', {
+                      'name': donation!.displayName,
+                      'amount': formatAmount(
+                        donation!.amountMinor,
+                        donation!.currency,
+                      ),
+                    }),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: kFontOutfit,

@@ -29,10 +29,8 @@ enum QrMode {
   final String wire;
   final String label;
 
-  static QrMode fromWire(
-    String? wire, {
-    QrMode fallback = QrMode.connected,
-  }) => values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
+  static QrMode fromWire(String? wire, {QrMode fallback = QrMode.connected}) =>
+      values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
 }
 
 /// Device-wide app behavior, persisted locally. Band-scoped preferences
@@ -44,6 +42,7 @@ class AppSettings {
     this.pollIntervalSec = 4,
     this.themeMode = AppThemeMode.system,
     this.stage = const StageSettings(),
+    this.localeCode,
   });
 
   /// How often the live session polls Stripe for new donations.
@@ -55,20 +54,29 @@ class AppSettings {
   /// How the live stage looks (style, vessel, scene, theme…).
   final StageSettings stage;
 
+  /// The chosen UI language as a locale code (e.g. `de`), or null to follow
+  /// the device language. Resolved against the shipped locales at launch.
+  final String? localeCode;
+
+  static const _unset = Object();
+
   AppSettings copyWith({
     int? pollIntervalSec,
     AppThemeMode? themeMode,
     StageSettings? stage,
+    Object? localeCode = _unset,
   }) => AppSettings(
     pollIntervalSec: pollIntervalSec ?? this.pollIntervalSec,
     themeMode: themeMode ?? this.themeMode,
     stage: stage ?? this.stage,
+    localeCode: localeCode == _unset ? this.localeCode : localeCode as String?,
   );
 
   Map<String, dynamic> toJson() => {
     'pollIntervalSec': pollIntervalSec,
     'themeMode': themeMode.wire,
     'stage': stage.toJson(),
+    if (localeCode != null) 'localeCode': localeCode,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -79,5 +87,6 @@ class AppSettings {
             Map<String, dynamic>.from(json['stage'] as Map),
           )
         : const StageSettings(),
+    localeCode: json['localeCode'] as String?,
   );
 }

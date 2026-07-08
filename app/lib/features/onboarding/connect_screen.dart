@@ -5,6 +5,7 @@ import '../../core/external_link.dart';
 
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../data/stripe/stripe_requests.dart';
 import '../../domain/tip_method.dart';
@@ -40,19 +41,15 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
   }
 
   String? _validateFormat(String key) {
-    if (key.isEmpty) return 'Paste your restricted API key first.';
+    if (key.isEmpty) return context.s.t('onboarding.connect.key_empty');
     if (key.startsWith('pk_')) {
-      return 'That\'s a *publishable* key. You need the restricted key '
-          '(starts with rk_) — see the guide.';
+      return context.s.t('onboarding.connect.key_publishable');
     }
     if (key.startsWith('sk_live_')) {
-      return 'That\'s your full live secret key — too powerful to put on a '
-          'device. Create a *restricted* key (rk_live_…) instead; it takes '
-          'two minutes and can only do what this app needs.';
+      return context.s.t('onboarding.connect.key_secret');
     }
     if (!key.startsWith('rk_') && !key.startsWith('sk_test_')) {
-      return 'This doesn\'t look like a Stripe restricted key '
-          '(expected rk_live_… or rk_test_…).';
+      return context.s.t('onboarding.connect.key_unrecognized');
     }
     return null;
   }
@@ -82,10 +79,12 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
           currency: draft?.currency ?? app.currency,
           displayName: (draft?.name.trim().isNotEmpty ?? false)
               ? draft!.name.trim()
-              : (app.displayName.isEmpty ? 'My tips' : app.displayName),
+              : (app.displayName.isEmpty
+                    ? context.s.t('onboarding.connect.default_display_name')
+                    : app.displayName),
           thankYouMessage: (draft?.thankYouMessage.trim().isNotEmpty ?? false)
               ? draft!.thankYouMessage.trim()
-              : 'Thank you! 💛',
+              : context.s.t('onboarding.connect.default_thanks'),
         );
         await ref.read(appStateProvider.notifier).connect(key);
         await ref.read(appStateProvider.notifier).setTipJar(jar);
@@ -93,8 +92,7 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
         pushOnboardingStep(context, ref, after: TipMethod.stripe);
       } else {
         setState(() {
-          _error = 'Some permissions are missing. Edit the key in Stripe, '
-              'then verify again.';
+          _error = context.s.t('onboarding.connect.permissions_missing');
         });
       }
     } on StripeApiException catch (e) {
@@ -136,8 +134,10 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
               shrinkWrap: true,
               padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
               children: [
-                Text('What the key can do',
-                    style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+                Text(
+                  context.s.t('onboarding.connect.key_permissions_title'),
+                  style: outfitStyle(18, c.text, weight: FontWeight.w700),
+                ),
                 const SizedBox(height: 6),
                 const _KeyPermissionsList(),
               ],
@@ -164,11 +164,18 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Connect Stripe'),
+        title: Text(context.s.t('onboarding.connect.title')),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Center(child: LtPill(label: 'Step $step of $total')),
+            child: Center(
+              child: LtPill(
+                label: context.s.t('onboarding.connect.step_pill', {
+                  'step': step,
+                  'total': total,
+                }),
+              ),
+            ),
           ),
         ],
       ),
@@ -184,13 +191,13 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Create your restricted key',
-                        style: outfitStyle(16, c.text,
-                            weight: FontWeight.w700)),
+                    Text(
+                      context.s.t('onboarding.connect.create_key_heading'),
+                      style: outfitStyle(16, c.text, weight: FontWeight.w700),
+                    ),
                     const SizedBox(height: 6),
                     Text(
-                      'Two minutes, once. The key can create your tip link '
-                      'and watch donations — nothing else.',
+                      context.s.t('onboarding.connect.create_key_subtitle'),
                       style: TextStyle(
                         fontFamily: kFontBody,
                         fontSize: 13,
@@ -199,22 +206,24 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const _NumberedLine(
-                        1, 'Open the pre-filled form in your Stripe dashboard'),
+                    _NumberedLine(1, context.s.t('onboarding.connect.step1')),
                     const SizedBox(height: 10),
-                    const _NumberedLine(
-                        2, 'Review the permissions, click “Create key”'),
+                    _NumberedLine(2, context.s.t('onboarding.connect.step2')),
                     const SizedBox(height: 10),
-                    const _NumberedLine(3, 'Copy it and paste it below'),
+                    _NumberedLine(3, context.s.t('onboarding.connect.step3')),
                     const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: FilledButton.tonalIcon(
                             onPressed: () => openExternal(kCreateKeyUrl),
-                            icon: const Icon(Icons.open_in_new_rounded,
-                                size: 18),
-                            label: const Text('Open pre-filled form'),
+                            icon: const Icon(
+                              Icons.open_in_new_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              context.s.t('onboarding.connect.open_form'),
+                            ),
                           ),
                         ),
                         // Phones drop the permissions card; this reveals the
@@ -223,7 +232,9 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                           const SizedBox(width: 8),
                           LtIconCircleButton(
                             icon: Icons.help_outline_rounded,
-                            tooltip: 'What the key can do',
+                            tooltip: context.s.t(
+                              'onboarding.connect.key_permissions_title',
+                            ),
                             size: 48,
                             onTap: () => _showKeyPermissions(context),
                           ),
@@ -237,15 +248,20 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                         TextButton(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                                builder: (_) => const KeyGuideScreen()),
+                              builder: (_) => const KeyGuideScreen(),
+                            ),
                           ),
-                          child: const Text('Step-by-step guide'),
+                          child: Text(
+                            context.s.t('onboarding.connect.guide_button'),
+                          ),
                         ),
                         const SizedBox(width: 6),
                         TextButton(
                           onPressed: () =>
                               showFullscreenQr(context, kCreateKeyUrl),
-                          child: const Text('QR for your laptop'),
+                          child: Text(
+                            context.s.t('onboarding.connect.qr_button'),
+                          ),
                         ),
                       ],
                     ),
@@ -258,9 +274,10 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('What the key can do',
-                          style: outfitStyle(16, c.text,
-                              weight: FontWeight.w700)),
+                      Text(
+                        context.s.t('onboarding.connect.key_permissions_title'),
+                        style: outfitStyle(16, c.text, weight: FontWeight.w700),
+                      ),
                       const SizedBox(height: 4),
                       const _KeyPermissionsList(),
                     ],
@@ -272,24 +289,32 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Paste the key',
-                        style: outfitStyle(16, c.text,
-                            weight: FontWeight.w700)),
+                    Text(
+                      context.s.t('onboarding.connect.paste_heading'),
+                      style: outfitStyle(16, c.text, weight: FontWeight.w700),
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _keyController,
                       autocorrect: false,
                       enableSuggestions: false,
                       style: const TextStyle(
-                          fontFamily: 'monospace', fontSize: 14),
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'rk_live_…',
                         errorText: _error,
                         errorMaxLines: 4,
                         suffixIcon: IconButton(
-                          tooltip: 'Paste',
-                          icon: Icon(Icons.content_paste_rounded,
-                              size: 20, color: c.accent),
+                          tooltip: context.s.t(
+                            'onboarding.connect.paste_tooltip',
+                          ),
+                          icon: Icon(
+                            Icons.content_paste_rounded,
+                            size: 20,
+                            color: c.accent,
+                          ),
                           onPressed: _pasteFromClipboard,
                         ),
                       ),
@@ -301,8 +326,7 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Stored in this device\'s keychain. Only ever talks '
-                      'to api.stripe.com.',
+                      context.s.t('onboarding.connect.paste_help'),
                       style: TextStyle(
                         fontFamily: kFontBody,
                         fontSize: 12,
@@ -312,10 +336,12 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                     ),
                     if (key.isNotEmpty && isTest) ...[
                       const SizedBox(height: 10),
-                      const Align(
+                      Align(
                         alignment: Alignment.centerLeft,
                         child: LtPill(
-                          label: 'Test / sandbox key — payments simulated',
+                          label: context.s.t(
+                            'onboarding.connect.test_key_pill',
+                          ),
                           icon: Icons.science_rounded,
                           soft: false,
                         ),
@@ -328,7 +354,7 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
               // steps — so the layout reads the same across every method.
               const SizedBox(height: 20),
               LtPrimaryButton(
-                label: 'Verify & connect',
+                label: context.s.t('onboarding.connect.verify_button'),
                 busy: _busy,
                 onPressed: _verifyAndConnect,
               ),
@@ -337,16 +363,23 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
               TextButton(
                 onPressed: _busy
                     ? null
-                    : () => pushOnboardingStep(context, ref,
-                        after: TipMethod.stripe),
-                child: Text('Skip — set up later',
-                    style: outfitStyle(14, c.textSecondary)),
+                    : () => pushOnboardingStep(
+                        context,
+                        ref,
+                        after: TipMethod.stripe,
+                      ),
+                child: Text(
+                  context.s.t('onboarding.connect.skip'),
+                  style: outfitStyle(14, c.textSecondary),
+                ),
               ),
               if (_checks != null) ...[
                 const SizedBox(height: 14),
                 LtCard(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Column(
                     children: [
                       for (var i = 0; i < _checks!.checks.length; i++) ...[
@@ -382,7 +415,10 @@ class _NumberedLine extends StatelessWidget {
           child: Text(
             text,
             style: TextStyle(
-                fontFamily: kFontBody, fontSize: 14, color: c.text),
+              fontFamily: kFontBody,
+              fontSize: 14,
+              color: c.text,
+            ),
           ),
         ),
       ],
@@ -407,8 +443,7 @@ class _KeyPermissionsList extends StatelessWidget {
         ],
         const SizedBox(height: 8),
         Text(
-          'Everything else stays “None” — no payouts, refunds or '
-          'balance access. Full live keys are refused.',
+          context.s.t('onboarding.connect.permissions_caveat'),
           style: TextStyle(
             fontFamily: kFontBody,
             fontSize: 12,
@@ -448,7 +483,7 @@ class _PermissionRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  permission.why,
+                  context.s.t('enum.perm_why.${permission.slug}'),
                   style: TextStyle(
                     fontFamily: kFontBody,
                     fontSize: 12,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../widgets/band_switcher.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
@@ -13,8 +14,9 @@ const double kRailBreakpoint = 940;
 
 /// Set from outside the shell (e.g. jar-setup success → Poster) to land on
 /// a specific tab; the shell consumes and clears it.
-final shellTabRequestProvider =
-    NotifierProvider<ShellTabRequest, ShellTab?>(ShellTabRequest.new);
+final shellTabRequestProvider = NotifierProvider<ShellTabRequest, ShellTab?>(
+  ShellTabRequest.new,
+);
 
 class ShellTabRequest extends Notifier<ShellTab?> {
   @override
@@ -34,8 +36,12 @@ enum ShellTab {
   poster('Poster', Icons.print_rounded, Icons.print_outlined, inNav: false),
   settings('Settings', Icons.settings_rounded, Icons.settings_outlined);
 
-  const ShellTab(this.label, this.activeIcon, this.inactiveIcon,
-      {this.inNav = true});
+  const ShellTab(
+    this.label,
+    this.activeIcon,
+    this.inactiveIcon, {
+    this.inNav = true,
+  });
   final String label;
   final IconData activeIcon;
   final IconData inactiveIcon;
@@ -196,11 +202,11 @@ class _BottomTabBar extends StatelessWidget {
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 3),
+                            horizontal: 16,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: t == tab
-                                ? c.accentSoft
-                                : Colors.transparent,
+                            color: t == tab ? c.accentSoft : Colors.transparent,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Icon(
@@ -211,7 +217,7 @@ class _BottomTabBar extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          t.label,
+                          context.s.t('shell.tab_${t.name}'),
                           style: outfitStyle(
                             11,
                             t == tab ? c.accent : c.textMuted,
@@ -258,8 +264,10 @@ class _SideRail extends ConsumerWidget {
               children: [
                 const LtLogoMark(size: 34),
                 const SizedBox(width: 10),
-                Text('live.tips',
-                    style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+                Text(
+                  'live.tips',
+                  style: outfitStyle(18, c.text, weight: FontWeight.w700),
+                ),
               ],
             ),
           ),
@@ -277,7 +285,9 @@ class _SideRail extends ConsumerWidget {
                   onTap: () => onSelect(t),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 11),
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
                     child: Row(
                       children: [
                         Icon(
@@ -287,7 +297,7 @@ class _SideRail extends ConsumerWidget {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          t.label,
+                          context.s.t('shell.tab_${t.name}'),
                           style: outfitStyle(
                             14,
                             t == tab ? c.onAccentSoft : c.textSecondary,
@@ -325,8 +335,11 @@ class LtLogoMark extends StatelessWidget {
         color: c.accent,
         borderRadius: BorderRadius.circular(size / 3),
       ),
-      child: Icon(Icons.volunteer_activism,
-          size: size * 0.57, color: c.onAccent),
+      child: Icon(
+        Icons.volunteer_activism,
+        size: size * 0.57,
+        color: c.onAccent,
+      ),
     );
   }
 }

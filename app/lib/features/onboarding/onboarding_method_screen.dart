@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../domain/tip_method.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/enum_labels.dart';
 import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
 import 'onboarding_flow.dart';
-import 'relay_setup_screen.dart' show extractMobilePayBoxId, mobilePayCurrencyError;
+import 'relay_setup_screen.dart'
+    show extractMobilePayBoxId, mobilePayCurrencyError;
 
 /// One onboarding step for a relay method — Revolut or MobilePay. The value is
 /// stashed in the draft (no jar is created yet; the final screen registers one
@@ -16,7 +19,7 @@ import 'relay_setup_screen.dart' show extractMobilePayBoxId, mobilePayCurrencyEr
 /// painless.
 class OnboardingMethodScreen extends ConsumerStatefulWidget {
   const OnboardingMethodScreen({super.key, required this.method})
-      : assert(method != TipMethod.stripe);
+    : assert(method != TipMethod.stripe);
 
   final TipMethod method;
 
@@ -59,7 +62,9 @@ class _OnboardingMethodScreenState
 
   void _skip() {
     // Leave this method unset in the draft, then move on.
-    ref.read(onboardingDraftProvider.notifier).update(
+    ref
+        .read(onboardingDraftProvider.notifier)
+        .update(
           (d) => _isRevolut
               ? d.copyWith(revolutUsername: '')
               : d.copyWith(mobilepayBoxId: ''),
@@ -76,7 +81,9 @@ class _OnboardingMethodScreenState
         return;
       }
       if (!RegExp(r'^[A-Za-z0-9._-]{3,32}$').hasMatch(raw)) {
-        setState(() => _error = 'That doesn\'t look like a Revolut username.');
+        setState(
+          () => _error = context.s.t('onboarding.method.revolut_invalid'),
+        );
         return;
       }
       ref
@@ -90,11 +97,15 @@ class _OnboardingMethodScreenState
       }
       final box = extractMobilePayBoxId(raw);
       if (box == null) {
-        setState(() => _error = 'That doesn\'t look like a Box link or id — '
-            'paste the share link from MobilePay.');
+        setState(
+          () => _error = context.s.t('onboarding.method.mobilepay_invalid'),
+        );
         return;
       }
-      final curErr = mobilePayCurrencyError(draft?.currency ?? 'eur');
+      final curErr = mobilePayCurrencyError(
+        draft?.currency ?? 'eur',
+        context: context,
+      );
       if (curErr != null) {
         setState(() => _error = curErr);
         return;
@@ -115,12 +126,19 @@ class _OnboardingMethodScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.method.label),
+        title: Text(widget.method.l10nLabel(context)),
         actions: [
           if (step != null && total != null)
             Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Center(child: LtPill(label: 'Step $step of $total')),
+              child: Center(
+                child: LtPill(
+                  label: context.s.t('onboarding.method.step_pill', {
+                    'step': step,
+                    'total': total,
+                  }),
+                ),
+              ),
             ),
         ],
       ),
@@ -136,15 +154,14 @@ class _OnboardingMethodScreenState
               ],
               Text(
                 _isRevolut
-                    ? 'Fans who pick Revolut on your tip page are sent to '
-                        'your @username.'
-                    : 'Fans who pick MobilePay on your tip page are sent to '
-                        'your Box.',
+                    ? context.s.t('onboarding.method.intro_revolut')
+                    : context.s.t('onboarding.method.intro_mobilepay'),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 14,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 14,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
               const SizedBox(height: 20),
               LtCard(
@@ -152,7 +169,10 @@ class _OnboardingMethodScreenState
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _FieldLabel(
-                        _isRevolut ? 'Revolut username' : 'MobilePay Box'),
+                      _isRevolut
+                          ? context.s.t('onboarding.method.revolut_label')
+                          : context.s.t('onboarding.method.mobilepay_label'),
+                    ),
                     _isRevolut
                         ? TextField(
                             controller: _controller,
@@ -160,7 +180,9 @@ class _OnboardingMethodScreenState
                             enableSuggestions: false,
                             decoration: InputDecoration(
                               prefixText: '@',
-                              hintText: 'username',
+                              hintText: context.s.t(
+                                'onboarding.method.revolut_hint',
+                              ),
                               errorText: _error,
                               errorMaxLines: 3,
                               suffixIcon: _pasteButton(c),
@@ -175,7 +197,9 @@ class _OnboardingMethodScreenState
                             autocorrect: false,
                             enableSuggestions: false,
                             style: const TextStyle(
-                                fontFamily: 'monospace', fontSize: 13.5),
+                              fontFamily: 'monospace',
+                              fontSize: 13.5,
+                            ),
                             decoration: InputDecoration(
                               hintText: 'https://qr.mobilepay.fi/box/…',
                               errorText: _error,
@@ -190,27 +214,30 @@ class _OnboardingMethodScreenState
                     const SizedBox(height: 8),
                     Text(
                       _isRevolut
-                          ? 'In the Revolut app: tap your profile → your '
-                              '@username is under your name.'
-                          : 'In MobilePay: open your Box → Share → paste the '
-                              'whole link or just the code. MobilePay Boxes '
-                              'are EUR only.',
+                          ? context.s.t('onboarding.method.revolut_help')
+                          : context.s.t('onboarding.method.mobilepay_help'),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12,
-                          height: 1.4,
-                          color: c.textMuted),
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        height: 1.4,
+                        color: c.textMuted,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-              LtPrimaryButton(label: 'Save', onPressed: _save),
+              LtPrimaryButton(
+                label: context.s.t('onboarding.method.save'),
+                onPressed: _save,
+              ),
               const SizedBox(height: 10),
               TextButton(
                 onPressed: _skip,
-                child: Text('Skip — set up later',
-                    style: outfitStyle(14, c.textSecondary)),
+                child: Text(
+                  context.s.t('onboarding.method.skip'),
+                  style: outfitStyle(14, c.textSecondary),
+                ),
               ),
             ],
           ),
@@ -220,10 +247,10 @@ class _OnboardingMethodScreenState
   }
 
   Widget _pasteButton(LtColors c) => IconButton(
-        tooltip: 'Paste',
-        icon: Icon(Icons.content_paste_rounded, size: 20, color: c.accent),
-        onPressed: _pasteFromClipboard,
-      );
+    tooltip: context.s.t('onboarding.method.paste_tooltip'),
+    icon: Icon(Icons.content_paste_rounded, size: 20, color: c.accent),
+    onPressed: _pasteFromClipboard,
+  );
 }
 
 class _FieldLabel extends StatelessWidget {

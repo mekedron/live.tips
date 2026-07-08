@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
 import '../../../domain/rollover_math.dart';
+import '../../../l10n/app_localizations.dart';
 import 'stage_types.dart';
 
 /// Vertical space the HUD occupies at the top / the mini-feed at the bottom —
@@ -29,11 +30,7 @@ const kStageGlassSoft = Color(0xB314110E);
 /// currency formatting, fonts and accessibility all live here. Wrapped in
 /// IgnorePointer by the caller so orbit gestures reach the WebView below.
 class StageHud extends StatelessWidget {
-  const StageHud({
-    super.key,
-    required this.snapshot,
-    this.trophyPulse = 0,
-  });
+  const StageHud({super.key, required this.snapshot, this.trophyPulse = 0});
 
   final StageSnapshot snapshot;
 
@@ -87,10 +84,10 @@ class StageHud extends StatelessWidget {
                         child: Stack(
                           children: [
                             Container(
-                                color: Colors.white.withValues(alpha: 0.14)),
+                              color: Colors.white.withValues(alpha: 0.14),
+                            ),
                             FractionallySizedBox(
-                              widthFactor:
-                                  s.jarPct.clamp(0.0, 1.0).toDouble(),
+                              widthFactor: s.jarPct.clamp(0.0, 1.0).toDouble(),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: kStageAccent,
@@ -105,9 +102,15 @@ class StageHud extends StatelessWidget {
                   ),
                   SizedBox(height: wide ? 8 : 7),
                   Text(
-                    '${formatAmount(s.currentJarMinor, s.currency)} of '
-                    '${formatAmount(s.goalMinor, s.currency)} · '
-                    '$jarPctRounded%${wide ? ' of tonight\'s goal' : ''}',
+                    context.s.t('stage.jar_progress', {
+                          'current': formatAmount(
+                            s.currentJarMinor,
+                            s.currency,
+                          ),
+                          'goal': formatAmount(s.goalMinor, s.currency),
+                          'pct': jarPctRounded,
+                        }) +
+                        (wide ? context.s.t('stage.of_tonights_goal') : ''),
                     style: TextStyle(
                       fontFamily: kFontOutfit,
                       fontSize: wide ? 14 : 12.5,
@@ -168,8 +171,10 @@ class _TrophyLine extends StatelessWidget {
           const Icon(Icons.emoji_events_rounded, size: 16, color: kGold),
           const SizedBox(width: 5),
           Text(
-            '${formatAmount(bankedMinor, currency)} in $bankedJars full '
-            '${bankedJars == 1 ? 'jar' : 'jars'}',
+            context.s.t('stage.trophy_line', {
+              'amount': formatAmount(bankedMinor, currency),
+              'count': bankedJars,
+            }),
             style: const TextStyle(
               fontFamily: kFontOutfit,
               fontSize: 14,
@@ -203,7 +208,7 @@ class StageMiniFeed extends StatelessWidget {
           border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
         child: Text(
-          'Waiting for the first tip…',
+          context.s.t('stage.waiting_first_tip'),
           style: TextStyle(
             fontFamily: kFontOutfit,
             fontSize: 13,
@@ -223,13 +228,16 @@ class StageMiniFeed extends StatelessWidget {
             child: Opacity(
               opacity: (1 - i * 0.25).clamp(0.3, 1.0).toDouble(),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: kStageGlassSoft,
                   borderRadius: BorderRadius.circular(999),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -336,8 +344,8 @@ class _TipBannerLayerState extends State<TipBannerLayer> {
     final hold = _queue.isNotEmpty
         ? kTipBannerHoldCrowded
         : _current!.donation.hasMessage
-            ? kTipBannerHoldWithMessage
-            : kTipBannerHold;
+        ? kTipBannerHoldWithMessage
+        : kTipBannerHold;
     _timer = Timer(hold, _dismiss);
   }
 
@@ -355,46 +363,55 @@ class _TipBannerLayerState extends State<TipBannerLayer> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final wide = constraints.maxWidth > 780;
-      return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        // just below the HUD numbers, over the jar's headroom — follows the
-        // total's tablet drop (see StageHud.topOffset) so it stays clear of it
-        padding: EdgeInsets.only(
-            top: MediaQuery.paddingOf(context).top + (wide ? 204 : 188)),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 480),
-          reverseDuration: const Duration(milliseconds: 320),
-          transitionBuilder: (child, animation) {
-            // separate curves: the pop may overshoot, opacity must not
-            final fade =
-                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-            final pop =
-                CurvedAnimation(parent: animation, curve: Curves.easeOutBack);
-            return FadeTransition(
-              opacity: fade,
-              child: ScaleTransition(
-                scale: Tween(begin: 0.86, end: 1.0).animate(pop),
-                child: SlideTransition(
-                  position: Tween(
-                    begin: const Offset(0, -0.3),
-                    end: Offset.zero,
-                  ).animate(pop),
-                  child: child,
-                ),
-              ),
-            );
-          },
-          child: _current == null
-              ? const SizedBox.shrink(key: ValueKey('no-banner'))
-              : _TipBanner(
-                  key: ValueKey(_current!.donation.id), tip: _current!),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth > 780;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            // just below the HUD numbers, over the jar's headroom — follows the
+            // total's tablet drop (see StageHud.topOffset) so it stays clear of it
+            padding: EdgeInsets.only(
+              top: MediaQuery.paddingOf(context).top + (wide ? 204 : 188),
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 480),
+              reverseDuration: const Duration(milliseconds: 320),
+              transitionBuilder: (child, animation) {
+                // separate curves: the pop may overshoot, opacity must not
+                final fade = CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                );
+                final pop = CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutBack,
+                );
+                return FadeTransition(
+                  opacity: fade,
+                  child: ScaleTransition(
+                    scale: Tween(begin: 0.86, end: 1.0).animate(pop),
+                    child: SlideTransition(
+                      position: Tween(
+                        begin: const Offset(0, -0.3),
+                        end: Offset.zero,
+                      ).animate(pop),
+                      child: child,
+                    ),
+                  ),
+                );
+              },
+              child: _current == null
+                  ? const SizedBox.shrink(key: ValueKey('no-banner'))
+                  : _TipBanner(
+                      key: ValueKey(_current!.donation.id),
+                      tip: _current!,
+                    ),
+            ),
+          ),
+        );
+      },
     );
-    });
   }
 }
 
@@ -468,9 +485,7 @@ class _TipBanner extends StatelessWidget {
               children: [
                 Text(
                   // "~" flags an unverified (donor-declared) amount.
-                  '${big ? '👑 ' : ''}${d.displayName} tipped '
-                  '${d.verified ? '' : '~'}'
-                  '${formatAmount(d.amountMinor, d.currency)}',
+                  '${big ? '👑 ' : ''}${context.s.t('stage.tipped', {'name': d.displayName, 'amount': '${d.verified ? '' : '~'}${formatAmount(d.amountMinor, d.currency)}'})}',
                   style: TextStyle(
                     fontFamily: kFontOutfit,
                     fontSize: big ? 18 : 16,

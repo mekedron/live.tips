@@ -16,6 +16,7 @@ import '../../domain/live_session.dart';
 import '../../domain/rollover_math.dart';
 import '../../domain/stage_settings.dart';
 import '../../domain/tip_jar.dart';
+import '../../l10n/app_localizations.dart';
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/goal_editor.dart';
@@ -69,7 +70,9 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
     if (width == null) return;
     final settings = ref.read(appStateProvider).settings;
     if (settings.stage.railWidth == width) return;
-    await ref.read(appStateProvider.notifier).updateSettings(
+    await ref
+        .read(appStateProvider.notifier)
+        .updateSettings(
           settings.copyWith(stage: settings.stage.copyWith(railWidth: width)),
         );
   }
@@ -184,7 +187,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
       context,
       initialMinor: _session.goalMinor,
       currency: _session.currency,
-      title: 'Preview goal',
+      title: context.s.t('settings.stage_preview.goal_sheet_title'),
     );
     if (newGoal == null || !mounted) return;
     setState(() {
@@ -201,8 +204,9 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
     // Whatever QR is actually configured (Stripe link or live.tips page);
     // a fully unconfigured preview falls back to the demo jar's.
     final qrUrl = app.activeQrUrl ?? TipJar.demo.url;
-    final artistName =
-        app.displayName.isEmpty ? TipJar.demo.displayName : app.displayName;
+    final artistName = app.displayName.isEmpty
+        ? TipJar.demo.displayName
+        : app.displayName;
     final snapshot = StageSnapshot.fromState(
       LiveState(session: _session, lastDonation: _lastDonation),
     );
@@ -284,7 +288,9 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                       children: [
                         StageGlassButton(
                           icon: Icons.arrow_back_rounded,
-                          tooltip: 'Back',
+                          tooltip: context.s.t(
+                            'settings.stage_preview.back_tooltip',
+                          ),
                           size: wide ? 44 : 40,
                           onTap: () => _handleBack(context),
                         ),
@@ -300,13 +306,17 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                           const SizedBox(width: 8),
                           StageGlassButton(
                             icon: Icons.flag_rounded,
-                            tooltip: 'Preview goal',
+                            tooltip: context.s.t(
+                              'settings.stage_preview.preview_goal_tooltip',
+                            ),
                             onTap: () => _editGoal(context),
                           ),
                           const SizedBox(width: 8),
                           StageGlassButton(
                             icon: Icons.palette_rounded,
-                            tooltip: 'Stage look',
+                            tooltip: context.s.t(
+                              'settings.stage_preview.stage_look_tooltip',
+                            ),
                             onTap: () => showStageLookSheet(context),
                           ),
                         ],
@@ -327,7 +337,9 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                     // reserved strip, matching the jar.
                     child: Padding(
                       padding: EdgeInsets.only(
-                          bottom: 24 + safeBottom, right: railInset),
+                        bottom: 24 + safeBottom,
+                        right: railInset,
+                      ),
                       child: _PretendTipButton(
                         busy: _pending,
                         onTap: () => _onPretendTip(context),
@@ -346,7 +358,8 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                           color: kStageGlassSoft,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08)),
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -360,19 +373,25 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                             const SizedBox(width: 8),
                             StageGlassSquare(
                               icon: Icons.qr_code_2_rounded,
-                              tooltip: 'Show QR',
+                              tooltip: context.s.t(
+                                'settings.stage_preview.show_qr_tooltip',
+                              ),
                               onTap: () => showFullscreenQr(context, qrUrl),
                             ),
                             const SizedBox(width: 8),
                             StageGlassSquare(
                               icon: Icons.flag_rounded,
-                              tooltip: 'Preview goal',
+                              tooltip: context.s.t(
+                                'settings.stage_preview.preview_goal_tooltip',
+                              ),
                               onTap: () => _editGoal(context),
                             ),
                             const SizedBox(width: 8),
                             StageGlassSquare(
                               icon: Icons.palette_rounded,
-                              tooltip: 'Stage look',
+                              tooltip: context.s.t(
+                                'settings.stage_preview.stage_look_tooltip',
+                              ),
                               onTap: () => showStageLookSheet(context),
                             ),
                           ],
@@ -389,7 +408,8 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                       offset: Offset(wide ? -railInset / 2 : 0.0, 0),
                       child: Padding(
                         padding: EdgeInsets.only(
-                            top: safeTop + (wide ? 160 : 188)),
+                          top: safeTop + (wide ? 160 : 188),
+                        ),
                         child: const _PendingPill(),
                       ),
                     ),
@@ -464,13 +484,20 @@ class _PreviewPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.visibility_outlined,
-              size: 16, color: Colors.white.withValues(alpha: 0.7)),
+          Icon(
+            Icons.visibility_outlined,
+            size: 16,
+            color: Colors.white.withValues(alpha: 0.7),
+          ),
           const SizedBox(width: 8),
           Text(
-            'Stage preview',
-            style: outfitStyle(13, Colors.white,
-                weight: FontWeight.w700, letterSpacing: 0.3),
+            context.s.t('settings.stage_preview.pill_label'),
+            style: outfitStyle(
+              13,
+              Colors.white,
+              weight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
           ),
         ],
       ),
@@ -500,11 +527,16 @@ class _PretendTipButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = Text(
-      busy ? 'Landing…' : 'Pretend tip',
+      busy
+          ? context.s.t('settings.stage_preview.landing')
+          : context.s.t('settings.stage_preview.pretend_tip'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style:
-          outfitStyle(14.5, const Color(0xFF40160A), weight: FontWeight.w700),
+      style: outfitStyle(
+        14.5,
+        const Color(0xFF40160A),
+        weight: FontWeight.w700,
+      ),
     );
     final button = Material(
       color: kStageAccent,
@@ -523,11 +555,16 @@ class _PretendTipButton extends StatelessWidget {
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2.4, color: Color(0xFF40160A)),
+                    strokeWidth: 2.4,
+                    color: Color(0xFF40160A),
+                  ),
                 )
               else
-                const Icon(Icons.volunteer_activism_rounded,
-                    size: 19, color: Color(0xFF40160A)),
+                const Icon(
+                  Icons.volunteer_activism_rounded,
+                  size: 19,
+                  color: Color(0xFF40160A),
+                ),
               const SizedBox(width: 8),
               // Loose Flexible: centered by the row when there's slack, clipped
               // to an ellipsis when the slot is tight.
@@ -564,11 +601,13 @@ class _PendingPill extends StatelessWidget {
             width: 16,
             height: 16,
             child: CircularProgressIndicator(
-                strokeWidth: 2.2, color: kStageAccent),
+              strokeWidth: 2.2,
+              color: kStageAccent,
+            ),
           ),
           const SizedBox(width: 10),
           Text(
-            'Adding your tip…',
+            context.s.t('settings.stage_preview.adding_tip'),
             style: outfitStyle(14, Colors.white.withValues(alpha: 0.85)),
           ),
         ],
@@ -583,8 +622,7 @@ typedef PretendTip = ({int amountMinor, String? name, String? message});
 /// The fan-facing tip form the preview stands in for: amount (required),
 /// nickname and message (both optional) — the same fields Stripe collects.
 /// Returns null if dismissed.
-Future<PretendTip?> showPretendTipSheet(
-    BuildContext context, String currency) {
+Future<PretendTip?> showPretendTipSheet(BuildContext context, String currency) {
   final amountCtrl = TextEditingController();
   final nameCtrl = TextEditingController();
   final messageCtrl = TextEditingController();
@@ -603,7 +641,11 @@ Future<PretendTip?> showPretendTipSheet(
           void submit() {
             final minor = parseMajorToMinor(amountCtrl.text, currency);
             if (minor == null) {
-              setSheet(() => amountError = 'Enter an amount greater than 0');
+              setSheet(
+                () => amountError = context.s.t(
+                  'settings.stage_preview.amount_error',
+                ),
+              );
               return;
             }
             final name = nameCtrl.text.trim();
@@ -625,24 +667,30 @@ Future<PretendTip?> showPretendTipSheet(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Send a pretend tip',
-                    style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+                Text(
+                  context.s.t('settings.stage_preview.sheet_title'),
+                  style: outfitStyle(18, c.text, weight: FontWeight.w700),
+                ),
                 const SizedBox(height: 4),
                 Text(
-                  'Exactly what your fans fill in — see how it lands on stage.',
+                  context.s.t('settings.stage_preview.sheet_subtitle'),
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13,
-                      color: c.textSecondary),
+                    fontFamily: kFontBody,
+                    fontSize: 13,
+                    color: c.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 18),
                 TextField(
                   controller: amountCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: outfitStyle(22, c.text, weight: FontWeight.w700),
                   decoration: InputDecoration(
-                    labelText: 'Amount',
+                    labelText: context.s.t(
+                      'settings.stage_preview.amount_label',
+                    ),
                     hintText: '0',
                     errorText: amountError,
                     suffixText: currency.toUpperCase(),
@@ -661,7 +709,9 @@ Future<PretendTip?> showPretendTipSheet(
                     for (final p in presets) ...[
                       _AmountChip(
                         label: formatAmount(
-                            p * minorUnitsPerMajor(currency), currency),
+                          p * minorUnitsPerMajor(currency),
+                          currency,
+                        ),
                         onTap: () => setSheet(() {
                           amountCtrl.text = p.toString();
                           amountError = null;
@@ -675,9 +725,9 @@ Future<PretendTip?> showPretendTipSheet(
                 TextField(
                   controller: nameCtrl,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Name (optional)',
-                    hintText: 'Anonymous',
+                  decoration: InputDecoration(
+                    labelText: context.s.t('settings.stage_preview.name_label'),
+                    hintText: context.s.t('settings.stage_preview.name_hint'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -686,14 +736,18 @@ Future<PretendTip?> showPretendTipSheet(
                   textCapitalization: TextCapitalization.sentences,
                   minLines: 1,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Message (optional)',
-                    hintText: 'Say something nice…',
+                  decoration: InputDecoration(
+                    labelText: context.s.t(
+                      'settings.stage_preview.message_label',
+                    ),
+                    hintText: context.s.t(
+                      'settings.stage_preview.message_hint',
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
                 LtPrimaryButton(
-                  label: 'Drop it in the jar',
+                  label: context.s.t('settings.stage_preview.submit_button'),
                   icon: Icons.volunteer_activism_rounded,
                   onPressed: submit,
                 ),

@@ -6,6 +6,8 @@ import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
 import '../../domain/relay_jar.dart';
 import '../../domain/tip_method.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/enum_labels.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../onboarding/relay_setup_screen.dart'
@@ -18,7 +20,7 @@ import '../onboarding/relay_setup_screen.dart'
 /// an artist removes a method; clearing the last one disconnects the tip page.
 class RelayMethodScreen extends ConsumerStatefulWidget {
   const RelayMethodScreen({super.key, required this.method})
-      : assert(method != TipMethod.stripe);
+    : assert(method != TipMethod.stripe);
 
   final TipMethod method;
 
@@ -67,6 +69,8 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
   }
 
   Future<void> _save({bool removing = false}) async {
+    final s = context.s;
+    final methodLabel = widget.method.l10nLabel(context);
     final app = ref.read(appStateProvider);
     final notifier = ref.read(appStateProvider.notifier);
     final jar = app.relayJar;
@@ -75,9 +79,12 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
     String? value;
     if (_isRevolut) {
       final raw = _controller.text.trim().replaceFirst(RegExp(r'^@+'), '');
-      if (raw.isNotEmpty &&
-          !RegExp(r'^[A-Za-z0-9._-]{3,32}$').hasMatch(raw)) {
-        setState(() => _error = 'That doesn\'t look like a Revolut username.');
+      if (raw.isNotEmpty && !RegExp(r'^[A-Za-z0-9._-]{3,32}$').hasMatch(raw)) {
+        setState(
+          () => _error = context.s.t(
+            'settings.relay_method.error_revolut_invalid',
+          ),
+        );
         return;
       }
       value = raw.isEmpty ? null : raw;
@@ -86,11 +93,14 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
       if (raw.isNotEmpty) {
         final box = extractMobilePayBoxId(raw);
         if (box == null) {
-          setState(() => _error = 'That doesn\'t look like a Box link or id — '
-              'paste the share link from MobilePay.');
+          setState(
+            () => _error = context.s.t(
+              'settings.relay_method.error_mobilepay_invalid',
+            ),
+          );
           return;
         }
-        final curErr = mobilePayCurrencyError(app.currency);
+        final curErr = mobilePayCurrencyError(app.currency, context: context);
         if (curErr != null) {
           setState(() => _error = curErr);
           return;
@@ -108,7 +118,8 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
     final mobilepay = _isRevolut
         ? (jar?.hasMobilePay ?? false ? jar!.mobilepayBoxId : null)
         : value;
-    final bothEmpty = (revolut == null || revolut.isEmpty) &&
+    final bothEmpty =
+        (revolut == null || revolut.isEmpty) &&
         (mobilepay == null || mobilepay.isEmpty);
 
     // Nothing to add for a band with no tip page and an empty field.
@@ -122,16 +133,12 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Disconnect tip page?'),
-          content: const Text(
-            'This is your last tip-page method, so clearing it disconnects '
-            'your tip page. Its QR stops working immediately. Tips history '
-            'stays on this device.',
-          ),
+          title: Text(context.s.t('settings.relay_method.disconnect_title')),
+          content: Text(context.s.t('settings.relay_method.disconnect_body')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(context.s.t('settings.relay_method.cancel')),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -139,7 +146,9 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Disconnect'),
+              child: Text(
+                context.s.t('settings.relay_method.disconnect_confirm'),
+              ),
             ),
           ],
         ),
@@ -166,7 +175,7 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
           mobilepayBoxId: mobilepay,
         );
         await notifier.setRelayJar(result.jar, result.secret);
-        _finish('Tip page created');
+        _finish(s.t('settings.relay_method.created_snack'));
       } else if (bothEmpty) {
         final secret = app.relaySecret;
         if (secret != null) {
@@ -177,7 +186,7 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
           }
         }
         await notifier.clearRelayJar();
-        _finish('Tip page disconnected');
+        _finish(s.t('settings.relay_method.disconnected_snack'));
       } else {
         // Build the jar explicitly so a cleared method becomes null (copyWith
         // can't null a field), then push the full profile to the relay.
@@ -199,9 +208,15 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
           stripeUrl: app.tipJar?.url,
         );
         await notifier.updateRelayJarLocal(updated);
-        _finish(value == null
-            ? '${widget.method.label} removed'
-            : '${widget.method.label} saved');
+        _finish(
+          value == null
+              ? s.t('settings.relay_method.method_removed_snack', {
+                  'method': methodLabel,
+                })
+              : s.t('settings.relay_method.method_saved_snack', {
+                  'method': methodLabel,
+                }),
+        );
       }
     } on RelayApiException catch (e) {
       if (mounted) setState(() => _error = e.friendlyMessage);
@@ -220,25 +235,27 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
 
   void _finish(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
     Navigator.of(context).pop();
   }
 
   Widget _pasteButton(LtColors c) => IconButton(
-        tooltip: 'Paste',
-        icon: Icon(Icons.content_paste_rounded, size: 20, color: c.accent),
-        onPressed: _pasteFromClipboard,
-      );
+    tooltip: context.s.t('settings.relay_method.paste_tooltip'),
+    icon: Icon(Icons.content_paste_rounded, size: 20, color: c.accent),
+    onPressed: _pasteFromClipboard,
+  );
 
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
     final jar = ref.watch(appStateProvider).relayJar;
-    final currentlySet =
-        _isRevolut ? (jar?.hasRevolut ?? false) : (jar?.hasMobilePay ?? false);
+    final currentlySet = _isRevolut
+        ? (jar?.hasRevolut ?? false)
+        : (jar?.hasMobilePay ?? false);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.method.label)),
+      appBar: AppBar(title: Text(widget.method.l10nLabel(context))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -247,15 +264,14 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
             children: [
               Text(
                 _isRevolut
-                    ? 'Fans who pick Revolut on your tip page are sent to '
-                        'your @username.'
-                    : 'Fans who pick MobilePay on your tip page are sent to '
-                        'your Box.',
+                    ? context.s.t('settings.relay_method.intro_revolut')
+                    : context.s.t('settings.relay_method.intro_mobilepay'),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 14,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 14,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
               const SizedBox(height: 20),
               LtCard(
@@ -263,7 +279,12 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _FieldLabel(
-                        _isRevolut ? 'Revolut username' : 'MobilePay Box'),
+                      _isRevolut
+                          ? context.s.t('settings.relay_method.label_revolut')
+                          : context.s.t(
+                              'settings.relay_method.label_mobilepay',
+                            ),
+                    ),
                     _isRevolut
                         ? TextField(
                             controller: _controller,
@@ -271,7 +292,9 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
                             enableSuggestions: false,
                             decoration: InputDecoration(
                               prefixText: '@',
-                              hintText: 'username',
+                              hintText: context.s.t(
+                                'settings.relay_method.hint_revolut',
+                              ),
                               errorText: _error,
                               errorMaxLines: 3,
                               suffixIcon: _pasteButton(c),
@@ -286,7 +309,9 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
                             autocorrect: false,
                             enableSuggestions: false,
                             style: const TextStyle(
-                                fontFamily: 'monospace', fontSize: 13.5),
+                              fontFamily: 'monospace',
+                              fontSize: 13.5,
+                            ),
                             decoration: InputDecoration(
                               hintText: 'https://qr.mobilepay.fi/box/…',
                               errorText: _error,
@@ -301,30 +326,30 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
                     const SizedBox(height: 8),
                     Text(
                       _isRevolut
-                          ? 'In the Revolut app: tap your profile → your '
-                              '@username is under your name.'
-                          : 'In MobilePay: open your Box → Share → paste the '
-                              'whole link or just the code. MobilePay Boxes '
-                              'are EUR only.',
+                          ? context.s.t('settings.relay_method.help_revolut')
+                          : context.s.t('settings.relay_method.help_mobilepay'),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12,
-                          height: 1.4,
-                          color: c.textMuted),
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        height: 1.4,
+                        color: c.textMuted,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
               LtPrimaryButton(
-                label: 'Save',
+                label: context.s.t('settings.relay_method.save_button'),
                 busy: _busy && !_removing,
                 onPressed: _busy ? null : _save,
               ),
               if (currentlySet) ...[
                 const SizedBox(height: 12),
                 LtDangerButton(
-                  label: 'Remove ${widget.method.label}',
+                  label: context.s.t('settings.relay_method.remove_button', {
+                    'method': widget.method.l10nLabel(context),
+                  }),
                   onPressed: _busy ? null : _remove,
                   busy: _removing,
                 ),

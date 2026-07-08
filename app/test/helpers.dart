@@ -1,7 +1,21 @@
+import 'package:flutter/widgets.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/band_account.dart';
+import 'package:live_tips/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Localization wiring for widget tests: the same delegates the real
+/// MaterialApp uses, so `context.s` resolves instead of throwing. Pump a
+/// MaterialApp with these and `locale: const Locale('en')`. English resolves
+/// synchronously (see AppLocalizations), so no extra pump is needed.
+const List<LocalizationsDelegate<Object?>> kTestL10nDelegates = [
+  AppLocalizations.delegate,
+  GlobalMaterialLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+  GlobalCupertinoLocalizations.delegate,
+];
 
 /// In-memory [SecureStore] — the keychain plugin is a silent no-op in tests,
 /// so anything that must READ a secret back (migration, band switching)
@@ -101,15 +115,13 @@ Future<LocalStore> seededStore({
   String bandName = '',
 }) async {
   final registry = AccountsRegistry(
-    accounts: [
-      BandAccount(id: accountId, name: bandName, createdAtMs: 0),
-    ],
+    accounts: [BandAccount(id: accountId, name: bandName, createdAtMs: 0)],
     activeId: accountId,
   );
   SharedPreferences.setMockInitialValues({
     LocalStore.kAccounts:
         '{"activeId":"$accountId","accounts":[{"id":"$accountId",'
-            '"name":"$bandName","createdAtMs":0}]}',
+        '"name":"$bandName","createdAtMs":0}]}',
     ...values,
     for (final e in accountValues.entries)
       LocalStore.accountKey(e.key, accountId): e.value,

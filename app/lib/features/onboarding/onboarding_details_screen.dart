@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/currencies.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
@@ -23,11 +24,12 @@ class OnboardingDetailsScreen extends ConsumerStatefulWidget {
 class _OnboardingDetailsScreenState
     extends ConsumerState<OnboardingDetailsScreen> {
   final _nameController = TextEditingController();
-  final _thanksController = TextEditingController(
-    text: 'Thank you for supporting live music! 🎶',
-  );
+  final _thanksController = TextEditingController();
   String _currency = 'eur';
   String? _error;
+  // The default thank-you text is localized, so it can't be set until
+  // dependencies (Localizations) are available — see didChangeDependencies.
+  bool _thanksInitialized = false;
 
   @override
   void initState() {
@@ -44,6 +46,21 @@ class _OnboardingDetailsScreenState
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Prefill the default thank-you message once, only when nothing (draft or
+    // prior edit) already populated the field.
+    if (!_thanksInitialized) {
+      _thanksInitialized = true;
+      if (_thanksController.text.isEmpty) {
+        _thanksController.text = context.s.t(
+          'onboarding.details.thanks_default',
+        );
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _thanksController.dispose();
@@ -53,14 +70,16 @@ class _OnboardingDetailsScreenState
   Future<void> _continue() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Add your artist or band name — fans will see it.');
+      setState(() => _error = context.s.t('onboarding.details.name_required'));
       return;
     }
     final thankYou = _thanksController.text.trim();
     // Preserve any methods already picked (back-navigation), just refresh the
     // details.
     final existing = ref.read(onboardingDraftProvider);
-    ref.read(onboardingDraftProvider.notifier).set(
+    ref
+        .read(onboardingDraftProvider.notifier)
+        .set(
           (existing ?? const OnboardingDraft()).copyWith(
             name: name,
             currency: _currency,
@@ -71,9 +90,9 @@ class _OnboardingDetailsScreenState
     // half-finished band never reads "Unnamed band".
     await ref.read(appStateProvider.notifier).renameBand(name);
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const MethodSelectScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const MethodSelectScreen()));
   }
 
   @override
@@ -85,11 +104,17 @@ class _OnboardingDetailsScreenState
     final total = ref.watch(onboardingDraftProvider)?.totalSteps ?? 3;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Your details'),
+        title: Text(context.s.t('onboarding.details.title')),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Center(child: LtPill(label: 'Step 1 of $total')),
+            child: Center(
+              child: LtPill(
+                label: context.s.t('onboarding.details.step_pill', {
+                  'total': total,
+                }),
+              ),
+            ),
           ),
         ],
       ),
@@ -101,49 +126,57 @@ class _OnboardingDetailsScreenState
             children: [
               LtProgressSegments(total: total, filled: 1),
               const SizedBox(height: 16),
-              Text('Let\'s set up your tip jar',
-                  style: outfitStyle(22, c.text, weight: FontWeight.w800)),
+              Text(
+                context.s.t('onboarding.details.heading'),
+                style: outfitStyle(22, c.text, weight: FontWeight.w800),
+              ),
               const SizedBox(height: 6),
               Text(
-                'Tell us who you are and how you want to be paid. You can '
-                'change all of this later in Settings.',
+                context.s.t('onboarding.details.subtitle'),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 14,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 14,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
               const SizedBox(height: 20),
               LtCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const _FieldLabel('Artist or band name'),
+                    _FieldLabel(context.s.t('onboarding.details.name_label')),
                     TextField(
                       controller: _nameController,
                       textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                          hintText: 'The Midnight Foxes'),
+                      decoration: InputDecoration(
+                        hintText: context.s.t('onboarding.details.name_hint'),
+                      ),
                       onChanged: (_) {
                         if (_error != null) setState(() => _error = null);
                       },
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Fans see this on your tip page, the stage and posters.',
+                      context.s.t('onboarding.details.name_help'),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12,
-                          color: c.textMuted),
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        color: c.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    const _FieldLabel('Currency'),
+                    _FieldLabel(
+                      context.s.t('onboarding.details.currency_label'),
+                    ),
                     InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () async {
                         final picked = await showLtPicker<String>(
                           context: context,
-                          title: 'Currency',
+                          title: context.s.t(
+                            'onboarding.details.currency_picker_title',
+                          ),
                           values: kSupportedCurrencies,
                           selected: _currency,
                           labelOf: currencyLabel,
@@ -152,7 +185,9 @@ class _OnboardingDetailsScreenState
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 13),
+                          horizontal: 14,
+                          vertical: 13,
+                        ),
                         decoration: BoxDecoration(
                           color: c.bg,
                           border: Border.all(color: c.border, width: 1.5),
@@ -164,38 +199,45 @@ class _OnboardingDetailsScreenState
                               child: Text(
                                 currencyLabel(_currency),
                                 style: TextStyle(
-                                    fontFamily: kFontBody,
-                                    fontSize: 15,
-                                    color: c.text),
+                                  fontFamily: kFontBody,
+                                  fontSize: 15,
+                                  color: c.text,
+                                ),
                               ),
                             ),
-                            Icon(Icons.expand_more_rounded,
-                                size: 22, color: c.textSecondary),
+                            Icon(
+                              Icons.expand_more_rounded,
+                              size: 22,
+                              color: c.textSecondary,
+                            ),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const _FieldLabel('Thank-you message'),
+                    _FieldLabel(context.s.t('onboarding.details.thanks_label')),
                     TextField(
                       controller: _thanksController,
                       maxLength: 200,
                       maxLines: 2,
                       minLines: 1,
-                      buildCounter: (context,
-                              {required currentLength,
-                              required isFocused,
-                              maxLength}) =>
-                          null,
+                      buildCounter:
+                          (
+                            context, {
+                            required currentLength,
+                            required isFocused,
+                            maxLength,
+                          }) => null,
                       decoration: const InputDecoration(counterText: ''),
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Shown after a Stripe tip and on your tip page.',
+                      context.s.t('onboarding.details.thanks_help'),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12,
-                          color: c.textMuted),
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        color: c.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -205,15 +247,16 @@ class _OnboardingDetailsScreenState
                 Text(
                   _error!,
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13,
-                      height: 1.45,
-                      color: c.danger),
+                    fontFamily: kFontBody,
+                    fontSize: 13,
+                    height: 1.45,
+                    color: c.danger,
+                  ),
                 ),
               ],
               const SizedBox(height: 20),
               LtPrimaryButton(
-                label: 'Continue',
+                label: context.s.t('onboarding.details.continue'),
                 trailingIcon: Icons.arrow_forward_rounded,
                 onPressed: _continue,
               ),

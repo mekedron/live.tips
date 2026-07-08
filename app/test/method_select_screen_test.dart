@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/features/onboarding/method_select_screen.dart';
+import 'helpers.dart';
 
 /// Tall surface: the screen is a lazy ListView, and the warning card plus
 /// the Continue button must be on-screen for the finders to see them.
@@ -12,6 +13,9 @@ Future<void> _pump(WidgetTester tester) async {
   await tester.pumpWidget(
     ProviderScope(
       child: MaterialApp(
+        localizationsDelegates: kTestL10nDelegates,
+        locale: const Locale('en'),
+
         theme: buildLightTheme(),
         home: const MethodSelectScreen(),
       ),
@@ -25,20 +29,23 @@ bool _continueEnabled(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byType(FilledButton)).onPressed != null;
 
 void main() {
-  testWidgets('nothing is preselected; Stripe is recommended',
-      (tester) async {
+  testWidgets('nothing is preselected; Stripe is recommended', (tester) async {
     await _pump(tester);
 
     expect(find.text('Recommended'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
     expect(find.byIcon(Icons.radio_button_unchecked_rounded), findsNWidgets(3));
     expect(find.text(_warningTitle), findsNothing);
-    expect(_continueEnabled(tester), isFalse,
-        reason: 'no method picked yet — nothing to continue with');
+    expect(
+      _continueEnabled(tester),
+      isFalse,
+      reason: 'no method picked yet — nothing to continue with',
+    );
   });
 
-  testWidgets('selecting Stripe alone shows no warning and enables Continue',
-      (tester) async {
+  testWidgets('selecting Stripe alone shows no warning and enables Continue', (
+    tester,
+  ) async {
     await _pump(tester);
 
     await tester.tap(find.text('Stripe'));
@@ -49,34 +56,44 @@ void main() {
     expect(_continueEnabled(tester), isTrue);
   });
 
-  testWidgets('selecting Revolut alongside Stripe surfaces the honest warning',
-      (tester) async {
-    await _pump(tester);
+  testWidgets(
+    'selecting Revolut alongside Stripe surfaces the honest warning',
+    (tester) async {
+      await _pump(tester);
 
-    await tester.tap(find.text('Stripe'));
-    await tester.pump();
-    await tester.tap(find.text('Revolut'));
-    await tester.pump();
+      await tester.tap(find.text('Stripe'));
+      await tester.pump();
+      await tester.tap(find.text('Revolut'));
+      await tester.pump();
 
-    expect(find.byIcon(Icons.check_circle_rounded), findsNWidgets(2));
-    expect(find.text(_warningTitle), findsOneWidget);
-    // Stripe still selected → the stronger plea is absent.
-    expect(find.textContaining('We strongly recommend keeping Stripe'),
-        findsNothing);
-  });
+      expect(find.byIcon(Icons.check_circle_rounded), findsNWidgets(2));
+      expect(find.text(_warningTitle), findsOneWidget);
+      // Stripe still selected → the stronger plea is absent.
+      expect(
+        find.textContaining('We strongly recommend keeping Stripe'),
+        findsNothing,
+      );
+    },
+  );
 
-  testWidgets('a relay method without Stripe gets the stronger warning',
-      (tester) async {
+  testWidgets('a relay method without Stripe gets the stronger warning', (
+    tester,
+  ) async {
     await _pump(tester);
 
     await tester.tap(find.text('MobilePay'));
     await tester.pump();
 
     expect(find.text(_warningTitle), findsOneWidget);
-    expect(find.textContaining('We strongly recommend keeping Stripe'),
-        findsOneWidget);
-    expect(_continueEnabled(tester), isTrue,
-        reason: 'MobilePay alone is still a valid selection');
+    expect(
+      find.textContaining('We strongly recommend keeping Stripe'),
+      findsOneWidget,
+    );
+    expect(
+      _continueEnabled(tester),
+      isTrue,
+      reason: 'MobilePay alone is still a valid selection',
+    );
   });
 
   testWidgets('deselecting back to empty disables Continue', (tester) async {

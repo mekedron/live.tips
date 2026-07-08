@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../data/stripe/stripe_requests.dart';
+import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 
@@ -33,8 +34,6 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
   String? _error;
   KeyCheckResult? _checks;
 
-  static const _defaultThanks = 'Thank you! 💛';
-
   @override
   void dispose() {
     _keyController.dispose();
@@ -47,19 +46,16 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
     return '${key.substring(0, 8)}…${key.substring(key.length - 4)}';
   }
 
-  String? _validateFormat(String key) {
-    if (key.isEmpty) return 'Paste your restricted API key first.';
+  String? _validateFormat(BuildContext context, String key) {
+    if (key.isEmpty) return context.s.t('settings.stripe_key.error_empty');
     if (key.startsWith('pk_')) {
-      return 'That\'s a *publishable* key. You need the restricted key '
-          '(starts with rk_).';
+      return context.s.t('settings.stripe_key.error_publishable');
     }
     if (key.startsWith('sk_live_')) {
-      return 'That\'s your full live secret key — too powerful to put on a '
-          'device. Create a *restricted* key (rk_live_…) instead.';
+      return context.s.t('settings.stripe_key.error_secret');
     }
     if (!key.startsWith('rk_') && !key.startsWith('sk_test_')) {
-      return 'This doesn\'t look like a Stripe restricted key '
-          '(expected rk_live_… or rk_test_…).';
+      return context.s.t('settings.stripe_key.error_format');
     }
     return null;
   }
@@ -78,7 +74,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
 
   Future<void> _save() async {
     final key = _keyController.text.trim();
-    final formatError = _validateFormat(key);
+    final formatError = _validateFormat(context, key);
     setState(() {
       _error = formatError;
       _checks = null;
@@ -97,9 +93,9 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       if (!mounted) return;
       setState(() => _checks = result);
       if (!result.allOk) {
-        setState(() => _error =
-            'Some permissions are missing. Edit the key in Stripe, then '
-            'verify again.');
+        setState(
+          () => _error = context.s.t('settings.stripe_key.error_permissions'),
+        );
         return;
       }
 
@@ -108,10 +104,13 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       // already configured (Account details), never re-asked here.
       final jar = await StripeRequests(probe).createTipJar(
         currency: oldJar?.currency ?? app.currency,
-        displayName: app.displayName.isEmpty ? 'My tips' : app.displayName,
-        thankYouMessage: oldJar?.thankYouMessage ??
+        displayName: app.displayName.isEmpty
+            ? context.s.t('settings.stripe_key.default_display_name')
+            : app.displayName,
+        thankYouMessage:
+            oldJar?.thankYouMessage ??
             app.relayJar?.message ??
-            _defaultThanks,
+            context.s.t('settings.stripe_key.default_thanks'),
       );
 
       await notifier.connect(key);
@@ -122,8 +121,9 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       if (oldJar != null && oldKey != null && !oldJar.isDemo) {
         final oldClient = StripeClient(oldKey);
         try {
-          await StripeRequests(oldClient)
-              .deactivatePaymentLink(oldJar.paymentLinkId);
+          await StripeRequests(
+            oldClient,
+          ).deactivatePaymentLink(oldJar.paymentLinkId);
         } catch (_) {
         } finally {
           oldClient.close();
@@ -151,10 +151,15 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(oldKey == null
-                ? 'Stripe connected'
-                : 'Stripe key replaced — new tip link created')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              oldKey == null
+                  ? context.s.t('settings.stripe_key.connected_snack')
+                  : context.s.t('settings.stripe_key.replaced_snack'),
+            ),
+          ),
+        );
         Navigator.of(context).pop();
       }
     } on StripeApiException catch (e) {
@@ -179,16 +184,12 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Disconnect Stripe?'),
-        content: const Text(
-          'Removes the Stripe key and tip link from this account on this device. '
-          'Your Stripe account and its payments stay in Stripe — you can '
-          'reconnect a key any time.',
-        ),
+        title: Text(context.s.t('settings.stripe_key.disconnect_title')),
+        content: Text(context.s.t('settings.stripe_key.disconnect_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.s.t('settings.stripe_key.cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -196,7 +197,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Disconnect'),
+            child: Text(context.s.t('settings.stripe_key.disconnect_confirm')),
           ),
         ],
       ),
@@ -237,7 +238,12 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       await ref.read(appStateProvider.notifier).disconnectStripe();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Stripe disconnected')));
+          SnackBar(
+            content: Text(
+              context.s.t('settings.stripe_key.disconnected_snack'),
+            ),
+          ),
+        );
         Navigator.of(context).pop();
       }
     } finally {
@@ -259,7 +265,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
     final isTest = key.startsWith('rk_test_') || key.startsWith('sk_test_');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Stripe')),
+      appBar: AppBar(title: Text(context.s.t('settings.stripe_key.title'))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -268,16 +274,14 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
             children: [
               Text(
                 connected
-                    ? 'Card tips settle straight to your Stripe account. '
-                        'Paste a new key to move accounts or rotate the key.'
-                    : 'Card tips settle straight to your Stripe account. Your '
-                        'name, currency and thank-you message come from '
-                        'Account details — just paste your restricted key.',
+                    ? context.s.t('settings.stripe_key.intro_connected')
+                    : context.s.t('settings.stripe_key.intro_new'),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 14,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 14,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
               const SizedBox(height: 20),
               if (connected) ...[
@@ -286,7 +290,9 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                     LtRow(
                       icon: Icons.key_rounded,
                       title: _maskedKey(app.apiKey),
-                      subtitle: 'The restricted key on this device',
+                      subtitle: context.s.t(
+                        'settings.stripe_key.key_row_subtitle',
+                      ),
                       trailing: StatusPill(
                         status: app.isTestMode
                             ? LtKeyStatus.test
@@ -302,23 +308,25 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                   decoration: BoxDecoration(
                     color: c.danger.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: c.danger.withValues(alpha: 0.25)),
+                    border: Border.all(color: c.danger.withValues(alpha: 0.25)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
-                          size: 20, color: c.danger),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 20,
+                        color: c.danger,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Replacing the key creates a fresh tip link. Printed '
-                          'QR codes with the old Stripe link stop working.',
+                          context.s.t('settings.stripe_key.replace_warning'),
                           style: TextStyle(
-                              fontFamily: kFontBody,
-                              fontSize: 13,
-                              height: 1.4,
-                              color: c.text),
+                            fontFamily: kFontBody,
+                            fontSize: 13,
+                            height: 1.4,
+                            color: c.text,
+                          ),
                         ),
                       ),
                     ],
@@ -327,26 +335,30 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                 const SizedBox(height: 14),
               ] else ...[
                 LtCard(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
                         child: Text(
-                          'Need a key? Create a restricted key in your Stripe '
-                          'dashboard — it takes two minutes.',
+                          context.s.t('settings.stripe_key.need_key'),
                           style: TextStyle(
-                              fontFamily: kFontBody,
-                              fontSize: 13,
-                              height: 1.4,
-                              color: c.textSecondary),
+                            fontFamily: kFontBody,
+                            fontSize: 13,
+                            height: 1.4,
+                            color: c.textSecondary,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
                       FilledButton.tonalIcon(
                         onPressed: () => openExternal(kCreateKeyUrl),
                         icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                        label: const Text('Open'),
+                        label: Text(
+                          context.s.t('settings.stripe_key.open_button'),
+                        ),
                       ),
                     ],
                   ),
@@ -357,22 +369,34 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(connected ? 'Paste a new key' : 'Paste your key',
-                        style:
-                            outfitStyle(16, c.text, weight: FontWeight.w700)),
+                    Text(
+                      connected
+                          ? context.s.t(
+                              'settings.stripe_key.paste_title_connected',
+                            )
+                          : context.s.t('settings.stripe_key.paste_title_new'),
+                      style: outfitStyle(16, c.text, weight: FontWeight.w700),
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _keyController,
                       autocorrect: false,
                       enableSuggestions: false,
                       style: const TextStyle(
-                          fontFamily: 'monospace', fontSize: 14),
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'rk_live_…',
                         suffixIcon: IconButton(
-                          tooltip: 'Paste',
-                          icon: Icon(Icons.content_paste_rounded,
-                              size: 20, color: c.accent),
+                          tooltip: context.s.t(
+                            'settings.stripe_key.paste_tooltip',
+                          ),
+                          icon: Icon(
+                            Icons.content_paste_rounded,
+                            size: 20,
+                            color: c.accent,
+                          ),
                           onPressed: _pasteFromClipboard,
                         ),
                       ),
@@ -384,20 +408,22 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Stored in this device\'s keychain. Only ever talks to '
-                      'api.stripe.com.',
+                      context.s.t('settings.stripe_key.storage_note'),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12,
-                          height: 1.5,
-                          color: c.textMuted),
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        height: 1.5,
+                        color: c.textMuted,
+                      ),
                     ),
                     if (key.isNotEmpty && isTest) ...[
                       const SizedBox(height: 10),
-                      const Align(
+                      Align(
                         alignment: Alignment.centerLeft,
                         child: LtPill(
-                          label: 'Test / sandbox key — payments simulated',
+                          label: context.s.t(
+                            'settings.stripe_key.test_key_pill',
+                          ),
                           icon: Icons.science_rounded,
                           soft: false,
                         ),
@@ -408,15 +434,18 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                       Text(
                         _error!,
                         style: TextStyle(
-                            fontFamily: kFontBody,
-                            fontSize: 13,
-                            height: 1.45,
-                            color: c.danger),
+                          fontFamily: kFontBody,
+                          fontSize: 13,
+                          height: 1.45,
+                          color: c.danger,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 14),
                     LtPrimaryButton(
-                      label: connected ? 'Verify & replace' : 'Verify & connect',
+                      label: connected
+                          ? context.s.t('settings.stripe_key.verify_replace')
+                          : context.s.t('settings.stripe_key.verify_connect'),
                       busy: _busy && !_removing,
                       onPressed: _busy ? null : _save,
                     ),
@@ -426,7 +455,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
               if (connected) ...[
                 const SizedBox(height: 12),
                 LtDangerButton(
-                  label: 'Disconnect Stripe',
+                  label: context.s.t('settings.stripe_key.disconnect_button'),
                   onPressed: _busy ? null : _disconnect,
                   busy: _removing,
                 ),
@@ -434,8 +463,10 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
               if (_checks != null) ...[
                 const SizedBox(height: 14),
                 LtCard(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Column(
                     children: [
                       for (var i = 0; i < _checks!.checks.length; i++) ...[
@@ -477,10 +508,11 @@ class _CheckRow extends StatelessWidget {
             child: Text(
               check.label,
               style: TextStyle(
-                  fontFamily: kFontBody,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: c.text),
+                fontFamily: kFontBody,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: c.text,
+              ),
             ),
           ),
         ],

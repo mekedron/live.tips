@@ -5,10 +5,12 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../domain/app_settings.dart';
 import '../../domain/donation.dart';
 import '../../domain/live_session.dart';
-import '../onboarding/relay_setup_screen.dart' show confirmAndRegenerateRelayJar;
+import '../onboarding/relay_setup_screen.dart'
+    show confirmAndRegenerateRelayJar;
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
@@ -35,8 +37,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// Dev convenience: `flutter run --dart-define=AUTO_RESUME=1` jumps
   /// straight back into a stored session — no clicking through the UI.
-  static const _autoResume =
-      bool.fromEnvironment('AUTO_RESUME', defaultValue: false);
+  static const _autoResume = bool.fromEnvironment(
+    'AUTO_RESUME',
+    defaultValue: false,
+  );
 
   @override
   void initState() {
@@ -81,8 +85,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _openLive() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const LiveScreen()));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const LiveScreen()));
   }
 
   @override
@@ -113,10 +118,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 // ---------------------------------------------------------------------------
 
 class _MobileHome extends StatelessWidget {
-  const _MobileHome({
-    required this.app,
-    required this.goalCard,
-  });
+  const _MobileHome({required this.app, required this.goalCard});
 
   final AppState app;
   final Widget goalCard;
@@ -138,8 +140,10 @@ class _MobileHome extends StatelessWidget {
               children: [
                 const LtLogoMark(size: 30),
                 const SizedBox(width: 10),
-                Text('live.tips',
-                    style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+                Text(
+                  'live.tips',
+                  style: outfitStyle(17, c.text, weight: FontWeight.w700),
+                ),
               ],
             ),
           ),
@@ -151,10 +155,7 @@ class _MobileHome extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 children: [
-                  const BandNameButton(
-                    fontSize: 24,
-                    weight: FontWeight.w700,
-                  ),
+                  const BandNameButton(fontSize: 24, weight: FontWeight.w700),
                   const SizedBox(height: 14),
                   goalCard,
                   if (url != null) ...[
@@ -180,10 +181,7 @@ class _MobileHome extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _DesktopHome extends ConsumerWidget {
-  const _DesktopHome({
-    required this.app,
-    required this.goalCard,
-  });
+  const _DesktopHome({required this.app, required this.goalCard});
 
   final AppState app;
   final Widget goalCard;
@@ -191,8 +189,9 @@ class _DesktopHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final url = app.activeQrUrl;
-    final sessions =
-        ref.read(localStoreProvider).readSessionHistory(app.accountId);
+    final sessions = ref
+        .read(localStoreProvider)
+        .readSessionHistory(app.accountId);
     final last = sessions.isEmpty ? null : sessions.last;
 
     return SingleChildScrollView(
@@ -203,10 +202,7 @@ class _DesktopHome extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const BandNameButton(
-                fontSize: 32,
-                weight: FontWeight.w800,
-              ),
+              const BandNameButton(fontSize: 32, weight: FontWeight.w800),
               const SizedBox(height: 28),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,7 +301,7 @@ class _GoalCard extends ConsumerWidget {
     final goalBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const LtSectionLabel('Tonight\'s goal'),
+        LtSectionLabel(context.s.t('home.tonights_goal')),
         const SizedBox(height: 6),
         money,
         const SizedBox(height: 12),
@@ -321,22 +317,28 @@ class _GoalCard extends ConsumerWidget {
         const SizedBox(height: 12),
         if (live != null)
           LtPrimaryButton(
-            label: 'Return to session · '
-                '${formatAmount(live!.session.totalMinor, live!.session.currency)} so far',
+            label: context.s.t('home.return_to_session', {
+              'amount': formatAmount(
+                live!.session.totalMinor,
+                live!.session.currency,
+              ),
+            }),
             icon: Icons.play_arrow_rounded,
             onPressed: onReturn,
           )
         else ...[
           LtPrimaryButton(
-            label: 'Go live',
+            label: context.s.t('home.go_live'),
             icon: Icons.sensors_rounded,
             onPressed: () async {
               if (storedSession == null) {
                 onStart();
                 return;
               }
-              final choice =
-                  await _confirmStartOverStored(context, storedSession);
+              final choice = await _confirmStartOverStored(
+                context,
+                storedSession,
+              );
               if (choice == _StoredSessionChoice.resume) {
                 final resumed = await controller.resumeStored();
                 if (resumed && context.mounted) onReturn();
@@ -348,10 +350,15 @@ class _GoalCard extends ConsumerWidget {
           if (hasStored) ...[
             const SizedBox(height: 10),
             Text(
-              'Started ${_startedAgo(storedSession)}'
-              '${_tipsSummary(storedSession)}',
+              context.s.t('home.session.started', {
+                'when': _startedAgo(context, storedSession),
+                'summary': _tipsSummary(context, storedSession),
+              }),
               style: TextStyle(
-                  fontFamily: kFontBody, fontSize: 12, color: c.textMuted),
+                fontFamily: kFontBody,
+                fontSize: 12,
+                color: c.textMuted,
+              ),
             ),
             const SizedBox(height: 6),
             Row(
@@ -362,21 +369,26 @@ class _GoalCard extends ConsumerWidget {
                       final resumed = await controller.resumeStored();
                       if (resumed && context.mounted) onReturn();
                     },
-                    icon: Icon(Icons.restore_rounded,
-                        size: 18, color: c.textSecondary),
-                    label: const Text(
-                      'Resume session',
+                    icon: Icon(
+                      Icons.restore_rounded,
+                      size: 18,
+                      color: c.textSecondary,
+                    ),
+                    label: Text(
+                      context.s.t('home.resume_session'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Discard it',
+                  tooltip: context.s.t('home.discard_it'),
                   icon: const Icon(Icons.delete_outline_rounded),
                   onPressed: () async {
-                    final confirmed =
-                        await _confirmDiscardStored(context, storedSession);
+                    final confirmed = await _confirmDiscardStored(
+                      context,
+                      storedSession,
+                    );
                     if (confirmed) await controller.discardStored();
                   },
                 ),
@@ -387,12 +399,15 @@ class _GoalCard extends ConsumerWidget {
         const SizedBox(height: 10),
         // A no-stakes dry run of the stage — pour pretend tips before going live.
         OutlinedButton.icon(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const StagePreviewScreen()),
+          onPressed: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const StagePreviewScreen())),
+          icon: Icon(
+            Icons.play_circle_outline_rounded,
+            size: 18,
+            color: c.textSecondary,
           ),
-          icon: Icon(Icons.play_circle_outline_rounded,
-              size: 18, color: c.textSecondary),
-          label: const Text('Preview stage'),
+          label: Text(context.s.t('home.preview_stage')),
         ),
       ],
     );
@@ -420,7 +435,7 @@ class _GoalCard extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const LtSectionLabel('Tonight\'s goal'),
+              LtSectionLabel(context.s.t('home.tonights_goal')),
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -454,18 +469,17 @@ class _BumpChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     Widget chip(String label, int Function() next) => Material(
-          color: c.chip,
-          shape: const StadiumBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => onBump(next()),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Text(label, style: outfitStyle(12, c.textSecondary)),
-            ),
-          ),
-        );
+      color: c.chip,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => onBump(next()),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(label, style: outfitStyle(12, c.textSecondary)),
+        ),
+      ),
+    );
     final perMajor = minorUnitsPerMajor(currency);
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -488,8 +502,7 @@ class _StageLookRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
-    final stage =
-        ref.watch(appStateProvider.select((s) => s.settings.stage));
+    final stage = ref.watch(appStateProvider.select((s) => s.settings.stage));
     return Material(
       color: c.bg,
       borderRadius: BorderRadius.circular(12),
@@ -506,19 +519,22 @@ class _StageLookRow extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Stage look', style: outfitStyle(13.5, c.text)),
                     Text(
-                      stageLookSummary(stage),
+                      context.s.t('home.stage_look'),
+                      style: outfitStyle(13.5, c.text),
+                    ),
+                    Text(
+                      stageLookSummary(context, stage),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12.5,
-                          color: c.textSecondary),
+                        fontFamily: kFontBody,
+                        fontSize: 12.5,
+                        color: c.textSecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  size: 20, color: c.textMuted),
+              Icon(Icons.chevron_right_rounded, size: 20, color: c.textMuted),
             ],
           ),
         ),
@@ -534,37 +550,48 @@ class _StageLookRow extends ConsumerWidget {
 enum _StoredSessionChoice { resume, discardAndStart }
 
 /// "38 min ago", "2h ago", or the weekday once it's over a day old.
-String _startedAgo(LiveSession session) {
+String _startedAgo(BuildContext context, LiveSession session) {
   final elapsed = DateTime.now().difference(session.startedAt);
-  if (elapsed.inMinutes < 1) return 'just now';
-  if (elapsed.inMinutes < 60) return '${elapsed.inMinutes} min ago';
-  if (elapsed.inHours < 24) return '${elapsed.inHours}h ago';
+  if (elapsed.inMinutes < 1) return context.s.t('home.time.just_now');
+  if (elapsed.inMinutes < 60) {
+    return context.s.t('home.time.min_ago', {'n': elapsed.inMinutes});
+  }
+  if (elapsed.inHours < 24) {
+    return context.s.t('home.time.hours_ago', {'n': elapsed.inHours});
+  }
   return DateFormat('EEEE, MMMM d').format(session.startedAt);
 }
 
 /// A trailing clause, not a sentence: " with 4 tips ($128.00)" / " with no
 /// tips yet".
-String _tipsSummary(LiveSession session) => session.count == 0
-    ? ' with no tips yet'
-    : ' with ${session.count} tip${session.count == 1 ? '' : 's'} '
-        '(${formatAmount(session.totalMinor, session.currency)})';
+String _tipsSummary(BuildContext context, LiveSession session) =>
+    session.count == 0
+    ? context.s.t('home.session.no_tips')
+    : context.s.t('home.session.with_tips', {
+        'n': session.count,
+        'amount': formatAmount(session.totalMinor, session.currency),
+      });
 
 /// Confirms before wiping a stored session for good — names what's about to
 /// be lost so a stray tap can't silently erase a tracked set.
 Future<bool> _confirmDiscardStored(
-    BuildContext context, LiveSession session) async {
+  BuildContext context,
+  LiveSession session,
+) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Discard this session?'),
+      title: Text(context.s.t('home.discard.title')),
       content: Text(
-        'Started ${_startedAgo(session)}${_tipsSummary(session)}. '
-        'This can\'t be undone — it won\'t be saved to your history.',
+        context.s.t('home.discard.body', {
+          'when': _startedAgo(context, session),
+          'summary': _tipsSummary(context, session),
+        }),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(context.s.t('home.cancel')),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
@@ -572,7 +599,7 @@ Future<bool> _confirmDiscardStored(
             foregroundColor: Colors.white,
           ),
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Discard'),
+          child: Text(context.s.t('home.discard.confirm')),
         ),
       ],
     ),
@@ -584,33 +611,37 @@ Future<bool> _confirmDiscardStored(
 /// it — this lets the artist resume it, discard it and start fresh, or back
 /// out instead.
 Future<_StoredSessionChoice?> _confirmStartOverStored(
-    BuildContext context, LiveSession session) {
+  BuildContext context,
+  LiveSession session,
+) {
   return showDialog<_StoredSessionChoice>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Unfinished session found'),
+      title: Text(context.s.t('home.unfinished.title')),
       content: Text(
-        'Your last set started ${_startedAgo(session)}'
-        '${_tipsSummary(session)}. Starting a new one discards it for good.',
+        context.s.t('home.unfinished.body', {
+          'when': _startedAgo(context, session),
+          'summary': _tipsSummary(context, session),
+        }),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(context.s.t('home.cancel')),
         ),
         TextButton(
           onPressed: () =>
               Navigator.of(context).pop(_StoredSessionChoice.resume),
-          child: const Text('Resume it'),
+          child: Text(context.s.t('home.unfinished.resume')),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.error,
             foregroundColor: Colors.white,
           ),
-          onPressed: () => Navigator.of(context)
-              .pop(_StoredSessionChoice.discardAndStart),
-          child: const Text('Discard & start new'),
+          onPressed: () =>
+              Navigator.of(context).pop(_StoredSessionChoice.discardAndStart),
+          child: Text(context.s.t('home.unfinished.discard_start')),
         ),
       ],
     ),
@@ -660,16 +691,19 @@ class _TipLinkRowCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(connected ? 'Your tip page' : 'Your tip link',
-                        style: outfitStyle(15, c.text)),
+                    Text(
+                      connected
+                          ? context.s.t('home.tip_page_title')
+                          : context.s.t('home.tip_link_title'),
+                      style: outfitStyle(15, c.text),
+                    ),
                     Padding(
                       padding: const EdgeInsets.only(top: 3, bottom: 8),
                       child: Text(
                         // The Stripe URL is worth reading; the tip page URL
                         // matters less than what fans find behind it.
                         connected
-                            ? 'Fans pick Stripe, Revolut or MobilePay on '
-                                'your tip page.'
+                            ? context.s.t('home.fans_pick_methods')
                             : url.replaceFirst(RegExp('^https?://'), ''),
                         maxLines: connected ? 2 : 1,
                         overflow: TextOverflow.ellipsis,
@@ -678,37 +712,39 @@ class _TipLinkRowCard extends ConsumerWidget {
                                 fontFamily: kFontBody,
                                 fontSize: 12,
                                 height: 1.35,
-                                color: c.textSecondary)
+                                color: c.textSecondary,
+                              )
                             : TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11.5,
-                                color: c.textMuted),
+                                color: c.textMuted,
+                              ),
                       ),
                     ),
                     Row(
                       children: [
                         LtIconCircleButton(
                           icon: Icons.open_in_new_rounded,
-                          tooltip: 'Open in new tab',
+                          tooltip: context.s.t('home.open_in_new_tab'),
                           onTap: () => openTipLink(url),
                         ),
                         const SizedBox(width: 8),
                         LtIconCircleButton(
                           icon: Icons.content_copy_rounded,
-                          tooltip: 'Copy link',
+                          tooltip: context.s.t('home.copy_link'),
                           onTap: () => copyTipLink(context, url),
                         ),
                         const SizedBox(width: 8),
                         LtIconCircleButton(
                           icon: Icons.ios_share_rounded,
-                          tooltip: 'Share',
+                          tooltip: context.s.t('home.share'),
                           onTap: () =>
                               SharePlus.instance.share(ShareParams(text: url)),
                         ),
                         const SizedBox(width: 8),
                         LtIconCircleButton(
                           icon: Icons.print_rounded,
-                          tooltip: 'Poster',
+                          tooltip: context.s.t('home.poster'),
                           onTap: () => openPoster(context),
                         ),
                       ],
@@ -733,9 +769,7 @@ class _TipLinkRowCard extends ConsumerWidget {
 /// connected mode it regenerates the relay jar (needs one).
 bool _showRecreate(AppState app) {
   if (app.demo) return true;
-  return app.effectiveQrMode == QrMode.connected
-      ? app.hasRelay
-      : app.hasStripe;
+  return app.effectiveQrMode == QrMode.connected ? app.hasRelay : app.hasStripe;
 }
 
 /// The Stripe-link ⇄ tip-page switch shown when both exist. Persisted in
@@ -775,8 +809,12 @@ class _DesktopTipLinkCard extends ConsumerWidget {
         children: [
           Align(
             alignment: Alignment.centerLeft,
-            child: Text(connected ? 'Your tip page' : 'Your tip link',
-                style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+            child: Text(
+              connected
+                  ? context.s.t('home.tip_page_title')
+                  : context.s.t('home.tip_link_title'),
+              style: outfitStyle(17, c.text, weight: FontWeight.w700),
+            ),
           ),
           const SizedBox(height: 18),
           if (app.hasBothQrModes) ...[
@@ -789,8 +827,7 @@ class _DesktopTipLinkCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(999),
             onTap: () => copyTipLink(context, url),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
               decoration: BoxDecoration(
                 color: c.bg,
                 border: Border.all(color: c.border),
@@ -805,14 +842,14 @@ class _DesktopTipLinkCard extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12.5,
-                          color: c.textSecondary),
+                        fontFamily: 'monospace',
+                        fontSize: 12.5,
+                        color: c.textSecondary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(Icons.content_copy_rounded,
-                      size: 17, color: c.accent),
+                  Icon(Icons.content_copy_rounded, size: 17, color: c.accent),
                 ],
               ),
             ),
@@ -820,13 +857,14 @@ class _DesktopTipLinkCard extends ConsumerWidget {
           if (connected) ...[
             const SizedBox(height: 10),
             Text(
-              'Fans pick Stripe, Revolut or MobilePay on your tip page.',
+              context.s.t('home.fans_pick_methods'),
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontFamily: kFontBody,
-                  fontSize: 12.5,
-                  height: 1.4,
-                  color: c.textSecondary),
+                fontFamily: kFontBody,
+                fontSize: 12.5,
+                height: 1.4,
+                color: c.textSecondary,
+              ),
             ),
           ],
           const SizedBox(height: 14),
@@ -835,7 +873,7 @@ class _DesktopTipLinkCard extends ConsumerWidget {
               Expanded(
                 child: _SoftMini(
                   icon: Icons.open_in_new_rounded,
-                  label: 'Open',
+                  label: context.s.t('home.open'),
                   onTap: () => openTipLink(url),
                 ),
               ),
@@ -843,16 +881,15 @@ class _DesktopTipLinkCard extends ConsumerWidget {
               Expanded(
                 child: _SoftMini(
                   icon: Icons.ios_share_rounded,
-                  label: 'Share',
-                  onTap: () =>
-                      SharePlus.instance.share(ShareParams(text: url)),
+                  label: context.s.t('home.share'),
+                  onTap: () => SharePlus.instance.share(ShareParams(text: url)),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _SoftMini(
                   icon: Icons.print_rounded,
-                  label: 'Poster',
+                  label: context.s.t('home.poster'),
                   onTap: () => openPoster(context),
                 ),
               ),
@@ -929,15 +966,20 @@ class _NewTipLinkButton extends ConsumerWidget {
             ? confirmAndRegenerateRelayJar(context, ref)
             : Navigator.of(context).push(
                 MaterialPageRoute(
-                    builder: (_) => const JarSetupScreen(recreate: true)),
+                  builder: (_) => const JarSetupScreen(recreate: true),
+                ),
               ),
         style: TextButton.styleFrom(
           foregroundColor: c.textSecondary,
           padding: const EdgeInsets.symmetric(vertical: 10),
         ),
         icon: const Icon(Icons.autorenew_rounded, size: 17),
-        label: Text(connected ? 'New tip page link' : 'Create new tip link',
-            style: outfitStyle(13, c.textSecondary)),
+        label: Text(
+          connected
+              ? context.s.t('home.new_tip_page_link')
+              : context.s.t('home.create_new_tip_link'),
+          style: outfitStyle(13, c.textSecondary),
+        ),
       ),
     );
   }
@@ -985,14 +1027,19 @@ class _RecentTipsCard extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Text('Recent tips',
-                    style: outfitStyle(compact ? 15 : 17, c.text,
-                        weight: FontWeight.w700)),
+                child: Text(
+                  context.s.t('home.recent_tips'),
+                  style: outfitStyle(
+                    compact ? 15 : 17,
+                    c.text,
+                    weight: FontWeight.w700,
+                  ),
+                ),
               ),
               TextButton(
                 onPressed: () =>
                     AppShellScope.of(context)?.select(ShellTab.history),
-                child: const Text('View all'),
+                child: Text(context.s.t('home.view_all')),
               ),
             ],
           ),
@@ -1000,13 +1047,13 @@ class _RecentTipsCard extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'Demo mode — start a session to watch pretend fans shower '
-                'you with tips.',
+                context.s.t('home.demo_mode'),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 13.5,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 13.5,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
             )
           else
@@ -1017,12 +1064,12 @@ class _RecentTipsCard extends ConsumerWidget {
                     ? Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Text(
-                          'No tips yet. Put that QR code where people can '
-                          'see it! 🎯',
+                          context.s.t('home.no_tips_yet'),
                           style: TextStyle(
-                              fontFamily: kFontBody,
-                              fontSize: 13.5,
-                              color: c.textSecondary),
+                            fontFamily: kFontBody,
+                            fontSize: 13.5,
+                            color: c.textSecondary,
+                          ),
                         ),
                       )
                     : Column(
@@ -1030,7 +1077,9 @@ class _RecentTipsCard extends ConsumerWidget {
                           for (var i = 0; i < shown.length; i++) ...[
                             if (i > 0) Divider(height: 1, color: c.divider),
                             DonationTile(
-                                donation: shown[i], showTime: !compact),
+                              donation: shown[i],
+                              showTime: !compact,
+                            ),
                           ],
                         ],
                       );
@@ -1038,16 +1087,18 @@ class _RecentTipsCard extends ConsumerWidget {
               loading: () => const Padding(
                 padding: EdgeInsets.all(20),
                 child: Center(
-                    child: CircularProgressIndicator(strokeWidth: 2.5)),
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
               ),
               error: (error, _) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
-                  'Couldn\'t load recent tips: $error',
+                  context.s.t('home.recent_tips_error', {'error': error}),
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13,
-                      color: c.danger),
+                    fontFamily: kFontBody,
+                    fontSize: 13,
+                    color: c.danger,
+                  ),
                 ),
               ),
             ),
@@ -1069,24 +1120,30 @@ class _LastSessionCard extends StatelessWidget {
         ? 0
         : (session.totalMinor / session.goalMinor * 100).round();
     Widget row(String label, String value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.5),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13.5,
-                      color: c.textSecondary)),
-              Text(value,
-                  style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: c.text)),
-            ],
+      padding: const EdgeInsets.symmetric(vertical: 4.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: kFontBody,
+              fontSize: 13.5,
+              color: c.textSecondary,
+            ),
           ),
-        );
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: kFontBody,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: c.text,
+            ),
+          ),
+        ],
+      ),
+    );
 
     return LtCard(
       radius: 24,
@@ -1094,8 +1151,10 @@ class _LastSessionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Last session',
-              style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+          Text(
+            context.s.t('home.last_session'),
+            style: outfitStyle(17, c.text, weight: FontWeight.w700),
+          ),
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -1113,28 +1172,40 @@ class _LastSessionCard extends StatelessWidget {
               if (session.goalReached)
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 3),
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: c.successContainer,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text('Goal reached 🎉',
-                      style: outfitStyle(12, c.onSuccessContainer,
-                          weight: FontWeight.w700)),
+                  child: Text(
+                    context.s.t('home.goal_reached'),
+                    style: outfitStyle(
+                      12,
+                      c.onSuccessContainer,
+                      weight: FontWeight.w700,
+                    ),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 14),
-          row('Tips', '${session.count}'),
-          row('Duration',
-              formatDuration(session.elapsed(session.endedAt))),
-          if (session.goalMinor > 0) row('Goal', '$pct%'),
+          row(context.s.t('home.stat.tips'), '${session.count}'),
+          row(
+            context.s.t('home.stat.duration'),
+            formatDuration(session.elapsed(session.endedAt)),
+          ),
+          if (session.goalMinor > 0)
+            row(context.s.t('home.stat.goal'), '$pct%'),
           if (session.count > 0)
-            row('Average tip',
-                formatAmount(session.averageMinor, session.currency)),
+            row(
+              context.s.t('home.stat.average_tip'),
+              formatAmount(session.averageMinor, session.currency),
+            ),
           if (session.biggest != null)
             row(
-              'Biggest tip',
+              context.s.t('home.stat.biggest_tip'),
               '${formatAmount(session.biggest!.amountMinor, session.currency)}'
               ' · ${session.biggest!.displayName}',
             ),

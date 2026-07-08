@@ -8,9 +8,10 @@ import 'package:printing/printing.dart';
 
 import '../../core/poster/poster_document.dart';
 import '../../core/poster/poster_paper.dart';
-import '../../core/poster/poster_strings.dart';
 import '../../core/theme.dart';
 import '../../domain/poster.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/enum_labels.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../shell/app_shell.dart';
@@ -52,19 +53,33 @@ class PosterScreen extends ConsumerWidget {
     final resolvedName = posterSettings.displayName.trim().isEmpty
         ? artistName
         : posterSettings.displayName.trim();
+    // Blank caption lines fall back to the localized defaults, so an
+    // untouched poster prints in the user's language rather than English.
+    final resolvedPoster = posterSettings.copyWith(
+      headline: posterSettings.headline.trim().isEmpty
+          ? context.s.t('poster.default_headline')
+          : posterSettings.headline,
+      subline: posterSettings.subline.trim().isEmpty
+          ? context.s.t('poster.default_subline')
+          : posterSettings.subline,
+      footer: posterSettings.footer.trim().isEmpty
+          ? context.s.t('poster.default_footer')
+          : posterSettings.footer,
+    );
     // In the shell it follows the rail; opened as a modal route (no shell
     // scope) it falls back to the screen width, so desktop keeps the wide
     // layout there too.
-    final isRail = AppShellScope.of(context)?.isRail ??
+    final isRail =
+        AppShellScope.of(context)?.isRail ??
         (MediaQuery.sizeOf(context).width >= kRailBreakpoint);
 
     // Reads fresh state at call time: the customize sheet outlives this
     // build, and consecutive edits must not clobber each other.
     void updatePoster(PosterSettings Function(PosterSettings) update) {
       final current = ref.read(appStateProvider).band;
-      ref.read(appStateProvider.notifier).updateBand(
-            current.copyWith(poster: update(current.poster)),
-          );
+      ref
+          .read(appStateProvider.notifier)
+          .updateBand(current.copyWith(poster: update(current.poster)));
     }
 
     // Theme · Format · Customize — one plain select list, mirroring the
@@ -76,16 +91,16 @@ class PosterScreen extends ConsumerWidget {
         children: [
           LtRow(
             icon: Icons.palette_outlined,
-            title: 'Theme',
-            trailing: _ValueText(posterSettings.theme.label),
+            title: context.s.t('poster.theme'),
+            trailing: _ValueText(posterSettings.theme.l10nLabel(context)),
             chevron: true,
             onTap: () async {
               final picked = await showLtPicker<PosterTheme>(
                 context: context,
-                title: 'Poster theme',
+                title: context.s.t('poster.theme_picker_title'),
                 values: PosterTheme.values,
                 selected: posterSettings.theme,
-                labelOf: (t) => t.label,
+                labelOf: (t) => t.l10nLabel(context),
               );
               if (picked != null) {
                 updatePoster((s) => s.copyWith(theme: picked));
@@ -95,16 +110,16 @@ class PosterScreen extends ConsumerWidget {
           Divider(height: 1, color: c.divider),
           LtRow(
             icon: Icons.crop_free_rounded,
-            title: 'Format',
-            trailing: _ValueText(posterSettings.paperSize.label),
+            title: context.s.t('poster.format'),
+            trailing: _ValueText(posterSettings.paperSize.l10nLabel(context)),
             chevron: true,
             onTap: () async {
               final picked = await showLtPicker<PosterPaperSize>(
                 context: context,
-                title: 'Paper size',
+                title: context.s.t('poster.paper_size_title'),
                 values: PosterPaperSize.values,
                 selected: posterSettings.paperSize,
-                labelOf: (p) => p.label,
+                labelOf: (p) => p.l10nLabel(context),
               );
               if (picked != null) {
                 updatePoster((s) => s.copyWith(paperSize: picked));
@@ -114,7 +129,7 @@ class PosterScreen extends ConsumerWidget {
           Divider(height: 1, color: c.divider),
           LtRow(
             icon: Icons.edit_outlined,
-            title: 'Customize text & name',
+            title: context.s.t('poster.customize'),
             chevron: true,
             onTap: () => _showCustomizeSheet(
               context,
@@ -128,7 +143,7 @@ class PosterScreen extends ConsumerWidget {
     );
 
     final printButton = LtPrimaryButton(
-      label: 'Print / Save PDF',
+      label: context.s.t('poster.print_save'),
       icon: Icons.print_rounded,
       onPressed: () => Printing.layoutPdf(
         name: _pdfName(resolvedName),
@@ -138,9 +153,9 @@ class PosterScreen extends ConsumerWidget {
           paperSize:
               posterPaperSizeForFormat(format) ?? posterSettings.paperSize,
           displayName: resolvedName,
-          headline: posterSettings.headline,
-          subline: posterSettings.subline,
-          footer: posterSettings.footer,
+          headline: resolvedPoster.headline,
+          subline: resolvedPoster.subline,
+          footer: resolvedPoster.footer,
         ),
       ),
     );
@@ -152,21 +167,20 @@ class PosterScreen extends ConsumerWidget {
           theme: posterSettings.theme,
           paperSize: posterSettings.paperSize,
           displayName: resolvedName,
-          headline: posterSettings.headline,
-          subline: posterSettings.subline,
-          footer: posterSettings.footer,
+          headline: resolvedPoster.headline,
+          subline: resolvedPoster.subline,
+          footer: resolvedPoster.footer,
         );
-        await Printing.sharePdf(
-            bytes: bytes, filename: _pdfName(resolvedName));
+        await Printing.sharePdf(bytes: bytes, filename: _pdfName(resolvedName));
       },
       icon: Icon(Icons.ios_share_rounded, size: 18, color: c.textSecondary),
-      label: const Text('Share PDF'),
+      label: Text(context.s.t('poster.share_pdf')),
     );
 
     final preview = _PosterViewport(
       qrData: qrData,
       displayName: resolvedName,
-      settings: posterSettings,
+      settings: resolvedPoster,
     );
 
     if (isRail) {
@@ -187,14 +201,19 @@ class PosterScreen extends ConsumerWidget {
                           Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: IconButton(
-                              tooltip: 'Back',
+                              tooltip: context.s.t('poster.back'),
                               icon: const Icon(Icons.arrow_back_rounded),
                               onPressed: () => Navigator.of(context).pop(),
                             ),
                           ),
-                        Text('Poster',
-                            style: outfitStyle(32, c.text,
-                                weight: FontWeight.w800)),
+                        Text(
+                          context.s.t('poster.title'),
+                          style: outfitStyle(
+                            32,
+                            c.text,
+                            weight: FontWeight.w800,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -225,16 +244,17 @@ class PosterScreen extends ConsumerWidget {
                 children: [
                   if (Navigator.of(context).canPop())
                     IconButton(
-                      tooltip: 'Back',
+                      tooltip: context.s.t('poster.back'),
                       icon: const Icon(Icons.arrow_back_rounded),
                       onPressed: () => Navigator.of(context).pop(),
                     )
                   else
                     const SizedBox(width: 20),
                   Expanded(
-                    child: Text('Poster',
-                        style:
-                            outfitStyle(20, c.text, weight: FontWeight.w700)),
+                    child: Text(
+                      context.s.t('poster.title'),
+                      style: outfitStyle(20, c.text, weight: FontWeight.w700),
+                    ),
                   ),
                   const SizedBox(width: 20),
                 ],
@@ -269,7 +289,8 @@ class PosterScreen extends ConsumerWidget {
     BuildContext context, {
     required PosterSettings settings,
     required String jarDisplayName,
-    required void Function(PosterSettings Function(PosterSettings)) updatePoster,
+    required void Function(PosterSettings Function(PosterSettings))
+    updatePoster,
   }) {
     showModalBottomSheet<void>(
       context: context,
@@ -312,14 +333,18 @@ class _CustomizeForm extends StatefulWidget {
 }
 
 class _CustomizeFormState extends State<_CustomizeForm> {
-  late final _nameController =
-      TextEditingController(text: widget.settings.displayName);
-  late final _headlineController =
-      TextEditingController(text: widget.settings.headline);
-  late final _sublineController =
-      TextEditingController(text: widget.settings.subline);
-  late final _footerController =
-      TextEditingController(text: widget.settings.footer);
+  late final _nameController = TextEditingController(
+    text: widget.settings.displayName,
+  );
+  late final _headlineController = TextEditingController(
+    text: widget.settings.headline,
+  );
+  late final _sublineController = TextEditingController(
+    text: widget.settings.subline,
+  );
+  late final _footerController = TextEditingController(
+    text: widget.settings.footer,
+  );
 
   @override
   void dispose() {
@@ -334,59 +359,63 @@ class _CustomizeFormState extends State<_CustomizeForm> {
   Widget build(BuildContext context) {
     final c = context.lt;
     Widget label(String text) => Padding(
-          padding: const EdgeInsets.only(bottom: 6, top: 14),
-          child: Text(text, style: outfitStyle(13, c.text)),
-        );
+      padding: const EdgeInsets.only(bottom: 6, top: 14),
+      child: Text(text, style: outfitStyle(13, c.text)),
+    );
     return SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Customize text & name',
-              style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+          Text(
+            context.s.t('poster.customize'),
+            style: outfitStyle(18, c.text, weight: FontWeight.w700),
+          ),
           const SizedBox(height: 4),
           Text(
-            'Write these in any language you like. Leave a field blank to '
-            'use the default wording.',
+            context.s.t('poster.customize_help'),
             style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 12.5,
-                color: c.textSecondary),
+              fontFamily: kFontBody,
+              fontSize: 12.5,
+              color: c.textSecondary,
+            ),
           ),
-          label('Name on poster'),
+          label(context.s.t('poster.name_label')),
           TextField(
             controller: _nameController,
             decoration: InputDecoration(hintText: widget.jarDisplayName),
             onChanged: (v) =>
                 widget.updatePoster((s) => s.copyWith(displayName: v)),
           ),
-          label('“Scan to tip” line'),
+          label(context.s.t('poster.headline_label')),
           TextField(
             controller: _headlineController,
             decoration: InputDecoration(
-                hintText: kDefaultPosterStrings.headline),
+              hintText: context.s.t('poster.default_headline'),
+            ),
             onChanged: (v) =>
                 widget.updatePoster((s) => s.copyWith(headline: v)),
           ),
-          label('Subtitle'),
+          label(context.s.t('poster.subline_label')),
           TextField(
             controller: _sublineController,
-            decoration:
-                InputDecoration(hintText: kDefaultPosterStrings.subline),
+            decoration: InputDecoration(
+              hintText: context.s.t('poster.default_subline'),
+            ),
             onChanged: (v) =>
                 widget.updatePoster((s) => s.copyWith(subline: v)),
           ),
-          label('Thank-you line'),
+          label(context.s.t('poster.footer_label')),
           TextField(
             controller: _footerController,
-            decoration:
-                InputDecoration(hintText: kDefaultPosterStrings.footer),
-            onChanged: (v) =>
-                widget.updatePoster((s) => s.copyWith(footer: v)),
+            decoration: InputDecoration(
+              hintText: context.s.t('poster.default_footer'),
+            ),
+            onChanged: (v) => widget.updatePoster((s) => s.copyWith(footer: v)),
           ),
           const SizedBox(height: 20),
           LtPrimaryButton(
-            label: 'Done',
+            label: context.s.t('poster.done'),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -484,8 +513,11 @@ class _PosterViewportState extends State<_PosterViewport> {
       final format = posterPageFormats[settings.paperSize]!;
       final longEdgeInches = math.max(format.width, format.height) / 72.0;
       final dpi = (2000 / longEdgeInches).clamp(96.0, 300.0);
-      final raster =
-          await Printing.raster(bytes, pages: const [0], dpi: dpi).first;
+      final raster = await Printing.raster(
+        bytes,
+        pages: const [0],
+        dpi: dpi,
+      ).first;
       final image = await raster.toImage();
       if (!mounted || token != _rasterToken) {
         image.dispose();
@@ -528,8 +560,10 @@ class _PosterViewportState extends State<_PosterViewport> {
         child: image == null
             ? Center(
                 child: _failed
-                    ? Text('Preview unavailable',
-                        style: outfitStyle(14, c.textSecondary))
+                    ? Text(
+                        context.s.t('poster.preview_unavailable'),
+                        style: outfitStyle(14, c.textSecondary),
+                      )
                     : const SizedBox(
                         width: 28,
                         height: 28,
@@ -571,9 +605,7 @@ class _PosterViewportState extends State<_PosterViewport> {
                     left: 0,
                     right: 0,
                     bottom: 12,
-                    child: IgnorePointer(
-                      child: Center(child: _ViewportHint()),
-                    ),
+                    child: IgnorePointer(child: Center(child: _ViewportHint())),
                   ),
                   Positioned(
                     right: 12,
@@ -629,7 +661,7 @@ class _ViewportHint extends StatelessWidget {
         border: Border.all(color: c.border),
       ),
       child: Text(
-        'Scroll or pinch to zoom · drag to move',
+        context.s.t('poster.viewport_hint'),
         style: outfitStyle(11, c.textSecondary),
       ),
     );
@@ -651,12 +683,15 @@ class _ResetButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Tooltip(
-          message: 'Reset zoom',
+          message: context.s.t('poster.reset_zoom'),
           child: SizedBox(
             width: 34,
             height: 34,
-            child: Icon(Icons.center_focus_strong_rounded,
-                size: 18, color: c.textSecondary),
+            child: Icon(
+              Icons.center_focus_strong_rounded,
+              size: 18,
+              color: c.textSecondary,
+            ),
           ),
         ),
       ),

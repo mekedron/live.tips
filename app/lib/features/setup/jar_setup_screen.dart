@@ -12,6 +12,7 @@ import '../../data/relay/relay_client.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../domain/relay_jar.dart';
 import '../../domain/tip_jar.dart';
+import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
@@ -36,14 +37,13 @@ class JarSetupScreen extends ConsumerStatefulWidget {
 
 class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
   final _nameController = TextEditingController();
-  final _thanksController = TextEditingController(
-    text: 'Thank you for supporting live music! 🎶',
-  );
+  final _thanksController = TextEditingController();
   String _currency = 'usd';
   bool _busy = false;
   String? _error;
   TipJar? _created;
   TipJar? _previousJar;
+  bool _appliedThanksDefault = false;
 
   @override
   void initState() {
@@ -54,6 +54,19 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
       _nameController.text = app.tipJar!.displayName;
       _currency = app.tipJar!.currency;
       _thanksController.text = app.tipJar!.thankYouMessage;
+      _appliedThanksDefault = true;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Prefill the localized default thank-you message once (context isn't
+    // available in initState). Skipped when recreating, which already loaded
+    // the existing message above.
+    if (!_appliedThanksDefault) {
+      _appliedThanksDefault = true;
+      _thanksController.text = context.s.t('setup.thanks_default');
     }
   }
 
@@ -67,7 +80,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
   Future<void> _create() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Give your tip jar a name — fans will see it.');
+      setState(() => _error = context.s.t('setup.error_name_required'));
       return;
     }
     final requests = ref.read(stripeRequestsProvider);
@@ -82,15 +95,18 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
         currency: _currency,
         displayName: name,
         thankYouMessage: _thanksController.text.trim().isEmpty
-            ? 'Thank you! 💛'
+            ? context.s.t('setup.thanks_fallback')
             : _thanksController.text.trim(),
       );
       setState(() => _created = jar);
     } on StripeApiException catch (e) {
-      setState(() => _error = e.isPermissionError
-          ? '${e.friendlyMessage}\n\nAdd the missing permission to your key '
-              'in the Stripe dashboard, then try again.'
-          : e.friendlyMessage);
+      setState(
+        () => _error = e.isPermissionError
+            ? context.s.t('setup.error_permission', {
+                'message': e.friendlyMessage,
+              })
+            : e.friendlyMessage,
+      );
     } on StripeNetworkException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -139,19 +155,16 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel Stripe setup?'),
-        content: const Text(
-          'The API key you just connected is removed from this device. '
-          'Nothing else changes — you can reconnect it any time.',
-        ),
+        title: Text(context.s.t('setup.cancel_title')),
+        content: Text(context.s.t('setup.cancel_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep setting up'),
+            child: Text(context.s.t('setup.keep_setting_up')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove key'),
+            child: Text(context.s.t('setup.remove_key')),
           ),
         ],
       ),
@@ -164,7 +177,10 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
   /// card button never points at a retired payment link. Silent on failure:
   /// the page just keeps the old link until the next successful update.
   static Future<void> _syncRelayStripeUrl(
-      RelayJar relayJar, String secret, TipJar jar) async {
+    RelayJar relayJar,
+    String secret,
+    TipJar jar,
+  ) async {
     final client = RelayClient();
     try {
       await client.updateJar(
@@ -188,17 +204,25 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
           ? null
           : AppBar(
               title: Text(
-                  widget.recreate ? 'New tip link' : 'Create your tip jar'),
+                widget.recreate
+                    ? context.s.t('setup.recreate_title')
+                    : context.s.t('setup.create_title'),
+              ),
               automaticallyImplyLeading: widget.recreate,
               actions: [
                 if (widget.recreate)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 16),
-                    child: Center(child: LtPill(label: 'Replaces the old link')),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: Center(
+                      child: LtPill(
+                        label: context.s.t('setup.replaces_old_link'),
+                      ),
+                    ),
                   )
                 else ...[
-                  if (ref.watch(appStateProvider
-                          .select((s) => s.accounts.length)) >
+                  if (ref.watch(
+                        appStateProvider.select((s) => s.accounts.length),
+                      ) >
                       1)
                     const Padding(
                       padding: EdgeInsets.only(right: 4),
@@ -208,7 +232,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
                     padding: const EdgeInsets.only(right: 8),
                     child: TextButton(
                       onPressed: _cancelSetup,
-                      child: const Text('Cancel'),
+                      child: Text(context.s.t('setup.cancel')),
                     ),
                   ),
                 ],
@@ -242,14 +266,13 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'This replaces your current link — the old link and any '
-                    'printed QR codes will stop working. Edit the details below, '
-                    'then create the new one.',
+                    context.s.t('setup.recreate_warning'),
                     style: TextStyle(
-                        fontFamily: kFontBody,
-                        fontSize: 13,
-                        height: 1.4,
-                        color: c.text),
+                      fontFamily: kFontBody,
+                      fontSize: 13,
+                      height: 1.4,
+                      color: c.text,
+                    ),
                   ),
                 ),
               ],
@@ -258,8 +281,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
           const SizedBox(height: 16),
         ],
         Text(
-          'This creates a donation link in your Stripe account. Fans choose '
-          'their own amount and can leave a name and a message.',
+          context.s.t('setup.intro'),
           style: TextStyle(
             fontFamily: kFontBody,
             fontSize: 14,
@@ -272,27 +294,31 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _FieldLabel('Artist or band name'),
+              _FieldLabel(context.s.t('setup.name_label')),
               TextField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
-                decoration:
-                    const InputDecoration(hintText: 'The Midnight Foxes'),
+                decoration: InputDecoration(
+                  hintText: context.s.t('setup.name_hint'),
+                ),
               ),
               const SizedBox(height: 5),
               Text(
-                'Fans see this on the payment page and the stage.',
+                context.s.t('setup.name_help'),
                 style: TextStyle(
-                    fontFamily: kFontBody, fontSize: 12, color: c.textMuted),
+                  fontFamily: kFontBody,
+                  fontSize: 12,
+                  color: c.textMuted,
+                ),
               ),
               const SizedBox(height: 16),
-              _FieldLabel('Currency'),
+              _FieldLabel(context.s.t('setup.currency')),
               InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: () async {
                   final picked = await showLtPicker<String>(
                     context: context,
-                    title: 'Currency',
+                    title: context.s.t('setup.currency'),
                     values: kSupportedCurrencies,
                     selected: _currency,
                     labelOf: currencyLabel,
@@ -301,7 +327,9 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 13),
+                    horizontal: 14,
+                    vertical: 13,
+                  ),
                   decoration: BoxDecoration(
                     color: c.bg,
                     border: Border.all(color: c.border, width: 1.5),
@@ -313,29 +341,35 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
                         child: Text(
                           currencyLabel(_currency),
                           style: TextStyle(
-                              fontFamily: kFontBody,
-                              fontSize: 15,
-                              color: c.text),
+                            fontFamily: kFontBody,
+                            fontSize: 15,
+                            color: c.text,
+                          ),
                         ),
                       ),
-                      Icon(Icons.expand_more_rounded,
-                          size: 22, color: c.textSecondary),
+                      Icon(
+                        Icons.expand_more_rounded,
+                        size: 22,
+                        color: c.textSecondary,
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              _FieldLabel('Thank-you message'),
+              _FieldLabel(context.s.t('setup.thanks_label')),
               TextField(
                 controller: _thanksController,
                 maxLength: 200,
                 maxLines: 2,
                 minLines: 1,
-                buildCounter: (context,
-                        {required currentLength,
-                        required isFocused,
-                        maxLength}) =>
-                    null,
+                buildCounter:
+                    (
+                      context, {
+                      required currentLength,
+                      required isFocused,
+                      maxLength,
+                    }) => null,
                 onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(counterText: ''),
               ),
@@ -344,19 +378,21 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Shown right after they pay.',
+                      context.s.t('setup.thanks_help'),
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12,
-                          color: c.textMuted),
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        color: c.textMuted,
+                      ),
                     ),
                   ),
                   Text(
                     '${_thanksController.text.characters.length}/200',
                     style: TextStyle(
-                        fontFamily: kFontBody,
-                        fontSize: 12,
-                        color: c.textMuted),
+                      fontFamily: kFontBody,
+                      fontSize: 12,
+                      color: c.textMuted,
+                    ),
                   ),
                 ],
               ),
@@ -368,22 +404,26 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
           Text(
             _error!,
             style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 13,
-                height: 1.45,
-                color: c.danger),
+              fontFamily: kFontBody,
+              fontSize: 13,
+              height: 1.45,
+              color: c.danger,
+            ),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => openExternal(kApiKeysDashboardUrl),
-            icon: Icon(Icons.open_in_new_rounded,
-                size: 18, color: c.textSecondary),
-            label: const Text('Edit key permissions in Stripe'),
+            icon: Icon(
+              Icons.open_in_new_rounded,
+              size: 18,
+              color: c.textSecondary,
+            ),
+            label: Text(context.s.t('setup.edit_key_permissions')),
           ),
         ],
         const SizedBox(height: 20),
         LtPrimaryButton(
-          label: 'Create my tip link',
+          label: context.s.t('setup.create_button'),
           busy: _busy,
           onPressed: _create,
         ),
@@ -404,20 +444,21 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
             height: 64,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-                color: c.successContainer, shape: BoxShape.circle),
+              color: c.successContainer,
+              shape: BoxShape.circle,
+            ),
             child: Icon(Icons.check_rounded, size: 34, color: c.success),
           ),
         ),
         const SizedBox(height: 16),
         Text(
-          'Your tip link is live!',
+          context.s.t('setup.success_title'),
           textAlign: TextAlign.center,
           style: outfitStyle(26, c.text, weight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
         Text(
-          'Print the QR, tape it to your case, put it on the merch table — '
-          'anyone can tip you in seconds.',
+          context.s.t('setup.success_body'),
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: kFontBody,
@@ -443,7 +484,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
             Expanded(
               child: _SoftAction(
                 icon: Icons.ios_share_rounded,
-                label: 'Share',
+                label: context.s.t('setup.share'),
                 onTap: () =>
                     SharePlus.instance.share(ShareParams(text: jar.url)),
               ),
@@ -452,7 +493,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
             Expanded(
               child: _SoftAction(
                 icon: Icons.print_rounded,
-                label: 'Poster',
+                label: context.s.t('setup.poster'),
                 onTap: () => _finish(thenOpen: ShellTab.poster),
               ),
             ),
@@ -460,17 +501,19 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
             Expanded(
               child: _SoftAction(
                 icon: Icons.theater_comedy_rounded,
-                label: 'Stage',
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const StagePreviewScreen(),
-                )),
+                label: context.s.t('setup.stage'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const StagePreviewScreen()),
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 32),
         LtPrimaryButton(
-          label: widget.recreate ? 'Done' : 'Go to Home',
+          label: widget.recreate
+              ? context.s.t('setup.done')
+              : context.s.t('setup.go_home'),
           onPressed: _finish,
         ),
       ],

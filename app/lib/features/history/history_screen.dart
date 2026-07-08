@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/external_link.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/enum_labels.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
@@ -23,12 +25,11 @@ enum _HistoryTab { sessions, mobilepay, revolut, donations }
 
 /// Header note over the device-local tip-page lists — honesty first: these
 /// rows are donor-declared, not settled payments.
-const _kRelayHistoryNote =
-    'Recorded on this device when tips reach your live screen — '
-    'not confirmed payments.';
+String _relayHistoryNote(BuildContext context) =>
+    context.s.t('history.relay_note');
 
-String _relayHistoryEmpty(TipMethod method) =>
-    'Tips from ${method.label} will appear here after your next live session.';
+String _relayHistoryEmpty(BuildContext context, TipMethod method) =>
+    context.s.t('history.relay_empty', {'method': method.l10nLabel(context)});
 
 /// Opens the donation's transaction in the artist's Stripe Dashboard (a new
 /// browser tab on web). No-op for tips that have no link — demo tips, or
@@ -43,8 +44,8 @@ void _openDonationInStripe(Donation donation) {
 /// (so the row stays non-interactive rather than looking tappable but dead).
 VoidCallback? _stripeTap(Donation donation) =>
     donation.stripeDashboardUrl == null
-        ? null
-        : () => _openDonationInStripe(donation);
+    ? null
+    : () => _openDonationInStripe(donation);
 
 /// A subtle link that opens the artist's whole Stripe payments list in the
 /// Dashboard — the escape hatch to *every* transaction in the account,
@@ -58,8 +59,7 @@ class _ViewInStripeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     return TextButton(
-      onPressed: () =>
-          openExternal(url),
+      onPressed: () => openExternal(url),
       style: TextButton.styleFrom(
         foregroundColor: c.textSecondary,
         textStyle: outfitStyle(12.5, c.textSecondary, weight: FontWeight.w600),
@@ -67,10 +67,10 @@ class _ViewInStripeButton extends StatelessWidget {
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('View all in Stripe'),
+          Text(context.s.t('history.view_all_stripe')),
           SizedBox(width: 5),
           Icon(Icons.open_in_new_rounded, size: 14),
         ],
@@ -163,16 +163,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         .reversed
         .toList();
     final jar = app.effectiveTipJar;
-    final stripeAllUrl =
-        (jar == null || jar.isDemo) ? null : jar.stripePaymentsUrl;
+    final stripeAllUrl = (jar == null || jar.isDemo)
+        ? null
+        : jar.stripePaymentsUrl;
     // Each relay-method tab exists for anyone whose jar offers it, and for
     // anyone whose device still remembers tips from it (jar deleted, tips
     // kept). Stripe-only installs keep the familiar two tabs untouched.
     final relayHistory = ref.watch(relayHistoryProvider);
     final relayJar = app.effectiveRelayJar;
-    final showMobilePay = (relayJar?.hasMobilePay ?? false) ||
+    final showMobilePay =
+        (relayJar?.hasMobilePay ?? false) ||
         relayHistory.any((d) => d.method == TipMethod.mobilepay);
-    final showRevolut = (relayJar?.hasRevolut ?? false) ||
+    final showRevolut =
+        (relayJar?.hasRevolut ?? false) ||
         relayHistory.any((d) => d.method == TipMethod.revolut);
     if (_tab == _HistoryTab.mobilepay && !showMobilePay) {
       _tab = _HistoryTab.sessions; // the tab just vanished under us
@@ -182,36 +185,53 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     }
     return isRail
         ? _buildDesktop(
-            sessions, stripeAllUrl, showMobilePay, showRevolut, relayHistory)
+            sessions,
+            stripeAllUrl,
+            showMobilePay,
+            showRevolut,
+            relayHistory,
+          )
         : _buildMobile(
-            sessions, stripeAllUrl, showMobilePay, showRevolut, relayHistory);
+            sessions,
+            stripeAllUrl,
+            showMobilePay,
+            showRevolut,
+            relayHistory,
+          );
   }
 
   /// Tabs in fixed left-to-right order (Sessions, then relay methods, then
   /// Stripe last — it's recommended but the least-used tab in practice),
   /// filtered to the ones that currently apply.
   List<_HistoryTab> _visibleTabs(bool showMobilePay, bool showRevolut) => [
-        _HistoryTab.sessions,
-        if (showMobilePay) _HistoryTab.mobilepay,
-        if (showRevolut) _HistoryTab.revolut,
-        _HistoryTab.donations,
-      ];
+    _HistoryTab.sessions,
+    if (showMobilePay) _HistoryTab.mobilepay,
+    if (showRevolut) _HistoryTab.revolut,
+    _HistoryTab.donations,
+  ];
 
-  String _tabLabel(_HistoryTab t, bool showMobilePay, bool showRevolut) =>
-      switch (t) {
-        _HistoryTab.sessions => 'Sessions',
-        _HistoryTab.mobilepay => 'MobilePay',
-        _HistoryTab.revolut => 'Revolut',
-        // 'Stripe' only makes sense next to a relay tab — alone it stays
-        // 'Donations', so Stripe-only users see no churn.
-        _HistoryTab.donations =>
-          (showMobilePay || showRevolut) ? 'Stripe' : 'Donations',
-      };
+  String _tabLabel(
+    BuildContext context,
+    _HistoryTab t,
+    bool showMobilePay,
+    bool showRevolut,
+  ) => switch (t) {
+    _HistoryTab.sessions => context.s.t('history.tab_sessions'),
+    _HistoryTab.mobilepay => 'MobilePay',
+    _HistoryTab.revolut => 'Revolut',
+    // 'Stripe' only makes sense next to a relay tab — alone it stays
+    // 'Donations', so Stripe-only users see no churn.
+    _HistoryTab.donations =>
+      (showMobilePay || showRevolut)
+          ? 'Stripe'
+          : context.s.t('history.tab_donations'),
+  };
 
   // -------------------------------------------------------------- stats ---
 
   ({String allTime, String tips, String sessions, String avg}) _stats(
-      List<LiveSession> sessions) {
+    List<LiveSession> sessions,
+  ) {
     final currency = sessions.isNotEmpty
         ? sessions.first.currency
         : ref.read(appStateProvider).currency;
@@ -227,8 +247,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // ------------------------------------------------------------- mobile ---
 
-  Widget _buildMobile(List<LiveSession> sessions, String? stripeAllUrl,
-      bool showMobilePay, bool showRevolut, List<Donation> relayHistory) {
+  Widget _buildMobile(
+    List<LiveSession> sessions,
+    String? stripeAllUrl,
+    bool showMobilePay,
+    bool showRevolut,
+    List<Donation> relayHistory,
+  ) {
     final c = context.lt;
     final stats = _stats(sessions);
     return Center(
@@ -245,9 +270,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 height: 56,
                 child: Row(
                   children: [
-                    Text('History',
-                        style:
-                            outfitStyle(20, c.text, weight: FontWeight.w700)),
+                    Text(
+                      context.s.t('history.title'),
+                      style: outfitStyle(20, c.text, weight: FontWeight.w700),
+                    ),
                     const Spacer(),
                     if (_tab == _HistoryTab.donations && stripeAllUrl != null)
                       _ViewInStripeButton(stripeAllUrl),
@@ -258,15 +284,25 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               Row(
                 children: [
                   Expanded(
-                      child: LtStatCard(
-                          label: 'All-time', value: stats.allTime)),
+                    child: LtStatCard(
+                      label: context.s.t('history.stat_all_time_short'),
+                      value: stats.allTime,
+                    ),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
-                      child: LtStatCard(label: 'Tips', value: stats.tips)),
+                    child: LtStatCard(
+                      label: context.s.t('history.stat_tips'),
+                      value: stats.tips,
+                    ),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
-                      child: LtStatCard(
-                          label: 'Sessions', value: stats.sessions)),
+                    child: LtStatCard(
+                      label: context.s.t('history.stat_sessions'),
+                      value: stats.sessions,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -274,7 +310,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 values: _visibleTabs(showMobilePay, showRevolut),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
-                labelOf: (t) => _tabLabel(t, showMobilePay, showRevolut),
+                labelOf: (t) =>
+                    _tabLabel(context, t, showMobilePay, showRevolut),
               ),
               const SizedBox(height: 14),
               if (_tab == _HistoryTab.donations) ...[
@@ -294,8 +331,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // ------------------------------------------------------------ desktop ---
 
-  Widget _buildDesktop(List<LiveSession> sessions, String? stripeAllUrl,
-      bool showMobilePay, bool showRevolut, List<Donation> relayHistory) {
+  Widget _buildDesktop(
+    List<LiveSession> sessions,
+    String? stripeAllUrl,
+    bool showMobilePay,
+    bool showRevolut,
+    List<Donation> relayHistory,
+  ) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
     final stats = _stats(sessions);
@@ -310,8 +352,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             children: [
               Row(
                 children: [
-                  Text('History',
-                      style: outfitStyle(32, c.text, weight: FontWeight.w800)),
+                  Text(
+                    context.s.t('history.title'),
+                    style: outfitStyle(32, c.text, weight: FontWeight.w800),
+                  ),
                   const Spacer(),
                   if (_tab == _HistoryTab.donations &&
                       !app.demo &&
@@ -323,19 +367,32 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               Row(
                 children: [
                   Expanded(
-                      child: LtStatCard(
-                          label: 'All-time total', value: stats.allTime)),
+                    child: LtStatCard(
+                      label: context.s.t('history.stat_all_time'),
+                      value: stats.allTime,
+                    ),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
-                      child: LtStatCard(label: 'Tips', value: stats.tips)),
+                    child: LtStatCard(
+                      label: context.s.t('history.stat_tips'),
+                      value: stats.tips,
+                    ),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
-                      child: LtStatCard(
-                          label: 'Sessions', value: stats.sessions)),
+                    child: LtStatCard(
+                      label: context.s.t('history.stat_sessions'),
+                      value: stats.sessions,
+                    ),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
-                      child: LtStatCard(
-                          label: 'Average tip', value: stats.avg)),
+                    child: LtStatCard(
+                      label: context.s.t('history.stat_avg'),
+                      value: stats.avg,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -343,14 +400,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 values: _visibleTabs(showMobilePay, showRevolut),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
-                labelOf: (t) => _tabLabel(t, showMobilePay, showRevolut),
+                labelOf: (t) =>
+                    _tabLabel(context, t, showMobilePay, showRevolut),
               ),
               const SizedBox(height: 24),
               if (_tab == _HistoryTab.donations)
                 _DonationsTable(
                   title: (showMobilePay || showRevolut)
                       ? 'Stripe'
-                      : 'Donations',
+                      : context.s.t('history.tab_donations'),
                   demo: app.demo,
                   relayOnly: !app.demo && !app.hasStripe,
                   donations: _donations,
@@ -373,11 +431,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 )
               else if (sessions.isEmpty)
                 Text(
-                  'No sessions yet — hit “Go live” before the first song!',
+                  context.s.t('history.sessions_empty'),
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13.5,
-                      color: c.textSecondary),
+                    fontFamily: kFontBody,
+                    fontSize: 13.5,
+                    color: c.textSecondary,
+                  ),
                 )
               else
                 Column(
@@ -385,8 +444,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   children: [
                     for (final s in sessions) ...[
                       _SessionCard(
-                          session: s,
-                          onTap: () => _showSessionDetail(context, s)),
+                        session: s,
+                        onTap: () => _showSessionDetail(context, s),
+                      ),
                       const SizedBox(height: 12),
                     ],
                   ],
@@ -409,14 +469,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            'Demo mode has no Stripe history.\nConnect your account to see '
-            'every donation you\'ve ever received.',
+            context.s.t('history.demo_no_stripe'),
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 13.5,
-                height: 1.5,
-                color: c.textSecondary),
+              fontFamily: kFontBody,
+              fontSize: 13.5,
+              height: 1.5,
+              color: c.textSecondary,
+            ),
           ),
         ),
       ];
@@ -427,14 +487,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            'Your Revolut & MobilePay tips are in their own tabs. '
-            'Connect a Stripe account to take card tips too.',
+            context.s.t('history.relay_only_tabs'),
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 13.5,
-                height: 1.5,
-                color: c.textSecondary),
+              fontFamily: kFontBody,
+              fontSize: 13.5,
+              height: 1.5,
+              color: c.textSecondary,
+            ),
           ),
         ),
       ];
@@ -445,16 +505,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Column(
             children: [
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13,
-                      color: c.danger)),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: kFontBody,
+                  fontSize: 13,
+                  color: c.danger,
+                ),
+              ),
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => _loadMore(reset: true),
-                child: const Text('Retry'),
+                child: Text(context.s.t('history.retry')),
               ),
             ],
           ),
@@ -466,12 +529,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            'No donations yet — they\'ll all show up here.',
+            context.s.t('history.donations_empty'),
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 13.5,
-                color: c.textSecondary),
+              fontFamily: kFontBody,
+              fontSize: 13.5,
+              color: c.textSecondary,
+            ),
           ),
         ),
       ];
@@ -480,10 +544,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final widgets = _dayGroupedTiles(_donations);
 
     if (_hasMore || _loading) {
-      widgets.add(const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
-      ));
+      widgets.add(
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+        ),
+      );
     }
     return widgets;
   }
@@ -500,33 +566,37 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       if (group.isEmpty) return;
       final rows = group;
       widgets
-        ..add(Padding(
-          padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
-          child: LtSectionLabel(groupLabel!),
-        ))
-        ..add(LtCard(
-          radius: 16,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Column(
-            children: [
-              for (var i = 0; i < rows.length; i++) ...[
-                if (i > 0) Divider(height: 1, color: c.divider),
-                DonationTile(
-                  donation: rows[i],
-                  showTime: true,
-                  // Null for tip-page tips (no Stripe transaction to open) —
-                  // the row stays inert instead of tappable-but-dead.
-                  onTap: _stripeTap(rows[i]),
-                ),
-              ],
-            ],
+        ..add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
+            child: LtSectionLabel(groupLabel!),
           ),
-        ));
+        )
+        ..add(
+          LtCard(
+            radius: 16,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Column(
+              children: [
+                for (var i = 0; i < rows.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: c.divider),
+                  DonationTile(
+                    donation: rows[i],
+                    showTime: true,
+                    // Null for tip-page tips (no Stripe transaction to open) —
+                    // the row stays inert instead of tappable-but-dead.
+                    onTap: _stripeTap(rows[i]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
       group = [];
     }
 
     for (final d in donations) {
-      final label = _dayLabel(d.createdAt);
+      final label = _dayLabel(context, d.createdAt);
       if (label != groupLabel) {
         flush();
         groupLabel = label;
@@ -550,13 +620,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            _relayHistoryEmpty(method),
+            _relayHistoryEmpty(context, method),
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 13.5,
-                height: 1.5,
-                color: c.textSecondary),
+              fontFamily: kFontBody,
+              fontSize: 13.5,
+              height: 1.5,
+              color: c.textSecondary,
+            ),
           ),
         ),
       ];
@@ -565,24 +636,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       Padding(
         padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
         child: Text(
-          _kRelayHistoryNote,
+          _relayHistoryNote(context),
           style: TextStyle(
-              fontFamily: kFontBody,
-              fontSize: 12.5,
-              height: 1.4,
-              color: c.textMuted),
+            fontFamily: kFontBody,
+            fontSize: 12.5,
+            height: 1.4,
+            color: c.textMuted,
+          ),
         ),
       ),
       ..._dayGroupedTiles(donations),
     ];
   }
 
-  String _dayLabel(DateTime time) {
+  String _dayLabel(BuildContext context, DateTime time) {
     final now = DateTime.now();
     final day = DateTime(time.year, time.month, time.day);
     final today = DateTime(now.year, now.month, now.day);
-    if (day == today) return 'Tonight';
-    if (day == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    if (day == today) return context.s.t('history.tonight');
+    if (day == today.subtract(const Duration(days: 1))) {
+      return context.s.t('history.yesterday');
+    }
     return DateFormat('EEEE, MMM d').format(time);
   }
 
@@ -595,12 +669,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            'No sessions yet — hit “Go live” before the first song!',
+            context.s.t('history.sessions_empty'),
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 13.5,
-                color: c.textSecondary),
+              fontFamily: kFontBody,
+              fontSize: 13.5,
+              color: c.textSecondary,
+            ),
           ),
         ),
       ];
@@ -633,14 +708,23 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${DateFormat('EEE, MMM d').format(session.startedAt)} · '
-                    '${session.count} tips · '
-                    '${formatDuration(session.elapsed(session.endedAt))}'
-                    '${session.goalReached ? ' · goal reached 🎉' : ''}',
+                    context.s.t('history.session_meta', {
+                          'date': DateFormat(
+                            'EEE, MMM d',
+                          ).format(session.startedAt),
+                          'count': session.count,
+                          'duration': formatDuration(
+                            session.elapsed(session.endedAt),
+                          ),
+                        }) +
+                        (session.goalReached
+                            ? context.s.t('history.goal_reached_suffix')
+                            : ''),
                     style: TextStyle(
-                        fontFamily: kFontBody,
-                        fontSize: 13,
-                        color: c.textSecondary),
+                      fontFamily: kFontBody,
+                      fontSize: 13,
+                      color: c.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -649,11 +733,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             Expanded(
               child: session.donations.isEmpty
                   ? Center(
-                      child: Text('No tips in this session.',
-                          style: TextStyle(
-                              fontFamily: kFontBody,
-                              fontSize: 13.5,
-                              color: c.textSecondary)),
+                      child: Text(
+                        context.s.t('history.session_no_tips'),
+                        style: TextStyle(
+                          fontFamily: kFontBody,
+                          fontSize: 13.5,
+                          color: c.textSecondary,
+                        ),
+                      ),
                     )
                   : ListView.separated(
                       controller: scrollController,
@@ -693,23 +780,31 @@ class _TableHeader extends StatelessWidget {
     final c = context.lt;
 
     Widget cell(String text, {int flex = 1, TextAlign? align}) => Expanded(
-          flex: flex,
-          child: Text(
-            text.toUpperCase(),
-            textAlign: align,
-            style: outfitStyle(11, c.textMuted,
-                weight: FontWeight.w700, letterSpacing: 1),
-          ),
-        );
+      flex: flex,
+      child: Text(
+        text.toUpperCase(),
+        textAlign: align,
+        style: outfitStyle(
+          11,
+          c.textMuted,
+          weight: FontWeight.w700,
+          letterSpacing: 1,
+        ),
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          cell('Fan', flex: 5),
-          cell('Message', flex: 8),
-          cell('When', flex: 3),
-          cell('Amount', flex: 2, align: TextAlign.right),
+          cell(context.s.t('history.col_fan'), flex: 5),
+          cell(context.s.t('history.col_message'), flex: 8),
+          cell(context.s.t('history.col_when'), flex: 3),
+          cell(
+            context.s.t('history.col_amount'),
+            flex: 2,
+            align: TextAlign.right,
+          ),
           const SizedBox(width: _kStripeColWidth),
         ],
       ),
@@ -753,33 +848,32 @@ class _DonationsTable extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(title,
-              style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+          Text(title, style: outfitStyle(17, c.text, weight: FontWeight.w700)),
           const SizedBox(height: 12),
           if (demo)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                'Demo mode has no Stripe history. Connect your account to '
-                'see every donation you\'ve ever received.',
+                context.s.t('history.demo_no_stripe_inline'),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 13.5,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 13.5,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
             )
           else if (relayOnly)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                'Your Revolut & MobilePay tips are in the table below. '
-                'Connect a Stripe account to take card tips too.',
+                context.s.t('history.relay_only_below'),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 13.5,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 13.5,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
             )
           else ...[
@@ -789,11 +883,12 @@ class _DonationsTable extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Text(
-                  error ?? 'No donations yet — they\'ll all show up here.',
+                  error ?? context.s.t('history.donations_empty'),
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13.5,
-                      color: error != null ? c.danger : c.textSecondary),
+                    fontFamily: kFontBody,
+                    fontSize: 13.5,
+                    color: error != null ? c.danger : c.textSecondary,
+                  ),
                 ),
               ),
             for (var i = 0; i < donations.length; i++) ...[
@@ -807,7 +902,8 @@ class _DonationsTable extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.all(14),
                 child: Center(
-                    child: CircularProgressIndicator(strokeWidth: 2.5)),
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
               )
             else if (hasMore && donations.isNotEmpty)
               Padding(
@@ -815,7 +911,7 @@ class _DonationsTable extends StatelessWidget {
                 child: Center(
                   child: TextButton(
                     onPressed: onLoadMore,
-                    child: const Text('Load more'),
+                    child: Text(context.s.t('history.load_more')),
                   ),
                 ),
               ),
@@ -851,28 +947,29 @@ class _RelayTable extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(title,
-              style: outfitStyle(17, c.text, weight: FontWeight.w700)),
+          Text(title, style: outfitStyle(17, c.text, weight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(
-            _kRelayHistoryNote,
+            _relayHistoryNote(context),
             style: TextStyle(
-                fontFamily: kFontBody,
-                fontSize: 12.5,
-                height: 1.4,
-                color: c.textMuted),
+              fontFamily: kFontBody,
+              fontSize: 12.5,
+              height: 1.4,
+              color: c.textMuted,
+            ),
           ),
           const SizedBox(height: 12),
           if (donations.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                _relayHistoryEmpty(method),
+                _relayHistoryEmpty(context, method),
                 style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 13.5,
-                    height: 1.5,
-                    color: c.textSecondary),
+                  fontFamily: kFontBody,
+                  fontSize: 13.5,
+                  height: 1.5,
+                  color: c.textSecondary,
+                ),
               ),
             )
           else ...[
@@ -913,9 +1010,10 @@ class _TableRow extends StatelessWidget {
             child: Row(
               children: [
                 InitialAvatar(
-                    name: donation.displayName,
-                    anonymous: anonymous,
-                    size: 32),
+                  name: donation.displayName,
+                  anonymous: anonymous,
+                  size: 32,
+                ),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
@@ -956,8 +1054,7 @@ class _TableRow extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 13.5,
-                  color:
-                      donation.hasMessage ? c.textSecondary : c.textFaint,
+                  color: donation.hasMessage ? c.textSecondary : c.textFaint,
                 ),
               ),
             ),
@@ -965,9 +1062,12 @@ class _TableRow extends StatelessWidget {
           Expanded(
             flex: 3,
             child: Text(
-              _when(donation.createdAt),
+              _when(context, donation.createdAt),
               style: TextStyle(
-                  fontFamily: kFontBody, fontSize: 12.5, color: c.textMuted),
+                fontFamily: kFontBody,
+                fontSize: 12.5,
+                color: c.textMuted,
+              ),
             ),
           ),
           Expanded(
@@ -983,8 +1083,11 @@ class _TableRow extends StatelessWidget {
             child: onTap == null
                 ? null
                 : Center(
-                    child: Icon(Icons.open_in_new_rounded,
-                        size: 16, color: c.textMuted),
+                    child: Icon(
+                      Icons.open_in_new_rounded,
+                      size: 16,
+                      color: c.textMuted,
+                    ),
                   ),
           ),
         ],
@@ -994,13 +1097,14 @@ class _TableRow extends StatelessWidget {
     return InkWell(onTap: onTap, child: row);
   }
 
-  String _when(DateTime time) {
+  String _when(BuildContext context, DateTime time) {
     final now = DateTime.now();
-    final sameDay = time.year == now.year &&
-        time.month == now.month &&
-        time.day == now.day;
+    final sameDay =
+        time.year == now.year && time.month == now.month && time.day == now.day;
     return sameDay
-        ? 'Today ${DateFormat('HH:mm').format(time)}'
+        ? context.s.t('history.today_at', {
+            'time': DateFormat('HH:mm').format(time),
+          })
         : DateFormat('MMM d').format(time);
   }
 }
@@ -1020,11 +1124,13 @@ class _SessionCard extends StatelessWidget {
     final reached = session.goalReached;
     final now = DateTime.now();
     final started = session.startedAt;
-    final sameDay = started.year == now.year &&
+    final sameDay =
+        started.year == now.year &&
         started.month == now.month &&
         started.day == now.day;
-    final dayLabel =
-        sameDay ? 'Tonight' : DateFormat('MMM d').format(started);
+    final dayLabel = sameDay
+        ? context.s.t('history.tonight')
+        : DateFormat('MMM d').format(started);
 
     return LtCard(
       radius: 18,
@@ -1052,22 +1158,23 @@ class _SessionCard extends StatelessWidget {
                     if (session.goalMinor > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: reached
-                              ? c.successContainer
-                              : c.chip,
+                          color: reached ? c.successContainer : c.chip,
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           session.bankedJars > 0
-                              ? '$pct% · 🏆 ${session.bankedJars}'
+                              ? context.s.t('history.session_pct_jars', {
+                                  'pct': pct,
+                                  'jars': session.bankedJars,
+                                })
                               : '$pct%',
                           style: outfitStyle(
                             11,
-                            reached
-                                ? c.onSuccessContainer
-                                : c.textSecondary,
+                            reached ? c.onSuccessContainer : c.textSecondary,
                             weight: FontWeight.w700,
                           ),
                         ),
@@ -1076,12 +1183,18 @@ class _SessionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$dayLabel · ${session.count} tips · '
-                  '${formatDuration(session.elapsed(session.endedAt))}',
+                  context.s.t('history.session_meta', {
+                    'date': dayLabel,
+                    'count': session.count,
+                    'duration': formatDuration(
+                      session.elapsed(session.endedAt),
+                    ),
+                  }),
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 12.5,
-                      color: c.textSecondary),
+                    fontFamily: kFontBody,
+                    fontSize: 12.5,
+                    color: c.textSecondary,
+                  ),
                 ),
               ],
             ),

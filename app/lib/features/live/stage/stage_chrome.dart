@@ -5,6 +5,7 @@ import '../../../core/fullscreen.dart';
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
 import '../../../domain/donation.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../widgets/install_steps.dart';
 import '../../../widgets/qr_card.dart';
 import '../../poster/poster_screen.dart';
@@ -86,8 +87,11 @@ class StageGlassSquare extends StatelessWidget {
         child: SizedBox(
           width: 44,
           height: 44,
-          child:
-              Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.85)),
+          child: Icon(
+            icon,
+            size: 20,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
         ),
       ),
     );
@@ -116,7 +120,7 @@ class StageFullscreenButton extends StatelessWidget {
     if (fullscreenNeedsInstall) {
       return StageGlassButton(
         icon: Icons.fullscreen_rounded,
-        tooltip: 'Fullscreen',
+        tooltip: context.s.t('stage.fullscreen'),
         size: size,
         onTap: () => showAddToHomeScreenSheet(context),
       );
@@ -138,7 +142,11 @@ void showAddToHomeScreenSheet(BuildContext context) {
     ),
     builder: (context) => Padding(
       padding: EdgeInsets.fromLTRB(
-          24, 20, 24, 24 + MediaQuery.paddingOf(context).bottom),
+        24,
+        20,
+        24,
+        24 + MediaQuery.paddingOf(context).bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,22 +161,24 @@ void showAddToHomeScreenSheet(BuildContext context) {
                   color: kStageAccent.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.fullscreen_rounded,
-                    color: kStageAccent, size: 22),
+                child: const Icon(
+                  Icons.fullscreen_rounded,
+                  color: kStageAccent,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text('Go fullscreen on iPhone',
-                    style:
-                        outfitStyle(18, Colors.white, weight: FontWeight.w700)),
+                child: Text(
+                  context.s.t('stage.fullscreen_iphone_title'),
+                  style: outfitStyle(18, Colors.white, weight: FontWeight.w700),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            'iPhone Safari can’t expand a web page to fullscreen. Add live.tips '
-            'to your Home Screen once and it launches with no browser bars — a '
-            'clean, full-screen stage.',
+            context.s.t('stage.fullscreen_iphone_body'),
             style: TextStyle(
               fontFamily: kFontBody,
               fontSize: 14,
@@ -180,7 +190,7 @@ void showAddToHomeScreenSheet(BuildContext context) {
           // Shared with the onboarding install nudge — see widgets/install_steps.
           // The stage hint only ever fires on iPhone, so the Apple steps apply.
           InstallStepList(
-            steps: installSteps(apple: true),
+            steps: installSteps(context, apple: true),
             numberBg: Colors.white.withValues(alpha: 0.08),
             numberFg: Colors.white,
             iconColor: Colors.white.withValues(alpha: 0.7),
@@ -196,9 +206,14 @@ void showAddToHomeScreenSheet(BuildContext context) {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Got it',
-                  style: outfitStyle(15, const Color(0xFF40160A),
-                      weight: FontWeight.w700)),
+              child: Text(
+                context.s.t('stage.got_it'),
+                style: outfitStyle(
+                  15,
+                  const Color(0xFF40160A),
+                  weight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         ],
@@ -253,9 +268,8 @@ class StageQrPanel extends StatelessWidget {
               QrBlock(data: url, size: qrSize),
               const SizedBox(height: 14),
               Text(
-                'Scan to tip',
-                style: outfitStyle(20, Colors.white,
-                    weight: FontWeight.w700),
+                context.s.t('stage.scan_to_tip'),
+                style: outfitStyle(20, Colors.white, weight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
               Text(
@@ -275,25 +289,31 @@ class StageQrPanel extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    tooltip: 'Copy link',
+                    tooltip: context.s.t('stage.copy_link'),
                     onPressed: () => copyTipLink(context, url),
-                    icon: Icon(Icons.content_copy_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.7)),
+                    icon: Icon(
+                      Icons.content_copy_rounded,
+                      size: 18,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
                   ),
                   IconButton(
-                    tooltip: 'Open link',
+                    tooltip: context.s.t('stage.open_link'),
                     onPressed: () => openTipLink(url),
-                    icon: Icon(Icons.open_in_new_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.7)),
+                    icon: Icon(
+                      Icons.open_in_new_rounded,
+                      size: 18,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
                   ),
                   IconButton(
-                    tooltip: 'Print poster',
+                    tooltip: context.s.t('stage.print_poster'),
                     onPressed: () => openPoster(context),
-                    icon: Icon(Icons.print_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.7)),
+                    icon: Icon(
+                      Icons.print_rounded,
+                      size: 18,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
               ),
@@ -307,10 +327,13 @@ class StageQrPanel extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'RECENT MESSAGES',
+                    context.s.t('stage.recent_messages'),
                     style: outfitStyle(
-                        10.5, Colors.white.withValues(alpha: 0.4),
-                        weight: FontWeight.w700, letterSpacing: 1.4),
+                      10.5,
+                      Colors.white.withValues(alpha: 0.4),
+                      weight: FontWeight.w700,
+                      letterSpacing: 1.4,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -466,8 +489,7 @@ class _RailResizeHandleState extends State<_RailResizeHandle> {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.28),
                 borderRadius: BorderRadius.circular(3),
-                border:
-                    Border.all(color: Colors.black.withValues(alpha: 0.25)),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.25)),
               ),
             ),
           ),

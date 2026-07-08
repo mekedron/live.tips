@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/fullscreen.dart';
 import '../../core/install_prompt.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../widgets/install_steps.dart';
 import '../../widgets/lt_ui.dart';
 import 'onboarding_details_screen.dart';
@@ -24,35 +25,34 @@ class InstallHintScreen extends StatelessWidget {
   /// iPhone case, where the stage can't go full-screen at all; elsewhere the
   /// toggle still works, so we only warn about the lingering browser chrome.
   Future<void> _continueInBrowser(
-      BuildContext context, bool noFullscreen) async {
+    BuildContext context,
+    bool noFullscreen,
+  ) async {
     final navigator = Navigator.of(context);
     final firstLine = noFullscreen
-        ? 'Without live.tips on your Home Screen, the stage can’t go '
-            'full-screen — the browser’s bars stay on screen and moving around '
-            'the app feels less smooth.'
-        : 'In the browser the address bar and toolbars stay on screen and '
-            'moving around the app feels less smooth.';
+        ? context.s.t('onboarding.install_hint.no_fullscreen_warning')
+        : context.s.t('onboarding.install_hint.browser_chrome_warning');
     // The clincher: there's no server. History lives in this browser's storage,
     // and a Home-Screen app installed later can start from a separate store —
     // so sessions collected in the browser first may not follow it over.
-    final message = '$firstLine\n\n'
-        'Your session history is saved on this device only — there’s no '
-        'server — and an app added later can start from a separate store, so '
-        'sessions you collect in the browser first may not carry over. Adding '
-        'it now keeps everything in one place.';
+    final message = context.s.t('onboarding.install_hint.continue_message', {
+      'first': firstLine,
+    });
     final proceed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Continue in the browser?'),
+        title: Text(
+          context.s.t('onboarding.install_hint.continue_dialog_title'),
+        ),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.s.t('onboarding.install_hint.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Continue anyway'),
+            child: Text(context.s.t('onboarding.install_hint.continue_anyway')),
           ),
         ],
       ),
@@ -94,29 +94,32 @@ class InstallHintScreen extends StatelessWidget {
                               color: c.accentSoft,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Icon(Icons.add_to_home_screen_rounded,
-                                size: 34, color: c.accent),
+                            child: Icon(
+                              Icons.add_to_home_screen_rounded,
+                              size: 34,
+                              color: c.accent,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          'Add live.tips to your Home Screen',
+                          context.s.t('onboarding.install_hint.title'),
                           textAlign: TextAlign.center,
-                          style:
-                              outfitStyle(24, c.text, weight: FontWeight.w800),
+                          style: outfitStyle(
+                            24,
+                            c.text,
+                            weight: FontWeight.w800,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Text(
                           apple
-                              ? 'Safari can’t show live.tips full-screen on '
-                                  'iPhone or iPad. Add it to your Home Screen '
-                                  'and it launches edge-to-edge, with no browser '
-                                  'bars — the clean stage your audience should '
-                                  'see. Takes a few seconds.'
-                              : 'Add live.tips to your Home Screen and it '
-                                  'launches like an app — full-screen, no '
-                                  'browser bars, and one tap away when you’re '
-                                  'ready to go live. Takes a few seconds.',
+                              ? context.s.t(
+                                  'onboarding.install_hint.subtitle_apple',
+                                )
+                              : context.s.t(
+                                  'onboarding.install_hint.subtitle_generic',
+                                ),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: kFontBody,
@@ -128,7 +131,7 @@ class InstallHintScreen extends StatelessWidget {
                         const SizedBox(height: 22),
                         LtCard(
                           child: InstallStepList(
-                            steps: installSteps(apple: apple),
+                            steps: installSteps(context, apple: apple),
                             numberBg: c.accentSoft,
                             numberFg: c.onAccentSoft,
                             iconColor: c.textSecondary,
@@ -144,14 +147,14 @@ class InstallHintScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       LtPrimaryButton(
-                        label: 'Continue',
+                        label: context.s.t('onboarding.install_hint.continue'),
                         trailingIcon: Icons.arrow_forward_rounded,
                         onPressed: () =>
                             _continueInBrowser(context, noFullscreen),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'You can always do this later.',
+                        context.s.t('onboarding.install_hint.later_hint'),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: kFontBody,

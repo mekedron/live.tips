@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../domain/stage_settings.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/enum_labels.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../live/stage/stage_resolver.dart';
@@ -11,11 +13,11 @@ import 'stage_preview_screen.dart';
 
 /// One-line summary of the current stage look — "3D jar · Concert stage ·
 /// Golden Hour" — for the Home quick row and settings subtitles.
-String stageLookSummary(StageSettings stage) {
+String stageLookSummary(BuildContext context, StageSettings stage) {
   final parts = <String>[
-    stage.style.label,
-    if (stage.style == StageStyle.jar3d) stage.scene.label,
-    if (stage.style != StageStyle.classic) stage.theme.label,
+    stage.style.l10nLabel(context),
+    if (stage.style == StageStyle.jar3d) stage.scene.l10nLabel(context),
+    if (stage.style != StageStyle.classic) stage.theme.l10nLabel(context),
   ];
   return parts.join(' · ');
 }
@@ -34,9 +36,10 @@ Future<void> showStageLookSheet(BuildContext context) {
         controller: scrollController,
         padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
         children: [
-          Text('Stage look',
-              style: outfitStyle(18, context.lt.text,
-                  weight: FontWeight.w700)),
+          Text(
+            context.s.t('settings.stage.look_sheet_title'),
+            style: outfitStyle(18, context.lt.text, weight: FontWeight.w700),
+          ),
           const SizedBox(height: 4),
           const StageSettingsSection(),
         ],
@@ -73,20 +76,19 @@ class StageSettingsSection extends ConsumerWidget {
     final rows = <Widget>[
       LtRow(
         icon: Icons.theater_comedy_rounded,
-        title: 'Style',
+        title: context.s.t('settings.stage.style_title'),
         subtitle: !webViewSupported && isJar
-            ? 'Jar styles need a WebView — this platform shows the classic '
-                'screen instead.'
+            ? context.s.t('settings.stage.style_webview_note')
             : null,
-        trailing: _ValueText(stage.style.label),
+        trailing: _ValueText(stage.style.l10nLabel(context)),
         chevron: true,
         onTap: () async {
           final picked = await showLtPicker<StageStyle>(
             context: context,
-            title: 'Stage style',
+            title: context.s.t('settings.stage.style_picker_title'),
             values: StageStyle.values,
             selected: stage.style,
-            labelOf: (s) => s.label,
+            labelOf: (s) => s.l10nLabel(context),
           );
           if (picked != null) update(stage.copyWith(style: picked));
         },
@@ -94,17 +96,21 @@ class StageSettingsSection extends ConsumerWidget {
       if (is3d)
         LtRow(
           icon: Icons.local_drink_rounded,
-          title: 'Vessel',
-          trailing: _ValueText('${stage.vessel.label} · ~${fits(stage.vessel)}'),
+          title: context.s.t('settings.stage.vessel_title'),
+          trailing: _ValueText(
+            '${stage.vessel.l10nLabel(context)} · ~${fits(stage.vessel)}',
+          ),
           chevron: true,
           onTap: () async {
             final picked = await showLtPicker<JarVessel>(
               context: context,
-              title: 'Vessel — any size fills toward your goal',
+              title: context.s.t('settings.stage.vessel_picker_title'),
               values: JarVessel.selectable,
               selected: stage.vessel,
-              labelOf: (v) => v.label,
-              detailOf: (v) => 'holds ~${fits(v)}',
+              labelOf: (v) => v.l10nLabel(context),
+              detailOf: (v) => context.s.t('settings.stage.vessel_detail', {
+                'amount': fits(v),
+              }),
             );
             if (picked != null) update(stage.copyWith(vessel: picked));
           },
@@ -112,16 +118,16 @@ class StageSettingsSection extends ConsumerWidget {
       if (is3d)
         LtRow(
           icon: Icons.landscape_rounded,
-          title: 'Scene',
-          trailing: _ValueText(stage.scene.label),
+          title: context.s.t('settings.stage.scene_title'),
+          trailing: _ValueText(stage.scene.l10nLabel(context)),
           chevron: true,
           onTap: () async {
             final picked = await showLtPicker<JarScene>(
               context: context,
-              title: 'Scene',
+              title: context.s.t('settings.stage.scene_title'),
               values: JarScene.values,
               selected: stage.scene,
-              labelOf: (s) => s.label,
+              labelOf: (s) => s.l10nLabel(context),
             );
             if (picked != null) update(stage.copyWith(scene: picked));
           },
@@ -129,16 +135,16 @@ class StageSettingsSection extends ConsumerWidget {
       if (isJar)
         LtRow(
           icon: Icons.palette_rounded,
-          title: 'Theme',
-          trailing: _ValueText(stage.theme.label),
+          title: context.s.t('settings.stage.theme_title'),
+          trailing: _ValueText(stage.theme.l10nLabel(context)),
           chevron: true,
           onTap: () async {
             final picked = await showLtPicker<JarTheme>(
               context: context,
-              title: 'Stage theme',
+              title: context.s.t('settings.stage.theme_picker_title'),
               values: JarTheme.values,
               selected: stage.theme,
-              labelOf: (t) => t.label,
+              labelOf: (t) => t.l10nLabel(context),
             );
             if (picked != null) update(stage.copyWith(theme: picked));
           },
@@ -146,8 +152,8 @@ class StageSettingsSection extends ConsumerWidget {
       if (isJar)
         LtRow(
           icon: Icons.payments_rounded,
-          title: 'Banknotes in the jar',
-          subtitle: 'Mix folded notes into the coin pile',
+          title: context.s.t('settings.stage.notes_title'),
+          subtitle: context.s.t('settings.stage.notes_subtitle'),
           trailing: Switch(
             value: stage.showNotes,
             onChanged: (v) => update(stage.copyWith(showNotes: v)),
@@ -156,8 +162,8 @@ class StageSettingsSection extends ConsumerWidget {
       if (isJar)
         LtRow(
           icon: Icons.volume_up_rounded,
-          title: 'Coin sounds',
-          subtitle: 'Clinks and milestone chimes',
+          title: context.s.t('settings.stage.coin_sounds_title'),
+          subtitle: context.s.t('settings.stage.coin_sounds_subtitle'),
           trailing: Switch(
             value: stage.soundEnabled,
             onChanged: (v) => update(stage.copyWith(soundEnabled: v)),
@@ -166,8 +172,8 @@ class StageSettingsSection extends ConsumerWidget {
       if (isJar)
         LtRow(
           icon: Icons.notifications_active_rounded,
-          title: 'New-tip fanfare',
-          subtitle: 'Hear money land mid-song',
+          title: context.s.t('settings.stage.tip_fanfare_title'),
+          subtitle: context.s.t('settings.stage.tip_fanfare_subtitle'),
           trailing: Switch(
             value: stage.tipSoundEnabled,
             onChanged: (v) => update(stage.copyWith(tipSoundEnabled: v)),
@@ -176,18 +182,17 @@ class StageSettingsSection extends ConsumerWidget {
       if (is3d)
         LtRow(
           icon: Icons.auto_awesome_rounded,
-          title: 'Render quality',
-          subtitle: 'Auto drops effects if the device can\'t hold a smooth '
-              'frame rate',
-          trailing: _ValueText(stage.quality.label),
+          title: context.s.t('settings.stage.quality_title'),
+          subtitle: context.s.t('settings.stage.quality_subtitle'),
+          trailing: _ValueText(stage.quality.l10nLabel(context)),
           chevron: true,
           onTap: () async {
             final picked = await showLtPicker<StageQuality>(
               context: context,
-              title: 'Render quality',
+              title: context.s.t('settings.stage.quality_title'),
               values: StageQuality.values,
               selected: stage.quality,
-              labelOf: (q) => q.label,
+              labelOf: (q) => q.l10nLabel(context),
             );
             if (picked != null) update(stage.copyWith(quality: picked));
           },
@@ -195,12 +200,12 @@ class StageSettingsSection extends ConsumerWidget {
       if (isJar)
         LtRow(
           icon: Icons.play_circle_outline_rounded,
-          title: 'Preview the stage',
-          subtitle: 'Pour pretend tips — no session needed',
+          title: context.s.t('settings.stage.preview_title'),
+          subtitle: context.s.t('settings.stage.preview_subtitle'),
           chevron: true,
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => const StagePreviewScreen(),
-          )),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const StagePreviewScreen())),
         ),
     ];
 

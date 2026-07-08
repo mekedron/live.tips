@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/money.dart';
 import '../core/theme.dart';
+import '../l10n/app_localizations.dart';
 import 'lt_ui.dart';
 
 /// Bottom-sheet editor for tonight's goal. Returns the new goal in minor
@@ -10,10 +11,11 @@ Future<int?> showGoalEditorSheet(
   BuildContext context, {
   required int initialMinor,
   required String currency,
-  String title = 'Tonight\'s goal',
+  String? title,
 }) {
-  final controller =
-      TextEditingController(text: formatMajorPlain(initialMinor, currency));
+  final controller = TextEditingController(
+    text: formatMajorPlain(initialMinor, currency),
+  );
   return showModalBottomSheet<int>(
     context: context,
     isScrollControlled: true,
@@ -31,19 +33,24 @@ Future<int?> showGoalEditorSheet(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: outfitStyle(18, c.text, weight: FontWeight.w700)),
+            Text(
+              title ?? context.s.t('widgets.goal_editor.default_title'),
+              style: outfitStyle(18, c.text, weight: FontWeight.w700),
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               style: outfitStyle(20, c.text, weight: FontWeight.w700),
               decoration: InputDecoration(
                 suffixText: currency.toUpperCase(),
                 suffixStyle: outfitStyle(14, c.textSecondary),
               ),
-              onSubmitted: (_) => Navigator.of(context)
-                  .pop(parseMajorToMinor(controller.text, currency)),
+              onSubmitted: (_) => Navigator.of(
+                context,
+              ).pop(parseMajorToMinor(controller.text, currency)),
             ),
             const SizedBox(height: 12),
             Row(
@@ -60,16 +67,19 @@ Future<int?> showGoalEditorSheet(
                 ],
                 _BumpChip(
                   label: '×2',
-                  onTap: () => controller.text =
-                      formatMajorPlain(current() * 2, currency),
+                  onTap: () => controller.text = formatMajorPlain(
+                    current() * 2,
+                    currency,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
             LtPrimaryButton(
-              label: 'Save goal',
-              onPressed: () => Navigator.of(context)
-                  .pop(parseMajorToMinor(controller.text, currency)),
+              label: context.s.t('widgets.goal_editor.save_goal'),
+              onPressed: () => Navigator.of(
+                context,
+              ).pop(parseMajorToMinor(controller.text, currency)),
             ),
           ],
         ),

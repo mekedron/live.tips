@@ -4,6 +4,7 @@ import 'package:live_tips/domain/donation.dart';
 import 'package:live_tips/domain/rollover_math.dart';
 import 'package:live_tips/features/live/stage/stage_chrome.dart';
 import 'package:live_tips/features/live/stage/stage_hud.dart';
+import 'helpers.dart';
 
 JarTipAttribution tip(
   String id, {
@@ -12,54 +13,63 @@ JarTipAttribution tip(
   int amount = 500,
   double delta = 0.05,
   bool verified = true,
-}) =>
-    JarTipAttribution(
-      donation: Donation(
-        id: id,
-        amountMinor: amount,
-        currency: 'eur',
-        createdAt: DateTime.utc(2026, 7, 4),
-        name: name,
-        message: message,
-        livemode: false,
-        verified: verified,
-      ),
-      deltaPct: delta,
-      jarPctAfter: 0.5,
-      rollovers: 0,
-      bankedJarsAfter: 0,
-    );
+}) => JarTipAttribution(
+  donation: Donation(
+    id: id,
+    amountMinor: amount,
+    currency: 'eur',
+    createdAt: DateTime.utc(2026, 7, 4),
+    name: name,
+    message: message,
+    livemode: false,
+    verified: verified,
+  ),
+  deltaPct: delta,
+  jarPctAfter: 0.5,
+  rollovers: 0,
+  bankedJarsAfter: 0,
+);
 
 Widget host(List<JarTipAttribution> tips, int serial) => MaterialApp(
-      home: Scaffold(
-        backgroundColor: Colors.black,
-        body: TipBannerLayer(tips: tips, tipSerial: serial),
-      ),
-    );
+  localizationsDelegates: kTestL10nDelegates,
+
+  locale: const Locale('en'),
+
+  home: Scaffold(
+    backgroundColor: Colors.black,
+    body: TipBannerLayer(tips: tips, tipSerial: serial),
+  ),
+);
 
 void main() {
   group('TipBannerLayer', () {
-    testWidgets('a banner holds long enough to be read from the stage',
-        (tester) async {
+    testWidgets('a banner holds long enough to be read from the stage', (
+      tester,
+    ) async {
       await tester.pumpWidget(host(const [], 0));
       await tester.pumpWidget(host([tip('cs_1', name: 'Anna')], 1));
       await tester.pump(const Duration(milliseconds: 500)); // entrance
 
       expect(find.textContaining('Anna tipped'), findsOneWidget);
       await tester.pump(const Duration(seconds: 5));
-      expect(find.textContaining('Anna tipped'), findsOneWidget,
-          reason: 'the old floats died at 2.7 s — banners must survive 5 s');
+      expect(
+        find.textContaining('Anna tipped'),
+        findsOneWidget,
+        reason: 'the old floats died at 2.7 s — banners must survive 5 s',
+      );
 
       await tester.pump(const Duration(seconds: 2)); // past the 7 s hold
       await tester.pump(const Duration(milliseconds: 400)); // exit anim
       expect(find.textContaining('Anna tipped'), findsNothing);
     });
 
-    testWidgets('a message extends the hold and is shown verbatim',
-        (tester) async {
+    testWidgets('a message extends the hold and is shown verbatim', (
+      tester,
+    ) async {
       await tester.pumpWidget(host(const [], 0));
       await tester.pumpWidget(
-          host([tip('cs_1', name: 'Maya', message: 'Great show!')], 1));
+        host([tip('cs_1', name: 'Maya', message: 'Great show!')], 1),
+      );
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.text('“Great show!”'), findsOneWidget);
@@ -71,16 +81,21 @@ void main() {
       expect(find.text('“Great show!”'), findsNothing);
     });
 
-    testWidgets('a burst queues — every donor gets their own moment',
-        (tester) async {
+    testWidgets('a burst queues — every donor gets their own moment', (
+      tester,
+    ) async {
       await tester.pumpWidget(host(const [], 0));
       await tester.pumpWidget(
-          host([tip('cs_1', name: 'Anna'), tip('cs_2', name: 'Marco')], 2));
+        host([tip('cs_1', name: 'Anna'), tip('cs_2', name: 'Marco')], 2),
+      );
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.textContaining('Anna tipped'), findsOneWidget);
-      expect(find.textContaining('Marco tipped'), findsNothing,
-          reason: 'banners never overlap');
+      expect(
+        find.textContaining('Marco tipped'),
+        findsNothing,
+        reason: 'banners never overlap',
+      );
 
       // crowded hold (4 s) + gap + entrance → the queue advances
       await tester.pump(const Duration(seconds: 4));
@@ -94,25 +109,31 @@ void main() {
       expect(find.textContaining('Marco tipped'), findsNothing);
     });
 
-    testWidgets('a tip arriving mid-banner wraps the current one up sooner',
-        (tester) async {
+    testWidgets('a tip arriving mid-banner wraps the current one up sooner', (
+      tester,
+    ) async {
       await tester.pumpWidget(host(const [], 0));
       await tester.pumpWidget(
-          host([tip('cs_1', name: 'Anna', message: 'hi!')], 1));
+        host([tip('cs_1', name: 'Anna', message: 'hi!')], 1),
+      );
       await tester.pump(const Duration(milliseconds: 500));
 
       await tester.pumpWidget(host([tip('cs_2', name: 'Marco')], 2));
       await tester.pump(const Duration(seconds: 1));
-      expect(find.textContaining('Anna tipped'), findsOneWidget,
-          reason: 'the current banner is never yanked away instantly');
+      expect(
+        find.textContaining('Anna tipped'),
+        findsOneWidget,
+        reason: 'the current banner is never yanked away instantly',
+      );
 
       await tester.pump(const Duration(seconds: 2)); // wrap-up + gap passed
       await tester.pump(const Duration(milliseconds: 700));
       expect(find.textContaining('Marco tipped'), findsOneWidget);
     });
 
-    testWidgets('re-pumping the same serial does not re-enqueue',
-        (tester) async {
+    testWidgets('re-pumping the same serial does not re-enqueue', (
+      tester,
+    ) async {
       await tester.pumpWidget(host(const [], 0));
       final batch = [tip('cs_1', name: 'Anna')];
       await tester.pumpWidget(host(batch, 1));
@@ -121,35 +142,51 @@ void main() {
 
       await tester.pump(const Duration(seconds: 7));
       await tester.pump(const Duration(milliseconds: 700));
-      expect(find.textContaining('Anna tipped'), findsNothing,
-          reason: 'a duplicate would replay Anna after the first hold');
+      expect(
+        find.textContaining('Anna tipped'),
+        findsNothing,
+        reason: 'a duplicate would replay Anna after the first hold',
+      );
     });
 
-    testWidgets('a big tip (≥10% of goal) gets the crown treatment',
-        (tester) async {
+    testWidgets('a big tip (≥10% of goal) gets the crown treatment', (
+      tester,
+    ) async {
       await tester.pumpWidget(host(const [], 0));
       await tester.pumpWidget(
-          host([tip('cs_1', name: 'Anna', amount: 5000, delta: 0.25)], 1));
+        host([tip('cs_1', name: 'Anna', amount: 5000, delta: 0.25)], 1),
+      );
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.textContaining('👑'), findsOneWidget);
     });
 
     testWidgets(
-        'an unverified (donor-declared) tip shows ~ before the amount and '
-        'NEVER gets the crown, however big', (tester) async {
-      await tester.pumpWidget(host(const [], 0));
-      await tester.pumpWidget(host([
-        tip('relay_1',
-            name: 'Anna', amount: 5000, delta: 0.25, verified: false),
-      ], 1));
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(find.textContaining('👑'), findsNothing,
-          reason: 'the crown must stay worth trusting');
-      expect(find.textContaining('tipped ~'), findsOneWidget);
-    });
+      'an unverified (donor-declared) tip shows ~ before the amount and '
+      'NEVER gets the crown, however big',
+      (tester) async {
+        await tester.pumpWidget(host(const [], 0));
+        await tester.pumpWidget(
+          host([
+            tip(
+              'relay_1',
+              name: 'Anna',
+              amount: 5000,
+              delta: 0.25,
+              verified: false,
+            ),
+          ], 1),
+        );
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(
+          find.textContaining('👑'),
+          findsNothing,
+          reason: 'the crown must stay worth trusting',
+        );
+        expect(find.textContaining('tipped ~'), findsOneWidget);
+      },
+    );
 
-    testWidgets('a verified tip shows the plain amount, no ~',
-        (tester) async {
+    testWidgets('a verified tip shows the plain amount, no ~', (tester) async {
       await tester.pumpWidget(host(const [], 0));
       await tester.pumpWidget(host([tip('cs_1', name: 'Anna')], 1));
       await tester.pump(const Duration(milliseconds: 500));

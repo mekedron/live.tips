@@ -9,10 +9,16 @@ library;
 
 class RequiredPermission {
   const RequiredPermission({
+    required this.slug,
     required this.resource,
     required this.access,
     required this.why,
   });
+
+  /// Stable id for i18n lookup (`enum.perm_why.<slug>`). The [resource] and
+  /// [access] mirror the (English) Stripe dashboard and stay untranslated;
+  /// only [why] — our own explanation — is localized, keyed by this slug.
+  final String slug;
 
   final String resource;
   final String access; // "Read" | "Write"
@@ -24,26 +30,31 @@ class RequiredPermission {
 /// or customer data.
 const kRequiredPermissions = [
   RequiredPermission(
+    slug: 'checkout_sessions',
     resource: 'Checkout Sessions',
     access: 'Read',
     why: 'See incoming donations — history and details.',
   ),
   RequiredPermission(
+    slug: 'events',
     resource: 'Events',
     access: 'Read',
     why: 'Live feed: poll for new donations during a session.',
   ),
   RequiredPermission(
+    slug: 'payment_links',
     resource: 'Payment Links',
     access: 'Write',
     why: 'Create and manage your donation link.',
   ),
   RequiredPermission(
+    slug: 'products',
     resource: 'Products',
     access: 'Write',
     why: 'Create the "Tips" product behind the link.',
   ),
   RequiredPermission(
+    slug: 'prices',
     resource: 'Prices',
     access: 'Write',
     why: 'Create the pay-what-you-want price for tips.',

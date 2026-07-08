@@ -5,6 +5,7 @@ import '../core/money.dart';
 import '../core/theme.dart';
 import '../domain/donation.dart';
 import '../domain/tip_method.dart';
+import '../l10n/app_localizations.dart';
 import 'lt_ui.dart';
 import 'method_badges.dart';
 
@@ -76,7 +77,9 @@ class DonationTile extends StatelessWidget {
                 Text(
                   donation.hasMessage
                       ? donation.message!.trim()
-                      : (showTime ? 'No message' : relativeTime(donation.createdAt)),
+                      : (showTime
+                            ? context.s.t('widgets.donation_tile.no_message')
+                            : relativeTime(context, donation.createdAt)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -100,9 +103,10 @@ class DonationTile extends StatelessWidget {
                 Text(
                   shortTime(donation.createdAt),
                   style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 11,
-                      color: c.textMuted),
+                    fontFamily: kFontBody,
+                    fontSize: 11,
+                    color: c.textMuted,
+                  ),
                 ),
             ],
           ),
@@ -129,7 +133,7 @@ class ExternalTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     return Tooltip(
-      message: 'Received outside live.tips — not through your tip link.',
+      message: context.s.t('widgets.donation_tile.external_tooltip'),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
@@ -137,9 +141,13 @@ class ExternalTag extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
-          'External',
-          style: outfitStyle(10.5, c.textMuted,
-              weight: FontWeight.w700, letterSpacing: 0.3),
+          context.s.t('widgets.donation_tile.external'),
+          style: outfitStyle(
+            10.5,
+            c.textMuted,
+            weight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
         ),
       ),
     );
@@ -147,11 +155,17 @@ class ExternalTag extends StatelessWidget {
 }
 
 /// "just now / 4 min ago / 3 h ago / Jun 28"
-String relativeTime(DateTime time) {
+String relativeTime(BuildContext context, DateTime time) {
   final diff = DateTime.now().difference(time);
-  if (diff.inSeconds < 60) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
-  if (diff.inHours < 24) return '${diff.inHours} h ago';
+  if (diff.inSeconds < 60) {
+    return context.s.t('widgets.donation_tile.just_now');
+  }
+  if (diff.inMinutes < 60) {
+    return context.s.t('widgets.donation_tile.min_ago', {'n': diff.inMinutes});
+  }
+  if (diff.inHours < 24) {
+    return context.s.t('widgets.donation_tile.hours_ago', {'n': diff.inHours});
+  }
   return DateFormat('MMM d').format(time);
 }
 

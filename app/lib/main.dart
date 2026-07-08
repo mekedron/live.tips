@@ -6,6 +6,8 @@ import 'app.dart';
 import 'data/local_store.dart';
 import 'data/migrations.dart';
 import 'data/secure_store.dart';
+import 'l10n/app_locale.dart';
+import 'l10n/app_localizations.dart';
 import 'state/providers.dart';
 
 /// Dev convenience (debug builds only): skip the keychain and use this key.
@@ -20,6 +22,17 @@ Future<void> main() async {
   final localStore = await LocalStore.init();
   final secureStore = SecureStore();
 
+  // Warm the active locale's string table before the first frame so the UI
+  // opens already translated (the saved language, else the device language,
+  // resolved to the nearest shipped locale).
+  final savedLocaleCode = localStore.readSettings().localeCode;
+  final bootLocale = resolveSupportedLocale(
+    savedLocaleCode != null
+        ? Locale(savedLocaleCode)
+        : WidgetsBinding.instance.platformDispatcher.locale,
+  );
+  await AppLocalizations.load(bootLocale);
+
   // Prefs-side migration/creation of the accounts registry. Never touches
   // the keychain, so it can't block or fail transiently.
   final registry = await ensureAccountsRegistry(localStore);
@@ -28,8 +41,10 @@ Future<void> main() async {
   String? apiKey;
   String? relaySecret;
   if (kDebugMode && _devStripeKey.isNotEmpty) {
-    assert(_devStripeKey.contains('_test_'),
-        'DEV_STRIPE_KEY must be a test-mode key');
+    assert(
+      _devStripeKey.contains('_test_'),
+      'DEV_STRIPE_KEY must be a test-mode key',
+    );
     apiKey = _devStripeKey;
   } else {
     try {
@@ -49,7 +64,8 @@ Future<void> main() async {
   // scrub on the way in; this covers accounts that were already connected
   // before that scrubbing existed. Test-mode sessions are the user's own
   // real integration tests, so they're left alone here.
-  final hasRealAccount = (apiKey != null && !apiKey.contains('_test_')) ||
+  final hasRealAccount =
+      (apiKey != null && !apiKey.contains('_test_')) ||
       localStore.readRelayJar(activeId) != null;
   if (hasRealAccount) {
     await localStore.purgeSimulatedData(activeId);

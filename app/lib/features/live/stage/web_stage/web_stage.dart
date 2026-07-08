@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../../core/theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../../domain/rollover_math.dart';
 import '../../../../domain/stage_settings.dart';
 import '../stage_hud.dart';
@@ -77,23 +78,26 @@ class _WebStageState extends ConsumerState<WebStage> {
         _fail('renderer went silent');
       }
     });
-    _lifecycle = AppLifecycleListener(onStateChange: (s) {
-      // `inactive` fires the instant focus merely shifts away from the top
-      // Flutter view — on Flutter Web that includes focus moving into our
-      // OWN iframe (e.g. dragging to rotate the 3D scene), which is normal,
-      // continuous use, not backgrounding. Flutter Web synthesizes it from a
-      // plain `window.blur`, with no matching `focus` while the user keeps
-      // interacting with the stage — so treating it as "pause" freezes the
-      // stage on the first drag and never un-freezes it. Only states that
-      // mean genuinely-not-visible should pause.
-      final pause = s == AppLifecycleState.hidden ||
-          s == AppLifecycleState.paused ||
-          s == AppLifecycleState.detached;
-      if (pause == _paused) return;
-      _paused = pause;
-      _lastAlive = DateTime.now(); // don't count sleep as silence
-      _transport.send(StageSetPaused(pause));
-    });
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (s) {
+        // `inactive` fires the instant focus merely shifts away from the top
+        // Flutter view — on Flutter Web that includes focus moving into our
+        // OWN iframe (e.g. dragging to rotate the 3D scene), which is normal,
+        // continuous use, not backgrounding. Flutter Web synthesizes it from a
+        // plain `window.blur`, with no matching `focus` while the user keeps
+        // interacting with the stage — so treating it as "pause" freezes the
+        // stage on the first drag and never un-freezes it. Only states that
+        // mean genuinely-not-visible should pause.
+        final pause =
+            s == AppLifecycleState.hidden ||
+            s == AppLifecycleState.paused ||
+            s == AppLifecycleState.detached;
+        if (pause == _paused) return;
+        _paused = pause;
+        _lastAlive = DateTime.now(); // don't count sleep as silence
+        _transport.send(StageSetPaused(pause));
+      },
+    );
   }
 
   void _armReadyDeadline() {
@@ -151,18 +155,20 @@ class _WebStageState extends ConsumerState<WebStage> {
 
   void _sendInit() {
     final railInset = _railInset;
-    _transport.send(StageInit(
-      renderer: widget.renderer,
-      config: stageConfigJson(
-        widget.config,
-        reducedMotion: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
-        insetTop: kStageHudTopInset,
-        insetBottom: kStageHudBottomInset,
-        insetRight: railInset,
+    _transport.send(
+      StageInit(
+        renderer: widget.renderer,
+        config: stageConfigJson(
+          widget.config,
+          reducedMotion: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+          insetTop: kStageHudTopInset,
+          insetBottom: kStageHudBottomInset,
+          insetRight: railInset,
+        ),
+        jarPct: widget.snapshot.jarPct,
+        bankedJars: widget.snapshot.bankedJars,
       ),
-      jarPct: widget.snapshot.jarPct,
-      bankedJars: widget.snapshot.bankedJars,
-    ));
+    );
     _sentRailInset = railInset;
     _syncedJarPct = widget.snapshot.jarPct;
     _syncedGoal = widget.snapshot.goalMinor;
@@ -187,11 +193,9 @@ class _WebStageState extends ConsumerState<WebStage> {
     _heartbeatCheck?.cancel();
     ref.read(stageHealthProvider.notifier).reportWebViewFailure();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content:
-            Text('The jar stage is unavailable here — showing the classic '
-                'screen instead.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.s.t('stage.web_unavailable'))),
+      );
     }
   }
 
@@ -231,10 +235,12 @@ class _WebStageState extends ConsumerState<WebStage> {
       // or some other correction: resync absolutely, animated
       _syncedJarPct = widget.snapshot.jarPct;
       _syncedGoal = widget.snapshot.goalMinor;
-      _transport.send(StageSyncState(
-        jarPct: widget.snapshot.jarPct,
-        bankedJars: widget.snapshot.bankedJars,
-      ));
+      _transport.send(
+        StageSyncState(
+          jarPct: widget.snapshot.jarPct,
+          bankedJars: widget.snapshot.bankedJars,
+        ),
+      );
     }
 
     // preview screen poked the "tip" button
@@ -262,88 +268,96 @@ class _WebStageState extends ConsumerState<WebStage> {
   @override
   Widget build(BuildContext context) {
     final t = _transport;
-    return LayoutBuilder(builder: (context, constraints) {
-      final wide = constraints.maxWidth > 780;
-      // Re-frame the jar when the QR rail appears/disappears OR is dragged wider
-      // /narrower after the renderer is already live (rotating a tablet across
-      // the wide threshold, or resizing the rail) — _sendInit only covers the
-      // first frame's inset.
-      final railInset = wide ? stageRailInset(widget.config.railWidth) : 0.0;
-      if (_ready && railInset != _sentRailInset) {
-        _sentRailInset = railInset;
-        _transport.send(StageSetConfig({
-          'insets': {
-            'top': kStageHudTopInset,
-            'bottom': kStageHudBottomInset,
-            'right': railInset,
-          },
-        }));
-      }
-      // Centred top overlays (HUD total/bar, tip banner) slide left with the
-      // jar on wide stages so they stay over it, clear of the QR rail. Half the
-      // reserved strip == the jar's own leftward shift, for any width.
-      final overlayShift = -railInset / 2;
-      final safeBottom = MediaQuery.paddingOf(context).bottom;
-      // On phones the glass action bar floats over the bottom band — the
-      // mini feed must clear it.
-      final feedBottom = 12.0 + (wide ? 0 : 84) + safeBottom;
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          if (t is WebViewStageTransport)
-            WebViewWidget(controller: t.controller)
-          else if (t is IframeStageTransport)
-            HtmlElementView(viewType: t.viewType)
-          else
-            const ColoredBox(color: kStageBlack),
-          // native poster until the renderer's first frame — no white flash
-          if (!_ready)
-            const ColoredBox(
-              color: kStageBlack,
-              child: Center(
-                child: SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: CircularProgressIndicator(strokeWidth: 2.4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth > 780;
+        // Re-frame the jar when the QR rail appears/disappears OR is dragged wider
+        // /narrower after the renderer is already live (rotating a tablet across
+        // the wide threshold, or resizing the rail) — _sendInit only covers the
+        // first frame's inset.
+        final railInset = wide ? stageRailInset(widget.config.railWidth) : 0.0;
+        if (_ready && railInset != _sentRailInset) {
+          _sentRailInset = railInset;
+          _transport.send(
+            StageSetConfig({
+              'insets': {
+                'top': kStageHudTopInset,
+                'bottom': kStageHudBottomInset,
+                'right': railInset,
+              },
+            }),
+          );
+        }
+        // Centred top overlays (HUD total/bar, tip banner) slide left with the
+        // jar on wide stages so they stay over it, clear of the QR rail. Half the
+        // reserved strip == the jar's own leftward shift, for any width.
+        final overlayShift = -railInset / 2;
+        final safeBottom = MediaQuery.paddingOf(context).bottom;
+        // On phones the glass action bar floats over the bottom band — the
+        // mini feed must clear it.
+        final feedBottom = 12.0 + (wide ? 0 : 84) + safeBottom;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (t is WebViewStageTransport)
+              WebViewWidget(controller: t.controller)
+            else if (t is IframeStageTransport)
+              HtmlElementView(viewType: t.viewType)
+            else
+              const ColoredBox(color: kStageBlack),
+            // native poster until the renderer's first frame — no white flash
+            if (!_ready)
+              const ColoredBox(
+                color: kStageBlack,
+                child: Center(
+                  child: SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: CircularProgressIndicator(strokeWidth: 2.4),
+                  ),
                 ),
               ),
-            ),
-          // the native HUD floats above; IgnorePointer keeps orbit gestures
-          // flowing into the WebView. On wide stages it slides left with the
-          // jar (overlayShift) so the total/bar stay centred over it.
-          IgnorePointer(
-            child: Transform.translate(
-              offset: Offset(overlayShift, 0),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: StageHud(
-                    snapshot: widget.snapshot, trophyPulse: _trophyPulse),
-              ),
-            ),
-          ),
-          // the donation banner rides the same shift so it pops up centred
-          // over the jar, not under the rail
-          IgnorePointer(
-            child: Transform.translate(
-              offset: Offset(overlayShift, 0),
-              child: TipBannerLayer(
-                  tips: widget.tips, tipSerial: widget.tipSerial),
-            ),
-          ),
-          // The bottom-left mini feed duplicates the QR rail's recent list, so
-          // it only shows when the rail is hidden (phone / narrow).
-          if (!wide)
+            // the native HUD floats above; IgnorePointer keeps orbit gestures
+            // flowing into the WebView. On wide stages it slides left with the
+            // jar (overlayShift) so the total/bar stay centred over it.
             IgnorePointer(
-              child: Align(
-                alignment: Alignment.bottomLeft,
+              child: Transform.translate(
+                offset: Offset(overlayShift, 0),
                 child: Padding(
-                  padding: EdgeInsets.only(left: 16, bottom: feedBottom),
-                  child: StageMiniFeed(snapshot: widget.snapshot),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: StageHud(
+                    snapshot: widget.snapshot,
+                    trophyPulse: _trophyPulse,
+                  ),
                 ),
               ),
             ),
-        ],
-      );
-    });
+            // the donation banner rides the same shift so it pops up centred
+            // over the jar, not under the rail
+            IgnorePointer(
+              child: Transform.translate(
+                offset: Offset(overlayShift, 0),
+                child: TipBannerLayer(
+                  tips: widget.tips,
+                  tipSerial: widget.tipSerial,
+                ),
+              ),
+            ),
+            // The bottom-left mini feed duplicates the QR rail's recent list, so
+            // it only shows when the rail is hidden (phone / narrow).
+            if (!wide)
+              IgnorePointer(
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: 16, bottom: feedBottom),
+                    child: StageMiniFeed(snapshot: widget.snapshot),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 }

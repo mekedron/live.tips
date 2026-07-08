@@ -3,6 +3,7 @@ import '../../core/external_link.dart';
 
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../widgets/lt_ui.dart';
 
 /// In-app version of docs/onboarding/create-restricted-key.md — the full
@@ -15,11 +16,16 @@ class KeyGuideScreen extends StatelessWidget {
     final c = context.lt;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create the key'),
-        actions: const [
+        title: Text(context.s.t('onboarding.key_guide.title')),
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Center(child: LtPill(label: '~2 min', soft: false)),
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: LtPill(
+                label: context.s.t('onboarding.key_guide.duration'),
+                soft: false,
+              ),
+            ),
           ),
         ],
       ),
@@ -30,8 +36,10 @@ class KeyGuideScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: c.accentSoft,
                   borderRadius: BorderRadius.circular(16),
@@ -42,8 +50,7 @@ class KeyGuideScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Shortcut: the pre-filled form selects everything '
-                        'for you — review and click “Create key”.',
+                        context.s.t('onboarding.key_guide.shortcut'),
                         style: TextStyle(
                           fontFamily: kFontBody,
                           fontSize: 13,
@@ -56,42 +63,42 @@ class KeyGuideScreen extends StatelessWidget {
                     FilledButton(
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         textStyle: outfitStyle(12, Colors.white),
                         minimumSize: Size.zero,
                       ),
                       onPressed: () => openExternal(kCreateKeyUrl),
-                      child: const Text('Open form'),
+                      child: Text(
+                        context.s.t('onboarding.key_guide.open_form'),
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
-              const _StepCard(
+              _StepCard(
                 number: 1,
-                title: 'Sign in to your Stripe dashboard',
-                body: 'On a laptop is easiest — dashboard.stripe.com, the '
-                    'account that should receive the tips.',
+                title: context.s.t('onboarding.key_guide.step1_title'),
+                body: context.s.t('onboarding.key_guide.step1_body'),
               ),
               const SizedBox(height: 12),
-              const _StepCard(
+              _StepCard(
                 number: 2,
-                title: 'Open API keys',
-                body: '“Developers” (bottom-left) → “API keys”, or '
-                    'dashboard.stripe.com/apikeys directly.',
+                title: context.s.t('onboarding.key_guide.step2_title'),
+                body: context.s.t('onboarding.key_guide.step2_body'),
               ),
               const SizedBox(height: 12),
-              const _StepCard(
+              _StepCard(
                 number: 3,
-                title: 'Create a restricted key',
-                body: '“Create restricted key” → “Providing this key to a '
-                    'third-party application” → name it live.tips → '
-                    '“Customize permissions”.',
+                title: context.s.t('onboarding.key_guide.step3_title'),
+                body: context.s.t('onboarding.key_guide.step3_body'),
               ),
               const SizedBox(height: 12),
               _StepCard(
                 number: 4,
-                title: 'Grant exactly these permissions',
+                title: context.s.t('onboarding.key_guide.step4_title'),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -127,7 +134,7 @@ class KeyGuideScreen extends StatelessWidget {
                       ),
                     const SizedBox(height: 6),
                     Text(
-                      'Everything else stays “None”.',
+                      context.s.t('onboarding.key_guide.everything_else_none'),
                       style: TextStyle(
                         fontFamily: kFontBody,
                         fontSize: 12,
@@ -138,28 +145,26 @@ class KeyGuideScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              const _StepCard(
+              _StepCard(
                 number: 5,
-                title: 'Create, reveal & copy',
-                body: 'Starts with rk_live_ (or rk_test_ in a sandbox). '
-                    'AirDrop or a password manager gets it to the tablet '
-                    'safely. Rehearse with test card 4242 4242 4242 4242.',
+                title: context.s.t('onboarding.key_guide.step5_title'),
+                body: context.s.t('onboarding.key_guide.step5_body'),
               ),
               const SizedBox(height: 12),
-              const _StepCard(
+              _StepCard(
                 number: 6,
-                title: 'Good to know',
-                body: 'The key lives in this device\'s secure keychain and '
-                    'is only ever sent to api.stripe.com. Revoke it any time '
-                    'in the dashboard — the app simply stops working until '
-                    'you connect a new one.',
+                title: context.s.t('onboarding.key_guide.step6_title'),
+                body: context.s.t('onboarding.key_guide.step6_body'),
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () => openExternal(kApiKeysDashboardUrl),
-                icon: Icon(Icons.open_in_new_rounded,
-                    size: 18, color: c.textSecondary),
-                label: const Text('Open dashboard.stripe.com/apikeys'),
+                icon: Icon(
+                  Icons.open_in_new_rounded,
+                  size: 18,
+                  color: c.textSecondary,
+                ),
+                label: Text(context.s.t('onboarding.key_guide.open_dashboard')),
               ),
             ],
           ),

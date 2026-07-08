@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
 import '../../domain/app_settings.dart';
+import '../../l10n/app_localizations.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
@@ -116,34 +117,38 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                         height: 64,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                            color: c.successContainer, shape: BoxShape.circle),
-                        child:
-                            Icon(Icons.check_rounded, size: 34, color: c.success),
+                          color: c.successContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.check_rounded,
+                          size: 34,
+                          color: c.success,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      _url == null ? 'You\'re all set' : 'Your tip QR is ready!',
+                      _url == null
+                          ? context.s.t('onboarding.done.title_no_method')
+                          : context.s.t('onboarding.done.title_ready'),
                       textAlign: TextAlign.center,
                       style: outfitStyle(26, c.text, weight: FontWeight.w800),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       _url == null
-                          ? 'You didn\'t add a payment method yet. Add one '
-                              'anytime from Settings, then share your QR.'
+                          ? context.s.t('onboarding.done.subtitle_no_method')
                           : _connectedPage
-                              ? 'One QR for every way you take tips. Print it, '
-                                  'tape it to your case, put it on the merch '
-                                  'table.'
-                              : 'Print it, tape it to your case, put it on the '
-                                  'merch table — anyone can tip you in seconds.',
+                          ? context.s.t('onboarding.done.subtitle_connected')
+                          : context.s.t('onboarding.done.subtitle_stripe'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 14,
-                          height: 1.5,
-                          color: c.textSecondary),
+                        fontFamily: kFontBody,
+                        fontSize: 14,
+                        height: 1.5,
+                        color: c.textSecondary,
+                      ),
                     ),
                     if (_relayFailed && _url != null) ...[
                       const SizedBox(height: 14),
@@ -152,17 +157,18 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                         decoration: BoxDecoration(
                           color: kGold.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: kGold.withValues(alpha: 0.4)),
+                          border: Border.all(
+                            color: kGold.withValues(alpha: 0.4),
+                          ),
                         ),
                         child: Text(
-                          'We couldn\'t reach the live.tips relay to build your '
-                          'all-methods page, so this is your Stripe QR for now. '
-                          'Open Settings later to finish your tip page.',
+                          context.s.t('onboarding.done.relay_failed'),
                           style: TextStyle(
-                              fontFamily: kFontBody,
-                              fontSize: 12.5,
-                              height: 1.4,
-                              color: c.text),
+                            fontFamily: kFontBody,
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: c.text,
+                          ),
                         ),
                       ),
                     ],
@@ -178,9 +184,10 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                               _url!.replaceFirst(RegExp('^https?://'), ''),
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 13,
-                                  color: c.textSecondary),
+                                fontFamily: 'monospace',
+                                fontSize: 13,
+                                color: c.textSecondary,
+                              ),
                             ),
                           ],
                         ),
@@ -192,26 +199,35 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                         children: [
                           LtIconCircleButton(
                             icon: Icons.open_in_new_rounded,
-                            tooltip: 'Open in new tab',
+                            tooltip: context.s.t(
+                              'onboarding.done.open_tooltip',
+                            ),
                             onTap: () => openTipLink(_url!),
                           ),
                           const SizedBox(width: 12),
                           LtIconCircleButton(
                             icon: Icons.content_copy_rounded,
-                            tooltip: 'Copy link',
+                            tooltip: context.s.t(
+                              'onboarding.done.copy_tooltip',
+                            ),
                             onTap: () => copyTipLink(context, _url!),
                           ),
                           const SizedBox(width: 12),
                           LtIconCircleButton(
                             icon: Icons.ios_share_rounded,
-                            tooltip: 'Share',
-                            onTap: () => SharePlus.instance
-                                .share(ShareParams(text: _url!)),
+                            tooltip: context.s.t(
+                              'onboarding.done.share_tooltip',
+                            ),
+                            onTap: () => SharePlus.instance.share(
+                              ShareParams(text: _url!),
+                            ),
                           ),
                           const SizedBox(width: 12),
                           LtIconCircleButton(
                             icon: Icons.print_rounded,
-                            tooltip: 'Poster',
+                            tooltip: context.s.t(
+                              'onboarding.done.poster_tooltip',
+                            ),
                             onTap: () => openPoster(context),
                           ),
                         ],
@@ -219,7 +235,9 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                     ],
                     const SizedBox(height: 28),
                     LtPrimaryButton(
-                      label: _url == null ? 'Go to Home' : 'Done',
+                      label: _url == null
+                          ? context.s.t('onboarding.done.go_home')
+                          : context.s.t('onboarding.done.done'),
                       onPressed: _finish,
                     ),
                   ],

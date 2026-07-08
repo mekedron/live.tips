@@ -6,8 +6,10 @@ import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
 import '../../domain/app_settings.dart';
 import '../../domain/tip_method.dart';
+import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
+import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../shell/app_shell.dart';
 import 'account_details_screen.dart';
@@ -33,29 +35,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       id.length <= 12 ? id : '${id.substring(0, 8)}…';
 
   Future<void> _confirmRemoveBand() async {
+    final s = context.s;
     final app = ref.read(appStateProvider);
     if (ref.read(appStateProvider.notifier).accountActionsBlocked) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Stop the live session before removing an account.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s.t('settings.main.stop_session_remove'))),
+      );
       return;
     }
     final hasOthers = app.accounts.length > 1;
-    final name = app.displayName.isEmpty ? 'this account' : app.displayName;
+    final name = app.displayName.isEmpty
+        ? s.t('settings.main.this_account_fallback')
+        : app.displayName;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Remove $name from this device?'),
+        title: Text(s.t('settings.main.remove_title', {'name': name})),
         content: Text(
-          '${app.hasStripe ? 'Removes the API key and this account\'s local '
-              'data. This action can\'t be undone.' : 'Removes this '
-              'account\'s live.tips page and local data from this device. '
-              'This action can\'t be undone.'}'
-          '${hasOthers ? ' Your other accounts stay.' : ''}',
+          '${app.hasStripe ? s.t('settings.main.remove_body_stripe') : s.t('settings.main.remove_body_relay')}'
+          '${hasOthers ? s.t('settings.main.remove_body_others_suffix') : ''}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(s.t('common.cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -63,7 +66,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
+            child: Text(s.t('common.remove')),
           ),
         ],
       ),
@@ -79,6 +82,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
+    final s = context.s;
     final app = ref.watch(appStateProvider);
     final settings = app.settings;
     final isRail = AppShellScope.of(context)?.isRail ?? false;
@@ -87,16 +91,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       // ------------------------------------------------ account details ---
       if (app.demo)
         LtRowGroup(
-          header: 'Account',
+          header: s.t('settings.main.demo_header'),
           children: [
-            const LtRow(
+            LtRow(
               icon: Icons.science_rounded,
-              title: 'Demo mode',
-              subtitle: 'No Stripe account connected',
+              title: s.t('settings.main.demo_mode'),
+              subtitle: s.t('settings.main.demo_no_stripe'),
             ),
             LtRow(
               icon: Icons.logout_rounded,
-              title: 'Exit demo',
+              title: s.t('settings.main.exit_demo'),
               chevron: true,
               onTap: () {
                 ref.read(appStateProvider.notifier).exitDemo();
@@ -107,29 +111,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         )
       else
         LtRowGroup(
-          header: 'Account details',
+          header: s.t('settings.main.account_details_header'),
           children: [
             LtRow(
               icon: Icons.badge_rounded,
-              title: app.displayName.isEmpty ? 'Your account' : app.displayName,
-              subtitle: 'Name, currency and thank-you message',
+              title: app.displayName.isEmpty
+                  ? s.t('settings.main.your_account_fallback')
+                  : app.displayName,
+              subtitle: s.t('settings.main.account_details_subtitle'),
               chevron: true,
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const AccountDetailsScreen()),
+                MaterialPageRoute(builder: (_) => const AccountDetailsScreen()),
               ),
             ),
             LtRow(
               icon: Icons.swap_horiz_rounded,
-              title: 'Switch account',
-              subtitle: 'Work with another account on this device',
+              title: s.t('settings.main.switch_account'),
+              subtitle: s.t('settings.main.switch_account_subtitle'),
               chevron: true,
               onTap: () => showBandSwitcherSheet(context, ref),
             ),
             LtRow(
               icon: Icons.delete_outline_rounded,
               iconColor: c.danger,
-              title: 'Remove this account from this device',
+              title: s.t('settings.main.remove_account_row'),
               titleColor: c.danger,
               chevron: true,
               onTap: _confirmRemoveBand,
@@ -139,19 +144,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       // ----------------------------------------------- payment methods ---
       if (!app.demo)
         LtRowGroup(
-          header: 'Payment methods',
+          header: s.t('settings.main.payment_methods_header'),
           children: [
             LtRow(
               leading: _MethodStatusDot(
-                  icon: Icons.credit_card_rounded, connected: app.hasStripe),
-              title: app.hasStripe ? 'Stripe' : 'Add Stripe',
+                icon: Icons.credit_card_rounded,
+                connected: app.hasStripe,
+              ),
+              title: app.hasStripe ? 'Stripe' : s.t('settings.main.add_stripe'),
               subtitle: app.hasStripe
-                  ? '${_maskedKey(app.apiKey)} — verified card tips'
-                  : 'Verified card tips',
+                  ? s.t('settings.main.stripe_connected_subtitle', {
+                      'key': _maskedKey(app.apiKey),
+                    })
+                  : s.t('settings.main.stripe_add_subtitle'),
               trailing: app.hasStripe
                   ? StatusPill(
-                      status:
-                          app.isTestMode ? LtKeyStatus.test : LtKeyStatus.live,
+                      status: app.isTestMode
+                          ? LtKeyStatus.test
+                          : LtKeyStatus.live,
                       compact: true,
                     )
                   : null,
@@ -162,32 +172,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             LtRow(
               leading: _MethodStatusDot(
-                  icon: TipMethod.revolut.icon,
-                  connected: app.relayJar?.hasRevolut ?? false),
+                icon: TipMethod.revolut.icon,
+                connected: app.relayJar?.hasRevolut ?? false,
+              ),
               title: 'Revolut',
               subtitle: (app.relayJar?.hasRevolut ?? false)
                   ? '@${app.relayJar!.revolutUsername}'
-                  : 'Not set',
+                  : s.t('settings.main.not_set'),
               chevron: true,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                    builder: (_) =>
-                        const RelayMethodScreen(method: TipMethod.revolut)),
+                  builder: (_) =>
+                      const RelayMethodScreen(method: TipMethod.revolut),
+                ),
               ),
             ),
             LtRow(
               leading: _MethodStatusDot(
-                  icon: TipMethod.mobilepay.icon,
-                  connected: app.relayJar?.hasMobilePay ?? false),
+                icon: TipMethod.mobilepay.icon,
+                connected: app.relayJar?.hasMobilePay ?? false,
+              ),
               title: 'MobilePay',
               subtitle: (app.relayJar?.hasMobilePay ?? false)
-                  ? 'Box ${_shortBoxId(app.relayJar!.mobilepayBoxId!)}'
-                  : 'Not set',
+                  ? s.t('settings.main.box', {
+                      'id': _shortBoxId(app.relayJar!.mobilepayBoxId!),
+                    })
+                  : s.t('settings.main.not_set'),
               chevron: true,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                    builder: (_) =>
-                        const RelayMethodScreen(method: TipMethod.mobilepay)),
+                  builder: (_) =>
+                      const RelayMethodScreen(method: TipMethod.mobilepay),
+                ),
               ),
             ),
           ],
@@ -198,7 +214,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const LtSectionLabel('Appearance'),
+            LtSectionLabel(s.t('settings.main.appearance')),
             const SizedBox(height: 10),
             LtSegmented<AppThemeMode>(
               values: AppThemeMode.values,
@@ -207,9 +223,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   .read(appStateProvider.notifier)
                   .updateSettings(settings.copyWith(themeMode: mode)),
               labelOf: (mode) => switch (mode) {
-                AppThemeMode.system => 'Auto',
-                AppThemeMode.light => 'Light',
-                AppThemeMode.dark => 'Dark',
+                AppThemeMode.system => s.t('settings.main.theme_auto'),
+                AppThemeMode.light => s.t('settings.main.theme_light'),
+                AppThemeMode.dark => s.t('settings.main.theme_dark'),
               },
               iconOf: (mode) => switch (mode) {
                 AppThemeMode.system => Icons.brightness_auto_rounded,
@@ -220,15 +236,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
+      // ------------------------------------------------------ language ---
+      LtRowGroup(
+        header: s.t('settings.language.header'),
+        children: [
+          LtRow(
+            icon: Icons.language_rounded,
+            title:
+                '${activeAppLocale(context).flag}  ${activeAppLocale(context).name}',
+            subtitle: s.t('settings.language.row_subtitle'),
+            chevron: true,
+            onTap: () => showLanguageSheet(context, ref),
+          ),
+        ],
+      ),
       // The tip jar (link / poster / recreate) and Stage look now live on the
       // Home screen and the stage-look sheet, so Settings no longer repeats them.
       // -------------------------------------------------- live session ---
       LtRowGroup(
-        header: 'Live session',
+        header: s.t('settings.main.live_session_header'),
         children: [
           LtRow(
             icon: Icons.speed_rounded,
-            title: 'Check for new tips every',
+            title: s.t('settings.main.poll_interval'),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -241,7 +271,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onTap: () => ref
                           .read(appStateProvider.notifier)
                           .updateSettings(
-                              settings.copyWith(pollIntervalSec: seconds)),
+                            settings.copyWith(pollIntervalSec: seconds),
+                          ),
                     ),
                   ),
               ],
@@ -255,28 +286,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Column(
           children: [
             Text(
-              'live.tips · open source — your keys, your money',
+              s.t('settings.main.footer_tagline'),
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontFamily: kFontBody, fontSize: 12, color: c.textMuted),
+                fontFamily: kFontBody,
+                fontSize: 12,
+                color: c.textMuted,
+              ),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 TextButton(
                   style: TextButton.styleFrom(
-                      textStyle: outfitStyle(12, c.accent)),
+                    textStyle: outfitStyle(12, c.accent),
+                  ),
                   onPressed: () => openExternal(kProjectUrl),
-                  child: const Text('Source code'),
+                  child: Text(s.t('settings.main.source_code')),
                 ),
                 TextButton(
                   style: TextButton.styleFrom(
-                      textStyle: outfitStyle(12, c.accent)),
+                    textStyle: outfitStyle(12, c.accent),
+                  ),
                   onPressed: () => showLicensePage(
                     context: context,
                     applicationName: 'live.tips',
                   ),
-                  child: const Text('Licenses'),
+                  child: Text(s.t('settings.main.licenses')),
                 ),
               ],
             ),
@@ -294,8 +330,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Settings',
-                    style: outfitStyle(32, c.text, weight: FontWeight.w800)),
+                Text(
+                  s.t('settings.main.title'),
+                  style: outfitStyle(32, c.text, weight: FontWeight.w800),
+                ),
                 const SizedBox(height: 24),
                 for (final section in sections) ...[
                   section,
@@ -318,8 +356,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               height: 56,
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Settings',
-                    style: outfitStyle(20, c.text, weight: FontWeight.w700)),
+                child: Text(
+                  s.t('settings.main.title'),
+                  style: outfitStyle(20, c.text, weight: FontWeight.w700),
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -355,8 +395,9 @@ class _MethodStatusDot extends StatelessWidget {
           decoration: BoxDecoration(
             color: connected ? c.success : Colors.transparent,
             shape: BoxShape.circle,
-            border:
-                connected ? null : Border.all(color: c.textFaint, width: 1.5),
+            border: connected
+                ? null
+                : Border.all(color: c.textFaint, width: 1.5),
           ),
         ),
         const SizedBox(width: 12),

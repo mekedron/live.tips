@@ -33,23 +33,32 @@ const _relayJar = RelayJar(
   createdAtMs: 1,
 );
 
-Future<void> _pumpSettings(WidgetTester tester, {required bool withStripe}) async {
+Future<void> _pumpSettings(
+  WidgetTester tester, {
+  required bool withStripe,
+}) async {
   // Tall surface so the whole settings list lays out without a scroll.
   await tester.binding.setSurfaceSize(const Size(600, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
-  final localStore = await seededStore(accountValues: {
-    if (withStripe) LocalStore.kTipJarBase: jsonEncode(_tipJar.toJson()),
-    LocalStore.kRelayJarBase: jsonEncode(_relayJar.toJson()),
-  });
+  final localStore = await seededStore(
+    accountValues: {
+      if (withStripe) LocalStore.kTipJarBase: jsonEncode(_tipJar.toJson()),
+      LocalStore.kRelayJarBase: jsonEncode(_relayJar.toJson()),
+    },
+  );
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         localStoreProvider.overrideWithValue(localStore),
         secureStoreProvider.overrideWithValue(SecureStore()),
-        initialApiKeyProvider
-            .overrideWithValue(withStripe ? 'rk_test_0123456789abcd' : null),
+        initialApiKeyProvider.overrideWithValue(
+          withStripe ? 'rk_test_0123456789abcd' : null,
+        ),
       ],
       child: MaterialApp(
+        localizationsDelegates: kTestL10nDelegates,
+        locale: const Locale('en'),
+
         theme: buildLightTheme(),
         home: const Scaffold(body: SettingsScreen()),
       ),
@@ -59,7 +68,9 @@ Future<void> _pumpSettings(WidgetTester tester, {required bool withStripe}) asyn
 }
 
 void main() {
-  testWidgets('Account details replaces the old account/key section', (tester) async {
+  testWidgets('Account details replaces the old account/key section', (
+    tester,
+  ) async {
     await _pumpSettings(tester, withStripe: true);
 
     // The new top section (LtSectionLabel upper-cases its header) and its rows.
@@ -86,8 +97,9 @@ void main() {
     expect(find.text('Save changes'), findsOneWidget);
   });
 
-  testWidgets('Stripe row opens the key editor; Revolut opens its own page',
-      (tester) async {
+  testWidgets('Stripe row opens the key editor; Revolut opens its own page', (
+    tester,
+  ) async {
     await _pumpSettings(tester, withStripe: true);
 
     // Stripe is now a tappable full page with a paste button and a disconnect.
@@ -111,17 +123,19 @@ void main() {
     expect(find.text('foxy'), findsOneWidget);
   });
 
-  testWidgets('with no Stripe, the row invites connecting and skips onboarding',
-      (tester) async {
-    await _pumpSettings(tester, withStripe: false);
+  testWidgets(
+    'with no Stripe, the row invites connecting and skips onboarding',
+    (tester) async {
+      await _pumpSettings(tester, withStripe: false);
 
-    // The row reads "Add Stripe" and opens the minimal key editor — not the
-    // full onboarding jar-setup form (no name / currency / thank-you here).
-    await tester.tap(find.text('Add Stripe'));
-    await tester.pumpAndSettle();
-    expect(find.text('Verify & connect'), findsOneWidget);
-    expect(find.text('Paste your key'), findsOneWidget);
-    expect(find.text('Thank-you message'), findsNothing);
-    expect(find.text('Currency'), findsNothing);
-  });
+      // The row reads "Add Stripe" and opens the minimal key editor — not the
+      // full onboarding jar-setup form (no name / currency / thank-you here).
+      await tester.tap(find.text('Add Stripe'));
+      await tester.pumpAndSettle();
+      expect(find.text('Verify & connect'), findsOneWidget);
+      expect(find.text('Paste your key'), findsOneWidget);
+      expect(find.text('Thank-you message'), findsNothing);
+      expect(find.text('Currency'), findsNothing);
+    },
+  );
 }
