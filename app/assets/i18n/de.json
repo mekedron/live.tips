@@ -13,7 +13,7 @@
   "enum.paper_size.a4": "A4 · 210 × 297 mm",
   "enum.paper_size.a5": "A5 · 148 × 210 mm",
   "enum.paper_size.a6": "A6 · 105 × 148 mm",
-  "enum.paper_size.letter": "US Letter · 8.5 × 11 in",
+  "enum.paper_size.letter": "US Letter · 8,5 × 11 in",
   "enum.perm_why.checkout_sessions": "Eingehende Spenden sehen — Verlauf und Details.",
   "enum.perm_why.events": "Live-Feed: während einer Session nach neuen Spenden abfragen.",
   "enum.perm_why.payment_links": "Deinen Spenden-Link erstellen und verwalten.",

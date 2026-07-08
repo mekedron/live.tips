@@ -13,7 +13,7 @@
   "enum.paper_size.a4": "A4 · 210 × 297 мм",
   "enum.paper_size.a5": "A5 · 148 × 210 мм",
   "enum.paper_size.a6": "A6 · 105 × 148 мм",
-  "enum.paper_size.letter": "US Letter · 8.5 × 11 дюйм",
+  "enum.paper_size.letter": "US Letter · 8,5 × 11 дюйм",
   "enum.perm_why.checkout_sessions": "Видеть входящие донаты — историю и детали.",
   "enum.perm_why.events": "Живая лента: опрос новых донатов во время сессии.",
   "enum.perm_why.payment_links": "Создавать ссылку для чаевых и управлять ею.",

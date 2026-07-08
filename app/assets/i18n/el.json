@@ -13,7 +13,7 @@
   "enum.paper_size.a4": "A4 · 210 × 297 mm",
   "enum.paper_size.a5": "A5 · 148 × 210 mm",
   "enum.paper_size.a6": "A6 · 105 × 148 mm",
-  "enum.paper_size.letter": "US Letter · 8.5 × 11 in",
+  "enum.paper_size.letter": "US Letter · 8,5 × 11 in",
   "enum.perm_why.checkout_sessions": "Δες τις εισερχόμενες δωρεές — ιστορικό και λεπτομέρειες.",
   "enum.perm_why.events": "Ζωντανή ροή: έλεγχος για νέες δωρεές κατά τη διάρκεια μιας συνεδρίας.",
   "enum.perm_why.payment_links": "Δημιουργία και διαχείριση του συνδέσμου δωρεών σου.",
