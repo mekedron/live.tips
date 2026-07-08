@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
@@ -8,6 +9,7 @@ import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
+import '../poster/poster_screen.dart';
 
 /// The last onboarding step: register the connected-mode tip page from every
 /// method the artist entered, then show the one QR they'll actually use.
@@ -182,6 +184,37 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                             ),
                           ],
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      // The same open / copy / share / poster row as Home.
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          LtIconCircleButton(
+                            icon: Icons.open_in_new_rounded,
+                            tooltip: 'Open in new tab',
+                            onTap: () => openTipLink(_url!),
+                          ),
+                          const SizedBox(width: 12),
+                          LtIconCircleButton(
+                            icon: Icons.content_copy_rounded,
+                            tooltip: 'Copy link',
+                            onTap: () => copyTipLink(context, _url!),
+                          ),
+                          const SizedBox(width: 12),
+                          LtIconCircleButton(
+                            icon: Icons.ios_share_rounded,
+                            tooltip: 'Share',
+                            onTap: () => SharePlus.instance
+                                .share(ShareParams(text: _url!)),
+                          ),
+                          const SizedBox(width: 12),
+                          LtIconCircleButton(
+                            icon: Icons.print_rounded,
+                            tooltip: 'Poster',
+                            onTap: () => openPoster(context),
+                          ),
+                        ],
                       ),
                     ],
                     const SizedBox(height: 28),

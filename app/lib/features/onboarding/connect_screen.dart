@@ -284,6 +284,8 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                           fontFamily: 'monospace', fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'rk_live_…',
+                        errorText: _error,
+                        errorMaxLines: 4,
                         suffixIcon: IconButton(
                           tooltip: 'Paste',
                           icon: Icon(Icons.content_paste_rounded,
@@ -319,36 +321,26 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                         ),
                       ),
                     ],
-                    if (_error != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 13,
-                          height: 1.45,
-                          color: c.danger,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    LtPrimaryButton(
-                      label: 'Verify & connect',
-                      busy: _busy,
-                      onPressed: _verifyAndConnect,
-                    ),
-                    const SizedBox(height: 6),
-                    // Easy out if Stripe was a mis-tap on the method picker.
-                    TextButton(
-                      onPressed: _busy
-                          ? null
-                          : () => pushOnboardingStep(context, ref,
-                              after: TipMethod.stripe),
-                      child: Text('Skip — set up later',
-                          style: outfitStyle(14, c.textSecondary)),
-                    ),
                   ],
                 ),
+              ),
+              // Buttons live below the card — matching the Revolut / MobilePay
+              // steps — so the layout reads the same across every method.
+              const SizedBox(height: 20),
+              LtPrimaryButton(
+                label: 'Verify & connect',
+                busy: _busy,
+                onPressed: _verifyAndConnect,
+              ),
+              const SizedBox(height: 6),
+              // Easy out if Stripe was a mis-tap on the method picker.
+              TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => pushOnboardingStep(context, ref,
+                        after: TipMethod.stripe),
+                child: Text('Skip — set up later',
+                    style: outfitStyle(14, c.textSecondary)),
               ),
               if (_checks != null) ...[
                 const SizedBox(height: 14),

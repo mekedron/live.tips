@@ -168,6 +168,7 @@ class _OnboardingMethodScreenState
                             onChanged: (_) {
                               if (_error != null) setState(() => _error = null);
                             },
+                            onSubmitted: (_) => _save(),
                           )
                         : TextField(
                             controller: _controller,
@@ -184,6 +185,7 @@ class _OnboardingMethodScreenState
                             onChanged: (_) {
                               if (_error != null) setState(() => _error = null);
                             },
+                            onSubmitted: (_) => _save(),
                           ),
                     const SizedBox(height: 8),
                     Text(
