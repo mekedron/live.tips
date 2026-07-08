@@ -544,5 +544,9 @@
   "widgets.qr_card.link_copied": "Lien copié",
   "widgets.qr_card.scan_to_tip": "Scannez pour laisser un pourboire",
   "widgets.test_mode_banner.banner": "{label} — les paiements sont simulés",
-  "widgets.test_mode_banner.test_mode": "MODE TEST"
+  "widgets.test_mode_banner.test_mode": "MODE TEST",
+  "home.reprint.title": "Le lien de votre page de pourboires a changé",
+  "home.reprint.body": "Votre ancien lien ne fonctionne plus, nous en avons donc créé un nouveau. Les QR codes imprimés pointent encore vers l'ancien lien — merci de les réimprimer.",
+  "home.reprint.show_qr": "Afficher le nouveau QR",
+  "home.reprint.dismiss": "Fermer"
 }

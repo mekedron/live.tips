@@ -544,5 +544,9 @@
   "widgets.qr_card.link_copied": "Link gekopieerd",
   "widgets.qr_card.scan_to_tip": "Scan om te fooien",
   "widgets.test_mode_banner.banner": "{label} — betalingen worden gesimuleerd",
-  "widgets.test_mode_banner.test_mode": "TESTMODUS"
+  "widgets.test_mode_banner.test_mode": "TESTMODUS",
+  "home.reprint.title": "De link naar je fooienpagina is gewijzigd",
+  "home.reprint.body": "Je oude link werkte niet meer, dus hebben we een nieuwe gemaakt. Gedrukte QR-codes verwijzen nog naar de oude link — print ze opnieuw.",
+  "home.reprint.show_qr": "Nieuwe QR-code tonen",
+  "home.reprint.dismiss": "Sluiten"
 }

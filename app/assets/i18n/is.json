@@ -544,5 +544,9 @@
   "widgets.qr_card.link_copied": "Hlekkur afritaður",
   "widgets.qr_card.scan_to_tip": "Skannaðu til að gefa þjórfé",
   "widgets.test_mode_banner.banner": "{label} — greiðslur eru hermdar",
-  "widgets.test_mode_banner.test_mode": "PRUFUHAMUR"
+  "widgets.test_mode_banner.test_mode": "PRUFUHAMUR",
+  "home.reprint.title": "Hlekkurinn á þjórfésíðuna þína breyttist",
+  "home.reprint.body": "Gamli hlekkurinn þinn hætti að virka, svo við bjuggum til nýjan. Prentaðir QR-kóðar vísa enn á gamla hlekkinn — vinsamlegast prentaðu þá aftur.",
+  "home.reprint.show_qr": "Sýna nýjan QR-kóða",
+  "home.reprint.dismiss": "Loka"
 }

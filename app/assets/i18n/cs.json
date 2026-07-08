@@ -544,5 +544,9 @@
   "widgets.qr_card.link_copied": "Odkaz zkopírován",
   "widgets.qr_card.scan_to_tip": "Naskenuj a přihoď",
   "widgets.test_mode_banner.banner": "{label} — platby jsou simulované",
-  "widgets.test_mode_banner.test_mode": "TESTOVACÍ REŽIM"
+  "widgets.test_mode_banner.test_mode": "TESTOVACÍ REŽIM",
+  "home.reprint.title": "Odkaz na tvou spropitné stránku se změnil",
+  "home.reprint.body": "Tvůj starý odkaz přestal fungovat, tak jsme vytvořili nový. Vytištěné QR kódy stále vedou na starý odkaz — vytiskni je prosím znovu.",
+  "home.reprint.show_qr": "Zobrazit nový QR kód",
+  "home.reprint.dismiss": "Zavřít"
 }

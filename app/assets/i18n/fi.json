@@ -544,5 +544,9 @@
   "widgets.qr_card.link_copied": "Linkki kopioitu",
   "widgets.qr_card.scan_to_tip": "Skannaa ja tippaa",
   "widgets.test_mode_banner.banner": "{label} — maksut simuloidaan",
-  "widgets.test_mode_banner.test_mode": "TESTITILA"
+  "widgets.test_mode_banner.test_mode": "TESTITILA",
+  "home.reprint.title": "Tippisivusi linkki muuttui",
+  "home.reprint.body": "Vanha tippisivun linkkisi lakkasi toimimasta, joten teimme uuden. Tulostetut QR-koodit osoittavat yhä vanhaan linkkiin — tulosta ne uudelleen.",
+  "home.reprint.show_qr": "Näytä uusi QR-koodi",
+  "home.reprint.dismiss": "Sulje"
 }

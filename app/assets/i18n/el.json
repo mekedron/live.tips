@@ -544,5 +544,9 @@
   "widgets.qr_card.link_copied": "Ο σύνδεσμος αντιγράφηκε",
   "widgets.qr_card.scan_to_tip": "Σκάναρε για φιλοδώρημα",
   "widgets.test_mode_banner.banner": "{label} — οι πληρωμές είναι προσομοιωμένες",
-  "widgets.test_mode_banner.test_mode": "ΔΟΚΙΜΑΣΤΙΚΗ ΛΕΙΤΟΥΡΓΙΑ"
+  "widgets.test_mode_banner.test_mode": "ΔΟΚΙΜΑΣΤΙΚΗ ΛΕΙΤΟΥΡΓΙΑ",
+  "home.reprint.title": "Ο σύνδεσμος της σελίδας φιλοδωρημάτων σου άλλαξε",
+  "home.reprint.body": "Ο παλιός σου σύνδεσμος σταμάτησε να λειτουργεί, οπότε φτιάξαμε έναν νέο. Οι τυπωμένοι κωδικοί QR δείχνουν ακόμα στον παλιό σύνδεσμο — τύπωσέ τους ξανά.",
+  "home.reprint.show_qr": "Εμφάνιση νέου QR",
+  "home.reprint.dismiss": "Κλείσιμο"
 }

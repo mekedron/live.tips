@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:characters/characters.dart';
 import 'package:http/http.dart' as http;
 
 import '../../domain/relay_jar.dart';
@@ -54,6 +55,27 @@ class RelayClient {
 
   final http.Client _http;
 
+  /// The relay enforces these caps (worker `validate.ts`); mirror them here so
+  /// a long Stripe display name can never 422 an otherwise-valid update — it's
+  /// clamped rather than rejected, since the relay artist name is cosmetic.
+  static const _maxArtistName = 50;
+  static const _maxMessage = 200;
+
+  static String _clampName(String s) {
+    final chars = s.characters;
+    return chars.length <= _maxArtistName
+        ? s
+        : chars.take(_maxArtistName).toString();
+  }
+
+  static String? _clampMessage(String? s) {
+    if (s == null) return null;
+    final chars = s.characters;
+    return chars.length <= _maxMessage
+        ? s
+        : chars.take(_maxMessage).toString();
+  }
+
   /// Registers a new jar. The returned secret is the only credential for
   /// this jar — persist it in the secure store, never alongside the jar.
   Future<({RelayJar jar, String secret})> createJar({
@@ -64,6 +86,8 @@ class RelayClient {
     String? revolutUsername,
     String? mobilepayBoxId,
   }) async {
+    artistName = _clampName(artistName);
+    message = _clampMessage(message);
     final json = await _send(
       'POST',
       '/v1/jars',
@@ -103,6 +127,8 @@ class RelayClient {
     String? message,
     String? stripeUrl,
   }) async {
+    artistName = _clampName(artistName);
+    message = _clampMessage(message);
     await _send(
       'PUT',
       '/v1/jars/${jar.jarId}',

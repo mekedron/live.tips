@@ -544,5 +544,9 @@
   "widgets.qr_card.link_copied": "Bağlantı kopyalandı",
   "widgets.qr_card.scan_to_tip": "Bahşiş için okut",
   "widgets.test_mode_banner.banner": "{label} — ödemeler simüle edilir",
-  "widgets.test_mode_banner.test_mode": "TEST MODU"
+  "widgets.test_mode_banner.test_mode": "TEST MODU",
+  "home.reprint.title": "Bahşiş sayfanızın bağlantısı değişti",
+  "home.reprint.body": "Eski bağlantınız çalışmayı durdurdu, bu yüzden yeni bir tane oluşturduk. Basılı QR kodları hâlâ eski bağlantıya yönlendiriyor — lütfen onları yeniden yazdırın.",
+  "home.reprint.show_qr": "Yeni QR kodunu göster",
+  "home.reprint.dismiss": "Kapat"
 }

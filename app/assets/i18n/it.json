@@ -544,5 +544,9 @@
   "widgets.qr_card.link_copied": "Link copiato",
   "widgets.qr_card.scan_to_tip": "Scansiona per lasciare una mancia",
   "widgets.test_mode_banner.banner": "{label} — i pagamenti sono simulati",
-  "widgets.test_mode_banner.test_mode": "MODALITÀ TEST"
+  "widgets.test_mode_banner.test_mode": "MODALITÀ TEST",
+  "home.reprint.title": "Il link della tua pagina delle mance è cambiato",
+  "home.reprint.body": "Il tuo vecchio link ha smesso di funzionare, così ne abbiamo creato uno nuovo. I codici QR stampati puntano ancora al vecchio link — ristampali.",
+  "home.reprint.show_qr": "Mostra il nuovo QR",
+  "home.reprint.dismiss": "Chiudi"
 }

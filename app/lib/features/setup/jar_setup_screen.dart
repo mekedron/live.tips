@@ -55,6 +55,10 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
       _currency = app.tipJar!.currency;
       _thanksController.text = app.tipJar!.thankYouMessage;
       _appliedThanksDefault = true;
+    } else if (app.relayJar != null) {
+      // Adding Stripe to a band that already has a relay jar: match its
+      // currency so the two never diverge (e.g. relay in EUR, Stripe in USD).
+      _currency = app.relayJar!.currency;
     }
   }
 

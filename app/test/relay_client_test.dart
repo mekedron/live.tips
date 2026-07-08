@@ -61,6 +61,27 @@ void main() {
     expect(result.secret, 's3cret');
   });
 
+  test('artistName is clamped to the relay limit (50 code points) so a long '
+      'Stripe display name never 422s', () async {
+    late http.Request seen;
+    final client = RelayClient(
+      client: MockClient((request) async {
+        seen = request;
+        return _json({
+          'jarId': 'j',
+          'secret': 's',
+          'donateUrl': 'https://live.tips/t/j',
+        }, 201);
+      }),
+    );
+
+    final longName = 'A' * 80;
+    await client.createJar(artistName: longName, currency: 'eur',
+        revolutUsername: 'x');
+    final body = jsonDecode(seen.body) as Map<String, dynamic>;
+    expect((body['artistName'] as String).length, 50);
+  });
+
   test('authenticated calls carry the Bearer secret', () async {
     final requests = <http.Request>[];
     final client = RelayClient(
