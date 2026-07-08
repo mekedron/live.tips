@@ -105,7 +105,7 @@ void main() {
     // Stripe is now a tappable full page with a paste button and a disconnect.
     await tester.tap(find.text('Stripe'));
     await tester.pumpAndSettle();
-    expect(find.text('Verify & replace'), findsOneWidget);
+    expect(find.text('Verify & update'), findsOneWidget);
     expect(find.byTooltip('Paste'), findsOneWidget);
     expect(find.text('Disconnect Stripe'), findsOneWidget);
 

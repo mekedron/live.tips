@@ -11,6 +11,9 @@ import '../../data/stripe/stripe_requests.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
+import '../../widgets/qr_card.dart';
+import '../onboarding/key_guide_screen.dart';
+import '../shell/app_shell.dart' show kRailBreakpoint;
 
 /// Connects or replaces the Stripe restricted key for the active band, from
 /// Settings. It's deliberately minimal: the name, currency and thank-you
@@ -70,6 +73,37 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
         _checks = null;
       });
     }
+  }
+
+  /// Mobile "?" affordance: the same permission table as the desktop card,
+  /// surfaced on demand so it doesn't push the paste field down.
+  void _showKeyPermissions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final c = context.lt;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
+              children: [
+                Text(
+                  context.s.t('settings.stripe_key.key_permissions_title'),
+                  style: outfitStyle(18, c.text, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                const _KeyPermissionsList(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _save() async {
@@ -263,6 +297,9 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
     final connected = app.hasStripe;
     final key = _keyController.text.trim();
     final isTest = key.startsWith('rk_test_') || key.startsWith('sk_test_');
+    // On phones the permissions live behind a "?" so the paste field isn't
+    // buried below the fold; wide layouts keep the full card visible.
+    final wide = MediaQuery.sizeOf(context).width >= kRailBreakpoint;
 
     return Scaffold(
       appBar: AppBar(title: Text(context.s.t('settings.stripe_key.title'))),
@@ -333,38 +370,107 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-              ] else ...[
-                LtCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          context.s.t('settings.stripe_key.need_key'),
-                          style: TextStyle(
-                            fontFamily: kFontBody,
-                            fontSize: 13,
-                            height: 1.4,
-                            color: c.textSecondary,
+              ],
+              LtCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      context.s.t('settings.stripe_key.create_key_heading'),
+                      style: outfitStyle(16, c.text, weight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      context.s.t('settings.stripe_key.create_key_subtitle'),
+                      style: TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 13,
+                        height: 1.5,
+                        color: c.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _NumberedLine(1, context.s.t('settings.stripe_key.step1')),
+                    const SizedBox(height: 10),
+                    _NumberedLine(2, context.s.t('settings.stripe_key.step2')),
+                    const SizedBox(height: 10),
+                    _NumberedLine(3, context.s.t('settings.stripe_key.step3')),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: () => openExternal(kCreateKeyUrl),
+                            icon: const Icon(
+                              Icons.open_in_new_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              context.s.t('settings.stripe_key.open_form'),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      FilledButton.tonalIcon(
-                        onPressed: () => openExternal(kCreateKeyUrl),
-                        icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                        label: Text(
-                          context.s.t('settings.stripe_key.open_button'),
+                        // Phones drop the permissions card; this reveals the
+                        // same table on demand right at the call to action.
+                        if (!wide) ...[
+                          const SizedBox(width: 8),
+                          LtIconCircleButton(
+                            icon: Icons.help_outline_rounded,
+                            tooltip: context.s.t(
+                              'settings.stripe_key.key_permissions_title',
+                            ),
+                            size: 48,
+                            onTap: () => _showKeyPermissions(context),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 6,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const KeyGuideScreen(),
+                            ),
+                          ),
+                          child: Text(
+                            context.s.t('settings.stripe_key.guide_button'),
+                          ),
                         ),
+                        TextButton(
+                          onPressed: () =>
+                              showFullscreenQr(context, kCreateKeyUrl),
+                          child: Text(
+                            context.s.t('settings.stripe_key.qr_button'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (wide) ...[
+                const SizedBox(height: 14),
+                LtCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.s.t(
+                          'settings.stripe_key.key_permissions_title',
+                        ),
+                        style: outfitStyle(16, c.text, weight: FontWeight.w700),
                       ),
+                      const SizedBox(height: 4),
+                      const _KeyPermissionsList(),
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
               ],
+              const SizedBox(height: 14),
               LtCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -441,16 +547,19 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 14),
-                    LtPrimaryButton(
-                      label: connected
-                          ? context.s.t('settings.stripe_key.verify_replace')
-                          : context.s.t('settings.stripe_key.verify_connect'),
-                      busy: _busy && !_removing,
-                      onPressed: _busy ? null : _save,
-                    ),
                   ],
                 ),
+              ),
+              // Button lives below the card — matching the Revolut / MobilePay
+              // editors and the onboarding connect step — so the layout reads
+              // the same across every method.
+              const SizedBox(height: 20),
+              LtPrimaryButton(
+                label: connected
+                    ? context.s.t('settings.stripe_key.verify_update')
+                    : context.s.t('settings.stripe_key.verify_connect'),
+                busy: _busy && !_removing,
+                onPressed: _busy ? null : _save,
               ),
               if (connected) ...[
                 const SizedBox(height: 12),
@@ -480,6 +589,125 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NumberedLine extends StatelessWidget {
+  const _NumberedLine(this.number, this.text);
+
+  final int number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Row(
+      children: [
+        LtStepNumber(number, size: 24),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: kFontBody,
+              fontSize: 14,
+              color: c.text,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The permission table plus the "everything else is None" caveat — shared
+/// by the desktop card and the mobile "?" bottom sheet.
+class _KeyPermissionsList extends StatelessWidget {
+  const _KeyPermissionsList();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < kRequiredPermissions.length; i++) ...[
+          if (i > 0) Divider(height: 1, color: c.divider),
+          _PermissionRow(permission: kRequiredPermissions[i]),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          context.s.t('settings.stripe_key.permissions_caveat'),
+          style: TextStyle(
+            fontFamily: kFontBody,
+            fontSize: 12,
+            height: 1.5,
+            color: c.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PermissionRow extends StatelessWidget {
+  const _PermissionRow({required this.permission});
+
+  final RequiredPermission permission;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    final write = permission.access == 'Write';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  permission.resource,
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: c.text,
+                  ),
+                ),
+                Text(
+                  context.s.t('enum.perm_why.${permission.slug}'),
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 12,
+                    height: 1.35,
+                    color: c.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: write ? c.accentSoft : c.chip,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              permission.access,
+              style: TextStyle(
+                fontFamily: kFontBody,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: write ? c.onAccentSoft : c.textSecondary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

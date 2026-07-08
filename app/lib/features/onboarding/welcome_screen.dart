@@ -116,6 +116,7 @@ class WelcomeScreen extends ConsumerWidget {
                             title: context.s.t('welcome.feature_jar_title'),
                             body: context.s.t('welcome.feature_jar_body'),
                           ),
+                          const SizedBox(height: 12),
                           const Spacer(flex: 5),
                           LtPrimaryButton(
                             label: context.s.t('welcome.get_started'),

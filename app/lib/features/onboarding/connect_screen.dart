@@ -242,8 +242,9 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 6,
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(context).push(
@@ -255,7 +256,6 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                             context.s.t('onboarding.connect.guide_button'),
                           ),
                         ),
-                        const SizedBox(width: 6),
                         TextButton(
                           onPressed: () =>
                               showFullscreenQr(context, kCreateKeyUrl),
