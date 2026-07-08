@@ -164,6 +164,9 @@ def build(out_dir, base):
 
         subs.update({
             "html_lang": code,
+            # Carry the page's language into the app so it opens in the same
+            # language the visitor is reading the landing page in.
+            "app_href": "/app/?lang=%s" % code,
             "canonical_url": canon,
             "og_url": canon,
             "og_locale": loc["og_locale"],
