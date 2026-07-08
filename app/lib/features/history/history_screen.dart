@@ -310,65 +310,54 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 17,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _DonationsTable(
-                          // Next to the tip-page table, name the source.
-                          title: showRelay ? 'Stripe' : 'Donations',
-                          demo: app.demo,
-                          relayOnly: !app.demo && !app.hasStripe,
-                          donations: _donations,
-                          loading: _loading,
-                          hasMore: _hasMore,
-                          error: _error,
-                          onLoadMore: _loadMore,
-                        ),
-                        if (showRelay) ...[
-                          const SizedBox(height: 24),
-                          _RelayTable(donations: relayHistory),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 24),
-                  Expanded(
-                    flex: 10,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(left: 2, bottom: 12),
-                          child: Text('Sessions',
-                              style: outfitStyle(17, c.text,
-                                  weight: FontWeight.w700)),
-                        ),
-                        if (sessions.isEmpty)
-                          Text(
-                            'No sessions yet — hit “Go live” before the '
-                            'first song!',
-                            style: TextStyle(
-                                fontFamily: kFontBody,
-                                fontSize: 13.5,
-                                color: c.textSecondary),
-                          )
-                        else
-                          for (final s in sessions) ...[
-                            _SessionCard(
-                                session: s,
-                                onTap: () => _showSessionDetail(context, s)),
-                            const SizedBox(height: 12),
-                          ],
-                      ],
-                    ),
-                  ),
-                ],
+              LtSegmented<_HistoryTab>(
+                values: showRelay
+                    ? _HistoryTab.values
+                    : const [_HistoryTab.donations, _HistoryTab.sessions],
+                selected: _tab,
+                onChanged: (t) => setState(() => _tab = t),
+                labelOf: (t) => switch (t) {
+                  // 'Stripe' only makes sense next to 'Tip page' — alone it
+                  // stays 'Donations', so Stripe-only users see no churn.
+                  _HistoryTab.donations => showRelay ? 'Stripe' : 'Donations',
+                  _HistoryTab.relay => 'Tip page',
+                  _HistoryTab.sessions => 'Sessions',
+                },
               ),
+              const SizedBox(height: 24),
+              if (_tab == _HistoryTab.donations)
+                _DonationsTable(
+                  title: showRelay ? 'Stripe' : 'Donations',
+                  demo: app.demo,
+                  relayOnly: !app.demo && !app.hasStripe,
+                  donations: _donations,
+                  loading: _loading,
+                  hasMore: _hasMore,
+                  error: _error,
+                  onLoadMore: _loadMore,
+                )
+              else if (_tab == _HistoryTab.relay)
+                _RelayTable(donations: relayHistory)
+              else if (sessions.isEmpty)
+                Text(
+                  'No sessions yet — hit “Go live” before the first song!',
+                  style: TextStyle(
+                      fontFamily: kFontBody,
+                      fontSize: 13.5,
+                      color: c.textSecondary),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final s in sessions) ...[
+                      _SessionCard(
+                          session: s,
+                          onTap: () => _showSessionDetail(context, s)),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
             ],
           ),
         ),
