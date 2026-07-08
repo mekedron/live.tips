@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme.dart';
 import '../domain/band_account.dart';
-import '../features/onboarding/method_select_screen.dart';
+import '../features/onboarding/onboarding_details_screen.dart';
 import '../state/live_session_controller.dart';
 import '../state/providers.dart';
 import 'lt_ui.dart';
@@ -154,11 +154,11 @@ class _BandSwitcherSheet extends ConsumerWidget {
     final account = await ref.read(appStateProvider.notifier).addAccount();
     if (account == null) return;
     if (context.mounted) Navigator.of(context).pop();
-    // The new empty band is active now; the method-select step starts its
+    // The new empty band is active now; the details step starts its
     // onboarding, and RootGate (welcome, behind this route) is the fallback
     // if the user backs out.
     rootNavigator.push(
-      MaterialPageRoute(builder: (_) => const MethodSelectScreen()),
+      MaterialPageRoute(builder: (_) => const OnboardingDetailsScreen()),
     );
   }
 

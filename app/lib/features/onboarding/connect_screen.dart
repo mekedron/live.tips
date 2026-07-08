@@ -7,12 +7,14 @@ import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../data/stripe/stripe_requests.dart';
+import '../../domain/tip_method.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
 import '../shell/app_shell.dart' show kRailBreakpoint;
 import 'key_guide_screen.dart';
+import 'onboarding_flow.dart';
 
 /// Bring-your-own-key onboarding: the artist creates a *restricted* key in
 /// their own dashboard, pastes it here, and we verify every permission
@@ -71,10 +73,24 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
       if (!mounted) return;
       setState(() => _checks = result);
       if (result.allOk) {
+        // Build the tip link right here — reusing the details from step 1 —
+        // and move on. No jar-setup page, no QR: onboarding just advances to
+        // the next method (or the final QR screen).
+        final draft = ref.read(onboardingDraftProvider);
+        final app = ref.read(appStateProvider);
+        final jar = await StripeRequests(client).createTipJar(
+          currency: draft?.currency ?? app.currency,
+          displayName: (draft?.name.trim().isNotEmpty ?? false)
+              ? draft!.name.trim()
+              : (app.displayName.isEmpty ? 'My tips' : app.displayName),
+          thankYouMessage: (draft?.thankYouMessage.trim().isNotEmpty ?? false)
+              ? draft!.thankYouMessage.trim()
+              : 'Thank you! 💛',
+        );
         await ref.read(appStateProvider.notifier).connect(key);
+        await ref.read(appStateProvider.notifier).setTipJar(jar);
         if (!mounted) return;
-        // RootGate now routes to tip jar setup.
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        pushOnboardingStep(context, ref, after: TipMethod.stripe);
       } else {
         setState(() {
           _error = 'Some permissions are missing. Edit the key in Stripe, '
@@ -140,11 +156,11 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
     // On phones the permissions live behind a "?" so the paste field isn't
     // buried below the fold; wide layouts keep the full card visible.
     final wide = MediaQuery.sizeOf(context).width >= kRailBreakpoint;
-    // Step numbering follows the onboarding draft; standalone (Settings)
-    // opens keep the classic two-step count.
+    // Step numbering follows the onboarding draft (Stripe is a per-method
+    // step); standalone opens fall back to a sensible count.
     final draft = ref.watch(onboardingDraftProvider);
-    final step = draft?.stepOf(OnboardingDraft.stepConnect) ?? 1;
-    final total = draft?.totalSteps ?? 2;
+    final step = draft?.stepOfMethod(TipMethod.stripe) ?? 3;
+    final total = draft?.totalSteps ?? 3;
 
     return Scaffold(
       appBar: AppBar(
@@ -320,6 +336,16 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
                       label: 'Verify & connect',
                       busy: _busy,
                       onPressed: _verifyAndConnect,
+                    ),
+                    const SizedBox(height: 6),
+                    // Easy out if Stripe was a mis-tap on the method picker.
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () => pushOnboardingStep(context, ref,
+                              after: TipMethod.stripe),
+                      child: Text('Skip — set up later',
+                          style: outfitStyle(14, c.textSecondary)),
                     ),
                   ],
                 ),

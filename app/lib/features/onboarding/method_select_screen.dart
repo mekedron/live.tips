@@ -5,12 +5,13 @@ import '../../core/theme.dart';
 import '../../domain/tip_method.dart';
 import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
-import 'connect_screen.dart';
-import 'relay_setup_screen.dart';
+import 'onboarding_flow.dart';
 
-/// First onboarding step: pick how tips reach you. Nothing is preselected;
+/// Second onboarding step: pick how tips reach you. Nothing is preselected;
 /// Stripe is recommended, and Revolut/MobilePay ride through the live.tips
-/// relay and come with an honest warning about what "unverified" means.
+/// relay and come with an honest warning about what "unverified" means. The
+/// band's name/currency/message were captured on the previous step and are
+/// preserved here.
 class MethodSelectScreen extends ConsumerStatefulWidget {
   const MethodSelectScreen({super.key});
 
@@ -30,13 +31,11 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
 
   void _continue() {
     if (_selected.isEmpty) return;
-    ref
-        .read(onboardingDraftProvider.notifier)
-        .set(OnboardingDraft(methods: Set.unmodifiable({..._selected})));
-    final Widget next = _selected.contains(TipMethod.stripe)
-        ? const ConnectScreen()
-        : const RelaySetupScreen();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => next));
+    // Keep the details captured on the previous step; only set the methods.
+    ref.read(onboardingDraftProvider.notifier).update(
+          (d) => d.copyWith(methods: Set.unmodifiable({..._selected})),
+        );
+    pushOnboardingStep(context, ref);
   }
 
   @override
@@ -44,9 +43,9 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
     final c = context.lt;
     final nonStripe = _selected.contains(TipMethod.revolut) ||
         _selected.contains(TipMethod.mobilepay);
-    // The pill previews the flow length for the current selection.
-    final draftPreview = OnboardingDraft(methods: _selected);
-    final total = _selected.isEmpty ? 3 : draftPreview.totalSteps;
+    // The pill previews the flow length for the current selection: details +
+    // this step + one per chosen method.
+    final total = 2 + (_selected.isEmpty ? 1 : _selected.length);
 
     return Scaffold(
       appBar: AppBar(
@@ -54,7 +53,7 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Center(child: LtPill(label: 'Step 1 of $total')),
+            child: Center(child: LtPill(label: 'Step 2 of $total')),
           ),
         ],
       ),
@@ -64,7 +63,7 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
-              LtProgressSegments(total: total, filled: 1),
+              LtProgressSegments(total: total, filled: 2),
               const SizedBox(height: 16),
               Text('How do you want to get tipped?',
                   style: outfitStyle(22, c.text, weight: FontWeight.w800)),

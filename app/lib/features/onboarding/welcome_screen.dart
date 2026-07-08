@@ -7,7 +7,7 @@ import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import 'install_hint_screen.dart';
-import 'method_select_screen.dart';
+import 'onboarding_details_screen.dart';
 
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
@@ -113,12 +113,12 @@ class WelcomeScreen extends ConsumerWidget {
                             trailingIcon: Icons.arrow_forward_rounded,
                             // Phones and tablets in a browser get the one-time
                             // "Add to Home Screen" nudge first; desktop and the
-                            // installed PWA go straight to picking methods.
+                            // installed PWA go straight to the details step.
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => shouldSuggestInstall
                                     ? const InstallHintScreen()
-                                    : const MethodSelectScreen(),
+                                    : const OnboardingDetailsScreen(),
                               ),
                             ),
                           ),

@@ -12,8 +12,6 @@ import '../../data/relay/relay_client.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../domain/relay_jar.dart';
 import '../../domain/tip_jar.dart';
-import '../onboarding/relay_setup_screen.dart';
-import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
@@ -131,19 +129,8 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
       navigator.pop();
       return;
     }
-    // Fresh onboarding: RootGate swaps to the shell by itself. When the
-    // draft also wants Revolut/MobilePay, the relay step rides on top —
-    // in edit mode when this band already has a relay jar, so a stale
-    // draft can never create a duplicate jar and orphan the old one.
-    final draft = ref.read(onboardingDraftProvider);
-    if (draft != null && draft.wantsRelay) {
-      final hasRelay = app.relayJar != null;
-      navigator.push(
-        MaterialPageRoute(builder: (_) => RelaySetupScreen(edit: hasRelay)),
-      );
-    } else {
-      ref.read(onboardingDraftProvider.notifier).clear();
-    }
+    // Fresh (RootGate's hasStripe-but-no-jar fallback): setTipJar swaps
+    // RootGate to the shell on its own — nothing more to push.
   }
 
   /// Backs out of Stripe setup: only the just-connected key goes away —
@@ -170,7 +157,6 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
       ),
     );
     if (confirmed != true) return;
-    ref.read(onboardingDraftProvider.notifier).clear();
     await ref.read(appStateProvider.notifier).cancelStripeSetup();
   }
 
@@ -197,11 +183,6 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Step numbering follows the onboarding draft; recreates and pre-draft
-    // installs keep the classic two-step count.
-    final draft = ref.watch(onboardingDraftProvider);
-    final step = draft?.stepOf(OnboardingDraft.stepJarSetup) ?? 2;
-    final total = draft?.totalSteps ?? 2;
     return Scaffold(
       appBar: _created != null
           ? null
@@ -223,14 +204,12 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
                       padding: EdgeInsets.only(right: 4),
                       child: Center(child: BandChip()),
                     ),
-                  TextButton(
-                    onPressed: _cancelSetup,
-                    child: const Text('Cancel'),
-                  ),
                   Padding(
-                    padding: const EdgeInsets.only(right: 16, left: 4),
-                    child: Center(
-                        child: LtPill(label: 'Step $step of $total')),
+                    padding: const EdgeInsets.only(right: 8),
+                    child: TextButton(
+                      onPressed: _cancelSetup,
+                      child: const Text('Cancel'),
+                    ),
                   ),
                 ],
               ],
@@ -246,16 +225,9 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
 
   Widget _buildForm() {
     final c = context.lt;
-    final draft = ref.watch(onboardingDraftProvider);
-    final step = draft?.stepOf(OnboardingDraft.stepJarSetup) ?? 2;
-    final total = draft?.totalSteps ?? 2;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
       children: [
-        if (!widget.recreate) ...[
-          LtProgressSegments(total: total, filled: step),
-          const SizedBox(height: 16),
-        ],
         if (widget.recreate) ...[
           Container(
             padding: const EdgeInsets.all(12),
@@ -498,13 +470,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
         ),
         const SizedBox(height: 32),
         LtPrimaryButton(
-          // With relay methods still to set up, this leads to the tip page
-          // step rather than the shell — the label must not overpromise.
-          label: widget.recreate
-              ? 'Done'
-              : (ref.watch(onboardingDraftProvider)?.wantsRelay ?? false)
-                  ? 'Continue — set up your tip page'
-                  : 'Go to Home',
+          label: widget.recreate ? 'Done' : 'Go to Home',
           onPressed: _finish,
         ),
       ],
