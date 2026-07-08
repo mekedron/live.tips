@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
-import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
@@ -242,7 +241,6 @@ class _SideRail extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
-    final app = ref.watch(appStateProvider);
 
     return Container(
       width: 240,
@@ -304,47 +302,6 @@ class _SideRail extends ConsumerWidget {
                 ),
               ),
             ),
-          const Spacer(),
-          _RailKeyChip(app: app),
-        ],
-      ),
-    );
-  }
-}
-
-class _RailKeyChip extends StatelessWidget {
-  const _RailKeyChip({required this.app});
-
-  final AppState app;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.lt;
-    final (bg, dot, fg, label) = app.demo
-        ? (c.chip, c.textMuted, c.textSecondary, 'Demo — simulated tips')
-        : !app.hasStripe && app.hasRelay
-            ? (c.chip, c.textMuted, c.textSecondary,
-                'live.tips page — no Stripe')
-            : app.isTestMode
-                ? (c.accentSoft, c.accent, c.onAccentSoft,
-                    'Test key — simulated')
-                : (c.successContainer, c.success, c.onSuccessContainer,
-                    'Live key connected');
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(label, style: outfitStyle(13, fg))),
         ],
       ),
     );
