@@ -3,8 +3,8 @@
 /// Stripe supports far more — this keeps the dropdown manageable. Add more
 /// freely; everything else in the app handles any ISO code.
 const List<String> kSupportedCurrencies = [
-  'usd',
   'eur',
+  'usd',
   'gbp',
   'cad',
   'aud',
@@ -30,8 +30,8 @@ const List<String> kSupportedCurrencies = [
 /// Human names for the picker ("USD — US Dollar"). Any code missing here
 /// still works — it just shows as the bare uppercase code.
 const Map<String, String> kCurrencyNames = {
-  'usd': 'US Dollar',
   'eur': 'Euro',
+  'usd': 'US Dollar',
   'gbp': 'British Pound',
   'cad': 'Canadian Dollar',
   'aud': 'Australian Dollar',

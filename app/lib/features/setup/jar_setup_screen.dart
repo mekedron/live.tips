@@ -38,7 +38,7 @@ class JarSetupScreen extends ConsumerStatefulWidget {
 class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
   final _nameController = TextEditingController();
   final _thanksController = TextEditingController();
-  String _currency = 'usd';
+  String _currency = 'eur';
   bool _busy = false;
   String? _error;
   TipJar? _created;
