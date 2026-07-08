@@ -62,7 +62,7 @@
   "step3_h3": "Patrz, jak słoik zapełnia się na żywo",
   "step3_p": "Twój tablet na scenie pokazuje każdy napiwek w czasie rzeczywistym na tle dzisiejszego celu — słoik 3D, wiadomości, konfetti. Zmieniaj cel w trakcie występu; zablokuj ekran, gdy tablet stoi na widoku.",
   "alt_pay_h3": "Przyjmuje też Revolut i MobilePay",
-  "alt_pay_p": "Opcjonalnie, obok Stripe: włącz je, a Twój kod QR otworzy małą stronę napiwków ze wszystkimi metodami płatności, które akceptujesz. Napiwki przez Revolut i MobilePay pojawiają się na ekranie sceny od razu, podczas gdy fan płaci w swojej aplikacji — oznaczone jako niezweryfikowane, bo te aplikacje nie potrafią potwierdzić płatności.",
+  "alt_pay_p": "Opcjonalnie, obok Stripe: włącz je, a ten sam kod QR nadal otwiera tylko jedną stronę napiwków ze wszystkimi metodami płatności, które akceptujesz — żadnego osobnego kodu dla każdej aplikacji. Napiwki przez Revolut i MobilePay pojawiają się na ekranie sceny od razu, podczas gdy fan płaci w swojej aplikacji — oznaczone jako niezweryfikowane, bo te aplikacje nie potrafią potwierdzić płatności.",
   "sec_kicker": "Bezpieczeństwo",
   "sec_h2": "Twoje klucze, Twoje pieniądze",
   "sec_lede": "Ze Stripe między Twoimi fanami a Twoim kontem bankowym nie stoi żaden serwer live.tips — aplikacja rozmawia z api.stripe.com i z niczym więcej. Opcjonalne napiwki przez Revolut i MobilePay przechodzą przez maleńki open-source'owy przekaźnik, który nie przechowuje żadnych danych płatności.",

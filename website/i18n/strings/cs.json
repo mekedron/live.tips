@@ -62,7 +62,7 @@
   "step3_h3": "Sleduj, jak se kasička plní naživo",
   "step3_p": "Tvůj tablet na pódiu ukazuje každé spropitné v reálném čase vůči dnešnímu cíli — 3D kasička, vzkazy, konfety. Cíl uprav i uprostřed vystoupení; obrazovku zamkni, když stojí vepředu.",
   "alt_pay_h3": "Bere i Revolut a MobilePay",
-  "alt_pay_p": "Volitelně vedle Stripe: zapni je a tvůj QR otevře malou stránku pro spropitné se všemi platebními metodami, které přijímáš. Spropitné přes Revolut a MobilePay se na obrazovce na pódiu objeví okamžitě, zatímco fanoušek platí ve své aplikaci — označené jako neověřené, protože tyto aplikace neumí platbu potvrdit.",
+  "alt_pay_p": "Volitelně vedle Stripe: zapni je a stejný QR kód dál otevře jen jednu stránku pro spropitné se všemi platebními metodami, které přijímáš — žádný zvláštní kód pro každou appku. Spropitné přes Revolut a MobilePay se na obrazovce na pódiu objeví okamžitě, zatímco fanoušek platí ve své aplikaci — označené jako neověřené, protože tyto aplikace neumí platbu potvrdit.",
   "sec_kicker": "Bezpečnost",
   "sec_h2": "Tvoje klíče, tvoje peníze",
   "sec_lede": "Se Stripe nestojí mezi vašimi fanoušky a vaším bankovním účtem žádný server live.tips — aplikace komunikuje s api.stripe.com a s ničím jiným. Volitelné spropitné přes Revolut a MobilePay prochází drobným open-source relé, které neukládá žádná platební data.",

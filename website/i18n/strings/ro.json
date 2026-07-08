@@ -62,7 +62,7 @@
   "step3_h3": "Vezi cum se umple borcanul, live",
   "step3_p": "Tableta ta de pe scenă îți arată fiecare bacșiș în timp real, raportat la obiectivul serii — borcan 3D, mesaje, confetti. Modifici obiectivul din mers; blochezi ecranul cât timp stă în față.",
   "alt_pay_h3": "Acceptă și Revolut și MobilePay",
-  "alt_pay_p": "Opționale, pe lângă Stripe: activează-le și codul tău QR deschide o mică pagină de bacșișuri cu toate metodele de plată pe care le accepți. Bacșișurile prin Revolut și MobilePay apar instant pe ecranul de pe scenă, în timp ce fanul plătește în aplicația lui — marcate ca neverificate, pentru că acele aplicații nu pot confirma plata.",
+  "alt_pay_p": "Opționale, pe lângă Stripe: activează-le și același cod QR deschide în continuare o singură pagină de bacșișuri cu toate metodele de plată pe care le accepți — fără un cod separat pentru fiecare aplicație. Bacșișurile prin Revolut și MobilePay apar instant pe ecranul de pe scenă, în timp ce fanul plătește în aplicația lui — marcate ca neverificate, pentru că acele aplicații nu pot confirma plata.",
   "sec_kicker": "Securitate",
   "sec_h2": "Cheile tale, banii tăi",
   "sec_lede": "Cu Stripe nu există niciun server live.tips între fanii tăi și contul tău bancar — aplicația comunică cu api.stripe.com și cu nimic altceva. Bacșișurile opționale prin Revolut și MobilePay trec printr-un mic releu open-source care nu stochează niciun fel de date de plată.",

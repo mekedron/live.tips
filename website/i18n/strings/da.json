@@ -62,7 +62,7 @@
   "step3_h3": "Se krukken fyldes live",
   "step3_p": "Din tablet på scenen viser hver skilling i realtid op mod aftenens mål — 3D-krukke, hilsner, konfetti. Rediger målet midt i sættet; lås skærmen, mens den står fremme.",
   "alt_pay_h3": "Tager også imod Revolut og MobilePay",
-  "alt_pay_p": "Valgfrit ved siden af Stripe: slå dem til, og din QR åbner en lille drikkepengeside med alle de betalingsmetoder, du tager imod. Drikkepenge via Revolut og MobilePay dukker op på sceneskærmen med det samme, mens fanen betaler i sin app — markeret som uverificerede, fordi de apps ikke kan bekræfte betalingen.",
+  "alt_pay_p": "Valgfrit ved siden af Stripe: slå dem til, og den samme QR-kode åbner stadig kun én drikkepengeside med alle de betalingsmetoder, du tager imod — ingen separat kode per app. Drikkepenge via Revolut og MobilePay dukker op på sceneskærmen med det samme, mens fanen betaler i sin app — markeret som uverificerede, fordi de apps ikke kan bekræfte betalingen.",
   "sec_kicker": "Sikkerhed",
   "sec_h2": "Dine nøgler, dine penge",
   "sec_lede": "Med Stripe står der ingen live.tips-server mellem dine fans og din bankkonto — appen taler med api.stripe.com og ikke med andet. Valgfrie drikkepenge via Revolut og MobilePay går gennem et lille open source-relæ, der ikke gemmer nogen betalingsdata.",

@@ -62,7 +62,7 @@
   "step3_h3": "Regardez le pot se remplir en direct",
   "step3_p": "Votre tablette sur scène affiche chaque pourboire en temps réel par rapport à l’objectif du soir — pot en 3D, messages, confettis. Modifiez l’objectif en plein set ; verrouillez l’écran pendant qu’il trône devant le public.",
   "alt_pay_h3": "Accepte aussi Revolut & MobilePay",
-  "alt_pay_p": "En option, à côté de Stripe : activez-les et votre QR ouvre une petite page de pourboires avec tous les moyens de paiement que vous acceptez. Les pourboires Revolut et MobilePay s’affichent instantanément sur l’écran de scène pendant que le fan paie dans son appli — marqués comme non vérifiés, car ces applis ne peuvent pas confirmer le paiement.",
+  "alt_pay_p": "En option, à côté de Stripe : activez-les et le même QR continue d’ouvrir une seule page de pourboires avec tous les moyens de paiement que vous acceptez — pas de code séparé par appli. Les pourboires Revolut et MobilePay s’affichent instantanément sur l’écran de scène pendant que le fan paie dans son appli — marqués comme non vérifiés, car ces applis ne peuvent pas confirmer le paiement.",
   "sec_kicker": "Sécurité",
   "sec_h2": "Vos clés, votre argent",
   "sec_lede": "Avec Stripe, aucun serveur live.tips ne s'interpose entre vos fans et votre compte bancaire — l'appli ne parle qu'à api.stripe.com, et à rien d'autre. Les pourboires optionnels via Revolut et MobilePay passent par un minuscule relais open source qui ne conserve aucune donnée de paiement.",

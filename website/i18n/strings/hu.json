@@ -62,7 +62,7 @@
   "step3_h3": "Nézd, ahogy élőben telik a persely",
   "step3_p": "A színpadon lévő tableted valós időben mutatja minden borravalót a ma esti célhoz mérve — 3D persely, üzenetek, konfetti. A célt fellépés közben is módosíthatod, a képernyőt pedig lezárhatod, amíg elöl van.",
   "alt_pay_h3": "Revolutot és MobilePayt is elfogad",
-  "alt_pay_p": "Opcionális kiegészítők a Stripe mellett: kapcsold be őket, és a QR-kódod egy kis borravalóoldalt nyit meg az összes általad elfogadott fizetési móddal. A Revolut- és MobilePay-borravalók azonnal megjelennek a színpadi képernyőn, míg a rajongó a saját alkalmazásában fizet — ellenőrizetlenként jelölve, mert ezek az alkalmazások nem tudják megerősíteni a fizetést.",
+  "alt_pay_p": "Opcionális kiegészítők a Stripe mellett: kapcsold be őket, és ugyanaz a QR-kód továbbra is csak egyetlen borravalóoldalt nyit meg az összes általad elfogadott fizetési móddal — nincs külön kód minden alkalmazáshoz. A Revolut- és MobilePay-borravalók azonnal megjelennek a színpadi képernyőn, míg a rajongó a saját alkalmazásában fizet — ellenőrizetlenként jelölve, mert ezek az alkalmazások nem tudják megerősíteni a fizetést.",
   "sec_kicker": "Biztonság",
   "sec_h2": "A te kulcsaid, a te pénzed",
   "sec_lede": "A Stripe esetében nincs live.tips-szerver a rajongóid és a bankszámlád között — az alkalmazás az api.stripe.com címmel kommunikál, és semmi mással. A Revolut és MobilePay útján érkező opcionális borravalók egy apró, nyílt forráskódú továbbítón mennek át, amely semmilyen fizetési adatot nem tárol.",

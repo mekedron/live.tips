@@ -62,7 +62,7 @@
   "step3_h3": "Zie de pot live vollopen",
   "step3_p": "Je tablet op het podium toont elke fooi in realtime, afgezet tegen het doel van vanavond — 3D-pot, berichten, confetti. Pas het doel aan tijdens je set; vergrendel het scherm terwijl het vooraan staat.",
   "alt_pay_h3": "Neemt ook Revolut & MobilePay aan",
-  "alt_pay_p": "Optioneel, naast Stripe: zet ze aan en je QR opent een kleine fooienpagina met alle betaalmethoden die je accepteert. Fooien via Revolut en MobilePay verschijnen meteen op je podiumscherm terwijl de fan in de app betaalt — gemarkeerd als niet-geverifieerd, omdat die apps de betaling niet kunnen bevestigen.",
+  "alt_pay_p": "Optioneel, naast Stripe: zet ze aan en dezelfde QR opent nog steeds maar één fooienpagina met alle betaalmethoden die je accepteert — geen aparte code per app. Fooien via Revolut en MobilePay verschijnen meteen op je podiumscherm terwijl de fan in de app betaalt — gemarkeerd als niet-geverifieerd, omdat die apps de betaling niet kunnen bevestigen.",
   "sec_kicker": "Beveiliging",
   "sec_h2": "Jouw sleutels, jouw geld",
   "sec_lede": "Met Stripe staat er geen live.tips-server tussen je fans en je bankrekening — de app praat met api.stripe.com en met niets anders. Optionele fooien via Revolut en MobilePay lopen via een piepklein open-source-relay dat geen betaalgegevens opslaat.",

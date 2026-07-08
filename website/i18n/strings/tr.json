@@ -62,7 +62,7 @@
   "step3_h3": "Kavanozun doluşunu canlı izle",
   "step3_p": "Sahnedeki tabletin, her bahşişi bu geceki hedefe göre anlık gösterir — 3D kavanoz, mesajlar, konfeti. Performans sürerken hedefi düzenle; tablet önde dururken ekranı kilitle.",
   "alt_pay_h3": "Revolut'u ve MobilePay'i de kabul eder",
-  "alt_pay_p": "İsteğe bağlı, Stripe'ın yanında: bunları açarsan QR kodun, kabul ettiğin tüm ödeme yöntemlerini sunan küçük bir bahşiş sayfasına götürür. Revolut ve MobilePay bahşişleri sahne ekranında anında görünür, hayran ise ödemeyi kendi uygulamasında tamamlar — bu uygulamalar ödemenin gerçekleştiğini doğrulayamadığı için bahşişler doğrulanmamış olarak işaretlenir.",
+  "alt_pay_p": "İsteğe bağlı, Stripe'ın yanında: bunları açarsan aynı QR kodu, kabul ettiğin tüm ödeme yöntemlerini sunan tek bir bahşiş sayfasını açmaya devam eder — her uygulama için ayrı bir kod gerekmez. Revolut ve MobilePay bahşişleri sahne ekranında anında görünür, hayran ise ödemeyi kendi uygulamasında tamamlar — bu uygulamalar ödemenin gerçekleştiğini doğrulayamadığı için bahşişler doğrulanmamış olarak işaretlenir.",
   "sec_kicker": "Güvenlik",
   "sec_h2": "Senin anahtarların, senin paran",
   "sec_lede": "Stripe ile hayranlarınızla banka hesabınız arasında hiçbir live.tips sunucusu yoktur — uygulama yalnızca api.stripe.com ile konuşur, başka hiçbir şeyle değil. İsteğe bağlı Revolut ve MobilePay bahşişleri, hiçbir ödeme verisi saklamayan minicik bir açık kaynak aktarıcıdan geçer.",

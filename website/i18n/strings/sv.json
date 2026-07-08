@@ -62,7 +62,7 @@
   "step3_h3": "Se burken fyllas live",
   "step3_p": "Din surfplatta på scenen visar varje dricks i realtid mot kvällens mål — 3D-burk, hälsningar, konfetti. Ändra målet mitt i spelningen och lås skärmen medan plattan står framme.",
   "alt_pay_h3": "Tar även emot Revolut och MobilePay",
-  "alt_pay_p": "Valfritt vid sidan av Stripe: slå på dem, så öppnar din QR-kod en liten drickssida med alla betalsätt du tar emot. Dricks via Revolut och MobilePay dyker upp på scenskärmen direkt, medan fansen betalar i sin app — märkt som overifierad, eftersom de apparna inte kan bekräfta betalningen.",
+  "alt_pay_p": "Valfritt vid sidan av Stripe: slå på dem, så öppnar samma QR-kod fortfarande bara en drickssida med alla betalsätt du tar emot — ingen separat kod per app. Dricks via Revolut och MobilePay dyker upp på scenskärmen direkt, medan fansen betalar i sin app — märkt som overifierad, eftersom de apparna inte kan bekräfta betalningen.",
   "sec_kicker": "Säkerhet",
   "sec_h2": "Dina nycklar, dina pengar",
   "sec_lede": "Med Stripe finns ingen live.tips-server mellan dina fans och ditt bankkonto — appen pratar med api.stripe.com och inget annat. Valfria dricksar via Revolut och MobilePay går genom ett pyttelitet relä med öppen källkod som inte sparar några betalningsuppgifter.",

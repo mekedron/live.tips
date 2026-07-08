@@ -62,7 +62,7 @@
   "step3_h3": "Katso purkin täyttyvän livenä",
   "step3_p": "Lavalla oleva tablettisi näyttää jokaisen tipin reaaliajassa illan tavoitetta vasten — 3D-purkki, viestit, konfetti. Muokkaa tavoitetta kesken keikan; lukitse näyttö, kun laite on esillä.",
   "alt_pay_h3": "Ottaa vastaan myös Revolutin ja MobilePayn",
-  "alt_pay_p": "Valinnainen lisä Stripen rinnalle: kytke ne päälle, niin QR-koodisi avaa pienen tippisivun, jossa on kaikki hyväksymäsi maksutavat. Revolut- ja MobilePay-tipit näkyvät lavan näytöllä heti, kun taas itse maksu tapahtuu fanin omassa sovelluksessa — ne merkitään vahvistamattomiksi, koska nämä sovellukset eivät kerro, menikö maksu perille.",
+  "alt_pay_p": "Valinnainen lisä Stripen rinnalle: kytke ne päälle, niin sama QR-koodi avaa yhä vain yhden tippisivun, jossa on kaikki hyväksymäsi maksutavat — ei erillistä koodia jokaiselle sovellukselle. Revolut- ja MobilePay-tipit näkyvät lavan näytöllä heti, kun taas itse maksu tapahtuu fanin omassa sovelluksessa — ne merkitään vahvistamattomiksi, koska nämä sovellukset eivät kerro, menikö maksu perille.",
   "sec_kicker": "Tietoturva",
   "sec_h2": "Omat avaimet, omat rahat",
   "sec_lede": "Stripen kanssa fanien ja pankkitilisi välissä ei ole yhtään live.tips-palvelinta — sovellus puhuu vain api.stripe.comin kanssa. Valinnaiset Revolut- ja MobilePay-tipit kulkevat pienen avoimen lähdekoodin välittimen kautta, joka ei tallenna mitään maksutietoja.",
