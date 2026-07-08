@@ -108,13 +108,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-String _greeting() {
-  final hour = DateTime.now().hour;
-  if (hour < 12) return 'Good morning,';
-  if (hour < 18) return 'Good afternoon,';
-  return 'Good evening,';
-}
-
 LtKeyStatus _keyStatus(AppState app) => app.demo
     ? LtKeyStatus.demo
     : !app.hasStripe && app.hasRelay
@@ -168,11 +161,6 @@ class _MobileHome extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 children: [
-                  Text(_greeting(),
-                      style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 14,
-                          color: c.textSecondary)),
                   const BandNameButton(
                     fontSize: 24,
                     weight: FontWeight.w700,
@@ -212,12 +200,10 @@ class _DesktopHome extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.lt;
     final url = app.activeQrUrl;
     final sessions =
         ref.read(localStoreProvider).readSessionHistory(app.accountId);
     final last = sessions.isEmpty ? null : sessions.last;
-    final dateLine = DateFormat('EEEE, MMMM d').format(DateTime.now());
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(40, 36, 40, 36),
@@ -227,35 +213,9 @@ class _DesktopHome extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_greeting(),
-                          style: TextStyle(
-                              fontFamily: kFontBody,
-                              fontSize: 15,
-                              color: c.textSecondary)),
-                      const BandNameButton(
-                        fontSize: 32,
-                        weight: FontWeight.w800,
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Text(
-                    last == null
-                        ? dateLine
-                        : '$dateLine · Last session: '
-                            '${formatAmount(last.totalMinor, last.currency)}',
-                    style: TextStyle(
-                        fontFamily: kFontBody,
-                        fontSize: 13,
-                        color: c.textMuted),
-                  ),
-                ],
+              const BandNameButton(
+                fontSize: 32,
+                weight: FontWeight.w800,
               ),
               const SizedBox(height: 28),
               Row(

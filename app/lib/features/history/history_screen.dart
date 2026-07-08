@@ -210,11 +210,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             children: [
               SizedBox(
                 height: 56,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('History',
-                      style:
-                          outfitStyle(20, c.text, weight: FontWeight.w700)),
+                child: Row(
+                  children: [
+                    Text('History',
+                        style:
+                            outfitStyle(20, c.text, weight: FontWeight.w700)),
+                    const Spacer(),
+                    if (_tab == _HistoryTab.donations && stripeAllUrl != null)
+                      _ViewInStripeButton(stripeAllUrl),
+                  ],
                 ),
               ),
               const SizedBox(height: 4),
@@ -249,11 +253,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 14),
               if (_tab == _HistoryTab.donations) ...[
-                if (stripeAllUrl != null)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _ViewInStripeButton(stripeAllUrl),
-                  ),
                 ..._donationGroups(),
               ] else if (_tab == _HistoryTab.relay)
                 ..._relayGroups(relayHistory)
