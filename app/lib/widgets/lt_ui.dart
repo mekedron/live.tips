@@ -68,13 +68,13 @@ class StatusPill extends StatelessWidget {
     final c = context.lt;
     final (bg, fg, label) = switch (status) {
       LtKeyStatus.live => (c.successContainer, c.onSuccessContainer, 'Live key'),
-      LtKeyStatus.test => (c.accentSoft, c.onAccentSoft, 'Test key'),
+      LtKeyStatus.test => (c.warningContainer, c.onWarningContainer, 'Test key'),
       LtKeyStatus.demo => (c.chip, c.textSecondary, 'Demo'),
       LtKeyStatus.relay => (c.chip, c.textSecondary, 'No Stripe'),
     };
     final dot = switch (status) {
       LtKeyStatus.live => c.success,
-      LtKeyStatus.test => c.accent,
+      LtKeyStatus.test => c.warning,
       LtKeyStatus.demo => c.textMuted,
       LtKeyStatus.relay => kGold,
     };

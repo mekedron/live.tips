@@ -36,6 +36,9 @@ class LtColors extends ThemeExtension<LtColors> {
     required this.success,
     required this.successContainer,
     required this.onSuccessContainer,
+    required this.warning,
+    required this.warningContainer,
+    required this.onWarningContainer,
     required this.danger,
   });
 
@@ -55,6 +58,9 @@ class LtColors extends ThemeExtension<LtColors> {
   final Color success;
   final Color successContainer;
   final Color onSuccessContainer;
+  final Color warning;
+  final Color warningContainer;
+  final Color onWarningContainer;
   final Color danger;
 
   static const light = LtColors(
@@ -74,6 +80,9 @@ class LtColors extends ThemeExtension<LtColors> {
     success: Color(0xFF1E9E62),
     successContainer: Color(0xFFDFF3E7),
     onSuccessContainer: Color(0xFF136A41),
+    warning: Color(0xFFD97706),
+    warningContainer: Color(0xFFFBEBD0),
+    onWarningContainer: Color(0xFF8A5200),
     danger: Color(0xFFC43C2A),
   );
 
@@ -94,6 +103,9 @@ class LtColors extends ThemeExtension<LtColors> {
     success: Color(0xFF4FCB8D),
     successContainer: Color(0xFF173226),
     onSuccessContainer: Color(0xFF4FCB8D),
+    warning: Color(0xFFF5B45A),
+    warningContainer: Color(0xFF3A2C14),
+    onWarningContainer: Color(0xFFF5B45A),
     danger: Color(0xFFFF6B5E),
   );
 
@@ -121,6 +133,9 @@ class LtColors extends ThemeExtension<LtColors> {
       success: mix(success, other.success),
       successContainer: mix(successContainer, other.successContainer),
       onSuccessContainer: mix(onSuccessContainer, other.onSuccessContainer),
+      warning: mix(warning, other.warning),
+      warningContainer: mix(warningContainer, other.warningContainer),
+      onWarningContainer: mix(onWarningContainer, other.onWarningContainer),
       danger: mix(danger, other.danger),
     );
   }

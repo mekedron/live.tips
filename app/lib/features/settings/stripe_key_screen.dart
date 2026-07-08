@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/external_link.dart';
+import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
 import '../../data/stripe/stripe_client.dart';
@@ -9,12 +11,14 @@ import '../../data/stripe/stripe_requests.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 
-/// Manages the Stripe restricted key for the active band. Pasting a new key
-/// verifies it, then rebuilds the tip jar (Product + Price + Payment Link) in
-/// that account — so a moved-account or rotated key always ends up with a
-/// working link. The old link is retired and the connected-mode tip page is
-/// re-pointed at the new Stripe URL. Full-page with a back arrow, mirroring
-/// the Revolut / MobilePay editors.
+/// Connects or replaces the Stripe restricted key for the active band, from
+/// Settings. It's deliberately minimal: the name, currency and thank-you
+/// message already live in Account details, so this screen only takes the
+/// key. Saving verifies it and builds the tip jar (Product + Price + Payment
+/// Link) in that account — reusing the band's details — so a first connect, a
+/// rotated key, or a moved account all end with a working link. No QR here:
+/// the artist lands back on Settings with a green "connected" dot. Full-page
+/// with a back arrow, mirroring the Revolut / MobilePay editors.
 class StripeKeyScreen extends ConsumerStatefulWidget {
   const StripeKeyScreen({super.key});
 
@@ -27,6 +31,8 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
   bool _busy = false;
   String? _error;
   KeyCheckResult? _checks;
+
+  static const _defaultThanks = 'Thank you! 💛';
 
   @override
   void dispose() {
@@ -69,7 +75,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
     }
   }
 
-  Future<void> _replace() async {
+  Future<void> _save() async {
     final key = _keyController.text.trim();
     final formatError = _validateFormat(key);
     setState(() {
@@ -96,12 +102,15 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
         return;
       }
 
-      // Build the new link with the new key BEFORE mutating any state — a
-      // failure here leaves the band on its old, working key.
+      // Build the link with the new key BEFORE mutating any state — a failure
+      // here leaves the band exactly as it was. Details come from what's
+      // already configured (Account details), never re-asked here.
       final jar = await StripeRequests(probe).createTipJar(
         currency: oldJar?.currency ?? app.currency,
         displayName: app.displayName.isEmpty ? 'My tips' : app.displayName,
-        thankYouMessage: oldJar?.thankYouMessage ?? 'Thank you! 💛',
+        thankYouMessage: oldJar?.thankYouMessage ??
+            app.relayJar?.message ??
+            _defaultThanks,
       );
 
       await notifier.connect(key);
@@ -112,8 +121,8 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       if (oldJar != null && oldKey != null && !oldJar.isDemo) {
         final oldClient = StripeClient(oldKey);
         try {
-          await StripeRequests(oldClient).deactivatePaymentLink(
-              oldJar.paymentLinkId);
+          await StripeRequests(oldClient)
+              .deactivatePaymentLink(oldJar.paymentLinkId);
         } catch (_) {
         } finally {
           oldClient.close();
@@ -141,8 +150,10 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Stripe key replaced — new tip link created')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(oldKey == null
+                ? 'Stripe connected'
+                : 'Stripe key replaced — new tip link created')));
         Navigator.of(context).pop();
       }
     } on StripeApiException catch (e) {
@@ -159,6 +170,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
+    final connected = app.hasStripe;
     final key = _keyController.text.trim();
     final isTest = key.startsWith('rk_test_') || key.startsWith('sk_test_');
 
@@ -170,54 +182,100 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
-              LtRowGroup(
-                children: [
-                  LtRow(
-                    icon: Icons.key_rounded,
-                    title: _maskedKey(app.apiKey),
-                    subtitle: 'The restricted key on this device',
-                    trailing: StatusPill(
-                      status: app.isTestMode
-                          ? LtKeyStatus.test
-                          : LtKeyStatus.live,
-                      compact: true,
-                    ),
-                  ),
-                ],
+              Text(
+                connected
+                    ? 'Card tips settle straight to your Stripe account. '
+                        'Paste a new key to move accounts or rotate the key.'
+                    : 'Card tips settle straight to your Stripe account. Your '
+                        'name, currency and thank-you message come from '
+                        'Account details — just paste your restricted key.',
+                style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 14,
+                    height: 1.5,
+                    color: c.textSecondary),
               ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: c.danger.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: c.danger.withValues(alpha: 0.25)),
-                ),
-                child: Row(
+              const SizedBox(height: 20),
+              if (connected) ...[
+                LtRowGroup(
                   children: [
-                    Icon(Icons.warning_amber_rounded, size: 20, color: c.danger),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Replacing the key creates a fresh tip link. Printed '
-                        'QR codes with the old Stripe link stop working.',
-                        style: TextStyle(
-                            fontFamily: kFontBody,
-                            fontSize: 13,
-                            height: 1.4,
-                            color: c.text),
+                    LtRow(
+                      icon: Icons.key_rounded,
+                      title: _maskedKey(app.apiKey),
+                      subtitle: 'The restricted key on this device',
+                      trailing: StatusPill(
+                        status: app.isTestMode
+                            ? LtKeyStatus.test
+                            : LtKeyStatus.live,
+                        compact: true,
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: c.danger.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                    border:
+                        Border.all(color: c.danger.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          size: 20, color: c.danger),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Replacing the key creates a fresh tip link. Printed '
+                          'QR codes with the old Stripe link stop working.',
+                          style: TextStyle(
+                              fontFamily: kFontBody,
+                              fontSize: 13,
+                              height: 1.4,
+                              color: c.text),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ] else ...[
+                LtCard(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Need a key? Create a restricted key in your Stripe '
+                          'dashboard — it takes two minutes.',
+                          style: TextStyle(
+                              fontFamily: kFontBody,
+                              fontSize: 13,
+                              height: 1.4,
+                              color: c.textSecondary),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton.tonalIcon(
+                        onPressed: () => openExternal(kCreateKeyUrl),
+                        icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                        label: const Text('Open'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
               LtCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Paste a new key',
-                        style: outfitStyle(16, c.text, weight: FontWeight.w700)),
+                    Text(connected ? 'Paste a new key' : 'Paste your key',
+                        style:
+                            outfitStyle(16, c.text, weight: FontWeight.w700)),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _keyController,
@@ -238,7 +296,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                         _error = null;
                         _checks = null;
                       }),
-                      onSubmitted: (_) => _replace(),
+                      onSubmitted: (_) => _save(),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -274,9 +332,9 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
                     ],
                     const SizedBox(height: 14),
                     LtPrimaryButton(
-                      label: 'Verify & replace',
+                      label: connected ? 'Verify & replace' : 'Verify & connect',
                       busy: _busy,
-                      onPressed: _replace,
+                      onPressed: _save,
                     ),
                   ],
                 ),

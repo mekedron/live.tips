@@ -9,7 +9,6 @@ import '../../domain/tip_method.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
-import '../onboarding/connect_screen.dart';
 import '../shell/app_shell.dart';
 import 'account_details_screen.dart';
 import 'relay_method_screen.dart';
@@ -50,10 +49,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text('Remove $name from this device?'),
         content: Text(
           '${app.hasStripe ? 'Removes the API key and this band\'s local '
-              'data. Your Stripe account, payment link, and donations are '
-              'untouched — you can reconnect any time.' : 'Removes this '
+              'data. This action can\'t be undone.' : 'Removes this '
               'band\'s live.tips page and local data from this device. '
-              'Session history can\'t be recovered.'}'
+              'This action can\'t be undone.'}'
           '${hasOthers ? ' Your other bands stay.' : ''}',
         ),
         actions: [
@@ -145,32 +143,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         LtRowGroup(
           header: 'Payment methods',
           children: [
-            if (app.hasStripe)
-              LtRow(
-                icon: Icons.credit_card_rounded,
-                title: 'Stripe',
-                subtitle: '${_maskedKey(app.apiKey)} — verified card tips',
-                trailing: StatusPill(
-                  status:
-                      app.isTestMode ? LtKeyStatus.test : LtKeyStatus.live,
-                  compact: true,
-                ),
-                chevron: true,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const StripeKeyScreen()),
-                ),
-              )
-            else
-              LtRow(
-                icon: Icons.credit_card_rounded,
-                title: 'Add Stripe — verified card tips',
-                chevron: true,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ConnectScreen()),
-                ),
-              ),
             LtRow(
-              icon: TipMethod.revolut.icon,
+              leading: _MethodStatusDot(
+                  icon: Icons.credit_card_rounded, connected: app.hasStripe),
+              title: app.hasStripe ? 'Stripe' : 'Add Stripe',
+              subtitle: app.hasStripe
+                  ? '${_maskedKey(app.apiKey)} — verified card tips'
+                  : 'Verified card tips',
+              trailing: app.hasStripe
+                  ? StatusPill(
+                      status:
+                          app.isTestMode ? LtKeyStatus.test : LtKeyStatus.live,
+                      compact: true,
+                    )
+                  : null,
+              chevron: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StripeKeyScreen()),
+              ),
+            ),
+            LtRow(
+              leading: _MethodStatusDot(
+                  icon: TipMethod.revolut.icon,
+                  connected: app.relayJar?.hasRevolut ?? false),
               title: 'Revolut',
               subtitle: (app.relayJar?.hasRevolut ?? false)
                   ? '@${app.relayJar!.revolutUsername}'
@@ -183,7 +178,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             LtRow(
-              icon: TipMethod.mobilepay.icon,
+              leading: _MethodStatusDot(
+                  icon: TipMethod.mobilepay.icon,
+                  connected: app.relayJar?.hasMobilePay ?? false),
               title: 'MobilePay',
               subtitle: (app.relayJar?.hasMobilePay ?? false)
                   ? 'Box ${_shortBoxId(app.relayJar!.mobilepayBoxId!)}'
@@ -336,6 +333,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A payment-method row's leading cluster: a small status dot (green when the
+/// method is connected/configured, a hollow ring when not) followed by the
+/// method's icon — the at-a-glance "is this hooked up?" indicator.
+class _MethodStatusDot extends StatelessWidget {
+  const _MethodStatusDot({required this.icon, required this.connected});
+
+  final IconData icon;
+  final bool connected;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: connected ? c.success : Colors.transparent,
+            shape: BoxShape.circle,
+            border:
+                connected ? null : Border.all(color: c.textFaint, width: 1.5),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Icon(icon, size: 22, color: c.textSecondary),
+      ],
     );
   }
 }
