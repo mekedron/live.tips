@@ -266,10 +266,48 @@
 
   /* ===== stage showcase ===== */
   .stage-section { padding-top: 8px; padding-bottom: 40px; }
+  /* The demo sits in a CSS device mock: an iPad-style slab from tablet width
+     up, an iPhone with a notch below (see the 720px block). The bezel stays
+     near-black in both page themes — it's hardware, not UI. */
+  .device {
+    position: relative; background: #101013; border-radius: 38px; padding: 20px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.07),
+      0 0 0 2px #43434A,
+      0 24px 64px rgba(0,0,0,.32);
+  }
+  /* front camera on the long edge, as on current iPads */
+  .device::before {
+    content: ""; position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #5A6B8C, #0B0B10 70%);
+  }
+  .device-notch { display: none; }
+  /* physical buttons, flush against the 2px edge ring: ::before is the volume
+     pair (the second key is its box-shadow copy), ::after is the power button,
+     .device-action is the iPhone-only action button. iPad puts everything on
+     the top (landscape) edge; the 720px block moves them to the iPhone's sides. */
+  .device-buttons { position: absolute; inset: 0; pointer-events: none; }
+  .device-buttons::before {
+    content: ""; position: absolute; top: -5px; right: 96px;
+    width: 38px; height: 5px; border-radius: 3px 3px 0 0; background: #43434A;
+    box-shadow: -50px 0 0 0 #43434A;
+  }
+  .device-buttons::after {
+    content: ""; position: absolute; top: -5px; left: 84px;
+    width: 52px; height: 5px; border-radius: 3px 3px 0 0; background: #43434A;
+  }
+  .device-action { display: none; }
   .stage-card {
-    position: relative; border-radius: 32px; overflow: hidden;
+    position: relative; border-radius: 18px; overflow: hidden;
     background: #0B0A0F; height: min(72vh, 640px); min-height: 460px;
-    box-shadow: 0 24px 64px rgba(0,0,0,.28);
+  }
+  /* keep the real iPad proportion (4:3 landscape) instead of an ultra-wide
+     slab: the screen height drives the width, and the device centers itself.
+     The vh fallback above only serves browsers without aspect-ratio. */
+  @supports (aspect-ratio: 4 / 3) {
+    .device { width: min(100%, calc(min(72vh, 640px) * 4 / 3 + 40px)); margin: 0 auto; }
+    .stage-card { height: auto; min-height: 0; aspect-ratio: 4 / 3; }
   }
   .stage-card iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
   /* Transparent shield over the iframe. iOS Safari ignores pointer-events:none on
@@ -438,7 +476,48 @@
   @media (max-width: 720px) {
     nav.main { display: none; }
     .hero { padding-top: 56px; padding-bottom: 40px; }
-    .stage-card { border-radius: 24px; min-height: 420px; height: 68vh; }
+    /* phone: the tablet slab becomes an iPhone — thinner bezel, rounder
+       corners, the edge camera dot replaced by a notch */
+    .device { border-radius: 52px; padding: 12px; }
+    .device::before { display: none; }
+    .device-notch {
+      display: block; position: absolute; top: 12px; left: 50%; z-index: 5;
+      transform: translateX(-50%); pointer-events: none;
+      width: min(48%, 176px); height: 27px; background: #101013;
+      border-radius: 0 0 18px 18px;
+    }
+    .device-notch::before { /* earpiece */
+      content: ""; position: absolute; left: 50%; top: 9px; transform: translateX(-50%);
+      width: 44px; height: 5px; border-radius: 3px; background: #1E1E24;
+    }
+    .device-notch::after { /* front camera */
+      content: ""; position: absolute; right: 22px; top: 8px;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #3A4A6B, #0B0B10 70%);
+    }
+    .device-buttons::before { /* volume keys, left edge */
+      top: 168px; right: auto; left: -5px; width: 5px; height: 36px;
+      border-radius: 3px 0 0 3px; box-shadow: 0 48px 0 0 #43434A;
+    }
+    .device-buttons::after { /* side (power) button, right edge */
+      top: 200px; left: auto; right: -5px; width: 5px; height: 60px;
+      border-radius: 0 3px 3px 0;
+    }
+    .device-action { /* action button above the volume keys */
+      display: block; position: absolute; top: 128px; left: -5px;
+      width: 5px; height: 22px; border-radius: 3px 0 0 3px;
+      background: #43434A; pointer-events: none;
+    }
+    .stage-card { border-radius: 40px; min-height: 420px; height: 68vh; }
+    /* keep the real iPhone proportion (9:19.5) instead of a squarish card:
+       the screen height drives the width, and the device centers itself.
+       The vh fallback above only serves browsers without aspect-ratio. */
+    @supports (aspect-ratio: 9 / 19.5) {
+      .device { width: min(100%, calc(78vh * 9 / 19.5 + 24px)); margin: 0 auto; }
+      .stage-card { height: auto; min-height: 0; aspect-ratio: 9 / 19.5; }
+    }
+    .hud-top { top: 52px; }
+    .hud-live, .hud-watch { top: 24px; }
     .hud-watch { display: none; }
     /* the LIVE-DEMO label collides with the total on narrow screens — keep the
        pulsing dot, drop the label, and shrink the pill to a neat circle */
@@ -575,6 +654,10 @@
 
   <!-- STAGE SHOWCASE -->
   <div class="wrap stage-section" id="jar">
+    <div class="device">
+    <span class="device-notch" aria-hidden="true"></span>
+    <span class="device-buttons" aria-hidden="true"></span>
+    <span class="device-action" aria-hidden="true"></span>
     <div class="stage-card">
       <iframe id="stage-frame" data-src="/stage/index.html" title="live.tips 3D tip jar" loading="lazy"></iframe>
       <div class="stage-shield" aria-hidden="true"></div>
@@ -601,6 +684,7 @@
           <button class="btn btn-primary btn-tip" id="tip-btn"><svg class="ms" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm23.5-130.5Q514-221 514-235v-15q50-9 86-39t36-89q0-42-24-77t-96-61q-60-20-83-35t-23-41q0-26 18.5-41t53.5-15q20 0 35 7t25 19q10 12 22.5 16.5t23.5-.5q15-6 20.5-20.5T606-653q-16-23-39.5-39T516-710v-15q0-14-10.5-24.5T481-760q-14 0-24.5 10.5T446-725v15q-50 11-78 44t-28 74q0 47 27.5 76t86.5 50q63 23 87.5 41t24.5 47q0 33-23.5 48.5T486-314q-26 0-47-12.5T404-364q-8-14-21-19t-26 0q-14 5-20.5 19t-.5 27q16 34 43 55.5t65 29.5v17q0 14 10.5 24.5T479-200q14 0 24.5-10.5Z"/></svg>{{tip_btn}}</button>
         </div>
       </div>
+    </div>
     </div>
     <div class="stage-controls">
       <div class="ctrl-row">
