@@ -7,6 +7,7 @@ class RelayJar {
     required this.donateUrl,
     required this.artistName,
     required this.currency,
+    this.message,
     this.revolutUsername,
     this.mobilepayBoxId,
     required this.createdAtMs,
@@ -19,6 +20,11 @@ class RelayJar {
   final String donateUrl;
   final String artistName;
   final String currency;
+
+  /// The artist's thank-you / welcome message shown on the donor page. The
+  /// tip-page equivalent of the Stripe link's thank-you message; edited from
+  /// Account Details. Null/empty means the donor page shows no message line.
+  final String? message;
   final String? revolutUsername;
   final String? mobilepayBoxId;
   final int createdAtMs;
@@ -42,6 +48,7 @@ class RelayJar {
     String? donateUrl,
     String? artistName,
     String? currency,
+    String? message,
     String? revolutUsername,
     String? mobilepayBoxId,
     int? createdAtMs,
@@ -51,6 +58,7 @@ class RelayJar {
         donateUrl: donateUrl ?? this.donateUrl,
         artistName: artistName ?? this.artistName,
         currency: currency ?? this.currency,
+        message: message ?? this.message,
         revolutUsername: revolutUsername ?? this.revolutUsername,
         mobilepayBoxId: mobilepayBoxId ?? this.mobilepayBoxId,
         createdAtMs: createdAtMs ?? this.createdAtMs,
@@ -61,6 +69,7 @@ class RelayJar {
         'donateUrl': donateUrl,
         'artistName': artistName,
         'currency': currency,
+        if (message != null) 'message': message,
         if (revolutUsername != null) 'revolutUsername': revolutUsername,
         if (mobilepayBoxId != null) 'mobilepayBoxId': mobilepayBoxId,
         'createdAtMs': createdAtMs,
@@ -71,6 +80,7 @@ class RelayJar {
         donateUrl: json['donateUrl'] as String,
         artistName: json['artistName'] as String? ?? '',
         currency: json['currency'] as String? ?? 'usd',
+        message: json['message'] as String?,
         revolutUsername: json['revolutUsername'] as String?,
         mobilepayBoxId: json['mobilepayBoxId'] as String?,
         createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,

@@ -142,6 +142,23 @@ class StripeRequests {
     );
   }
 
+  /// Edits an existing jar's display name and thank-you message in place —
+  /// the product's name and the payment link's post-checkout message. Used
+  /// when the currency is unchanged, so the link (and its QR) keep working;
+  /// a currency change still needs a fresh price + link via [createTipJar].
+  Future<void> updateTipJarDetails({
+    required String productId,
+    required String paymentLinkId,
+    required String displayName,
+    required String thankYouMessage,
+  }) async {
+    await client.post('products/$productId', {'name': 'Tips — $displayName'});
+    await client.post('payment_links/$paymentLinkId', {
+      'after_completion[type]': 'hosted_confirmation',
+      'after_completion[hosted_confirmation][custom_message]': thankYouMessage,
+    });
+  }
+
   Future<void> deactivatePaymentLink(String paymentLinkId) async {
     await client.post('payment_links/$paymentLinkId', {'active': 'false'});
   }

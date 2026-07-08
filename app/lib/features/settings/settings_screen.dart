@@ -4,14 +4,16 @@ import '../../core/external_link.dart';
 
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
-import '../../data/relay/relay_client.dart';
 import '../../domain/app_settings.dart';
 import '../../domain/tip_method.dart';
 import '../../state/providers.dart';
+import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../onboarding/connect_screen.dart';
-import '../onboarding/relay_setup_screen.dart';
 import '../shell/app_shell.dart';
+import 'account_details_screen.dart';
+import 'relay_method_screen.dart';
+import 'stripe_key_screen.dart';
 
 const _kAppVersion = '0.3.0';
 
@@ -32,70 +34,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// Box ids are unreadable uuids — show enough to recognize, no more.
   String _shortBoxId(String id) =>
       id.length <= 12 ? id : '${id.substring(0, 8)}…';
-
-  /// 'Account — [AppState.displayName]' when the band is named, so a
-  /// multi-band user always knows whose key they're looking at.
-  String _accountHeader(AppState app) =>
-      app.displayName.isEmpty ? 'Account' : 'Account — ${app.displayName}';
-
-  /// Revolut/MobilePay rows: edit the existing tip page, or start one with
-  /// just the tapped method when none exists yet (the Stripe link rides
-  /// along automatically when there is one).
-  void _openRelaySetup(TipMethod method) {
-    final hasRelay = ref.read(appStateProvider).hasRelay;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RelaySetupScreen(
-          edit: hasRelay,
-          initialMethods: hasRelay ? null : {method},
-        ),
-      ),
-    );
-  }
-
-  /// Kills the public tip page (best-effort DELETE on the relay) and forgets
-  /// it locally. History stays — it lives on this device only.
-  Future<void> _confirmDisconnectTipPage() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Disconnect tip page?'),
-        content: const Text(
-          'Your tip page QR stops working immediately. Tips history stays '
-          'on this device.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Disconnect'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    final app = ref.read(appStateProvider);
-    final jar = app.relayJar;
-    final secret = app.relaySecret;
-    if (jar != null && secret != null) {
-      final client = RelayClient();
-      try {
-        await client.deleteJar(jarId: jar.jarId, secret: secret);
-      } catch (_) {
-        // Offline or already gone — the local forget still proceeds.
-      } finally {
-        client.close();
-      }
-    }
-    await ref.read(appStateProvider.notifier).clearRelayJar();
-  }
 
   Future<void> _confirmRemoveBand() async {
     final app = ref.read(appStateProvider);
@@ -150,7 +88,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final isRail = AppShellScope.of(context)?.isRail ?? false;
 
     final sections = <Widget>[
-      // ------------------------------------------------------- account ---
+      // ------------------------------------------------ account details ---
       if (app.demo)
         LtRowGroup(
           header: 'Account',
@@ -171,46 +109,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ],
         )
-      else if (!app.hasStripe)
-        // Relay-only: honest about the missing Stripe key without pushing
-        // the (not-yet-built) payment-methods management UI.
-        LtRowGroup(
-          header: _accountHeader(app),
-          children: [
-            const LtRow(
-              icon: Icons.key_off_rounded,
-              title: 'No Stripe connected',
-              subtitle: 'Tips arrive through your live.tips page',
-              trailing: StatusPill(status: LtKeyStatus.relay, compact: true),
-            ),
-            LtRow(
-              icon: Icons.link_off_rounded,
-              iconColor: c.danger,
-              title: 'Remove this band from this device',
-              titleColor: c.danger,
-              chevron: true,
-              onTap: _confirmRemoveBand,
-            ),
-          ],
-        )
       else
         LtRowGroup(
-          header: _accountHeader(app),
+          header: 'Account details',
           children: [
             LtRow(
-              icon: Icons.key_rounded,
-              title: _maskedKey(app.apiKey),
-              subtitle: 'Connected to your Stripe account',
-              trailing: StatusPill(
-                status:
-                    app.isTestMode ? LtKeyStatus.test : LtKeyStatus.live,
-                compact: true,
+              icon: Icons.badge_rounded,
+              title: app.displayName.isEmpty ? 'Your band' : app.displayName,
+              subtitle: 'Name, currency and thank-you message',
+              chevron: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const AccountDetailsScreen()),
               ),
             ),
             LtRow(
-              icon: Icons.link_off_rounded,
+              icon: Icons.swap_horiz_rounded,
+              title: 'Switch account',
+              subtitle: 'Work with another band on this device',
+              chevron: true,
+              onTap: () => showBandSwitcherSheet(context, ref),
+            ),
+            LtRow(
+              icon: Icons.delete_outline_rounded,
               iconColor: c.danger,
-              title: 'Remove this band from this device',
+              title: 'Remove this account from this device',
               titleColor: c.danger,
               chevron: true,
               onTap: _confirmRemoveBand,
@@ -227,6 +150,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 icon: Icons.credit_card_rounded,
                 title: 'Stripe',
                 subtitle: '${_maskedKey(app.apiKey)} — verified card tips',
+                trailing: StatusPill(
+                  status:
+                      app.isTestMode ? LtKeyStatus.test : LtKeyStatus.live,
+                  compact: true,
+                ),
+                chevron: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const StripeKeyScreen()),
+                ),
               )
             else
               LtRow(
@@ -244,7 +176,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ? '@${app.relayJar!.revolutUsername}'
                   : 'Not set',
               chevron: true,
-              onTap: () => _openRelaySetup(TipMethod.revolut),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) =>
+                        const RelayMethodScreen(method: TipMethod.revolut)),
+              ),
             ),
             LtRow(
               icon: TipMethod.mobilepay.icon,
@@ -253,25 +189,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ? 'Box ${_shortBoxId(app.relayJar!.mobilepayBoxId!)}'
                   : 'Not set',
               chevron: true,
-              onTap: () => _openRelaySetup(TipMethod.mobilepay),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) =>
+                        const RelayMethodScreen(method: TipMethod.mobilepay)),
+              ),
             ),
-            if (app.hasRelay) ...[
-              LtRow(
-                icon: Icons.autorenew_rounded,
-                title: 'New tip page link',
-                subtitle: 'Printed QR codes with the old link stop working',
-                chevron: true,
-                onTap: () => confirmAndRegenerateRelayJar(context, ref),
-              ),
-              LtRow(
-                icon: Icons.link_off_rounded,
-                iconColor: c.danger,
-                title: 'Disconnect tip page',
-                titleColor: c.danger,
-                chevron: true,
-                onTap: _confirmDisconnectTipPage,
-              ),
-            ],
           ],
         ),
       // ---------------------------------------------------- appearance ---

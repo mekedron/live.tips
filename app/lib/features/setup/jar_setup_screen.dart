@@ -185,6 +185,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
         jar: relayJar,
         secret: secret,
         artistName: jar.displayName,
+        message: relayJar.message,
         stripeUrl: jar.url,
       );
     } catch (_) {

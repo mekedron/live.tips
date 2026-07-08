@@ -84,6 +84,7 @@ class RelayClient {
         donateUrl: json['donateUrl'] as String,
         artistName: artistName,
         currency: currency,
+        message: (message?.trim().isEmpty ?? true) ? null : message!.trim(),
         revolutUsername: revolutUsername,
         mobilepayBoxId: mobilepayBoxId,
         createdAtMs: DateTime.now().millisecondsSinceEpoch,

@@ -5,7 +5,6 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
-import '../../data/relay/relay_client.dart';
 import '../../domain/app_settings.dart';
 import '../../domain/donation.dart';
 import '../../domain/live_session.dart';
@@ -124,120 +123,6 @@ LtKeyStatus _keyStatus(AppState app) => app.demo
             ? LtKeyStatus.test
             : LtKeyStatus.live;
 
-/// The band name row: the name itself (with a chevron) opens the band
-/// switcher, and a small pencil beside it renames the band. Renaming changes
-/// only the *local* display name (home, stage, poster) — it never touches the
-/// Stripe link or its QR code, so it's safe any time. (Relay-connected bands
-/// also push the new name to their live.tips page, best effort.) The pencil
-/// is hidden in demo mode (there's no real jar to name).
-class _EditableJarName extends ConsumerWidget {
-  const _EditableJarName({
-    required this.app,
-    required this.fontSize,
-    required this.weight,
-  });
-
-  final AppState app;
-  final double fontSize;
-  final FontWeight weight;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.lt;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Flexible(
-          child: BandNameButton(fontSize: fontSize, weight: weight),
-        ),
-        if (!app.demo)
-          IconButton(
-            tooltip: 'Rename',
-            visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.edit_outlined,
-                size: fontSize * 0.6, color: c.textMuted),
-            onPressed: () => _editJarName(context, ref, app),
-          ),
-      ],
-    );
-  }
-}
-
-/// Rename the local display name — a light in-place edit that leaves the tip
-/// link untouched (see [_EditableJarName]). Opens as a bottom sheet, matching
-/// the Tonight's-goal editor.
-Future<void> _editJarName(
-    BuildContext context, WidgetRef ref, AppState app) async {
-  final notifier = ref.read(appStateProvider.notifier);
-  final controller = TextEditingController(text: app.displayName);
-  final saved = await showModalBottomSheet<String>(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) {
-      final c = context.lt;
-      void submit() => Navigator.of(context).pop(controller.text.trim());
-      return Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Display name',
-                style: outfitStyle(18, c.text, weight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text(
-              'Shown on your home screen, stage and poster. Your tip link and '
-              'its QR code aren\'t affected.',
-              style: TextStyle(
-                  fontFamily: kFontBody, fontSize: 13, color: c.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.words,
-              style: outfitStyle(20, c.text, weight: FontWeight.w700),
-              decoration:
-                  const InputDecoration(hintText: 'Artist or band name'),
-              onSubmitted: (_) => submit(),
-            ),
-            const SizedBox(height: 20),
-            LtPrimaryButton(label: 'Save name', onPressed: submit),
-          ],
-        ),
-      );
-    },
-  );
-  // Dispose after the sheet's exit animation is fully done.
-  Future.delayed(const Duration(seconds: 1), controller.dispose);
-  if (saved == null || saved.isEmpty || saved == app.displayName) return;
-  await notifier.renameBand(saved);
-  // Best effort: keep the public live.tips page's name in sync. The local
-  // rename already took; on failure the relay copy just drifts until the
-  // next successful update. The Stripe URL rides along because the relay
-  // treats an update as a full profile replace — omitting it would wipe the
-  // donor page's card button.
-  final relayJar = app.relayJar;
-  final secret = app.relaySecret;
-  if (relayJar == null || secret == null) return;
-  final client = RelayClient();
-  try {
-    await client.updateJar(
-      jar: relayJar.copyWith(artistName: saved),
-      secret: secret,
-      artistName: saved,
-      stripeUrl: app.tipJar?.url,
-    );
-  } catch (_) {
-    // Offline or a rotated secret — purely cosmetic drift, ignore.
-  } finally {
-    client.close();
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Mobile · 390-style single column with the logo top bar
 // ---------------------------------------------------------------------------
@@ -288,8 +173,7 @@ class _MobileHome extends StatelessWidget {
                           fontFamily: kFontBody,
                           fontSize: 14,
                           color: c.textSecondary)),
-                  _EditableJarName(
-                    app: app,
+                  const BandNameButton(
                     fontSize: 24,
                     weight: FontWeight.w700,
                   ),
@@ -354,8 +238,7 @@ class _DesktopHome extends ConsumerWidget {
                               fontFamily: kFontBody,
                               fontSize: 15,
                               color: c.textSecondary)),
-                      _EditableJarName(
-                        app: app,
+                      const BandNameButton(
                         fontSize: 32,
                         weight: FontWeight.w800,
                       ),

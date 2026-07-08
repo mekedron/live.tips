@@ -77,6 +77,7 @@ Future<void> confirmAndRegenerateRelayJar(
     } catch (_) {}
     final result = await client.createJar(
       artistName: old.artistName,
+      message: old.message,
       currency: old.currency,
       stripeUrl: app.tipJar?.url,
       revolutUsername: old.hasRevolut ? old.revolutUsername : null,
@@ -228,6 +229,7 @@ class _RelaySetupScreenState extends ConsumerState<RelaySetupScreen> {
           donateUrl: jar.donateUrl,
           artistName: name,
           currency: _currency,
+          message: jar.message,
           revolutUsername: revolut,
           mobilepayBoxId: boxId,
           createdAtMs: jar.createdAtMs,
@@ -236,6 +238,7 @@ class _RelaySetupScreenState extends ConsumerState<RelaySetupScreen> {
           jar: updated,
           secret: app.relaySecret!,
           artistName: name,
+          message: jar.message,
           stripeUrl: app.tipJar?.url,
         );
         await ref.read(appStateProvider.notifier).updateRelayJarLocal(updated);
