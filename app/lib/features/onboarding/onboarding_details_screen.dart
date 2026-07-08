@@ -79,13 +79,17 @@ class _OnboardingDetailsScreenState
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
+    // Methods aren't picked yet at this step — fall back to the minimum
+    // flow length (details + methods + one method step), same estimate
+    // the method-select screen uses before anything is checked.
+    final total = ref.watch(onboardingDraftProvider)?.totalSteps ?? 3;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Your details'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Center(child: LtPill(label: 'Step 1')),
+            child: Center(child: LtPill(label: 'Step 1 of $total')),
           ),
         ],
       ),
@@ -93,8 +97,10 @@ class _OnboardingDetailsScreenState
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
+              LtProgressSegments(total: total, filled: 1),
+              const SizedBox(height: 16),
               Text('Let\'s set up your tip jar',
                   style: outfitStyle(22, c.text, weight: FontWeight.w800)),
               const SizedBox(height: 6),

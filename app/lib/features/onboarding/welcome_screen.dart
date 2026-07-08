@@ -23,12 +23,8 @@ class WelcomeScreen extends ConsumerWidget {
       appBar: hasOtherBands
           ? AppBar(
               automaticallyImplyLeading: false,
-              actions: const [
-                Padding(
-                  padding: EdgeInsets.only(right: 16),
-                  child: Center(child: BandChip()),
-                ),
-              ],
+              centerTitle: false,
+              title: const BandChip(),
             )
           : null,
       body: SafeArea(
