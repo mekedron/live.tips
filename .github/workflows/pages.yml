@@ -20,6 +20,7 @@ on:
     paths:
       - 'website/**'
       - 'scripts/build_site.py'
+      - 'scripts/cache_bust_web.sh'
       - 'app/lib/**'
       - 'app/web/**'
       - 'app/assets/**'
