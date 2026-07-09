@@ -1,0 +1,29 @@
+<header>
+  <div class="wrap header-in">
+    <a class="logo" href="{{logo_href}}" aria-label="{{a11y_home}}">
+      <div class="logo-mark"><svg class="ms" viewBox="0 -960 960 960" aria-hidden="true"><path d="M535-87q11 3 25.5 2.5T585-89l295-111q0-34-24-57t-56-23H526q-3 0-7-.5t-6-1.5l-59-21q-8-3-11-10t-1-15q2-7 10-11t16-1l45 17q4 2 6.5 2.5t7.5.5h105q19 0 33.5-13t14.5-34q0-14-8.5-27T649-412L372-515q-7-2-14-3.5t-14-1.5h-64v361l255 72ZM40-160q0 33 23.5 56.5T120-80q33 0 56.5-23.5T200-160v-280q0-33-23.5-56.5T120-520q-33 0-56.5 23.5T40-440v280Zm570.5-317.5Q596-483 584-494L474-602q-31-30-52.5-66.5T400-748q0-55 38.5-93.5T532-880q32 0 60 13.5t48 36.5q20-23 48-36.5t60-13.5q55 0 93.5 38.5T880-748q0 43-21 79.5T807-602L696-494q-12 11-26.5 16.5T640-472q-15 0-29.5-5.5Z"/></svg></div>
+      <div class="logo-name">live.tips</div>
+    </a>
+    {{nav_links}}
+    <div class="header-actions">
+      <select class="lang-select lang-select--full" aria-label="{{a11y_lang}}">{{lang_switcher_options}}</select>
+      <span class="lang-mini">
+        <span class="lang-mini-flag" aria-hidden="true">{{current_flag}}</span>
+        <select class="lang-select lang-mini-select" aria-label="{{a11y_lang}}">{{lang_switcher_options}}</select>
+      </span>
+      <button class="icon-btn" id="theme-btn" title="{{theme}}" aria-label="{{a11y_theme}}">
+        <svg class="ms" viewBox="0 -960 960 960" aria-hidden="true"><path id="theme-ico" d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm40-83q119-15 199.5-104.5T800-480q0-123-80.5-212.5T520-797v634Z"/></svg>
+      </button>
+      <a class="icon-btn" id="gh-btn" href="https://github.com/mekedron/live.tips" target="_blank" rel="noopener" title="{{title_github}}" aria-label="{{a11y_github}}">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <span class="star-badge" id="gh-stars" aria-hidden="true"></span>
+      </a>
+      <a class="icon-btn bmc" href="https://buymeacoffee.com/mekedron" target="_blank" rel="noopener" title="{{bmc}}" aria-label="{{bmc}}">
+        <svg class="ms" viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-120q-17 0-28.5-11.5T160-160q0-17 11.5-28.5T200-200h560q17 0 28.5 11.5T800-160q0 17-11.5 28.5T760-120H200Zm120-160q-66 0-113-47t-47-113v-320q0-33 23.5-56.5T240-840h560q33 0 56.5 23.5T880-760v120q0 33-23.5 56.5T800-560h-80v120q0 66-47 113t-113 47H320Zm400-360h80v-120h-80v120Z"/></svg>
+      </a>
+      <a class="btn btn-primary btn-hdr" href="{{app_href}}" target="_blank" rel="noopener" aria-label="{{btn_open_app}}">
+        <span class="label">{{btn_open_app}}</span><svg class="ms" viewBox="0 -960 960 960" aria-hidden="true"><path d="M520-120q-17 0-28.5-11.5T480-160q0-17 11.5-28.5T520-200h240v-560H520q-17 0-28.5-11.5T480-800q0-17 11.5-28.5T520-840h240q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H520Zm27-320H200q-17 0-28.5-11.5T160-480q0-17 11.5-28.5T200-520h347L351-716q-12-12-11.5-28t12.5-28q12-11 28-11.5t28 11.5l264 264q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L408-188q-11 11-27.5 11T352-188q-12-12-12-28.5t12-28.5l195-195Z"/></svg>
+      </a>
+    </div>
+  </div>
+</header>

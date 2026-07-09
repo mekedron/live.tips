@@ -1,0 +1,559 @@
+  /* Self-hosted subsets built by scripts/gen_fonts.py, split by script so a
+     Latin page never downloads Cyrillic/Greek glyphs. Outfit ships Latin +
+     Latin-ext only (no Cyrillic/Greek upstream), so headings fall through to
+     Noto Sans for those scripts — hence the `Outfit, 'Noto Sans', …` stacks. */
+  @font-face {
+    font-family: 'Outfit'; font-style: normal; font-weight: 400 800; font-display: swap;
+    src: url('/fonts/outfit-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+2000-206F;
+  }
+  @font-face {
+    font-family: 'Outfit'; font-style: normal; font-weight: 400 800; font-display: swap;
+    src: url('/fonts/outfit-latinext.woff2') format('woff2');
+    unicode-range: U+0100-024F;
+  }
+  @font-face {
+    font-family: 'Noto Sans'; font-style: normal; font-weight: 400 800; font-display: swap;
+    src: url('/fonts/notosans-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+2000-206F;
+  }
+  @font-face {
+    font-family: 'Noto Sans'; font-style: normal; font-weight: 400 800; font-display: swap;
+    src: url('/fonts/notosans-latinext.woff2') format('woff2');
+    unicode-range: U+0100-024F;
+  }
+  @font-face {
+    font-family: 'Noto Sans'; font-style: normal; font-weight: 400 800; font-display: swap;
+    src: url('/fonts/notosans-cyrillic.woff2') format('woff2');
+    unicode-range: U+0400-04FF, U+0500-052F, U+2116;
+  }
+  @font-face {
+    font-family: 'Noto Sans'; font-style: normal; font-weight: 400 800; font-display: swap;
+    src: url('/fonts/notosans-greek.woff2') format('woff2');
+    unicode-range: U+0370-03FF;
+  }
+
+  :root {
+    --bg: #FAF6F1;
+    --card: #FFFFFF;
+    --border: #E9E1D6;
+    --border-soft: #F3EDE5;
+    --ink: #221D18;
+    --ink-2: #70685D;
+    --ink-3: #9C948A;
+    --accent: #E8542F;
+    --on-accent: #FFFFFF;
+    --soft: #FDE7DF;
+    --on-soft: #8A2E14;
+    --chip: #F3EDE5;
+    --green: #1E9E62;
+    --green-bg: #DFF3E7;
+    --green-ink: #136A41;
+    --accent-shadow: rgba(232,84,47,.3);
+    --card-shadow: rgba(34,29,24,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14110E;
+      --card: #1E1A16;
+      --border: #322C26;
+      --border-soft: #272219;
+      --ink: #F5F0E8;
+      --ink-2: #A79E92;
+      --ink-3: #7E766B;
+      --accent: #FF7C55;
+      --on-accent: #40160A;
+      --soft: #3E2018;
+      --on-soft: #FFB79F;
+      --chip: #272219;
+      --green: #4FCB8D;
+      --green-bg: #173226;
+      --green-ink: #4FCB8D;
+      --accent-shadow: rgba(0,0,0,.35);
+      --card-shadow: rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14110E;
+    --card: #1E1A16;
+    --border: #322C26;
+    --border-soft: #272219;
+    --ink: #F5F0E8;
+    --ink-2: #A79E92;
+    --ink-3: #7E766B;
+    --accent: #FF7C55;
+    --on-accent: #40160A;
+    --soft: #3E2018;
+    --on-soft: #FFB79F;
+    --chip: #272219;
+    --green: #4FCB8D;
+    --green-bg: #173226;
+    --green-ink: #4FCB8D;
+    --accent-shadow: rgba(0,0,0,.35);
+    --card-shadow: rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    transition: background .25s ease, color .25s ease;
+  }
+  a { color: inherit; text-decoration: none; }
+  /* inline-SVG icons (Material Symbols paths baked into the markup). Sized by
+     font-size via 1em, exactly like the icon font they replaced, so all the
+     per-context `.ms { font-size: … }` rules below keep working. */
+  .ms {
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+    display: inline-block;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+  h1, h2, h3 { font-family: Outfit, 'Noto Sans', sans-serif; margin: 0; text-wrap: pretty; }
+
+  /* ===== header ===== */
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-in { display: flex; align-items: center; gap: 10px; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 10px; margin-right: 6px; }
+  .logo-mark {
+    width: 32px; height: 32px; border-radius: 10px; background: var(--accent);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .logo-mark .ms { font-size: 18px; color: var(--on-accent); }
+  .logo-name { font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 18px; }
+  nav.main { display: flex; gap: 4px; margin: 0 auto; }
+  nav.main a {
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2);
+    padding: 8px 14px; border-radius: 999px; transition: background .15s ease, color .15s ease;
+  }
+  nav.main a:hover { background: var(--chip); color: var(--ink); }
+  .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .icon-btn {
+    position: relative;
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--card);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0; color: var(--ink-2);
+    transition: border-color .15s ease, color .15s ease, transform .1s ease;
+    flex-shrink: 0; touch-action: manipulation;
+  }
+  .icon-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+  .icon-btn:active { transform: scale(.94); }
+  .icon-btn .ms { font-size: 18px; }
+  .icon-btn svg:not(.ms) { width: 17px; height: 17px; fill: currentColor; display: block; }
+  .icon-btn.bmc { background: #FFDD00; border-color: #FFDD00; color: #000; }
+  .icon-btn.bmc:hover { background: #FFDD00; border-color: #000; color: #000; }
+  .star-badge {
+    position: absolute; bottom: -4px; right: -6px;
+    background: var(--accent); color: var(--on-accent);
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 9px;
+    border-radius: 999px; padding: 1.5px 5px; line-height: 1.3;
+    border: 2px solid var(--bg); display: none;
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; border-radius: 999px;
+    cursor: pointer; border: 0; white-space: nowrap; touch-action: manipulation;
+    transition: transform .1s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 14px var(--accent-shadow); }
+  .btn-primary:hover { box-shadow: 0 6px 20px var(--accent-shadow); }
+  .btn-ghost { background: var(--card); color: var(--ink); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--ink-3); }
+  .btn.bmc { background: #FFDD00; color: #000; border-color: #FFDD00; box-shadow: 0 4px 14px rgba(255,221,0,.35); }
+  .btn.bmc:hover { border-color: #FFDD00; box-shadow: 0 6px 20px rgba(255,221,0,.35); }
+  .btn-hdr { font-size: 14px; padding: 9px 18px; margin-left: 4px; }
+  .btn-hdr .ms { font-size: 16px; }
+  .btn svg:not(.ms) { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+
+  /* ===== hero ===== */
+  .hero { padding-top: 88px; padding-bottom: 56px; text-align: center; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--soft); color: var(--on-soft);
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; font-size: 13px;
+    border-radius: 999px; padding: 7px 16px;
+  }
+  .hero-badge .ms { font-size: 15px; }
+  .hero h1 {
+    font-size: clamp(40px, 6.5vw, 72px); font-weight: 800; line-height: 1.04;
+    letter-spacing: -0.02em; margin: 26px auto 0; max-width: 800px;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p.sub {
+    color: var(--ink-2); font-size: clamp(16px, 2vw, 19px); line-height: 1.6;
+    max-width: 620px; margin: 20px auto 0;
+  }
+  .hero-ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 34px; }
+  .hero-ph { display: flex; justify-content: center; margin-top: 26px; }
+  .btn-lg { font-size: 17px; padding: 16px 30px; }
+  .btn-lg .ms { font-size: 20px; }
+  .hero-trust {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    color: var(--ink-3); font-size: 13px; margin-top: 22px;
+  }
+  .hero-trust .ms { font-size: 14px; }
+
+  /* ===== stage showcase ===== */
+  .stage-section { padding-top: 8px; padding-bottom: 40px; }
+  /* The demo sits in a CSS device mock: an iPad-style slab from tablet width
+     up, an iPhone with a notch below (see the 720px block). The bezel stays
+     near-black in both page themes — it's hardware, not UI. */
+  .device {
+    position: relative; background: #101013; border-radius: 38px; padding: 20px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.07),
+      0 0 0 2px #43434A,
+      0 24px 64px rgba(0,0,0,.32);
+  }
+  /* front camera on the long edge, as on current iPads */
+  .device::before {
+    content: ""; position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #5A6B8C, #0B0B10 70%);
+  }
+  .device-notch { display: none; }
+  /* physical buttons, flush against the 2px edge ring: ::before is the volume
+     pair (the second key is its box-shadow copy), ::after is the power button,
+     .device-action is the iPhone-only action button. iPad puts everything on
+     the top (landscape) edge; the 720px block moves them to the iPhone's sides. */
+  .device-buttons { position: absolute; inset: 0; pointer-events: none; }
+  .device-buttons::before {
+    content: ""; position: absolute; top: -5px; right: 96px;
+    width: 38px; height: 5px; border-radius: 3px 3px 0 0; background: #43434A;
+    box-shadow: -50px 0 0 0 #43434A;
+  }
+  .device-buttons::after {
+    content: ""; position: absolute; top: -5px; left: 84px;
+    width: 52px; height: 5px; border-radius: 3px 3px 0 0; background: #43434A;
+  }
+  .device-action { display: none; }
+  .stage-card {
+    position: relative; border-radius: 18px; overflow: hidden;
+    background: #0B0A0F; height: min(72vh, 640px); min-height: 460px;
+  }
+  /* keep the real iPad proportion (4:3 landscape) instead of an ultra-wide
+     slab: the screen height drives the width, and the device centers itself.
+     The vh fallback above only serves browsers without aspect-ratio. */
+  @supports (aspect-ratio: 4 / 3) {
+    .device { width: min(100%, calc(min(72vh, 640px) * 4 / 3 + 40px)); margin: 0 auto; }
+    .stage-card { height: auto; min-height: 0; aspect-ratio: 4 / 3; }
+  }
+  .stage-card iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+  /* Transparent shield over the iframe. iOS Safari ignores pointer-events:none on
+     iframes and lets the frame swallow touch-scroll, so we let a real element own
+     the touch: the page scrolls past the demo and double-tap never zooms. The HUD
+     stays click-through; only its three controls opt back into taps. */
+  .stage-shield { position: absolute; inset: 0; pointer-events: auto; touch-action: manipulation; }
+  .stage-hud { position: absolute; inset: 0; pointer-events: none; touch-action: manipulation; }
+  /* Shown over the black backdrop until the stage's own `ready` message says
+     the first WebGL frame is on screen. Covers the gap before the first
+     gesture/intersection fires the lazy load, and stays up for good for
+     crawlers and no-JS visits, where /stage/ never loads at all (see
+     robots.txt) — better than a backdrop that looks broken or empty. */
+  .stage-placeholder {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    gap: 9px; color: rgba(255,255,255,.55); font-family: Outfit, 'Noto Sans', sans-serif;
+    font-weight: 600; font-size: 13px; letter-spacing: .2px; pointer-events: none;
+    opacity: 1; transition: opacity .5s ease;
+  }
+  .stage-placeholder .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.55); animation: lt-pulse 1.6s ease-in-out infinite; }
+  .stage-placeholder.is-hidden { opacity: 0; }
+  .hud-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(20,17,20,.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.08); border-radius: 999px;
+    color: #fff; font-family: Outfit, 'Noto Sans', sans-serif;
+  }
+  .hud-live { position: absolute; top: 18px; left: 18px; height: 40px; padding: 0 16px; font-weight: 700; font-size: 12px; letter-spacing: 1px; }
+  .hud-live .dot { width: 8px; height: 8px; border-radius: 50%; background: #FF6B5E; animation: lt-pulse 1.6s ease-in-out infinite; }
+  @keyframes lt-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .hud-watch { position: absolute; top: 18px; right: 18px; height: 40px; padding: 0 14px; font-weight: 600; font-size: 12px; color: rgba(255,255,255,.65); }
+  .hud-watch .dot { width: 8px; height: 8px; border-radius: 50%; background: #4FCB8D; box-shadow: 0 0 8px rgba(79,203,141,.7); }
+  .hud-top { position: absolute; top: 26px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; }
+  .hud-total {
+    color: #fff; font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 800;
+    font-size: clamp(38px, 6vw, 58px); line-height: 1;
+    text-shadow: 0 2px 24px rgba(0,0,0,.8); font-variant-numeric: tabular-nums;
+  }
+  .hud-bar { width: min(300px, 60%); height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; margin-top: 12px; }
+  .hud-bar > div { height: 100%; border-radius: 3px; background: #FF7C55; width: 0%; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+  .hud-goal { color: rgba(255,255,255,.7); font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; font-size: 13.5px; margin-top: 8px; text-shadow: 0 1px 8px rgba(0,0,0,.8); }
+  .hud-toast {
+    display: flex; align-items: center; gap: 12px; margin-top: 16px;
+    background: rgba(20,17,20,.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,124,85,.45); border-radius: 18px; padding: 11px 18px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    opacity: 0; transform: translateY(-6px); transition: opacity .4s ease, transform .4s ease;
+    max-width: calc(100% - 48px);
+  }
+  .hud-toast.show { opacity: 1; transform: translateY(0); }
+  .hud-toast .avatar {
+    width: 36px; height: 36px; border-radius: 50%; background: #3E2018; color: #FFB79F;
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .hud-toast .t1 { color: #fff; font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 15px; }
+  .hud-toast .t2 { color: rgba(255,255,255,.8); font-size: 12.5px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud-bottom { position: absolute; left: 0; right: 0; bottom: 22px; display: flex; justify-content: center; }
+  .btn-tip { pointer-events: auto; font-size: 15px; padding: 14px 26px; }
+  .btn-tip .ms { font-size: 19px; }
+  .hud-zoom { position: absolute; right: 18px; bottom: 84px; display: flex; flex-direction: column; gap: 8px; }
+  .zoom-btn {
+    pointer-events: auto; width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(20,17,20,.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.12); color: rgba(255,255,255,.85);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+    touch-action: manipulation; transition: background .15s ease, transform .1s ease;
+  }
+  .zoom-btn:hover { background: rgba(20,17,20,.75); color: #fff; }
+  .zoom-btn:active { transform: scale(.92); }
+  .zoom-btn .ms { font-size: 20px; }
+  .stage-controls { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+  .ctrl-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .ctrl-label {
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 1.4px;
+    color: var(--ink-3); width: 52px; flex-shrink: 0;
+  }
+  .ctrl-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; font-size: 12.5px;
+    background: var(--chip); color: var(--ink-2); border: 0; border-radius: 999px;
+    padding: 7px 13px; cursor: pointer; touch-action: manipulation;
+    transition: background .15s ease, color .15s ease;
+  }
+  .chip:hover { color: var(--ink); }
+  .chip.active { background: var(--soft); color: var(--on-soft); }
+  .stage-caption { text-align: center; color: var(--ink-3); font-size: 13.5px; margin-top: 16px; }
+  .stage-caption strong { color: var(--ink-2); font-weight: 600; }
+
+  /* ===== sections ===== */
+  section.block { padding-top: 64px; padding-bottom: 64px; }
+  .kicker {
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 12px;
+    letter-spacing: 1.6px; color: var(--accent); text-transform: uppercase;
+  }
+  .block h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; letter-spacing: -0.01em; margin-top: 10px; }
+  .block .lede { color: var(--ink-2); font-size: 17px; max-width: 560px; margin-top: 12px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; }
+  .step {
+    background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 26px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .step .num {
+    width: 44px; height: 44px; border-radius: 14px; background: var(--soft);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step .num .ms { font-size: 23px; color: var(--accent); }
+  .step h3 { font-size: 19px; font-weight: 700; }
+  .step p { margin: 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.55; }
+  .how-note {
+    display: flex; flex-direction: column; gap: 16px; align-items: flex-start;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 20px 24px; margin-top: 20px;
+  }
+  .how-note .ico {
+    width: 40px; height: 40px; border-radius: 14px; background: var(--soft);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .how-note .ico .ms { font-size: 20px; color: var(--accent); }
+  .how-note h3 { font-size: 16.5px; font-weight: 700; }
+  .how-note p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; max-width: 760px; }
+
+  /* security */
+  .sec-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 44px; align-items: center; margin-top: 40px; }
+  .sec-list { display: flex; flex-direction: column; gap: 22px; }
+  .sec-item { display: flex; gap: 16px; }
+  .sec-item .ico {
+    width: 40px; height: 40px; border-radius: 50%; background: var(--soft);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .sec-item .ico .ms { font-size: 20px; color: var(--accent); }
+  .sec-item h3 { font-size: 16.5px; font-weight: 700; }
+  .sec-item p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+  .perm-card { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 24px; }
+  .perm-card .pc-title { font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 16px; }
+  .perm-row { display: flex; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border-soft); }
+  .perm-row:last-of-type { border-bottom: 0; }
+  .perm-row .pn { flex: 1; font-size: 14px; font-weight: 600; }
+  .perm-tag { border-radius: 8px; padding: 3px 10px; font-size: 12px; font-weight: 700; background: var(--chip); color: var(--ink-2); }
+  .perm-tag.write { background: var(--soft); color: var(--on-soft); }
+  .perm-note { color: var(--ink-3); font-size: 12.5px; line-height: 1.5; margin-top: 10px; }
+
+  /* mini features */
+  .mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+  .mini {
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 20px;
+  }
+  .mini .ms { font-size: 24px; color: var(--accent); }
+  .mini h3 { font-size: 15.5px; font-weight: 700; margin-top: 12px; }
+  .mini p { margin: 5px 0 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
+
+  /* final cta */
+  .cta-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 32px;
+    padding: clamp(40px, 6vw, 72px) 32px; text-align: center;
+  }
+  .cta-card h2 { font-size: clamp(30px, 4.5vw, 46px); font-weight: 800; letter-spacing: -0.015em; }
+  .cta-card p { color: var(--ink-2); font-size: 17px; max-width: 520px; margin: 14px auto 0; }
+  .cta-card .hero-ctas { margin-top: 30px; }
+  .cta-foot { color: var(--ink-3); font-size: 13px; margin-top: 20px; }
+
+  /* footer */
+  footer { border-top: 1px solid var(--border); padding: 32px 0 44px; margin-top: 24px; }
+  .foot-in { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .foot-in .logo-name { font-size: 16px; }
+  .foot-links { display: flex; align-items: center; gap: 20px; margin-left: auto; flex-wrap: wrap; }
+  .foot-links a { font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; font-size: 13.5px; color: var(--ink-2); }
+  .foot-links a:hover { color: var(--accent); }
+  .foot-links a.bmc { background: #FFDD00; color: #000; padding: 5px 12px; border-radius: 999px; }
+  .foot-links a.bmc:hover { color: #000; opacity: .82; }
+  .foot-note { color: var(--ink-3); font-size: 12.5px; margin-top: 14px; }
+  .ph-badge { display: inline-flex; }
+  .ph-badge img { display: block; }
+  .ph-badge .ph-dark { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .ph-badge .ph-light { display: none; }
+    :root:not([data-theme="light"]) .ph-badge .ph-dark { display: block; }
+  }
+  :root[data-theme="dark"] .ph-badge .ph-light { display: none; }
+  :root[data-theme="dark"] .ph-badge .ph-dark { display: block; }
+  :root[data-theme="light"] .ph-badge .ph-light { display: block; }
+  :root[data-theme="light"] .ph-badge .ph-dark { display: none; }
+
+  @media (max-width: 860px) {
+    .steps { grid-template-columns: 1fr; }
+    .sec-grid { grid-template-columns: 1fr; gap: 32px; }
+    .mini-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 720px) {
+    nav.main { display: none; }
+    .hero { padding-top: 56px; padding-bottom: 40px; }
+    /* phone: the tablet slab becomes an iPhone — thinner bezel, rounder
+       corners, the edge camera dot replaced by a notch */
+    .device { border-radius: 52px; padding: 12px; }
+    .device::before { display: none; }
+    .device-notch {
+      display: block; position: absolute; top: 12px; left: 50%; z-index: 5;
+      transform: translateX(-50%); pointer-events: none;
+      width: min(48%, 176px); height: 27px; background: #101013;
+      border-radius: 0 0 18px 18px;
+    }
+    .device-notch::before { /* earpiece */
+      content: ""; position: absolute; left: 50%; top: 9px; transform: translateX(-50%);
+      width: 44px; height: 5px; border-radius: 3px; background: #1E1E24;
+    }
+    .device-notch::after { /* front camera */
+      content: ""; position: absolute; right: 22px; top: 8px;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #3A4A6B, #0B0B10 70%);
+    }
+    .device-buttons::before { /* volume keys, left edge */
+      top: 168px; right: auto; left: -5px; width: 5px; height: 36px;
+      border-radius: 3px 0 0 3px; box-shadow: 0 48px 0 0 #43434A;
+    }
+    .device-buttons::after { /* side (power) button, right edge */
+      top: 200px; left: auto; right: -5px; width: 5px; height: 60px;
+      border-radius: 0 3px 3px 0;
+    }
+    .device-action { /* action button above the volume keys */
+      display: block; position: absolute; top: 128px; left: -5px;
+      width: 5px; height: 22px; border-radius: 3px 0 0 3px;
+      background: #43434A; pointer-events: none;
+    }
+    .stage-card { border-radius: 40px; min-height: 420px; height: 68vh; }
+    /* keep the real iPhone proportion (9:19.5) instead of a squarish card:
+       the screen height drives the width, and the device centers itself.
+       The vh fallback above only serves browsers without aspect-ratio. */
+    @supports (aspect-ratio: 9 / 19.5) {
+      .device { width: min(100%, calc(78vh * 9 / 19.5 + 24px)); margin: 0 auto; }
+      .stage-card { height: auto; min-height: 0; aspect-ratio: 9 / 19.5; }
+    }
+    .hud-top { top: 52px; }
+    .hud-live, .hud-watch { top: 24px; }
+    .hud-watch { display: none; }
+    /* the LIVE-DEMO label collides with the total on narrow screens — keep the
+       pulsing dot, drop the label, and shrink the pill to a neat circle */
+    .hud-live-label { display: none; }
+    .hud-live { width: 40px; padding: 0; justify-content: center; }
+    section.block { padding-top: 48px; padding-bottom: 48px; }
+    .wrap { padding-left: 18px; padding-right: 18px; }
+  }
+  @media (max-width: 460px) {
+    /* icon-only on phones: a perfect circle matching the other header buttons
+       (desktop keeps the wide labelled "Open app" pill) */
+    .btn-hdr span.label { display: none; }
+    .btn-hdr { width: 36px; height: 36px; padding: 0; margin-left: 0; }
+    .btn-hdr .ms { font-size: 18px; }
+    .mini-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ===== language switcher (header) ===== */
+  .lang-select {
+    -webkit-appearance: none; appearance: none;
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; font-size: 13px;
+    color: var(--ink-2); background-color: var(--card);
+    border: 1px solid var(--border); border-radius: 999px;
+    height: 36px; padding: 0 30px 0 14px; cursor: pointer; flex-shrink: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='%239C948A'%3E%3Cpath d='M480-360 280-560h400L480-360Z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center; background-size: 16px;
+    transition: border-color .15s ease, color .15s ease; touch-action: manipulation;
+  }
+  .lang-select:hover { color: var(--ink); border-color: var(--ink-3); }
+  .lang-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* On narrow screens the flag+endonym select is too wide and crowds the header
+     buttons, so swap it for a circular flag button (matching the icon buttons)
+     with the native picker overlaid invisibly on top — tapping it still opens a
+     picker that lists every language by name, since it carries the full options. */
+  .lang-mini { display: none; }
+  @media (max-width: 560px) {
+    .lang-select--full { display: none; }
+    .lang-mini {
+      position: relative; display: inline-flex; flex-shrink: 0;
+      width: 36px; height: 36px; align-items: center; justify-content: center;
+      border: 1px solid var(--border); border-radius: 50%; background: var(--card);
+      overflow: hidden; transition: border-color .15s ease;
+    }
+    .lang-mini:hover { border-color: var(--ink-3); }
+    .lang-mini:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .lang-mini-flag { font-size: 17px; line-height: 1; pointer-events: none; }
+    .lang-mini-select {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; background: none;
+    }
+  }
+
+  /* ===== cross-language banner ("also available in …") ===== */
+  .lt-langbar { background: var(--soft); color: var(--on-soft); border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  .lt-langbar[hidden] { display: none; }
+  .lt-langbar-in { display: flex; align-items: center; gap: 10px; min-height: 44px; padding-top: 7px; padding-bottom: 7px; }
+  .lt-langbar .ms { font-size: 18px; flex-shrink: 0; }
+  .lt-langbar-text { flex: 1; }
+  .lt-langbar-cta {
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; color: var(--on-soft);
+    text-decoration: underline; text-underline-offset: 2px; white-space: nowrap;
+  }
+  .lt-langbar-x {
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; padding: 0;
+    border: 0; background: transparent; color: var(--on-soft); cursor: pointer;
+    font-size: 19px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    touch-action: manipulation; transition: background .15s ease;
+  }
+  .lt-langbar-x:hover { background: color-mix(in srgb, var(--on-soft) 15%, transparent); }

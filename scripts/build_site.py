@@ -49,10 +49,28 @@ INIT = {"total": "$436.00", "done": "$436", "goal": "$1,000", "pct": "44",
 
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([\w.\-]+)\s*\}\}")
 
+# `{{> partials/x.html}}` splices a file in verbatim, before any {{key}} is
+# substituted — so a partial can carry its own placeholders. `>` is outside
+# PLACEHOLDER_RE's character class, so the two passes never see each other's
+# tokens. Partials are stored without a trailing newline; the include token's
+# own line break supplies it.
+INCLUDE_RE = re.compile(r"\{\{>\s*([\w./\-]+)\s*\}\}")
+
 
 def load_json(path):
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def resolve_includes(text, depth=0):
+    if depth > 8:
+        raise RuntimeError("include nesting too deep — cycle in {{> …}}?")
+
+    def repl(m):
+        path = os.path.join(I18N, m.group(1))
+        with open(path, encoding="utf-8") as fh:
+            return resolve_includes(fh.read(), depth + 1)
+    return INCLUDE_RE.sub(repl, text)
 
 
 def esc(s):
@@ -89,7 +107,8 @@ def write(path, text):
 
 def build(out_dir, base):
     base = base.rstrip("/")
-    template = open(os.path.join(I18N, "template.html"), encoding="utf-8").read()
+    template = resolve_includes(
+        open(os.path.join(I18N, "template.html"), encoding="utf-8").read())
     reg = load_json(os.path.join(I18N, "locales.json"))
     default = reg["default"]
     locales = reg["locales"]
@@ -162,7 +181,19 @@ def build(out_dir, base):
         elif loc["script"] == "greek":
             preloads.append(preload("notosans-greek"))
 
+        # The header partial is shared with the blog, which anchors its logo at
+        # the locale home and carries a different nav. `nav_links` is rendered
+        # here rather than left as nested placeholders because the substitution
+        # is a single non-rescanning pass.
+        nav_links = ('<nav class="main">\n'
+                     '      <a href="#jar">%s</a>\n'
+                     '      <a href="#how">%s</a>\n'
+                     '      <a href="#security">%s</a>\n'
+                     '    </nav>' % (esc(s["nav_jar"]), esc(s["nav_how"]), esc(s["nav_security"])))
+
         subs.update({
+            "logo_href": "#top",
+            "nav_links": nav_links,
             "html_lang": code,
             # Carry the page's language into the app so it opens in the same
             # language the visitor is reading the landing page in.
