@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="{{html_lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{blog_index_title}}{{title_suffix}}</title>
+<meta name="description" content="{{blog_index_description}}">
+<!-- Self-referential, like every page on this site. A locale index is not a
+     duplicate of the English one; hreflang below ties them together. -->
+<link rel="canonical" href="{{canonical_url}}">
+{{hreflang_links}}
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#FAF6F1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14110E">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="live.tips">
+<meta property="og:url" content="{{og_url}}">
+<meta property="og:title" content="{{blog_index_title}}">
+<meta property="og:description" content="{{blog_index_description}}">
+<meta property="og:image" content="{{og_image}}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="{{og_locale}}">
+{{og_locale_alternates}}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{blog_index_title}}">
+<meta name="twitter:description" content="{{blog_index_description}}">
+<meta name="twitter:image" content="{{og_image}}">
+
+<link rel="alternate" type="application/atom+xml" title="{{feed_title}}" href="{{feed_url}}">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+{{font_preloads}}
+<script type="application/ld+json">
+{{jsonld}}
+</script>
+<style>
+{{> partials/style.css}}
+{{> partials/blog.css}}
+</style>
+</head>
+<body>
+
+{{> partials/langbar.html}}
+
+{{> partials/header.html}}
+
+<main id="top">
+  <div class="wrap blog-head">
+    <h1>{{blog_index_title}}</h1>
+    <p class="lede">{{blog_index_description}}</p>
+  </div>
+  <div class="wrap">
+    <div class="post-grid">
+{{post_cards}}
+    </div>
+  </div>
+</main>
+
+{{> partials/footer.html}}
+
+<!-- data-cfasync opts this script out of Cloudflare Rocket Loader: deferring it
+     would flash the wrong theme. Shared verbatim with the landing page. -->
+<script data-cfasync="false">
+(function () {
+  'use strict';
+
+{{> partials/chrome.js}}
+})();
+</script>
+</body>
+</html>

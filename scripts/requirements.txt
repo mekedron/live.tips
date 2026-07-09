@@ -1,0 +1,7 @@
+# Build-time only — nothing here ships to the browser.
+#
+# The landing page is pure stdlib; the blog needs a Markdown parser, and that is
+# the only dependency the site build has. Pinned exactly so a CI build and a
+# local build render identical HTML. Markdown is pure Python (no native
+# extension), so there is no wheel/platform matrix to worry about.
+Markdown==3.10.2

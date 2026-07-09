@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Notes on getting tipped: QR codes on stage, card payments without a middleman, and what we learn building live.tips in the open.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips blog",
+  "read_more": "Read more",
+  "published_on": "{date}",
+  "updated_on": "Updated {date}",
+  "reading_time_tmpl": "{min} min read",
+  "back_to_blog": "All posts",
+  "english_badge": "In English",
+  "empty_state": "Nothing here yet. The first post is on its way.",
+  "tags_label": "Topics",
+  "breadcrumb_home": "Home",
+  "breadcrumb_blog": "Blog"
+}

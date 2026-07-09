@@ -2,6 +2,10 @@
   var I18N = {{i18n_js}};
   var LOCALES = {{locales_js}};
   var CUR = "{{code}}";
+  /* Where the banner should send a reader who switches language from THIS page.
+     Empty on the landing (the locale home is right); on a blog page it maps each
+     locale to that post's translation, or to the locale's blog index. */
+  var ALT = {{alt_urls_js}};
 
   /* ================= language switcher (header <select>) ================= */
   [].forEach.call(document.querySelectorAll('.lang-select'), function (sel) {
@@ -29,7 +33,7 @@
     if (!want || want.c === CUR) return;
     document.getElementById('lt-langbar-text').textContent = want.b;
     var link = document.getElementById('lt-langbar-link');
-    link.href = want.c === 'en' ? '/' : '/' + want.c + '/';
+    link.href = ALT[want.c] || (want.c === 'en' ? '/' : '/' + want.c + '/');
     link.textContent = (want.f ? want.f + ' ' : '') + want.n + ' →';
     bar.hidden = false;
     document.getElementById('lt-langbar-x').addEventListener('click', function () {

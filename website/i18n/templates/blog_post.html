@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="{{html_lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{post_title}}{{title_suffix}}</title>
+<meta name="description" content="{{meta_description}}">
+<!-- Self-referential. A translation is NOT a duplicate of the English post:
+     canonicalizing it to /blog/<en-slug>/ would drop it from the index and void
+     the hreflang cluster below, which is the only thing telling Google these
+     pages are each other's language alternates. -->
+<link rel="canonical" href="{{canonical_url}}">
+{{hreflang_links}}
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#FAF6F1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14110E">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="live.tips">
+<meta property="og:url" content="{{og_url}}">
+<meta property="og:title" content="{{post_title}}">
+<meta property="og:description" content="{{post_description}}">
+<meta property="og:image" content="{{og_image}}">
+<meta property="og:image:alt" content="{{og_image_alt}}">
+<meta property="og:locale" content="{{og_locale}}">
+{{og_locale_alternates}}
+<meta property="article:published_time" content="{{published_iso}}">
+<meta property="article:modified_time" content="{{modified_iso}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{post_title}}">
+<meta name="twitter:description" content="{{post_description}}">
+<meta name="twitter:image" content="{{og_image}}">
+
+<!-- The raw-Markdown twin of this page, for LLMs and agents that would rather
+     not parse our HTML. Rendered by scripts/build_blog.py; announced here and
+     in /llms.txt, and deliberately absent from sitemap.xml — it is an alternate
+     representation of this page, not a page of its own. -->
+<link rel="alternate" type="text/markdown" href="{{markdown_url}}">
+<link rel="alternate" type="application/atom+xml" title="{{feed_title}}" href="{{feed_url}}">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+{{font_preloads}}
+<script type="application/ld+json">
+{{jsonld}}
+</script>
+<style>
+{{> partials/style.css}}
+{{> partials/blog.css}}
+</style>
+</head>
+<body>
+
+{{> partials/langbar.html}}
+
+{{> partials/header.html}}
+
+<main id="top">
+  <article class="wrap post-wrap">
+    <header class="post-header">
+      <a class="post-back" href="{{blog_url}}">{{back_to_blog}}</a>
+      <h1>{{post_title}}</h1>
+      <p class="lede">{{post_description}}</p>
+      <div class="post-meta">
+        <time datetime="{{published_iso}}">{{published_html}}</time>
+        <span class="post-meta-dot">·</span><span>{{reading_time}}</span>{{updated_html}}
+      </div>
+      {{post_tags}}
+    </header>
+    {{post_cover}}
+    <div class="post-body">
+{{post_body}}
+    </div>
+    <div class="post-foot">
+      <a class="post-back" href="{{blog_url}}">{{back_to_blog}}</a>
+    </div>
+  </article>
+</main>
+
+{{> partials/footer.html}}
+
+<!-- data-cfasync opts this script out of Cloudflare Rocket Loader: deferring it
+     would flash the wrong theme. Shared verbatim with the landing page. -->
+<script data-cfasync="false">
+(function () {
+  'use strict';
+
+{{> partials/chrome.js}}
+})();
+</script>
+</body>
+</html>

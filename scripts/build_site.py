@@ -12,34 +12,36 @@ English source of truth) and writes a static page per locale:
     _site/es/index.html      Español
     ... one dir per locale in website/i18n/locales.json ...
 
-It also emits `sitemap.xml` (with hreflang alternates) and copies the static
-assets from `website/` (fonts, icons, og-image, robots.txt). Every page gets a
-full hreflang cluster, a per-locale <select> switcher, and the embedded data
-the cross-language banner needs — all derived here, so adding a language is
-just a new strings/<code>.json plus an entry in locales.json.
+It then hands off to `build_blog.py`, which renders the localized Markdown blog
+into the same tree, and merges both sets of URLs into one `sitemap.xml` (each
+entry carrying its own hreflang alternates). Static assets from `website/`
+(fonts, icons, og-image, robots.txt) are copied across. Every page gets a full
+hreflang cluster, a per-locale <select> switcher, and the embedded data the
+cross-language banner needs — all derived here, so adding a language is just a
+new strings/<code>.json plus an entry in locales.json.
+
+Shared plumbing (template engine, partial includes, locale loading, sitemap
+emission) lives in `site_common.py`.
 
 Usage (also run verbatim by .github/workflows/pages.yml):
     python3 scripts/build_site.py --out _site
     python3 scripts/build_site.py --out /tmp/lt-site --base https://live.tips
 """
 import argparse
-import html
-import json
 import os
-import re
 import shutil
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEB = os.path.join(ROOT, "website")
-I18N = os.path.join(WEB, "i18n")
-STRINGS = os.path.join(I18N, "strings")
+import build_blog
+from site_common import (STRINGS, WEB, esc, font_preloads, home_path, js_literal,
+                         load_locales, load_strings, load_template, loc_url,
+                         render, sitemap_document, sitemap_url, write)
 
 # Values that legitimately contain inline markup (<br>, <em>, <strong>) and so
 # are injected verbatim; every other string is HTML-escaped.
 HTML_KEYS = {"hero_h1", "hero_sub", "stage_caption", "cta_h2"}
 
-# Runtime strings handed to the page's JS (see template's `var I18N = …`).
+# Runtime strings handed to the page's JS (see the chrome partial's `var I18N = …`).
 JS_KEYS = ("goal_tmpl", "tip_tmpl", "theme")
 
 # The demo HUD's initial numbers, matching the renderer boot state in the
@@ -47,93 +49,15 @@ JS_KEYS = ("goal_tmpl", "tip_tmpl", "theme")
 INIT = {"total": "$436.00", "done": "$436", "goal": "$1,000", "pct": "44",
         "name": "Anna S.", "amount": "$5.00"}
 
-PLACEHOLDER_RE = re.compile(r"\{\{\s*([\w.\-]+)\s*\}\}")
-
-# `{{> partials/x.html}}` splices a file in verbatim, before any {{key}} is
-# substituted — so a partial can carry its own placeholders. `>` is outside
-# PLACEHOLDER_RE's character class, so the two passes never see each other's
-# tokens. Partials are stored without a trailing newline; the include token's
-# own line break supplies it.
-INCLUDE_RE = re.compile(r"\{\{>\s*([\w./\-]+)\s*\}\}")
-
-
-def load_json(path):
-    with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
-
-
-def resolve_includes(text, depth=0):
-    if depth > 8:
-        raise RuntimeError("include nesting too deep — cycle in {{> …}}?")
-
-    def repl(m):
-        path = os.path.join(I18N, m.group(1))
-        with open(path, encoding="utf-8") as fh:
-            return resolve_includes(fh.read(), depth + 1)
-    return INCLUDE_RE.sub(repl, text)
-
-
-def esc(s):
-    return html.escape(s, quote=True)
-
-
-def js_literal(obj):
-    """JSON for embedding in a <script>; neutralize any </script> break-out."""
-    return json.dumps(obj, ensure_ascii=False).replace("<", "\\u003c")
-
-
-def home_path(code, default):
-    return "/" if code == default else "/%s/" % code
-
-
-def loc_url(base, code, default):
-    return base + "/" if code == default else "%s/%s/" % (base, code)
-
-
-def render(template, subs):
-    def repl(m):
-        key = m.group(1)
-        if key not in subs:
-            raise KeyError("template placeholder {{%s}} has no value" % key)
-        return subs[key]
-    return PLACEHOLDER_RE.sub(repl, template)
-
-
-def write(path, text):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write(text)
-
 
 def build(out_dir, base):
     base = base.rstrip("/")
-    template = resolve_includes(
-        open(os.path.join(I18N, "template.html"), encoding="utf-8").read())
-    reg = load_json(os.path.join(I18N, "locales.json"))
-    default = reg["default"]
-    locales = reg["locales"]
-    codes = [l["code"] for l in locales]
-    names = {l["code"]: l["name"] for l in locales}
-    flags = {l["code"]: l.get("flag", "") for l in locales}
-
-    en = load_json(os.path.join(STRINGS, "en.json"))
+    template = load_template("template.html")
+    default, locales, codes, names, flags = load_locales()
 
     # Load every locale's strings up front (English-filled for any gaps) so the
     # banner table can carry each language's own invitation phrase.
-    all_strings, warnings = {}, []
-    for code in codes:
-        path = os.path.join(STRINGS, "%s.json" % code)
-        data = load_json(path) if os.path.exists(path) else {}
-        if not os.path.exists(path):
-            warnings.append("  %s.json missing — English fallback for all keys" % code)
-        merged = dict(en)
-        merged.update({k: v for k, v in data.items() if k in en})
-        missing = [k for k in en if k not in data]
-        if data and missing:
-            warnings.append("  %s.json missing %d key(s): %s"
-                            % (code, len(missing), ", ".join(missing[:8])
-                               + (" …" if len(missing) > 8 else "")))
-        all_strings[code] = merged
+    all_strings, warnings = load_strings(STRINGS, codes)
 
     # Cross-language banner data (constant across pages): code, endonym, and the
     # "also available in …" phrase written IN that language.
@@ -168,19 +92,6 @@ def build(out_dir, base):
         # og:locale:alternate for every other locale.
         alts = "\n".join('<meta property="og:locale:alternate" content="%s">' % l["og_locale"]
                          for l in locales if l["code"] != code)
-        # Per-locale font preloads: Latin-1 always; add the extra subset the
-        # locale's script needs so its glyphs don't wait on lazy discovery.
-        def preload(stem):
-            return ('<link rel="preload" href="/fonts/%s.woff2" as="font" type="font/woff2" crossorigin>'
-                    % stem)
-        preloads = [preload("outfit-latin"), preload("notosans-latin")]
-        if loc["script"] == "latinext":
-            preloads += [preload("outfit-latinext"), preload("notosans-latinext")]
-        elif loc["script"] == "cyrillic":
-            preloads.append(preload("notosans-cyrillic"))
-        elif loc["script"] == "greek":
-            preloads.append(preload("notosans-greek"))
-
         # The header partial is shared with the blog, which anchors its logo at
         # the locale home and carries a different nav. `nav_links` is rendered
         # here rather than left as nested placeholders because the substitution
@@ -203,11 +114,14 @@ def build(out_dir, base):
             "og_locale": loc["og_locale"],
             "og_locale_alternates": alts,
             "hreflang_links": hreflang_links,
-            "font_preloads": "\n".join(preloads),
+            "font_preloads": font_preloads(loc),
             "lang_switcher_options": "".join(opts),
             "current_flag": esc(flags[code]),
             "i18n_js": js_literal({k: s[k] for k in JS_KEYS}),
             "locales_js": locales_js,
+            # The landing's per-locale twin is always the locale home, which the
+            # banner already derives; only the blog needs an override table.
+            "alt_urls_js": "{}",
             "code": code,
             "hud_total_static": esc(INIT["total"]),
             "hud_goal_static": esc(s["goal_tmpl"].replace("{done}", INIT["done"])
@@ -222,9 +136,11 @@ def build(out_dir, base):
     for code in codes:
         write(os.path.join(out_dir, code, "index.html"), page(code))
 
-    # Static assets: everything under website/ except the i18n sources, the
-    # internal README, and the files this build (re)generates.
-    skip = {"i18n", "README.md", "index.html", "sitemap.xml"}
+    # Static assets: everything under website/ except the i18n sources, the blog's
+    # Markdown sources (build_blog.py renders those, and copying them here would
+    # shadow the rendered tree), the internal README, and the files this build
+    # (re)generates.
+    skip = {"i18n", "blog", "README.md", "index.html", "sitemap.xml"}
     for name in sorted(os.listdir(WEB)):
         if name in skip:
             continue
@@ -236,24 +152,30 @@ def build(out_dir, base):
             os.makedirs(out_dir, exist_ok=True)
             shutil.copy2(src, dst)
 
+    # The blog renders into the same tree and returns its own sitemap entries.
+    # It reuses this build's locale registry and landing strings — the blog pages
+    # wear the same header, footer and banner, whose copy lives in strings/.
+    blog_urls, blog_warnings, blog_stats = build_blog.build(out_dir, base, {
+        "default": default, "locales": locales, "codes": codes,
+        "names": names, "flags": flags, "locales_js": locales_js,
+        "site_strings": all_strings,
+    })
+    warnings += blog_warnings
+
     # Sitemap: root + each /code/ (the /en/ alias and disallowed /app/, /stage/
-    # are deliberately absent), every entry carrying the full hreflang set.
-    xhtml = ['<xhtml:link rel="alternate" hreflang="x-default" href="%s"/>' % (base + "/")]
-    for c in codes:
-        xhtml.append('<xhtml:link rel="alternate" hreflang="%s" href="%s"/>'
-                     % (c, loc_url(base, c, default)))
-    alt_block = "\n".join("    " + x for x in xhtml)
-    urls = []
-    for c in codes:
-        urls.append("  <url>\n    <loc>%s</loc>\n%s\n  </url>" % (loc_url(base, c, default), alt_block))
-    sitemap = ('<?xml version="1.0" encoding="UTF-8"?>\n'
-               '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
-               '        xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
-               + "\n".join(urls) + "\n</urlset>\n")
-    write(os.path.join(out_dir, "sitemap.xml"), sitemap)
+    # are deliberately absent), every landing entry carrying the full hreflang
+    # set. Blog entries bring their own — a post is only announced in the
+    # languages it has actually been translated into.
+    landing_alts = [("x-default", base + "/")]
+    landing_alts += [(c, loc_url(base, c, default)) for c in codes]
+    urls = [sitemap_url(loc_url(base, c, default), landing_alts) for c in codes]
+    write(os.path.join(out_dir, "sitemap.xml"), sitemap_document(urls + blog_urls))
 
     print("Built %d locales into %s" % (len(codes), out_dir))
     print("  pages: / (root) + " + ", ".join("/%s/" % c for c in codes))
+    print("  blog:  %d post(s), %d translation(s), %d page(s), %d feed(s)"
+          % (blog_stats["posts"], blog_stats["translations"],
+             blog_stats["pages"], blog_stats["feeds"]))
     if warnings:
         print("Warnings:")
         print("\n".join(warnings))
@@ -264,7 +186,12 @@ def main():
     ap.add_argument("--out", required=True, help="output directory (e.g. _site)")
     ap.add_argument("--base", default="https://live.tips", help="canonical origin")
     args = ap.parse_args()
-    build(args.out, args.base)
+    try:
+        build(args.out, args.base)
+    except build_blog.BuildError as e:
+        # A mistake in someone's Markdown, not a crash. Say what to fix, and
+        # don't bury it under a traceback nobody needs.
+        sys.exit("Blog content error — %s" % e)
 
 
 if __name__ == "__main__":
