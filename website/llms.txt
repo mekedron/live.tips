@@ -25,6 +25,12 @@ This matters because almost nobody carries cash anymore: a band can fill a bar a
 
 Most live performers earn very little, and tips are often their main income. live.tips gives them a modern, cashless, dignified way to be supported directly by the people enjoying the show, with no platform taking a share.
 
+## Blog
+
+- [Blog](https://live.tips/blog/): posts on getting tipped — QR codes on stage, card payments without a middleman, and notes from building live.tips in the open. Localized like the rest of the site: a post translated into a language is served from `/<code>/blog/<slug>/` (the slug itself may be translated), and one that is not stays English-only rather than being machine-translated.
+- **Every post has a raw-Markdown twin.** Append `.md` to any post URL to fetch the article as plain Markdown, with a `Canonical:` / `Published:` header and fully-qualified links — e.g. <https://live.tips/blog/one-qr-code-every-payment-method.md>. It is the same content as the HTML page, without the markup. Each HTML post also advertises it via `<link rel="alternate" type="text/markdown">`.
+- [Atom feed](https://live.tips/blog/feed.xml): every post, newest first. One feed per language at `/<code>/blog/feed.xml`.
+
 ## Key pages
 
 - [Landing page](https://live.tips/): what it is, how it works, the security model, and the live 3D jar demo running right in the browser.

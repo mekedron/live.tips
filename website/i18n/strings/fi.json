@@ -90,6 +90,7 @@
   "cta_h2": "Käteinen katosi.<br>Aplodit eivät.",
   "cta_p": "Toimii selaimessasi jo tänään — ei asennusta, ei rekisteröitymistä. Natiivisovellukset ja lisää maksutapoja ovat suunnitteilla.",
   "cta_foot": "Tehty katusoittajille, baaribändeille ja katutaiteilijoille — yhden teistä tekemänä.",
+  "foot_blog": "Blogi",
   "foot_note": "Avointa lähdekoodia MIT-lisenssillä. Tipit menevät suoraan artistin omalle Stripe-tilille — live.tips ei koskaan kosketa rahoja.",
   "a11y_dismiss": "Sulje",
   "banner": "Tämä sivusto on saatavilla myös suomeksi.",

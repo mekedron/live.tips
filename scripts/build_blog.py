@@ -508,6 +508,7 @@ def build(out_dir, base, ctx):
         subs.update({
             "logo_href": "/" if lang == default else "/%s/" % lang,
             "app_href": "/app/?lang=%s" % lang,
+            "blog_href": urls.index(lang),
             "html_lang": lang,
             "lang_switcher_options": "".join(
                 '<option value="%s"%s>%s</option>'

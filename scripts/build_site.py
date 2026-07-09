@@ -109,6 +109,7 @@ def build(out_dir, base):
             # Carry the page's language into the app so it opens in the same
             # language the visitor is reading the landing page in.
             "app_href": "/app/?lang=%s" % code,
+            "blog_href": "/blog/" if code == default else "/%s/blog/" % code,
             "canonical_url": canon,
             "og_url": canon,
             "og_locale": loc["og_locale"],

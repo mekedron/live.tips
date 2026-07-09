@@ -41,7 +41,58 @@ app and stage are excluded there and disallowed in `robots.txt`.
 
 The `{{key}}` placeholders never collide with the page's CSS/JS braces; a few
 values carry inline markup (`hero_h1`, `hero_sub`, `stage_caption`, `cta_h2`)
-and are injected raw — everything else is HTML-escaped.
+and are injected raw — everything else is HTML-escaped. A second directive,
+`{{> partials/x.html}}`, splices a file in before any `{{key}}` is filled, which
+is how the landing and the blog share one header, footer, banner, stylesheet and
+chrome script (see [`i18n/partials/`](i18n/partials/)).
+
+## The blog
+
+Posts are Markdown, in [`blog/posts/<dir>/`](blog/posts/), rendered by
+[`scripts/build_blog.py`](../scripts/build_blog.py) (which `build_site.py` calls,
+so both share one locale registry and one `sitemap.xml`).
+
+```
+blog/posts/one-qr-code-every-payment-method/
+  post.json     date, updated?, cover?, cover_alt?, tags?, draft?, order?
+  en.md         REQUIRED — every untranslated locale links its readers here
+  de.md         optional; a post exists in the languages it has files for
+  assets/       images, copied once and addressed from every language
+```
+
+Each `<lang>.md` opens with a flat `---` frontmatter block: `title` and
+`description` are required, `slug` and `updated` are optional per-language
+overrides. It is not YAML — a real YAML parser would read `slug: no` as `false`.
+
+**Write a post** → new directory, a `post.json` with a `date`, and an `en.md`.
+**Translate one** → drop a `<lang>.md` beside it. Nothing else to wire up.
+
+Three rules are worth knowing before you write:
+
+- **Untranslated is a normal state.** A post is only ever published in the
+  languages it was actually written in; an English body is never served from
+  `/de/blog/…`. Every locale's index still lists every post — an untranslated one
+  shows its English title, an "In English" badge, and links to the English URL.
+- **Every page canonicalizes to itself.** A translation is not a duplicate of the
+  English post. Pointing its canonical at `/blog/<en-slug>/` would drop it from
+  Google's index *and* void the hreflang cluster that ties the languages together.
+  Each post's cluster names only the locales it exists in, plus `x-default`.
+- **Cross-link posts as `[text](post:<dir>)`**, never as a URL — slugs differ per
+  language, so the build resolves `post:` to the reader's own locale (or English
+  if that post has no translation there). Images are `assets/x.jpg`, rewritten to
+  the one absolute copy.
+
+Each post also gets a raw-Markdown twin at its URL + `.md` (for LLMs and agents),
+a per-locale Atom feed at `/blog/feed.xml`, and `BlogPosting` + `BreadcrumbList`
+JSON-LD. Blog chrome strings live in [`i18n/blog_strings/`](i18n/blog_strings/),
+separate from the landing's `strings/` so the blog can ship English-first without
+the landing warning about every untranslated key.
+
+Mistakes fail the build with a message naming the file: a link into a draft, two
+posts colliding on a slug in some language, a post with no `en.md`, frontmatter
+missing a title. [`scripts/check_site.py`](../scripts/check_site.py) then gates
+the rendered output — self-canonical everywhere, every hreflang and sitemap
+target resolves, JSON-LD parses — and the deploy runs it after every build.
 
 ## The tip-jar stage is reused, not copied
 
@@ -65,7 +116,7 @@ to `website/`.
 | `favicon.png`, `apple-touch-icon.png`, inline SVG favicon | `python3 scripts/gen_icons.py` |
 | `og-image.png` (social share banner) | `python3 scripts/gen_og_image.py` |
 | `fonts/*.woff2` (Outfit + Noto Sans subsets, split latin / latin-ext / Cyrillic / Greek) | `python3 scripts/gen_fonts.py` |
-| `index.html`, `<code>/index.html`, `sitemap.xml` | `python3 scripts/build_site.py --out _site` (run by the deploy) |
+| `index.html`, `<code>/index.html`, `blog/**`, `<code>/blog/**`, `sitemap.xml` | `python3 scripts/build_site.py --out _site` (run by the deploy) |
 
 Icons in the template are inline Material Symbols SVG paths (`svg.ms`) — there
 is deliberately no icon font. `robots.txt` and `llms.txt` (an LLM-facing
