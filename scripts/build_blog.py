@@ -56,7 +56,11 @@ MD_EXTENSIONS = ["extra", "sane_lists", "toc"]
 
 WORDS_PER_MINUTE = 200
 
-# Inline Markdown link/image targets: `](target)` and `](target "title")`.
+# Inline Markdown link/image targets: `](target)` and `](target "title")`. Only
+# the inline form — reference links (`[a][b]`) and autolinks (`<https://…>`) are
+# left alone, so `assets/` and `post:` must be written inline. Nothing else in a
+# post needs rewriting, and a real Markdown AST walk to catch the other two forms
+# would cost a treeprocessor for no gain.
 LINK_TARGET_RE = re.compile(r'(?<=\]\()([^)\s]+)((?:\s+"[^"]*")?\))')
 
 FRONTMATTER_FENCE = "---"
@@ -129,10 +133,6 @@ class Post:
         self.tags = meta.get("tags", [])
         self.cover = meta.get("cover")
         self.cover_alt = meta.get("cover_alt", "")
-
-    @property
-    def en(self):
-        return self.tr["en"]
 
     def slug(self, lang):
         return self.tr[lang].slug or self.name
