@@ -5,7 +5,7 @@ artist's device talks straight to `api.stripe.com` with a restricted key
 created by the artist — there is no live.tips backend. An **optional connected
 mode** adds Revolut/MobilePay via a minimal relay (`worker/`,
 `api.live.tips`); it is described in [Optional relay](#optional-relay-workerapilivetips)
-below and stores no donation data. This document explains the moving parts and
+below and keeps no donation history. This document explains the moving parts and
 the reasoning.
 
 ## The core loop: polling instead of webhooks
@@ -181,8 +181,17 @@ the smallest server that makes this possible:
   enabled methods. Revolut/MobilePay show a Turnstile-gated form (amount, name,
   message). Submitting relays a `tip` event over a WebSocket to the artist's
   device (first-message auth, hibernation-friendly), then redirects the fan to
-  the payment deep link. **No tip is ever stored server-side**; if the device
-  is offline the event is dropped by design.
+  the payment deep link.
+- **A tip outlives a missing screen, but only just.** The artist's socket dies
+  for ordinary reasons — the phone locks, they switch to MobilePay to check a
+  payment, they walk behind a wall — and the fan has already been sent off to
+  pay by the time we notice. So an undelivered `tip` event is queued in the jar
+  (bounded by `MAX_PENDING`, swept after `PENDING_TTL_MS` = 1 h by the same
+  alarm that handles the 90-day expiry), flushed to the next socket that
+  authenticates, and deleted on delivery. Every event carries a server-minted
+  `id`, so the flush can send before it deletes: a crash mid-flush redelivers,
+  and the app's dedupe-by-id keeps the tip off the stage twice. This queue is
+  the *only* place donor text is ever written server-side.
 - The app treats relayed tips as **unverified**: they count toward the session
   with a visible badge, never get the "big tipper" treatment, and History
   labels them as reported-not-confirmed.
@@ -195,7 +204,12 @@ the smallest server that makes this possible:
   token.
 - The live session keeps two independent channels: the unchanged Stripe poller
   and the relay WebSocket. Relay failures degrade to Stripe-only with a status
-  pill; they never block a session.
+  pill; they never block a session. Returning to the foreground redials the
+  socket at once (`RelayTipChannel.reconnectNow`) rather than waiting out a
+  backoff on a connection the OS has not yet admitted is dead.
+- Close codes are a contract: `4401` (bad or rotated secret) and `4410` (jar
+  gone) are terminal and send the artist to re-link; everything else, including
+  `4408` (auth deadline missed on a slow link), is transient and retried.
 
 ## Testing
 

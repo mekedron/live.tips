@@ -4,7 +4,9 @@ A minimal Cloudflare Worker that lets artists accept **MobilePay Box** and
 **Revolut** tips in addition to Stripe. It is a **profile store + live event
 pipe** — it stores an artist's public tip-jar profile (name, message, payment
 handles) and forwards tip notifications to the artist's device over a
-WebSocket. **It never stores donation history and never touches money.**
+WebSocket. **It keeps no donation history and never touches money.** A tip that
+finds nobody connected waits up to an hour for the artist's screen and is then
+deleted unseen; that queue is the only donor text ever written here.
 
 Stripe tips do not go through here at all — the app talks to Stripe directly,
 exactly as before. This relay exists only because MobilePay/Revolut have no
@@ -14,9 +16,15 @@ app labels them as such.
 ## Design
 
 - **One Durable Object per jar** (`JarDO`, SQLite backend). Holds ~1 KB: the
-  profile, a SHA-256 hash of the artist's secret, and the artist's hibernated
-  WebSockets. Self-destructs via its own alarm 90 days after the artist was
-  last seen — there is no global cleanup job.
+  profile, a SHA-256 hash of the artist's secret, the artist's hibernated
+  WebSockets, and — only while their screen is away — the tips it has not
+  managed to hand over yet. Self-destructs via its own alarm 90 days after the
+  artist was last seen — there is no global cleanup job.
+- **An undelivered tip is queued, not dropped.** The fan is redirected to pay
+  the instant they submit, so losing the event because the artist's phone
+  happened to be locked would cost them real money for nothing. The queue is
+  capped, swept after an hour by the same alarm, and emptied the moment a
+  screen authenticates.
 - **One `RegistryDO`** (single instance): a directory of jars for the
   maintainer admin view, plus the per-IP jar-creation quota. Metadata and
   counters only — never tip content or donor identities.
@@ -41,9 +49,19 @@ app labels them as such.
 | GET | `/healthz` | — | liveness |
 
 The WebSocket authenticates with a first message `{"type":"auth","secret":…}`;
-the server replies `{"type":"ready"}` or closes with code `4401`. Keepalive
-uses the hibernation auto-response (`ping`/`pong`) so idle sockets never wake
-the object.
+the server replies `{"type":"ready"}`, immediately followed by any tips queued
+while the device was away, or closes with a code. Keepalive uses the
+hibernation auto-response (`ping`/`pong`) so idle sockets never wake the
+object.
+
+Close codes are a contract with the app. `4401` (bad or rotated secret) and
+`4410` (jar gone) are **terminal** — the artist must re-link. Everything else
+is transient and retried, including `4408`, which means only that the socket
+missed the 30-second auth deadline on a slow link.
+
+`POST /t/:id/tips` answers `{redirectUrl, delivered, queued}`: `delivered` when
+a live screen took it, `queued` when it is waiting for one. The fan gets their
+deep link either way.
 
 ## Local development
 

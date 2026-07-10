@@ -196,9 +196,11 @@ export function renderDonorPage(profile: JarProfile, siteKey: string): string {
   ${buttons.join("\n  ")}
   ${form}
   <footer>
-    Tips you send here are relayed live to the performer's screen and never stored.
-    The performer's name and payment methods are kept until they delete this page
-    or after 90 days of inactivity. Powered by <a href="https://live.tips" rel="noopener">live.tips</a>.
+    Tips you send here go straight to the performer's screen. If their screen is
+    away, your tip waits up to an hour for it and is then deleted unseen — live.tips
+    keeps no donation history. The performer's name and payment methods are kept
+    until they delete this page or after 90 days of inactivity.
+    Powered by <a href="https://live.tips" rel="noopener">live.tips</a>.
   </footer>
 </main>
 ${turnstileScript}

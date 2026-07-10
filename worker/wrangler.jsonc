@@ -24,8 +24,10 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["JarDO", "RegistryDO"] }],
   "vars": {
-    // Public Turnstile sitekey. The placeholder is Cloudflare's visible,
-    // always-passing test key; replaced with the real key at deploy time.
+    // The real, public Turnstile sitekey for live.tips — deployed verbatim,
+    // nothing substitutes it. Safe to commit (sitekeys are served in the donor
+    // page's HTML); its secret half lives in TURNSTILE_SECRET. Tests override
+    // both with Cloudflare's always-passing pair, see vitest.config.ts.
     "TURNSTILE_SITE_KEY": "0x4AAAAAADxbXSyz6hPQKTiZ"
   },
   "observability": { "enabled": true, "head_sampling_rate": 1 },

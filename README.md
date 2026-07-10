@@ -13,7 +13,7 @@ tip live, with a goal progress bar, the latest message, and confetti.
 Artists can optionally also accept **Revolut** and **MobilePay Box** tips. Those two
 have no API to confirm a payment, so they route through a tiny open-source relay
 ([`worker/`](worker/), `api.live.tips`) that forwards tip notifications to the artist's
-device and **stores no donation history and never touches money**. Tips from these
+device and **keeps no donation history and never touches money**. Tips from these
 methods are shown as *unverified* because live.tips cannot confirm they were actually
 paid. Stripe-only setups still talk to no live.tips server at all — see
 [Connected mode](#connected-mode-revolut--mobilepay) below.
@@ -48,10 +48,15 @@ on Cloudflare at `api.live.tips`):
   method the artist enabled. Card / Apple Pay / Google Pay still go straight to the
   artist's Stripe link; Revolut and MobilePay open a short form (amount, name, message).
 - Submitting the form relays the tip to the artist's device over a WebSocket and
-  redirects the fan to the Revolut/MobilePay deep link. The relay **stores nothing** —
-  no donation history, no accounts, no analytics — and the artist's profile
-  (name, message, payment handles, all plain text) self-deletes after 90 days of
-  inactivity.
+  redirects the fan to the Revolut/MobilePay deep link. The relay keeps **no donation
+  history, no accounts, no analytics**, and the artist's profile (name, message,
+  payment handles, all plain text) self-deletes after 90 days of inactivity.
+- A device that is away — phone locked, artist checking their MobilePay app, walked
+  out of signal — would otherwise miss the tip entirely, since the fan has already
+  paid by then. So an undelivered tip waits in its jar for **up to one hour**, is
+  handed over the moment the artist's screen reconnects, and is deleted unseen if it
+  never does. That is the relay's only storage of donor text, and the only exception
+  to "no donation history".
 - Revolut/MobilePay tips are shown as **unverified**: they appear the moment a fan
   submits the form, whether or not the payment completes. The artist reconciles against
   their own Revolut/MobilePay app.
