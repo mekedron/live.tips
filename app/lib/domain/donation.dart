@@ -123,9 +123,14 @@ class Donation {
     );
   }
 
-  /// A tip relayed by the connected-mode worker (MobilePay/Revolut). The id
-  /// is only locally unique — [serial] disambiguates tips sharing the same
-  /// millisecond — and the payment is donor-declared, hence unverified.
+  /// A tip relayed by the connected-mode worker (MobilePay/Revolut). The
+  /// payment is donor-declared, hence unverified.
+  ///
+  /// [relayId] is the relay's own id for this tip, stable across redeliveries:
+  /// a tip the relay held while this device was away may be replayed, and the
+  /// session dedupes on the donation id to keep it off the stage twice. Older
+  /// relays send no id, so fall back to a locally-unique one — [serial]
+  /// disambiguates tips that share a millisecond.
   factory Donation.relayTip({
     required int amountMinor,
     required String currency,
@@ -134,9 +139,10 @@ class Donation {
     String? message,
     required int ts,
     required int serial,
+    String? relayId,
   }) =>
       Donation(
-        id: 'relay_${ts}_$serial',
+        id: relayId == null ? 'relay_${ts}_$serial' : 'relay_$relayId',
         amountMinor: amountMinor,
         currency: currency,
         createdAt: DateTime.fromMillisecondsSinceEpoch(ts),

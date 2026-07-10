@@ -40,6 +40,7 @@ class LiveScreen extends ConsumerStatefulWidget {
 
 class _LiveScreenState extends ConsumerState<LiveScreen> {
   late final ConfettiController _confetti;
+  late final AppLifecycleListener _lifecycle;
 
   /// Live width of the QR rail while the performer drags its handle. Seeded
   /// from the persisted [StageSettings.railWidth] on first paint; committed
@@ -68,6 +69,13 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     );
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Leaving the app — to open MobilePay, to answer a call, to lock the
+    // phone — kills the relay's WebSocket without telling us. Redial the
+    // moment the stage is back, so the feed is live again before the artist
+    // has looked down at it.
+    _lifecycle = AppLifecycleListener(
+      onResume: () => ref.read(liveSessionProvider.notifier).relayReconnectNow(),
+    );
     // every session gets a fresh chance at the 3D stage (post-frame:
     // providers must not change while the tree is building)
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -77,6 +85,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _confetti.dispose();
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

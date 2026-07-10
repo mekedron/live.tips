@@ -83,7 +83,7 @@ void main() {
     expect(jsonDecode(encodePong()), {'type': 'pong'});
   });
 
-  test('toDonation builds the relay donation with the serial in the id', () {
+  test('toDonation falls back to the serial when the relay sends no id', () {
     final tip = decodeRelayMessage(tipJson(name: '', message: '')) as RelayTip;
     final donation = tip.toDonation(4);
     expect(donation.id, 'relay_1751500000000_4');
@@ -93,5 +93,43 @@ void main() {
     expect(donation.name, isNull, reason: 'empty name stays anonymous');
     expect(donation.hasMessage, isFalse);
     expect(donation.createdAt.millisecondsSinceEpoch, 1751500000000);
+  });
+
+  test("the relay's id wins, so a replayed tip keeps one identity", () {
+    final frame = jsonEncode({
+      'type': 'tip',
+      'id': 'ab12',
+      'method': 'revolut',
+      'amountMinor': 500,
+      'currency': 'EUR',
+      'name': 'Maya',
+      'message': 'Encore!',
+      'ts': 1751500000000,
+    });
+    final tip = decodeRelayMessage(frame) as RelayTip;
+    expect(tip.id, 'ab12');
+    // The relay redelivers a queued tip on the next connection, where the
+    // channel's serial has restarted. The donation id must not move with it,
+    // or the session dedupe lets the same tip onto the stage twice.
+    expect(tip.toDonation(0).id, tip.toDonation(7).id);
+    expect(tip.toDonation(0).id, 'relay_ab12');
+  });
+
+  test('a blank or non-string id degrades to the serial form', () {
+    for (final bad in <Object>['', 42, <String, String>{}]) {
+      final frame = jsonEncode({
+        'type': 'tip',
+        'id': bad,
+        'method': 'revolut',
+        'amountMinor': 500,
+        'currency': 'EUR',
+        'name': 'Maya',
+        'message': 'Encore!',
+        'ts': 1751500000000,
+      });
+      final tip = decodeRelayMessage(frame) as RelayTip;
+      expect(tip.id, isNull, reason: '$bad is not an id');
+      expect(tip.toDonation(3).id, 'relay_1751500000000_3');
+    }
   });
 }

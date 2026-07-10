@@ -393,4 +393,97 @@ void main() {
       expect(h.sockets, hasLength(1));
     });
   });
+
+  group('reconnectNow (app returned to the foreground)', () {
+    test('redials at once instead of waiting out the backoff', () {
+      fakeAsync((async) {
+        final h = Harness(backoff: (_) => const Duration(seconds: 30));
+        h.channel.start();
+        async.flushMicrotasks();
+        h.socket.serverClose(); // suspended: the socket died
+        async.flushMicrotasks();
+        expect(h.statuses.last, RelayHealth.down);
+        expect(h.sockets, hasLength(1), reason: '30 s of backoff still to run');
+
+        h.channel.reconnectNow();
+        async.flushMicrotasks();
+
+        expect(h.sockets, hasLength(2), reason: 'redialled without waiting');
+        expect(h.socket.sent.first, encodeAuth('sec_test'));
+
+        h.socket.serverSend('{"type":"ready"}');
+        async.flushMicrotasks();
+        expect(h.statuses.last, RelayHealth.ok);
+
+        // The 30 s timer that was already ticking must not fire a second,
+        // redundant connect on top of the one we just made.
+        async.elapse(const Duration(minutes: 1));
+        expect(h.sockets, hasLength(2));
+      });
+    });
+
+    test('replaces a socket the OS has not yet admitted is dead', () {
+      fakeAsync((async) {
+        final h = Harness();
+        h.channel.start();
+        async.flushMicrotasks();
+        h.socket.serverSend('{"type":"ready"}');
+        async.flushMicrotasks();
+        expect(h.statuses.last, RelayHealth.ok);
+
+        // Looks healthy; the phone was actually asleep and the peer is gone.
+        final stale = h.socket;
+        h.channel.reconnectNow();
+        async.flushMicrotasks();
+
+        expect(stale.sinkClosed, isTrue);
+        expect(h.sockets, hasLength(2));
+
+        h.socket.serverSend('{"type":"ready"}');
+        async.flushMicrotasks();
+        expect(h.statuses.last, RelayHealth.ok);
+
+        // A late done from the abandoned socket must not kill the new one.
+        stale.serverClose();
+        async.elapse(const Duration(minutes: 1));
+        expect(h.sockets, hasLength(2), reason: 'no cascade of reconnects');
+        expect(h.statuses.last, RelayHealth.ok);
+      });
+    });
+
+    test('stays put after a terminal close, and after dispose', () {
+      fakeAsync((async) {
+        final h = Harness();
+        h.channel.start();
+        async.flushMicrotasks();
+        h.socket.serverClose(4401); // bad secret — re-linking is the only cure
+        async.flushMicrotasks();
+        expect(h.statuses.last, RelayHealth.unauthorized);
+
+        h.channel.reconnectNow();
+        async.elapse(const Duration(minutes: 10));
+        expect(h.sockets, hasLength(1), reason: 'terminal means terminal');
+
+        h.channel.dispose();
+        async.flushMicrotasks();
+        h.channel.reconnectNow();
+        async.elapse(const Duration(minutes: 10));
+        expect(h.sockets, hasLength(1));
+      });
+    });
+
+    test('a 4408 auth timeout is transient, not a re-link', () {
+      fakeAsync((async) {
+        final h = Harness();
+        h.channel.start();
+        async.flushMicrotasks();
+        h.socket.serverClose(4408); // slow link, relay swept the socket
+        async.flushMicrotasks();
+
+        expect(h.statuses.last, RelayHealth.down);
+        async.elapse(const Duration(seconds: 6));
+        expect(h.sockets, hasLength(2), reason: 'it retries on its own');
+      });
+    });
+  });
 }

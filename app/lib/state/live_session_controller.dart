@@ -257,6 +257,11 @@ class LiveSessionController extends Notifier<LiveState?> {
     state = state?.copyWith(health: PollHealth.error, lastError: message);
   }
 
+  /// The app is on screen again — redial the relay feed rather than wait for
+  /// the OS to surface a socket that died while we were suspended. No-op for
+  /// sessions without a relay jar.
+  void relayReconnectNow() => _relay?.reconnectNow();
+
   void editGoal(int goalMinor) {
     final current = state;
     if (current == null || goalMinor <= 0) return;

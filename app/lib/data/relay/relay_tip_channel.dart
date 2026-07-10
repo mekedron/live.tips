@@ -88,6 +88,37 @@ class RelayTipChannel {
     _open();
   }
 
+  /// Redials immediately, abandoning any socket we currently hold.
+  ///
+  /// Call this when the app returns to the foreground. A suspended process
+  /// comes back holding a socket the OS has not yet told us is dead, so the
+  /// feed looks healthy while nothing arrives — and once the death does
+  /// surface we would sit out a backoff delay before trying again. Both mean
+  /// "Can't reach live.tips" on stage for no reason. The relay holds tips for
+  /// a device that is away, so the only cost of an unnecessary redial is one
+  /// handshake.
+  void reconnectNow() {
+    if (_disposed || _terminal || !_started) return;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _attempt = 0; // a deliberate redial is not a failed attempt
+    final channel = _channel;
+    if (channel != null) {
+      // Drop it without going through _failCurrent: cancelling the
+      // subscription first means the old socket's done/error can never land
+      // on the connection we are about to open.
+      _channel = null;
+      _readyTimer?.cancel();
+      _readyTimer = null;
+      _pingTimer?.cancel();
+      _pingTimer = null;
+      unawaited(_sub?.cancel());
+      _sub = null;
+      _closeQuietly(channel);
+    }
+    _open();
+  }
+
   static final _jitterRandom = Random();
 
   /// Exponential 1 s → 30 s cap, ±20% jitter so a relay restart doesn't get

@@ -38,7 +38,12 @@ class RelayTip extends RelayInMessage {
     required this.name,
     required this.message,
     required this.ts,
+    this.id,
   });
+
+  /// The relay's own id, stable across redeliveries of a tip it held while
+  /// this device was offline. Null from relays older than the tip queue.
+  final String? id;
 
   final TipMethod method;
   final int amountMinor;
@@ -53,7 +58,8 @@ class RelayTip extends RelayInMessage {
   /// Milliseconds since epoch, as stamped by the relay.
   final int ts;
 
-  /// [serial] keeps ids unique when several tips share the same millisecond.
+  /// [serial] keeps ids unique when several tips share the same millisecond,
+  /// for relays that send no [id] of their own.
   Donation toDonation(int serial) => Donation.relayTip(
         amountMinor: amountMinor,
         currency: currency,
@@ -62,6 +68,7 @@ class RelayTip extends RelayInMessage {
         message: message.isEmpty ? null : message,
         ts: ts,
         serial: serial,
+        relayId: id,
       );
 }
 
@@ -107,6 +114,8 @@ RelayTip? _decodeTip(Map<String, dynamic> map) {
     final ts = map['ts'];
     if (ts is! int) return null;
 
+    final id = map['id'];
+
     return RelayTip(
       method: method,
       amountMinor: amount.clamp(_kMinAmountMinor, _kMaxAmountMinor),
@@ -114,6 +123,7 @@ RelayTip? _decodeTip(Map<String, dynamic> map) {
       name: map['name'] is String ? map['name'] as String : '',
       message: map['message'] is String ? map['message'] as String : '',
       ts: ts,
+      id: id is String && id.isNotEmpty ? id : null,
     );
   } catch (_) {
     return null;
