@@ -104,7 +104,7 @@ dashboard, which is a screen for *you*, not for the room.
 
 Not one of them will put a jar in front of your audience.
 
-![Two ways a tip reaches a performer: through a platform, a held balance and a payout queue, or straight from the fan to the artist.](assets/money-path.svg)
+![Two ways a tip reaches a performer: through a platform, a held balance and a payout queue, or straight from the fan to the artist.](assets/money-path-en.svg)
 
 ## Setting up during load-in
 

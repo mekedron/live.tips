@@ -67,6 +67,14 @@ overrides. It is not YAML — a real YAML parser would read `slug: no` as `false
 **Write a post** → new directory, a `post.json` with a `date`, and an `en.md`.
 **Translate one** → drop a `<lang>.md` beside it. Nothing else to wire up.
 
+Images in `assets/` are shared by every language, so an image with *words in it*
+needs one file per language. The comparison post's diagram does; it is generated
+from a table of short strings by
+[`scripts/gen_blog_diagram.py`](../scripts/gen_blog_diagram.py), which sizes each
+box to its own label — a diagram is served through `<img>` and so cannot use the
+page's webfont, and a layout tuned on English clips the first German compound
+noun it meets. Regenerate with `python3 scripts/gen_blog_diagram.py`.
+
 Three rules are worth knowing before you write:
 
 - **Untranslated is a normal state.** A post is only ever published in the
