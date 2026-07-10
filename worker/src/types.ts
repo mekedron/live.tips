@@ -40,6 +40,11 @@ export interface TipRequest {
 /** What the artist's device receives over the WebSocket. */
 export interface TipEvent {
   type: "tip";
+  /**
+   * Stamped once, when the tip arrives. A queued tip keeps the same id across
+   * every redelivery attempt, so the app's dedupe-by-id makes replay safe.
+   */
+  id: string;
   ts: number;
   method: TipMethod;
   amountMinor: number;

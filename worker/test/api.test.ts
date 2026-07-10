@@ -160,11 +160,12 @@ describe("tips endpoint", () => {
     mockTurnstile();
     const res = await postTip(jarId, {});
     expect(res.status).toBe(200);
-    const data = await res.json<{ redirectUrl: string; delivered: boolean }>();
+    const data = await res.json<{ redirectUrl: string; delivered: boolean; queued: boolean }>();
     const url = new URL(data.redirectUrl);
     expect(url.origin).toBe("https://revolut.me");
     expect(url.searchParams.get("note")).toBe("Grace: encore!");
-    expect(data.delivered).toBe(false); // nobody connected
+    expect(data.delivered).toBe(false); // nobody connected…
+    expect(data.queued).toBe(true); // …so it waits for them
   });
 
   it("rejects tips that fail Turnstile", async () => {

@@ -143,7 +143,14 @@ export default {
         const result = await stub.relay(tipRequest);
         switch (result.status) {
           case "ok":
-            return json({ redirectUrl: result.redirectUrl, delivered: result.delivered > 0 });
+            // `delivered` = a screen had it in hand; `queued` = it is being
+            // held for an artist whose screen is away. Either way the fan's
+            // message will be seen; neither is a reason to hide the deep link.
+            return json({
+              redirectUrl: result.redirectUrl,
+              delivered: result.delivered > 0,
+              queued: result.queued,
+            });
           case "gone":
             return json({ error: "not found" }, 404);
           case "method-unavailable":

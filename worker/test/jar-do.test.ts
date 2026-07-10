@@ -84,6 +84,22 @@ describe("WebSocket auth", () => {
     expect((await closed).code).toBe(4401);
   });
 
+  it("closes a socket that never authenticates with 4408, not the terminal 4401", async () => {
+    // 4401 means "your secret is no good — re-link". A socket that simply ran
+    // out of time on a slow link must not strand the artist there.
+    const { jarId } = await createJar();
+    const ws = await openSocket(jarId);
+    const closed = nextClose(ws);
+    const stub = env.JAR.get(env.JAR.idFromName(jarId));
+    await runInDurableObject(stub, async (instance, state) => {
+      for (const socket of state.getWebSockets()) {
+        socket.serializeAttachment({ authed: false, since: Date.now() - 60_000 });
+      }
+      await instance.alarm();
+    });
+    expect((await closed).code).toBe(4408);
+  });
+
   it("answers ready on the right secret and pongs pings", async () => {
     const { jarId, secret } = await createJar();
     const ws = await authedSocket(jarId, secret);
@@ -221,26 +237,186 @@ describe("socket cap", () => {
   });
 });
 
+function postSecretTip(jarId: string) {
+  return SELF.fetch(`https://live.tips/t/${jarId}/tips`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "CF-Connecting-IP": "198.51.100.11" },
+    body: JSON.stringify({
+      method: "revolut",
+      amountMinor: 500,
+      name: "SecretName",
+      message: "SecretMessage",
+      turnstileToken: "t",
+    }),
+  });
+}
+
+function postTipNamed(jarId: string, amountMinor: number, message: string) {
+  return SELF.fetch(`https://live.tips/t/${jarId}/tips`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "CF-Connecting-IP": "198.51.100.12" },
+    body: JSON.stringify({ method: "revolut", amountMinor, name: "Zoe", message, turnstileToken: "t" }),
+  });
+}
+
+async function storageDump(jarId: string): Promise<string> {
+  const stub = env.JAR.get(env.JAR.idFromName(jarId));
+  let dump = "";
+  await runInDurableObject(stub, async (_instance, state) => {
+    dump = JSON.stringify([...(await state.storage.list()).entries()]);
+  });
+  return dump;
+}
+
 describe("no donor content at rest", () => {
-  it("stores only a hash of the dedupe signature, never the name/message", async () => {
+  it("keeps nothing but a hashed dedupe signature once the tip is delivered", async () => {
+    const { jarId, secret } = await createJar();
+    const ws = await authedSocket(jarId, secret);
+    const incoming = nextMessage(ws);
+    mockTurnstile();
+    await postSecretTip(jarId);
+    await incoming; // delivered live — never queued
+
+    const dump = await storageDump(jarId);
+    expect(dump).not.toContain("SecretName");
+    expect(dump).not.toContain("SecretMessage");
+    expect(dump).not.toContain("pending");
+    ws.close();
+  });
+
+  it("holds an UNDELIVERED tip only under `pending`, and lets go of it on delivery", async () => {
+    const { jarId, secret } = await createJar();
+    mockTurnstile();
+    await postSecretTip(jarId); // nobody connected → queued
+
+    // The one exception to "no donor content at rest": a tip in flight to a
+    // screen that is away. It lives under `pending` and nowhere else.
+    const entries = JSON.parse(await storageDump(jarId)) as [string, unknown][];
+    const keysHoldingTheName = entries
+      .filter(([, value]) => JSON.stringify(value).includes("SecretName"))
+      .map(([key]) => key);
+    expect(keysHoldingTheName).toEqual(["pending"]);
+
+    // The artist comes back: the tip is handed over and immediately forgotten.
+    const ws = await authedSocket(jarId, secret);
+    const replayed = JSON.parse(await nextMessage(ws));
+    expect(replayed).toMatchObject({ type: "tip", name: "SecretName", message: "SecretMessage" });
+
+    const after = await storageDump(jarId);
+    expect(after).not.toContain("SecretName");
+    expect(after).not.toContain("SecretMessage");
+    ws.close();
+  });
+
+  it("sweeps an undelivered tip after the TTL even if the artist never returns", async () => {
     const { jarId } = await createJar();
     mockTurnstile();
-    await SELF.fetch(`https://live.tips/t/${jarId}/tips`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "CF-Connecting-IP": "198.51.100.11" },
-      body: JSON.stringify({
-        method: "revolut",
-        amountMinor: 500,
-        name: "SecretName",
-        message: "SecretMessage",
-        turnstileToken: "t",
-      }),
-    });
+    await postSecretTip(jarId);
+    expect(await storageDump(jarId)).toContain("SecretName");
+
     const stub = env.JAR.get(env.JAR.idFromName(jarId));
+    await runInDurableObject(stub, async (instance, state) => {
+      // Age the queue past PENDING_TTL_MS (1 h), then let the alarm sweep it.
+      const pending = (await state.storage.get<{ ts: number }[]>("pending"))!;
+      await state.storage.put(
+        "pending",
+        pending.map((event) => ({ ...event, ts: event.ts - 2 * 3_600_000 })),
+      );
+      await instance.alarm!();
+    });
+
+    const dump = await storageDump(jarId);
+    expect(dump).not.toContain("SecretName");
+    expect(dump).not.toContain("SecretMessage");
+  });
+});
+
+describe("undelivered tips wait for the artist", () => {
+  it("queues a tip when no screen is connected, and says so", async () => {
+    const { jarId } = await createJar();
+    mockTurnstile();
+    const res = await postSecretTip(jarId);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ delivered: boolean; queued: boolean; redirectUrl: string }>();
+    // The fan is still sent off to pay — that must never depend on the artist.
+    expect(body.redirectUrl).toContain("revolut.me");
+    expect(body.delivered).toBe(false);
+    expect(body.queued).toBe(true);
+  });
+
+  it("replays the backlog in arrival order to the next screen that authenticates", async () => {
+    const { jarId, secret } = await createJar();
+    mockTurnstile(2);
+    await postTipNamed(jarId, 100, "first");
+    await postTipNamed(jarId, 200, "second");
+
+    const ws = await authedSocket(jarId, secret);
+    const first = JSON.parse(await nextMessage(ws));
+    const second = JSON.parse(await nextMessage(ws));
+    expect([first.message, second.message]).toEqual(["first", "second"]);
+    expect([first.amountMinor, second.amountMinor]).toEqual([100, 200]);
+    ws.close();
+  });
+
+  it("replays a tip under the id it was queued with, so the app can dedupe it", async () => {
+    const { jarId, secret } = await createJar();
+    mockTurnstile();
+    await postTipNamed(jarId, 700, "solo");
+
+    // flushPending() sends before it deletes, so a crash mid-flush replays the
+    // batch. That is only safe because the id is minted once, at arrival.
+    const stub = env.JAR.get(env.JAR.idFromName(jarId));
+    let queuedId = "";
     await runInDurableObject(stub, async (_instance, state) => {
-      const dump = JSON.stringify([...(await state.storage.list()).entries()]);
-      expect(dump).not.toContain("SecretName");
-      expect(dump).not.toContain("SecretMessage");
+      queuedId = (await state.storage.get<{ id: string }[]>("pending"))![0]!.id;
+    });
+    expect(queuedId).not.toBe("");
+
+    const ws = await authedSocket(jarId, secret);
+    const event = JSON.parse(await nextMessage(ws));
+    expect(event.id).toBe(queuedId);
+    ws.close();
+  });
+
+  it("caps the queue at the hourly quota, dropping the oldest", async () => {
+    const { jarId } = await createJar();
+    const stub = env.JAR.get(env.JAR.idFromName(jarId));
+
+    // The hourly quota buckets on wall-clock hours, so a set spanning a bucket
+    // boundary really can push more than TIPS_PER_HOUR into one TTL window.
+    // Seed the queue full, then relay one more.
+    const seededAt = Date.now() - 1_000;
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put(
+        "pending",
+        Array.from({ length: 60 }, (_unused, i) => ({
+          type: "tip",
+          id: `old-${i}`,
+          ts: seededAt,
+          method: "revolut",
+          amountMinor: 100,
+          currency: "eur",
+          name: "",
+          message: `m${i}`,
+        })),
+      );
+    });
+
+    await runInDurableObject(stub, async (instance) => {
+      const result = await instance.relay({
+        method: "revolut",
+        amountMinor: 999,
+        name: "",
+        message: "newest",
+      });
+      expect(result.status).toBe("ok");
+    });
+
+    await runInDurableObject(stub, async (_instance, state) => {
+      const pending = (await state.storage.get<{ id: string; message: string }[]>("pending"))!;
+      expect(pending).toHaveLength(60);
+      expect(pending[0]!.id).toBe("old-1"); // "old-0" evicted
+      expect(pending.at(-1)!.message).toBe("newest");
     });
   });
 });
