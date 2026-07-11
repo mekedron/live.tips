@@ -1,6 +1,6 @@
 /// Composes payment deep links from validated atoms onto hardcoded hosts.
-/// These are UNOFFICIAL surfaces — Revolut and MobilePay document none of
-/// these parameters — so every assumption lives behind a constant here.
+/// These are UNOFFICIAL surfaces — Revolut, MobilePay and Monzo document none
+/// of these parameters — so every assumption lives behind a constant here.
 
 import { ZERO_DECIMAL } from "./validate";
 import type { JarProfile, TipRequest } from "./types";
@@ -21,6 +21,18 @@ export const REVOLUT_AMOUNT_UNIT: "major" | "minor" = "minor";
 export const REVOLUT_MIN_MINOR = 100;
 
 /**
+ * VERIFIED empirically (2026-07-11, real monzo.me page): the amount is a PATH
+ * segment in MAJOR units, not a query param in minor ones — `/daniel/5` bills
+ * "£5.00" and `/daniel/500` bills "£500.00". Decimals ride along fine:
+ * `/daniel/5.50` bills "£5.50". Getting this backwards would overcharge a
+ * donor 100×, which is why it is spelled out rather than inferred.
+ */
+export const MONZO_AMOUNT_UNIT: "major" | "minor" = "major";
+
+/** Monzo.me is a sterling-only surface — no currency parameter exists. */
+export const MONZO_CURRENCY = "gbp";
+
+/**
  * VERIFIED empirically (2026-07-07): qr.mobilepay.fi renders a 200-char
  * `message` untruncated, so the full message + packed name fits.
  */
@@ -31,6 +43,16 @@ export const MOBILEPAY_MESSAGE_MAX = 200;
  * hard "n / 64" character counter — clamp to what actually fits.
  */
 export const REVOLUT_NOTE_MAX = 64;
+
+/**
+ * NOT a verified platform limit. monzo.me echoed a 260-char `d` back
+ * untruncated (2026-07-11), and the description is never rendered on the web
+ * page at all — it is handed to the Monzo app, whose own reference field we
+ * cannot inspect from here. So this is our own conservative clamp, set to the
+ * same 200 the donor form already caps messages at: a message that fits the
+ * form fits the link, and nothing is silently dropped in between.
+ */
+export const MONZO_DESCRIPTION_MAX = 200;
 
 /** `"name: message"` — the colon is why names must not contain one. */
 export function packNote(name: string, message: string): string {
@@ -65,6 +87,13 @@ export function buildMobilePayUrl(boxId: string, amountMinor: number, note: stri
   return url.toString();
 }
 
+export function buildMonzoUrl(username: string, amountMinor: number, note: string): string {
+  const amount = amountParam(amountMinor, MONZO_CURRENCY, MONZO_AMOUNT_UNIT);
+  const url = new URL(`https://monzo.me/${encodeURIComponent(username)}/${amount}`);
+  if (note) url.searchParams.set("d", clampNote(note, MONZO_DESCRIPTION_MAX));
+  return url.toString();
+}
+
 /** Bare method links (no prefill) — donor-page fallbacks when JS/API fails. */
 export function bareMethodUrl(profile: JarProfile, method: TipRequest["method"]): string | null {
   if (method === "revolut" && profile.methods.revolutUsername) {
@@ -72,6 +101,9 @@ export function bareMethodUrl(profile: JarProfile, method: TipRequest["method"])
   }
   if (method === "mobilepay" && profile.methods.mobilepayBoxId) {
     return `https://qr.mobilepay.fi/box/${encodeURIComponent(profile.methods.mobilepayBoxId)}/pay-in`;
+  }
+  if (method === "monzo" && profile.methods.monzoUsername) {
+    return `https://monzo.me/${encodeURIComponent(profile.methods.monzoUsername)}`;
   }
   return null;
 }
@@ -83,6 +115,9 @@ export function buildRedirectUrl(profile: JarProfile, tip: TipRequest): string |
   }
   if (tip.method === "mobilepay" && profile.methods.mobilepayBoxId) {
     return buildMobilePayUrl(profile.methods.mobilepayBoxId, tip.amountMinor, note);
+  }
+  if (tip.method === "monzo" && profile.methods.monzoUsername) {
+    return buildMonzoUrl(profile.methods.monzoUsername, tip.amountMinor, note);
   }
   return null;
 }

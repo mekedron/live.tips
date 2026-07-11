@@ -21,8 +21,8 @@ const INLINE_SCRIPT = `(function () {
   function show(el) { el.removeAttribute('hidden'); }
   function hide(el) { el.setAttribute('hidden', ''); }
   function showSuccess() {
-    var app = methodInput.value === 'mobilepay' ? 'MobilePay' : 'Revolut';
-    document.getElementById('f-success-app').textContent = app;
+    var names = { mobilepay: 'MobilePay', monzo: 'Monzo', revolut: 'Revolut' };
+    document.getElementById('f-success-app').textContent = names[methodInput.value] || 'the app';
     hide(form);
     show(successEl);
     successEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -144,14 +144,21 @@ export function renderDonorPage(profile: JarProfile, siteKey: string): string {
   if (profile.methods.mobilepayBoxId) {
     buttons.push(`<button type="button" data-method="mobilepay" data-label="Tip with MobilePay">MobilePay</button>`);
   }
+  if (profile.methods.monzoUsername) {
+    buttons.push(`<button type="button" data-method="monzo" data-label="Tip with Monzo">Monzo</button>`);
+  }
 
   const fallbackLinks: string[] = [];
   const revolutBare = bareMethodUrl(profile, "revolut");
   const mobilepayBare = bareMethodUrl(profile, "mobilepay");
+  const monzoBare = bareMethodUrl(profile, "monzo");
   if (revolutBare) fallbackLinks.push(`<a href="${escapeHtml(revolutBare)}" rel="noopener">Open Revolut</a>`);
   if (mobilepayBare) fallbackLinks.push(`<a href="${escapeHtml(mobilepayBare)}" rel="noopener">Open MobilePay</a>`);
+  if (monzoBare) fallbackLinks.push(`<a href="${escapeHtml(monzoBare)}" rel="noopener">Open Monzo</a>`);
 
-  const hasForm = Boolean(profile.methods.revolutUsername || profile.methods.mobilepayBoxId);
+  const hasForm = Boolean(
+    profile.methods.revolutUsername || profile.methods.mobilepayBoxId || profile.methods.monzoUsername,
+  );
   const form = hasForm
     ? `
 <form id="tipform" hidden>

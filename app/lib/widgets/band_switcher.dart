@@ -23,6 +23,7 @@ String bandMethodsSummary(
     if (tipJar != null) 'Stripe',
     if (relayJar?.hasRevolut ?? false) 'Revolut',
     if (relayJar?.hasMobilePay ?? false) 'MobilePay',
+    if (relayJar?.hasMonzo ?? false) 'Monzo',
   ];
   return methods.isEmpty
       ? context.s.t('widgets.band_switcher.not_set_up')

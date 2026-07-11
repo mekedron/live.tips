@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/relay/relay_client.dart';
+import '../../domain/tip_method.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 
@@ -21,6 +22,26 @@ final _uuidRe = RegExp(
 String? extractMobilePayBoxId(String input) =>
     _uuidRe.firstMatch(input.trim())?.group(0)?.toLowerCase();
 
+final _monzoLinkRe = RegExp(
+  r'(?:^|//)monzo\.me/([^/?#\s]+)',
+  caseSensitive: false,
+);
+final _monzoHandleRe = RegExp(r'^[a-z0-9][a-z0-9._-]{0,29}$');
+
+/// Pulls the Monzo.me handle out of whatever the artist pasted: their profile
+/// link (`https://monzo.me/<handle>`, with or without a trailing amount path),
+/// or the bare handle with or without a leading `@`. Null when what's left
+/// isn't handle-shaped. Mirrors the worker's `MONZO_USERNAME` gate — the handle
+/// lands in a URL *path*, so a stray `/` must never survive.
+String? extractMonzoUsername(String input) {
+  final trimmed = input.trim();
+  final link = _monzoLinkRe.firstMatch(trimmed);
+  final handle = (link?.group(1) ?? trimmed)
+      .replaceFirst(RegExp(r'^@+'), '')
+      .toLowerCase();
+  return _monzoHandleRe.hasMatch(handle) ? handle : null;
+}
+
 /// MobilePay Boxes settle in euros only — every other currency is rejected
 /// client-side before the relay ever sees it. Null means fine. Pass [context]
 /// to get a localized message; without it (legacy callers) the English text is
@@ -36,6 +57,55 @@ String? mobilePayCurrencyError(String currency, {BuildContext? context}) {
       '${currency.toUpperCase()}. Switch the currency to EUR or '
       'remove MobilePay.';
 }
+
+/// Monzo.me collects in sterling only — the same client-side gate as
+/// [mobilePayCurrencyError]. A jar has one currency, so this also means Monzo
+/// and MobilePay can't both live on it; whichever the artist sets second
+/// surfaces this error rather than failing at the relay.
+String? monzoCurrencyError(String currency, {BuildContext? context}) {
+  if (currency.toLowerCase() == 'gbp') return null;
+  if (context != null) {
+    return context.s.t('onboarding.relay_setup.monzo_gbp_only', {
+      'currency': currency.toUpperCase(),
+    });
+  }
+  return 'Monzo is GBP only — your tip jar uses '
+      '${currency.toUpperCase()}. Switch the currency to GBP or '
+      'remove Monzo.';
+}
+
+/// The value the artist typed, reduced to the atom the relay stores. Null =
+/// what they pasted isn't usable for this method.
+String? parseRelayMethodValue(TipMethod method, String raw) => switch (method) {
+  TipMethod.revolut =>
+    RegExp(
+          r'^[A-Za-z0-9._-]{3,32}$',
+        ).hasMatch(raw.replaceFirst(RegExp(r'^@+'), ''))
+        ? raw.replaceFirst(RegExp(r'^@+'), '')
+        : null,
+  TipMethod.mobilepay => extractMobilePayBoxId(raw),
+  TipMethod.monzo => extractMonzoUsername(raw),
+  TipMethod.stripe => null,
+};
+
+/// Non-null when the band's currency rules this method out.
+String? relayMethodCurrencyError(
+  TipMethod method,
+  String currency, {
+  BuildContext? context,
+}) => switch (method) {
+  TipMethod.mobilepay => mobilePayCurrencyError(currency, context: context),
+  TipMethod.monzo => monzoCurrencyError(currency, context: context),
+  _ => null,
+};
+
+/// Literal placeholder for the link-shaped fields. Null when the method's hint
+/// is localized prose instead (Revolut takes a name, not a link).
+String? relayMethodHint(TipMethod method) => switch (method) {
+  TipMethod.mobilepay => 'https://qr.mobilepay.fi/box/…',
+  TipMethod.monzo => 'https://monzo.me/…',
+  _ => null,
+};
 
 /// Confirms, then replaces the connected-mode jar with a fresh one carrying
 /// the same profile — the shared "New tip page link" action behind Home and
@@ -90,6 +160,7 @@ Future<void> confirmAndRegenerateRelayJar(
       stripeUrl: app.tipJar?.url,
       revolutUsername: old.hasRevolut ? old.revolutUsername : null,
       mobilepayBoxId: old.hasMobilePay ? old.mobilepayBoxId : null,
+      monzoUsername: old.hasMonzo ? old.monzoUsername : null,
     );
     await ref
         .read(appStateProvider.notifier)

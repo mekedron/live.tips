@@ -90,6 +90,31 @@ describe("validateProfile", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("accepts a Monzo handle on a GBP jar, stripping @ and casing", () => {
+    const r = validateProfile({
+      ...baseProfile,
+      currency: "gbp",
+      methods: { monzoUsername: "@Daniel" },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.methods.monzoUsername).toBe("daniel");
+  });
+
+  it("rejects Monzo for non-GBP jars", () => {
+    const r = validateProfile({
+      ...baseProfile,
+      currency: "eur",
+      methods: { monzoUsername: "daniel" },
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects Monzo handles that could escape the URL path", () => {
+    for (const monzoUsername of ["dan/../evil", "dan iel", "", "dan?d=x", "-dan"]) {
+      expect(validateProfile({ ...baseProfile, currency: "gbp", methods: { monzoUsername } }).ok).toBe(false);
+    }
+  });
+
   it("rejects unknown keys at both levels", () => {
     expect(validateProfile({ ...baseProfile, evil: 1 }).ok).toBe(false);
     expect(

@@ -90,6 +90,7 @@ class SeenPingService {
         stripeUrl: stripeUrl,
         revolutUsername: jar.revolutUsername,
         mobilepayBoxId: jar.mobilepayBoxId,
+        monzoUsername: jar.monzoUsername,
       );
       await onRelinked(created.jar, created.secret, jar.donateUrl);
       await store.writeRelaySeenAt(accountId, nowMs);

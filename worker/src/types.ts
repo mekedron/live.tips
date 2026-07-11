@@ -24,10 +24,11 @@ export interface JarProfile {
     stripeUrl?: string;
     revolutUsername?: string;
     mobilepayBoxId?: string;
+    monzoUsername?: string;
   };
 }
 
-export type TipMethod = "revolut" | "mobilepay";
+export type TipMethod = "revolut" | "mobilepay" | "monzo";
 
 /** What the donor form submits (after validation). */
 export interface TipRequest {

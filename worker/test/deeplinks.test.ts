@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMobilePayUrl,
+  buildMonzoUrl,
   buildRedirectUrl,
   buildRevolutUrl,
   clampNote,
@@ -16,6 +17,13 @@ const profile: JarProfile = {
     revolutUsername: "mekedron",
     mobilepayBoxId: "a76b1e43-1958-483c-b602-da5869f57212",
   },
+};
+
+const monzoProfile: JarProfile = {
+  artistName: "Ada",
+  message: "",
+  currency: "gbp",
+  methods: { monzoUsername: "daniel" },
 };
 
 describe("packNote / clampNote", () => {
@@ -49,17 +57,41 @@ describe("URL composition", () => {
     expect(url.searchParams.get("message")).toBe("hello");
   });
 
+  it("builds Monzo links with the amount as a MAJOR-unit path segment", () => {
+    const url = new URL(buildMonzoUrl("daniel", 500, "Ada: nice & fun"));
+    expect(url.origin).toBe("https://monzo.me");
+    // £5.00, not £500 — the 100× overcharge this asserts against.
+    expect(url.pathname).toBe("/daniel/5");
+    expect(url.searchParams.get("d")).toBe("Ada: nice & fun");
+  });
+
+  it("renders a non-round Monzo amount with two decimals", () => {
+    expect(new URL(buildMonzoUrl("daniel", 1234, "")).pathname).toBe("/daniel/12.34");
+    expect(new URL(buildMonzoUrl("daniel", 550, "")).pathname).toBe("/daniel/5.50");
+  });
+
   it("cannot be steered off the allowlisted hosts by hostile note text", () => {
     const hostile = "x&redirect=https://evil.com#//evil.com";
     for (const raw of [
       buildRevolutUrl("mekedron", 500, "eur", hostile),
       buildMobilePayUrl("a76b1e43-1958-483c-b602-da5869f57212", 500, hostile),
+      buildMonzoUrl("daniel", 500, hostile),
     ]) {
       const url = new URL(raw);
-      expect(["https://revolut.me", "https://qr.mobilepay.fi"]).toContain(url.origin);
+      expect(["https://revolut.me", "https://qr.mobilepay.fi", "https://monzo.me"]).toContain(url.origin);
       // The hostile text survived only as an encoded query value.
       expect(url.searchParams.getAll("redirect")).toEqual([]);
     }
+  });
+
+  it("routes a monzo tip to monzo.me", () => {
+    const url = buildRedirectUrl(monzoProfile, {
+      method: "monzo",
+      amountMinor: 250,
+      name: "Ada",
+      message: "great set",
+    });
+    expect(url).toBe("https://monzo.me/daniel/2.50?d=Ada%3A+great+set");
   });
 
   it("returns null for unconfigured methods", () => {

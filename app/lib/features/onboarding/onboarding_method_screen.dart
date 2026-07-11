@@ -10,13 +10,13 @@ import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
 import 'onboarding_flow.dart';
 import 'relay_setup_screen.dart'
-    show extractMobilePayBoxId, mobilePayCurrencyError;
+    show parseRelayMethodValue, relayMethodCurrencyError, relayMethodHint;
 
-/// One onboarding step for a relay method — Revolut or MobilePay. The value is
-/// stashed in the draft (no jar is created yet; the final screen registers one
-/// tip page from every method at once). "Save" validates and advances; "Skip"
-/// advances without setting the method, so a mis-tap on the method picker is
-/// painless.
+/// One onboarding step for a relay method — Revolut, MobilePay or Monzo. The
+/// value is stashed in the draft (no jar is created yet; the final screen
+/// registers one tip page from every method at once). "Save" validates and
+/// advances; "Skip" advances without setting the method, so a mis-tap on the
+/// method picker is painless.
 class OnboardingMethodScreen extends ConsumerStatefulWidget {
   const OnboardingMethodScreen({super.key, required this.method})
     : assert(method != TipMethod.stripe);
@@ -28,19 +28,40 @@ class OnboardingMethodScreen extends ConsumerStatefulWidget {
       _OnboardingMethodScreenState();
 }
 
+/// This method's value in the draft, and the draft with it set — the only two
+/// places the per-method field name is spelled out.
+String? _draftValue(OnboardingDraft? draft, TipMethod method) =>
+    switch (method) {
+      TipMethod.revolut => draft?.revolutUsername,
+      TipMethod.mobilepay => draft?.mobilepayBoxId,
+      TipMethod.monzo => draft?.monzoUsername,
+      TipMethod.stripe => null,
+    };
+
+OnboardingDraft _withValue(
+  OnboardingDraft draft,
+  TipMethod method,
+  String value,
+) => switch (method) {
+  TipMethod.revolut => draft.copyWith(revolutUsername: value),
+  TipMethod.mobilepay => draft.copyWith(mobilepayBoxId: value),
+  TipMethod.monzo => draft.copyWith(monzoUsername: value),
+  TipMethod.stripe => draft,
+};
+
 class _OnboardingMethodScreenState
     extends ConsumerState<OnboardingMethodScreen> {
   final _controller = TextEditingController();
   String? _error;
 
-  bool get _isRevolut => widget.method == TipMethod.revolut;
+  /// i18n keys are suffixed with the method's wire name — see [RelayMethodScreen].
+  String get _wire => widget.method.wire;
 
   @override
   void initState() {
     super.initState();
-    final draft = ref.read(onboardingDraftProvider);
     _controller.text =
-        (_isRevolut ? draft?.revolutUsername : draft?.mobilepayBoxId) ?? '';
+        _draftValue(ref.read(onboardingDraftProvider), widget.method) ?? '';
   }
 
   @override
@@ -64,56 +85,35 @@ class _OnboardingMethodScreenState
     // Leave this method unset in the draft, then move on.
     ref
         .read(onboardingDraftProvider.notifier)
-        .update(
-          (d) => _isRevolut
-              ? d.copyWith(revolutUsername: '')
-              : d.copyWith(mobilepayBoxId: ''),
-        );
+        .update((d) => _withValue(d, widget.method, ''));
     pushOnboardingStep(context, ref, after: widget.method);
   }
 
   void _save() {
     final draft = ref.read(onboardingDraftProvider);
-    if (_isRevolut) {
-      final raw = _controller.text.trim().replaceFirst(RegExp(r'^@+'), '');
-      if (raw.isEmpty) {
-        _skip();
-        return;
-      }
-      if (!RegExp(r'^[A-Za-z0-9._-]{3,32}$').hasMatch(raw)) {
-        setState(
-          () => _error = context.s.t('onboarding.method.revolut_invalid'),
-        );
-        return;
-      }
-      ref
-          .read(onboardingDraftProvider.notifier)
-          .update((d) => d.copyWith(revolutUsername: raw));
-    } else {
-      final raw = _controller.text.trim();
-      if (raw.isEmpty) {
-        _skip();
-        return;
-      }
-      final box = extractMobilePayBoxId(raw);
-      if (box == null) {
-        setState(
-          () => _error = context.s.t('onboarding.method.mobilepay_invalid'),
-        );
-        return;
-      }
-      final curErr = mobilePayCurrencyError(
-        draft?.currency ?? 'eur',
-        context: context,
-      );
-      if (curErr != null) {
-        setState(() => _error = curErr);
-        return;
-      }
-      ref
-          .read(onboardingDraftProvider.notifier)
-          .update((d) => d.copyWith(mobilepayBoxId: box));
+    final raw = _controller.text.trim();
+    if (raw.isEmpty) {
+      _skip();
+      return;
     }
+
+    final value = parseRelayMethodValue(widget.method, raw);
+    if (value == null) {
+      setState(() => _error = context.s.t('onboarding.method.${_wire}_invalid'));
+      return;
+    }
+    final curErr = relayMethodCurrencyError(
+      widget.method,
+      draft?.currency ?? 'eur',
+      context: context,
+    );
+    if (curErr != null) {
+      setState(() => _error = curErr);
+      return;
+    }
+    ref
+        .read(onboardingDraftProvider.notifier)
+        .update((d) => _withValue(d, widget.method, value));
     pushOnboardingStep(context, ref, after: widget.method);
   }
 
@@ -123,6 +123,7 @@ class _OnboardingMethodScreenState
     final draft = ref.watch(onboardingDraftProvider);
     final step = draft?.stepOfMethod(widget.method);
     final total = draft?.totalSteps;
+    final linkHint = relayMethodHint(widget.method);
 
     return Scaffold(
       appBar: AppBar(
@@ -153,9 +154,7 @@ class _OnboardingMethodScreenState
                 const SizedBox(height: 16),
               ],
               Text(
-                _isRevolut
-                    ? context.s.t('onboarding.method.intro_revolut')
-                    : context.s.t('onboarding.method.intro_mobilepay'),
+                context.s.t('onboarding.method.intro_$_wire'),
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 14,
@@ -168,54 +167,34 @@ class _OnboardingMethodScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _FieldLabel(
-                      _isRevolut
-                          ? context.s.t('onboarding.method.revolut_label')
-                          : context.s.t('onboarding.method.mobilepay_label'),
-                    ),
-                    _isRevolut
-                        ? TextField(
-                            controller: _controller,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            decoration: InputDecoration(
-                              prefixText: '@',
-                              hintText: context.s.t(
-                                'onboarding.method.revolut_hint',
-                              ),
-                              errorText: _error,
-                              errorMaxLines: 3,
-                              suffixIcon: _pasteButton(c),
-                            ),
-                            onChanged: (_) {
-                              if (_error != null) setState(() => _error = null);
-                            },
-                            onSubmitted: (_) => _save(),
-                          )
-                        : TextField(
-                            controller: _controller,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            style: const TextStyle(
+                    _FieldLabel(context.s.t('onboarding.method.${_wire}_label')),
+                    TextField(
+                      controller: _controller,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      style: linkHint == null
+                          ? null
+                          : const TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 13.5,
                             ),
-                            decoration: InputDecoration(
-                              hintText: 'https://qr.mobilepay.fi/box/…',
-                              errorText: _error,
-                              errorMaxLines: 3,
-                              suffixIcon: _pasteButton(c),
-                            ),
-                            onChanged: (_) {
-                              if (_error != null) setState(() => _error = null);
-                            },
-                            onSubmitted: (_) => _save(),
-                          ),
+                      decoration: InputDecoration(
+                        prefixText: linkHint == null ? '@' : null,
+                        hintText:
+                            linkHint ??
+                            context.s.t('onboarding.method.revolut_hint'),
+                        errorText: _error,
+                        errorMaxLines: 3,
+                        suffixIcon: _pasteButton(c),
+                      ),
+                      onChanged: (_) {
+                        if (_error != null) setState(() => _error = null);
+                      },
+                      onSubmitted: (_) => _save(),
+                    ),
                     const SizedBox(height: 8),
                     Text(
-                      _isRevolut
-                          ? context.s.t('onboarding.method.revolut_help')
-                          : context.s.t('onboarding.method.mobilepay_help'),
+                      context.s.t('onboarding.method.${_wire}_help'),
                       style: TextStyle(
                         fontFamily: kFontBody,
                         fontSize: 12,

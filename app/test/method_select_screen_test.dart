@@ -23,7 +23,7 @@ Future<void> _pump(WidgetTester tester) async {
   );
 }
 
-const _warningTitle = 'Before you add Revolut or MobilePay';
+const _warningTitle = 'Before you add Revolut, MobilePay or Monzo';
 
 bool _continueEnabled(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byType(FilledButton)).onPressed != null;
@@ -34,7 +34,7 @@ void main() {
 
     expect(find.text('Recommended'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
-    expect(find.byIcon(Icons.radio_button_unchecked_rounded), findsNWidgets(3));
+    expect(find.byIcon(Icons.radio_button_unchecked_rounded), findsNWidgets(4));
     expect(find.text(_warningTitle), findsNothing);
     expect(
       _continueEnabled(tester),

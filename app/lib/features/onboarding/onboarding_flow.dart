@@ -8,7 +8,7 @@ import 'onboarding_done_screen.dart';
 import 'onboarding_method_screen.dart';
 
 /// Pushes the next onboarding setup step after [after] (null = the first one).
-/// Steps run in a fixed order — Stripe, Revolut, MobilePay — for whichever
+/// Steps run in a fixed order — Stripe, then the relay methods — for whichever
 /// methods the artist picked, then the final QR screen. Each step screen
 /// calls this on Save or Skip, so the chain advances the same way either way.
 void pushOnboardingStep(BuildContext context, WidgetRef ref,
@@ -17,13 +17,10 @@ void pushOnboardingStep(BuildContext context, WidgetRef ref,
   final startIdx = after == null ? 0 : order.indexOf(after) + 1;
   final Widget next;
   if (startIdx >= 0 && startIdx < order.length) {
-    next = switch (order[startIdx]) {
-      TipMethod.stripe => const ConnectScreen(),
-      TipMethod.revolut =>
-        const OnboardingMethodScreen(method: TipMethod.revolut),
-      TipMethod.mobilepay =>
-        const OnboardingMethodScreen(method: TipMethod.mobilepay),
-    };
+    final method = order[startIdx];
+    next = method == TipMethod.stripe
+        ? const ConnectScreen()
+        : OnboardingMethodScreen(method: method);
   } else {
     next = const OnboardingDoneScreen();
   }

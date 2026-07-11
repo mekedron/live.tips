@@ -21,7 +21,22 @@ import '../shell/app_shell.dart';
 // Session-first, then the relay methods artists lean on day to day, with
 // Stripe last — it's the recommended path but the least-used tab in
 // practice.
-enum _HistoryTab { sessions, mobilepay, revolut, donations }
+enum _HistoryTab { sessions, mobilepay, revolut, monzo, donations }
+
+/// The relay method a tab lists, or null for the tabs that aren't per-method.
+TipMethod? _tabMethod(_HistoryTab tab) => switch (tab) {
+  _HistoryTab.mobilepay => TipMethod.mobilepay,
+  _HistoryTab.revolut => TipMethod.revolut,
+  _HistoryTab.monzo => TipMethod.monzo,
+  _HistoryTab.sessions || _HistoryTab.donations => null,
+};
+
+/// The tab that lists a relay method, in the fixed left-to-right tab order.
+const _relayTabs = [
+  _HistoryTab.mobilepay,
+  _HistoryTab.revolut,
+  _HistoryTab.monzo,
+];
 
 /// Header note over the device-local tip-page lists — honesty first: these
 /// rows are donor-declared, not settled payments.
@@ -171,21 +186,26 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     // kept). Stripe-only installs keep the familiar two tabs untouched.
     final relayHistory = ref.watch(relayHistoryProvider);
     final relayJar = app.effectiveRelayJar;
-    final showMobilePay =
-        (relayJar?.hasMobilePay ?? false) ||
-        relayHistory.any((d) => d.method == TipMethod.mobilepay);
-    final showRevolut =
-        (relayJar?.hasRevolut ?? false) ||
-        relayHistory.any((d) => d.method == TipMethod.revolut);
+    // A relay tab shows when the method is configured now, or when this device
+    // still remembers tips from it (jar deleted, tips kept).
+    final configured = {
+      if (relayJar?.hasMobilePay ?? false) TipMethod.mobilepay,
+      if (relayJar?.hasRevolut ?? false) TipMethod.revolut,
+      if (relayJar?.hasMonzo ?? false) TipMethod.monzo,
+    };
+    final relayTabs = _relayTabs
+        .where(
+          (t) =>
+              configured.contains(_tabMethod(t)) ||
+              relayHistory.any((d) => d.method == _tabMethod(t)),
+        )
+        .toSet();
     // Demo mode has no real key but still previews the Stripe tab (with its
     // own explanatory empty state below); a real, key-less account gets no
     // tab at all — there's nothing to fetch and nothing archived locally.
     final showDonations = app.demo || app.hasStripe;
-    if (_tab == _HistoryTab.mobilepay && !showMobilePay) {
+    if (_relayTabs.contains(_tab) && !relayTabs.contains(_tab)) {
       _tab = _HistoryTab.sessions; // the tab just vanished under us
-    }
-    if (_tab == _HistoryTab.revolut && !showRevolut) {
-      _tab = _HistoryTab.sessions;
     }
     if (_tab == _HistoryTab.donations && !showDonations) {
       _tab = _HistoryTab.sessions;
@@ -194,16 +214,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         ? _buildDesktop(
             sessions,
             stripeAllUrl,
-            showMobilePay,
-            showRevolut,
+            relayTabs,
             showDonations,
             relayHistory,
           )
         : _buildMobile(
             sessions,
             stripeAllUrl,
-            showMobilePay,
-            showRevolut,
+            relayTabs,
             showDonations,
             relayHistory,
           );
@@ -213,32 +231,30 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   /// Stripe last — it's recommended but the least-used tab in practice),
   /// filtered to the ones that currently apply.
   List<_HistoryTab> _visibleTabs(
-    bool showMobilePay,
-    bool showRevolut,
+    Set<_HistoryTab> relayTabs,
     bool showDonations,
   ) => [
     _HistoryTab.sessions,
-    if (showMobilePay) _HistoryTab.mobilepay,
-    if (showRevolut) _HistoryTab.revolut,
+    ..._relayTabs.where(relayTabs.contains),
     if (showDonations) _HistoryTab.donations,
   ];
 
   String _tabLabel(
     BuildContext context,
     _HistoryTab t,
-    bool showMobilePay,
-    bool showRevolut,
-  ) => switch (t) {
-    _HistoryTab.sessions => context.s.t('history.tab_sessions'),
-    _HistoryTab.mobilepay => 'MobilePay',
-    _HistoryTab.revolut => 'Revolut',
-    // 'Stripe' only makes sense next to a relay tab — alone it stays
-    // 'Donations', so Stripe-only users see no churn.
-    _HistoryTab.donations =>
-      (showMobilePay || showRevolut)
+    Set<_HistoryTab> relayTabs,
+  ) {
+    final method = _tabMethod(t);
+    if (method != null) return method.label;
+    return switch (t) {
+      _HistoryTab.sessions => context.s.t('history.tab_sessions'),
+      // 'Stripe' only makes sense next to a relay tab — alone it stays
+      // 'Donations', so Stripe-only users see no churn.
+      _ => relayTabs.isNotEmpty
           ? 'Stripe'
           : context.s.t('history.tab_donations'),
-  };
+    };
+  }
 
   // -------------------------------------------------------------- stats ---
 
@@ -263,8 +279,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget _buildMobile(
     List<LiveSession> sessions,
     String? stripeAllUrl,
-    bool showMobilePay,
-    bool showRevolut,
+    Set<_HistoryTab> relayTabs,
     bool showDonations,
     List<Donation> relayHistory,
   ) {
@@ -321,19 +336,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 14),
               LtSegmented<_HistoryTab>(
-                values: _visibleTabs(showMobilePay, showRevolut, showDonations),
+                values: _visibleTabs(relayTabs, showDonations),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
-                labelOf: (t) =>
-                    _tabLabel(context, t, showMobilePay, showRevolut),
+                labelOf: (t) => _tabLabel(context, t, relayTabs),
               ),
               const SizedBox(height: 14),
               if (_tab == _HistoryTab.donations) ...[
                 ..._donationGroups(),
-              ] else if (_tab == _HistoryTab.mobilepay)
-                ..._relayGroups(relayHistory, TipMethod.mobilepay)
-              else if (_tab == _HistoryTab.revolut)
-                ..._relayGroups(relayHistory, TipMethod.revolut)
+              ] else if (_tabMethod(_tab) case final method?)
+                ..._relayGroups(relayHistory, method)
               else
                 ..._sessionCards(sessions),
             ],
@@ -348,8 +360,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget _buildDesktop(
     List<LiveSession> sessions,
     String? stripeAllUrl,
-    bool showMobilePay,
-    bool showRevolut,
+    Set<_HistoryTab> relayTabs,
     bool showDonations,
     List<Donation> relayHistory,
   ) {
@@ -412,16 +423,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 24),
               LtSegmented<_HistoryTab>(
-                values: _visibleTabs(showMobilePay, showRevolut, showDonations),
+                values: _visibleTabs(relayTabs, showDonations),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
-                labelOf: (t) =>
-                    _tabLabel(context, t, showMobilePay, showRevolut),
+                labelOf: (t) => _tabLabel(context, t, relayTabs),
               ),
               const SizedBox(height: 24),
               if (_tab == _HistoryTab.donations)
                 _DonationsTable(
-                  title: (showMobilePay || showRevolut)
+                  title: relayTabs.isNotEmpty
                       ? 'Stripe'
                       : context.s.t('history.tab_donations'),
                   demo: app.demo,
@@ -432,17 +442,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   error: _error,
                   onLoadMore: _loadMore,
                 )
-              else if (_tab == _HistoryTab.mobilepay)
+              else if (_tabMethod(_tab) case final method?)
                 _RelayTable(
-                  title: 'MobilePay',
-                  method: TipMethod.mobilepay,
-                  donations: _byMethod(relayHistory, TipMethod.mobilepay),
-                )
-              else if (_tab == _HistoryTab.revolut)
-                _RelayTable(
-                  title: 'Revolut',
-                  method: TipMethod.revolut,
-                  donations: _byMethod(relayHistory, TipMethod.revolut),
+                  title: method.label,
+                  method: method,
+                  donations: _byMethod(relayHistory, method),
                 )
               else if (sessions.isEmpty)
                 Text(

@@ -122,6 +122,18 @@ describe("donor page", () => {
     expect(html).toContain('data-method="mobilepay"');
   });
 
+  it("offers Monzo as a button and a no-JS fallback link", async () => {
+    const { jarId } = await createJar({
+      currency: "gbp",
+      methods: { monzoUsername: "daniel" },
+    });
+    const html = await (await SELF.fetch(`https://live.tips/t/${jarId}`)).text();
+    expect(html).toContain('data-method="monzo"');
+    // The <noscript>/error fallback: a bare profile link, no prefilled amount.
+    expect(html).toContain('href="https://monzo.me/daniel"');
+    expect(html).toContain("Amount (GBP)");
+  });
+
   it("escapes hostile artist names — the stored-XSS gate", async () => {
     const { jarId } = await createJar({ artistName: `<script>alert("pwn")</script>` });
     const html = await (await SELF.fetch(`https://live.tips/t/${jarId}`)).text();
@@ -166,6 +178,28 @@ describe("tips endpoint", () => {
     expect(url.searchParams.get("note")).toBe("Grace: encore!");
     expect(data.delivered).toBe(false); // nobody connected…
     expect(data.queued).toBe(true); // …so it waits for them
+  });
+
+  it("relays a Monzo tip to a major-unit monzo.me link", async () => {
+    const { jarId } = await createJar({
+      currency: "gbp",
+      methods: { monzoUsername: "daniel" },
+    });
+    mockTurnstile();
+    const res = await postTip(jarId, { method: "monzo", amountMinor: 750 });
+    expect(res.status).toBe(200);
+    const data = await res.json<{ redirectUrl: string }>();
+    const url = new URL(data.redirectUrl);
+    expect(url.origin).toBe("https://monzo.me");
+    expect(url.pathname).toBe("/daniel/7.50"); // £7.50, not £750
+    expect(url.searchParams.get("d")).toBe("Grace: encore!");
+  });
+
+  it("refuses a Monzo tip on a jar that has no Monzo handle", async () => {
+    const { jarId } = await createJar(); // revolut + mobilepay only
+    mockTurnstile();
+    // Same "method not available" 422 an unconfigured Revolut/MobilePay gets.
+    expect((await postTip(jarId, { method: "monzo" })).status).toBe(422);
   });
 
   it("rejects tips that fail Turnstile", async () => {

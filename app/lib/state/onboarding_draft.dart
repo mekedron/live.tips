@@ -16,6 +16,7 @@ class OnboardingDraft {
     this.methods = const {},
     this.revolutUsername,
     this.mobilepayBoxId,
+    this.monzoUsername,
   });
 
   /// Band / artist name from the details step.
@@ -33,20 +34,21 @@ class OnboardingDraft {
   /// Values entered on each method's step (null = skipped / not entered).
   final String? revolutUsername;
   final String? mobilepayBoxId;
+  final String? monzoUsername;
 
   bool get wantsStripe => methods.contains(TipMethod.stripe);
   bool get wantsRevolut => methods.contains(TipMethod.revolut);
   bool get wantsMobilePay => methods.contains(TipMethod.mobilepay);
+  bool get wantsMonzo => methods.contains(TipMethod.monzo);
 
   /// Any method that needs the live.tips relay (a donor page + jar).
-  bool get wantsRelay => wantsRevolut || wantsMobilePay;
+  bool get wantsRelay => methods.any(TipMethod.relayMethods.contains);
 
-  /// The selected methods in the fixed setup order: Stripe, Revolut,
-  /// MobilePay — the sequence the step screens walk through.
+  /// The selected methods in the fixed setup order: Stripe, then the relay
+  /// methods — the sequence the step screens walk through.
   List<TipMethod> get setupOrder => [
         if (wantsStripe) TipMethod.stripe,
-        if (wantsRevolut) TipMethod.revolut,
-        if (wantsMobilePay) TipMethod.mobilepay,
+        ...TipMethod.relayMethods.where(methods.contains),
       ];
 
   /// Screen keys for [stepOf].
@@ -74,6 +76,7 @@ class OnboardingDraft {
     Set<TipMethod>? methods,
     String? revolutUsername,
     String? mobilepayBoxId,
+    String? monzoUsername,
   }) =>
       OnboardingDraft(
         name: name ?? this.name,
@@ -82,6 +85,7 @@ class OnboardingDraft {
         methods: methods ?? this.methods,
         revolutUsername: revolutUsername ?? this.revolutUsername,
         mobilepayBoxId: mobilepayBoxId ?? this.mobilepayBoxId,
+        monzoUsername: monzoUsername ?? this.monzoUsername,
       );
 }
 

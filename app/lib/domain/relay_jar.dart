@@ -10,6 +10,7 @@ class RelayJar {
     this.message,
     this.revolutUsername,
     this.mobilepayBoxId,
+    this.monzoUsername,
     required this.createdAtMs,
   });
 
@@ -27,11 +28,14 @@ class RelayJar {
   final String? message;
   final String? revolutUsername;
   final String? mobilepayBoxId;
+  final String? monzoUsername;
   final int createdAtMs;
 
   bool get hasRevolut => (revolutUsername?.trim() ?? '').isNotEmpty;
 
   bool get hasMobilePay => (mobilepayBoxId?.trim() ?? '').isNotEmpty;
+
+  bool get hasMonzo => (monzoUsername?.trim() ?? '').isNotEmpty;
 
   static const demo = RelayJar(
     jarId: 'demo',
@@ -40,6 +44,7 @@ class RelayJar {
     currency: 'usd',
     revolutUsername: 'demo',
     mobilepayBoxId: null,
+    monzoUsername: null,
     createdAtMs: 0,
   );
 
@@ -51,6 +56,7 @@ class RelayJar {
     String? message,
     String? revolutUsername,
     String? mobilepayBoxId,
+    String? monzoUsername,
     int? createdAtMs,
   }) =>
       RelayJar(
@@ -61,6 +67,7 @@ class RelayJar {
         message: message ?? this.message,
         revolutUsername: revolutUsername ?? this.revolutUsername,
         mobilepayBoxId: mobilepayBoxId ?? this.mobilepayBoxId,
+        monzoUsername: monzoUsername ?? this.monzoUsername,
         createdAtMs: createdAtMs ?? this.createdAtMs,
       );
 
@@ -72,6 +79,7 @@ class RelayJar {
         if (message != null) 'message': message,
         if (revolutUsername != null) 'revolutUsername': revolutUsername,
         if (mobilepayBoxId != null) 'mobilepayBoxId': mobilepayBoxId,
+        if (monzoUsername != null) 'monzoUsername': monzoUsername,
         'createdAtMs': createdAtMs,
       };
 
@@ -83,6 +91,7 @@ class RelayJar {
         message: json['message'] as String?,
         revolutUsername: json['revolutUsername'] as String?,
         mobilepayBoxId: json['mobilepayBoxId'] as String?,
+        monzoUsername: json['monzoUsername'] as String?,
         createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
       );
 }

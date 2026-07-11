@@ -85,6 +85,7 @@ class RelayClient {
     String? stripeUrl,
     String? revolutUsername,
     String? mobilepayBoxId,
+    String? monzoUsername,
   }) async {
     artistName = _clampName(artistName);
     message = _clampMessage(message);
@@ -99,6 +100,7 @@ class RelayClient {
           'stripeUrl': ?stripeUrl,
           'revolutUsername': ?revolutUsername,
           'mobilepayBoxId': ?mobilepayBoxId,
+          'monzoUsername': ?monzoUsername,
         },
       },
     );
@@ -111,6 +113,7 @@ class RelayClient {
         message: (message?.trim().isEmpty ?? true) ? null : message!.trim(),
         revolutUsername: revolutUsername,
         mobilepayBoxId: mobilepayBoxId,
+        monzoUsername: monzoUsername,
         createdAtMs: DateTime.now().millisecondsSinceEpoch,
       ),
       secret: json['secret'] as String,
@@ -142,6 +145,7 @@ class RelayClient {
           if (jar.revolutUsername != null)
             'revolutUsername': jar.revolutUsername,
           if (jar.mobilepayBoxId != null) 'mobilepayBoxId': jar.mobilepayBoxId,
+          if (jar.monzoUsername != null) 'monzoUsername': jar.monzoUsername,
         },
       },
     );

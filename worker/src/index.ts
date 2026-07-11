@@ -82,6 +82,7 @@ function methodsSummary(profile: JarProfile): string {
   if (profile.methods.stripeUrl) parts.push("stripe");
   if (profile.methods.revolutUsername) parts.push(`revolut:${profile.methods.revolutUsername}`);
   if (profile.methods.mobilepayBoxId) parts.push("mobilepay");
+  if (profile.methods.monzoUsername) parts.push(`monzo:${profile.methods.monzoUsername}`);
   return parts.join(", ");
 }
 

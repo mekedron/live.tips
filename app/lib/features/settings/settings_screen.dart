@@ -206,6 +206,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
+            LtRow(
+              leading: _MethodStatusDot(
+                icon: TipMethod.monzo.icon,
+                connected: app.relayJar?.hasMonzo ?? false,
+              ),
+              title: 'Monzo',
+              subtitle: (app.relayJar?.hasMonzo ?? false)
+                  ? '@${app.relayJar!.monzoUsername}'
+                  : s.t('settings.main.not_set'),
+              chevron: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const RelayMethodScreen(method: TipMethod.monzo),
+                ),
+              ),
+            ),
           ],
         ),
       // ---------------------------------------------------- appearance ---

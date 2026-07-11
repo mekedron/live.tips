@@ -41,9 +41,7 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
-    final nonStripe =
-        _selected.contains(TipMethod.revolut) ||
-        _selected.contains(TipMethod.mobilepay);
+    final nonStripe = _selected.any(TipMethod.relayMethods.contains);
     // The pill previews the flow length for the current selection: details +
     // this step + one per chosen method.
     final total = 2 + (_selected.isEmpty ? 1 : _selected.length);
@@ -117,6 +115,16 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
                   'onboarding.method_select.mobilepay_subtitle',
                 ),
                 onTap: () => _toggle(TipMethod.mobilepay),
+              ),
+              const SizedBox(height: 12),
+              _MethodCard(
+                method: TipMethod.monzo,
+                selected: _selected.contains(TipMethod.monzo),
+                title: 'Monzo',
+                subtitle: context.s.t(
+                  'onboarding.method_select.monzo_subtitle',
+                ),
+                onTap: () => _toggle(TipMethod.monzo),
               ),
               if (nonStripe) ...[
                 const SizedBox(height: 16),

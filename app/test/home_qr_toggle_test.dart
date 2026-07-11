@@ -57,7 +57,9 @@ void main() {
     expect(find.text('All methods'), findsOneWidget);
     expect(find.text('Stripe only'), findsOneWidget);
     expect(
-      find.text('Fans pick Stripe, Revolut or MobilePay on your tip page.'),
+      find.text(
+        'Fans pick Stripe, Revolut, MobilePay or Monzo on your tip page.',
+      ),
       findsOneWidget,
     );
 
@@ -70,7 +72,9 @@ void main() {
     // to the Stripe URL.
     expect(localStore.readBandSettings(kTestAccountId).qrMode, QrMode.stripe);
     expect(
-      find.text('Fans pick Stripe, Revolut or MobilePay on your tip page.'),
+      find.text(
+        'Fans pick Stripe, Revolut, MobilePay or Monzo on your tip page.',
+      ),
       findsNothing,
     );
     expect(find.textContaining('buy.stripe.com'), findsOneWidget);

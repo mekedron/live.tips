@@ -49,7 +49,10 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
     final mobilepay = (draft?.mobilepayBoxId?.trim().isNotEmpty ?? false)
         ? draft!.mobilepayBoxId
         : null;
-    final wantsRelay = revolut != null || mobilepay != null;
+    final monzo = (draft?.monzoUsername?.trim().isNotEmpty ?? false)
+        ? draft!.monzoUsername
+        : null;
+    final wantsRelay = revolut != null || mobilepay != null || monzo != null;
 
     if (wantsRelay && app.relayJar == null) {
       final client = RelayClient();
@@ -61,6 +64,7 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
           stripeUrl: app.tipJar?.url,
           revolutUsername: revolut,
           mobilepayBoxId: mobilepay,
+          monzoUsername: monzo,
         );
         await ref
             .read(appStateProvider.notifier)

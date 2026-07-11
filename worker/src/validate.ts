@@ -69,6 +69,10 @@ export function escapeHtml(text: string): string {
 const STRIPE_URL = /^https:\/\/(?:buy|donate)\.stripe\.com\/[A-Za-z0-9_]{1,64}$/;
 const REVOLUT_USERNAME = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 const MOBILEPAY_BOX_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+// Monzo.me handles go in the URL *path*, so the charset gate is what keeps a
+// `/` or `..` out of the composed link. Single-character handles are real
+// (monzo.me/a resolves), hence no 3-char floor like Revolut's.
+const MONZO_USERNAME = /^[a-z0-9][a-z0-9._-]{0,29}$/;
 const CURRENCY = /^[a-z]{3}$/;
 
 /** Currencies whose minor unit equals the major unit (Stripe's list). */
@@ -111,7 +115,7 @@ function rejectUnknownKeys(obj: Record<string, unknown>, allowed: readonly strin
 // Profile validation (identical for POST create and PUT update)
 
 const PROFILE_KEYS = ["artistName", "message", "currency", "methods"] as const;
-const METHOD_KEYS = ["stripeUrl", "revolutUsername", "mobilepayBoxId"] as const;
+const METHOD_KEYS = ["stripeUrl", "revolutUsername", "mobilepayBoxId", "monzoUsername"] as const;
 
 export function validateProfile(body: Record<string, unknown>): Result<JarProfile> {
   const unknown = rejectUnknownKeys(body, PROFILE_KEYS, "profile");
@@ -160,8 +164,19 @@ export function validateProfile(body: Record<string, unknown>): Result<JarProfil
     if (currency !== "eur") return err(422, "MobilePay Box requires EUR");
     methods.mobilepayBoxId = v.trim().toLowerCase();
   }
+  if (methodsObj["monzoUsername"] !== undefined) {
+    const v = methodsObj["monzoUsername"];
+    if (typeof v !== "string") return err(422, "monzoUsername must be a string");
+    const lowered = v.trim().toLowerCase().replace(/^@/, "");
+    if (!MONZO_USERNAME.test(lowered)) return err(422, "monzoUsername is not a valid Monzo.me handle");
+    // Monzo.me only ever collects in sterling. Note this also makes Monzo and
+    // MobilePay mutually exclusive on one jar — a jar has a single currency,
+    // and their locks (GBP / EUR) can't both hold.
+    if (currency !== "gbp") return err(422, "Monzo requires GBP");
+    methods.monzoUsername = lowered;
+  }
 
-  if (!methods.stripeUrl && !methods.revolutUsername && !methods.mobilepayBoxId) {
+  if (!methods.stripeUrl && !methods.revolutUsername && !methods.mobilepayBoxId && !methods.monzoUsername) {
     return err(422, "at least one payment method is required");
   }
 
@@ -182,7 +197,9 @@ export function validateTip(
   if (unknown) return unknown;
 
   const method = body["method"];
-  if (method !== "revolut" && method !== "mobilepay") return err(422, "method must be revolut or mobilepay");
+  if (method !== "revolut" && method !== "mobilepay" && method !== "monzo") {
+    return err(422, "method must be revolut, mobilepay or monzo");
+  }
 
   const amount = body["amountMinor"];
   const { min, max } = amountBounds(currency);

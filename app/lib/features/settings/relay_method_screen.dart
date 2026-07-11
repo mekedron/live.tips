@@ -11,10 +11,10 @@ import '../../l10n/enum_labels.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../onboarding/relay_setup_screen.dart'
-    show extractMobilePayBoxId, mobilePayCurrencyError;
+    show parseRelayMethodValue, relayMethodCurrencyError, relayMethodHint;
 
-/// Edits a single connected-mode payment method — Revolut or MobilePay — on
-/// its own full-page screen (back arrow), mirroring the Stripe key editor.
+/// Edits a single connected-mode payment method — Revolut, MobilePay or Monzo
+/// — on its own full-page screen (back arrow), mirroring the Stripe key editor.
 /// The band's name and currency are set in Account Details, so they don't
 /// appear here. The red trash button clears the field and saves, which is how
 /// an artist removes a method; clearing the last one disconnects the tip page.
@@ -28,20 +28,30 @@ class RelayMethodScreen extends ConsumerStatefulWidget {
   ConsumerState<RelayMethodScreen> createState() => _RelayMethodScreenState();
 }
 
+/// The atom this method currently holds on [jar], or null when it's unset.
+String? _jarValue(RelayJar? jar, TipMethod method) => switch (method) {
+  TipMethod.revolut => (jar?.hasRevolut ?? false) ? jar!.revolutUsername : null,
+  TipMethod.mobilepay =>
+    (jar?.hasMobilePay ?? false) ? jar!.mobilepayBoxId : null,
+  TipMethod.monzo => (jar?.hasMonzo ?? false) ? jar!.monzoUsername : null,
+  TipMethod.stripe => null,
+};
+
 class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
   final _controller = TextEditingController();
   bool _busy = false;
   bool _removing = false;
   String? _error;
 
-  bool get _isRevolut => widget.method == TipMethod.revolut;
+  /// i18n keys are suffixed with the method's wire name, so one lookup serves
+  /// every method — adding one means adding strings, not another branch.
+  String get _wire => widget.method.wire;
 
   @override
   void initState() {
     super.initState();
-    final jar = ref.read(appStateProvider).relayJar;
     _controller.text =
-        (_isRevolut ? jar?.revolutUsername : jar?.mobilepayBoxId) ?? '';
+        _jarValue(ref.read(appStateProvider).relayJar, widget.method) ?? '';
   }
 
   @override
@@ -75,52 +85,36 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
     final notifier = ref.read(appStateProvider.notifier);
     final jar = app.relayJar;
 
-    // Resolve this method's new value from the field.
+    // Resolve this method's new value from the field. An empty field clears it.
     String? value;
-    if (_isRevolut) {
-      final raw = _controller.text.trim().replaceFirst(RegExp(r'^@+'), '');
-      if (raw.isNotEmpty && !RegExp(r'^[A-Za-z0-9._-]{3,32}$').hasMatch(raw)) {
+    final raw = _controller.text.trim();
+    if (raw.isNotEmpty) {
+      value = parseRelayMethodValue(widget.method, raw);
+      if (value == null) {
         setState(
           () => _error = context.s.t(
-            'settings.relay_method.error_revolut_invalid',
+            'settings.relay_method.error_${_wire}_invalid',
           ),
         );
         return;
       }
-      value = raw.isEmpty ? null : raw;
-    } else {
-      final raw = _controller.text.trim();
-      if (raw.isNotEmpty) {
-        final box = extractMobilePayBoxId(raw);
-        if (box == null) {
-          setState(
-            () => _error = context.s.t(
-              'settings.relay_method.error_mobilepay_invalid',
-            ),
-          );
-          return;
-        }
-        final curErr = mobilePayCurrencyError(app.currency, context: context);
-        if (curErr != null) {
-          setState(() => _error = curErr);
-          return;
-        }
-        value = box;
-      } else {
-        value = null;
+      final curErr = relayMethodCurrencyError(
+        widget.method,
+        app.currency,
+        context: context,
+      );
+      if (curErr != null) {
+        setState(() => _error = curErr);
+        return;
       }
     }
 
-    // The resulting method set after this edit — the other method is untouched.
-    final revolut = _isRevolut
-        ? value
-        : (jar?.hasRevolut ?? false ? jar!.revolutUsername : null);
-    final mobilepay = _isRevolut
-        ? (jar?.hasMobilePay ?? false ? jar!.mobilepayBoxId : null)
-        : value;
-    final bothEmpty =
-        (revolut == null || revolut.isEmpty) &&
-        (mobilepay == null || mobilepay.isEmpty);
+    // The resulting method set after this edit — the others are untouched.
+    final values = {
+      for (final m in TipMethod.relayMethods)
+        m: m == widget.method ? value : _jarValue(jar, m),
+    };
+    final allEmpty = values.values.every((v) => v == null || v.isEmpty);
 
     // Nothing to add for a band with no tip page and an empty field.
     if (jar == null && value == null) {
@@ -129,7 +123,7 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
     }
 
     // Clearing the last method retires the whole tip page — confirm first.
-    if (jar != null && bothEmpty) {
+    if (jar != null && allEmpty) {
       final ok = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -171,12 +165,13 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
           currency: app.currency,
           message: app.tipJar?.thankYouMessage,
           stripeUrl: app.tipJar?.url,
-          revolutUsername: revolut,
-          mobilepayBoxId: mobilepay,
+          revolutUsername: values[TipMethod.revolut],
+          mobilepayBoxId: values[TipMethod.mobilepay],
+          monzoUsername: values[TipMethod.monzo],
         );
         await notifier.setRelayJar(result.jar, result.secret);
         _finish(s.t('settings.relay_method.created_snack'));
-      } else if (bothEmpty) {
+      } else if (allEmpty) {
         final secret = app.relaySecret;
         if (secret != null) {
           try {
@@ -196,8 +191,9 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
           artistName: jar.artistName,
           currency: jar.currency,
           message: jar.message,
-          revolutUsername: revolut,
-          mobilepayBoxId: mobilepay,
+          revolutUsername: values[TipMethod.revolut],
+          mobilepayBoxId: values[TipMethod.mobilepay],
+          monzoUsername: values[TipMethod.monzo],
           createdAtMs: jar.createdAtMs,
         );
         await client.updateJar(
@@ -251,9 +247,10 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final jar = ref.watch(appStateProvider).relayJar;
-    final currentlySet = _isRevolut
-        ? (jar?.hasRevolut ?? false)
-        : (jar?.hasMobilePay ?? false);
+    final currentlySet = _jarValue(jar, widget.method) != null;
+    // A pasted share link is shown monospace so a long URL stays readable;
+    // Revolut takes a bare handle behind an `@` instead.
+    final linkHint = relayMethodHint(widget.method);
     return Scaffold(
       appBar: AppBar(title: Text(widget.method.l10nLabel(context))),
       body: Center(
@@ -263,9 +260,7 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
               Text(
-                _isRevolut
-                    ? context.s.t('settings.relay_method.intro_revolut')
-                    : context.s.t('settings.relay_method.intro_mobilepay'),
+                context.s.t('settings.relay_method.intro_$_wire'),
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 14,
@@ -279,55 +274,35 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _FieldLabel(
-                      _isRevolut
-                          ? context.s.t('settings.relay_method.label_revolut')
-                          : context.s.t(
-                              'settings.relay_method.label_mobilepay',
-                            ),
+                      context.s.t('settings.relay_method.label_$_wire'),
                     ),
-                    _isRevolut
-                        ? TextField(
-                            controller: _controller,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            decoration: InputDecoration(
-                              prefixText: '@',
-                              hintText: context.s.t(
-                                'settings.relay_method.hint_revolut',
-                              ),
-                              errorText: _error,
-                              errorMaxLines: 3,
-                              suffixIcon: _pasteButton(c),
-                            ),
-                            onChanged: (_) {
-                              if (_error != null) setState(() => _error = null);
-                            },
-                            onSubmitted: (_) => _save(),
-                          )
-                        : TextField(
-                            controller: _controller,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            style: const TextStyle(
+                    TextField(
+                      controller: _controller,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      style: linkHint == null
+                          ? null
+                          : const TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 13.5,
                             ),
-                            decoration: InputDecoration(
-                              hintText: 'https://qr.mobilepay.fi/box/…',
-                              errorText: _error,
-                              errorMaxLines: 3,
-                              suffixIcon: _pasteButton(c),
-                            ),
-                            onChanged: (_) {
-                              if (_error != null) setState(() => _error = null);
-                            },
-                            onSubmitted: (_) => _save(),
-                          ),
+                      decoration: InputDecoration(
+                        prefixText: linkHint == null ? '@' : null,
+                        hintText:
+                            linkHint ??
+                            context.s.t('settings.relay_method.hint_revolut'),
+                        errorText: _error,
+                        errorMaxLines: 3,
+                        suffixIcon: _pasteButton(c),
+                      ),
+                      onChanged: (_) {
+                        if (_error != null) setState(() => _error = null);
+                      },
+                      onSubmitted: (_) => _save(),
+                    ),
                     const SizedBox(height: 8),
                     Text(
-                      _isRevolut
-                          ? context.s.t('settings.relay_method.help_revolut')
-                          : context.s.t('settings.relay_method.help_mobilepay'),
+                      context.s.t('settings.relay_method.help_$_wire'),
                       style: TextStyle(
                         fontFamily: kFontBody,
                         fontSize: 12,
