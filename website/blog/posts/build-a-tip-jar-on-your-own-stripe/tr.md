@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Üçüncü çağrı bir `url` döndürür. O URL *sizin* bahşiş kavanozunuzdur. Stripe'ın barındırdığı
@@ -75,6 +75,12 @@ kurmadan „bu kimdendi ki?"yi böyle elde edersiniz:
 Stripe'ın [bahşiş ve bağış kabulü için gereklilikleri](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations)
 var — bir kez okuyun. „Ne kadar istersen o kadar öde" ayrıca başka line item'larla, indirimlerle
 veya yinelenen ödemelerle birleştirilemez. Bir bahşiş kavanozu için bunların hiçbiri sorun değil.
+
+Bu ayrımı doğru yapmaya değer. Stripe şöyle koyuyor: bahşiş, halihazırda sunulmuş bir mal
+ya da hizmet için verilir; bağış ise hayır amaçlı bir gayeye bağlı olmak zorundadır. Seti
+siz çaldınız; bahşiş onun bedeli. Yukarıdaki çağrının `donate` değil `submit_type=pay`
+göndermesinin sebebi de bu — `donate`, bağlantınızı `donate.stripe.com` üzerinde barındırır
+ve düğmeye *Bağış yap* yazar. O başka bir iş ve Stripe'ın çok daha sıkı incelediği bir iş.
 
 ## Anahtar: sızacağını varsayın ve bunu sıkıcı hale getirin
 

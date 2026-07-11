@@ -42,7 +42,7 @@ vera nákvæmur um hvað sá endurvarpi gerir, því „við bættum við bakend
 staðurinn þar sem þessar sögur fara úrskeiðis.
 
 Hann geymir opinbera þjórfésíðusniðið þitt — birtingarnafnið og greiðsluauðkennin sem
-þú kaust að birta. Það er allt og sumt. Hann heldur enga gjafasögu, sér enga peninga,
+þú kaust að birta. Það er allt og sumt. Hann heldur enga þjórfjársögu, sér enga peninga,
 geymir enga lykla og eyðir sjálfum sér eftir 90 daga aðgerðaleysi. Peningar færast
 enn beint milli Revolut- eða MobilePay-forrits aðdáandans þíns og þíns eigin.
 

@@ -149,7 +149,7 @@ Det her er vores kategori, så læs de næste fire afsnit med passende mistro.
 **live.tips** sætter én QR-kode på din kasse. Den åbner en side med de betalingsmetoder, *du* har slået til.
 Kortdrikkepenge går direkte ind på **din egen Stripe-konto** — ikke til en live.tips-saldo, for der findes ingen
 live.tips-saldo. Vi tager **0 procent**, der er ingen konto at oprette hos os, og det hele ligger MIT-licenseret
-på GitHub. Tabletten ved siden af dig viser hver donation live, med giverens navn og besked og en målbjælke — og
+på GitHub. Tabletten ved siden af dig viser hvert tip live, med tipperens navn og besked og en målbjælke — og
 det er den del, rummet kan se. En krukke, rummet ser fyldes, er hele grunden til, at møntkrukken virkede i fire
 hundrede år. Pengenes vej beskrev vi i
 [hvordan live.tips håndterer penge](post:how-live-tips-handles-money).

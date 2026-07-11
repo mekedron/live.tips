@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 La terza chiamata restituisce una `url`. Quella URL *è* il tuo barattolo delle mance.
@@ -77,6 +77,13 @@ Puoi anche raccogliere un nome e un messaggio. I Payment Links accettano fino a 
 Stripe ha dei [requisiti per accettare mance e donazioni](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations):
 leggili una volta. Il prezzo libero non si combina nemmeno con altri line item, sconti o
 pagamenti ricorrenti. Per un barattolo delle mance, nulla di tutto ciò dà fastidio.
+
+Vale la pena azzeccare questa distinzione. Stripe la mette così: una mancia è data per un
+bene o un servizio già reso, mentre una donazione dev'essere legata a uno scopo benefico.
+Hai suonato; la mancia la paga. È anche per questo che la chiamata qui sopra manda
+`submit_type=pay` e non `donate` — `donate` ospiterebbe il tuo link su `donate.stripe.com`
+e scriverebbe *Dona* sul pulsante. È un altro mestiere, e uno che Stripe esamina molto più
+a fondo.
 
 ## La chiave: dai per scontato che trapeli, e rendi la cosa noiosa
 

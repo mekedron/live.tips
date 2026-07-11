@@ -43,7 +43,7 @@ donde estas historias se tuercen.
 
 Almacena el perfil público de tu página de propinas: el nombre visible y los
 identificadores de pago que elegiste publicar. Eso es todo. No guarda historial de
-donaciones, no ve dinero, no retiene claves y se autoelimina tras 90 días de
+propinas, no ve dinero, no retiene claves y se autoelimina tras 90 días de
 inactividad. El dinero sigue moviéndose directamente entre la aplicación Revolut o
 MobilePay de tu fan y la tuya.
 

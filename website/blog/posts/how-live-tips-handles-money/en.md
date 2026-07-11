@@ -40,7 +40,7 @@ precise about what that relay does, because "we added a backend" is usually wher
 these stories go wrong.
 
 It stores your public tip-page profile — the display name and the payment handles
-you chose to publish. That is all. It keeps no donation history, sees no money,
+you chose to publish. That is all. It keeps no tip history, sees no money,
 holds no keys, and self-deletes after 90 days of inactivity. Money still moves
 directly between your fan's Revolut or MobilePay app and yours.
 

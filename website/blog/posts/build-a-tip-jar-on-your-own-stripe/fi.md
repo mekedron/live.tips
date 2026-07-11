@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Kolmas kutsu palauttaa `url`-kentän. Se URL *on* tippipurkkisi. Se on Stripen isännöimä sivu:
@@ -76,6 +76,13 @@ Voit myös kerätä nimen ja viestin. Payment Link ottaa enintään kolme `custo
 Stripellä on [vaatimukset tippien ja lahjoitusten vastaanottamiselle](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 lue ne kerran. Maksa-mitä-haluat ei myöskään yhdisty muihin line itemeihin, alennuksiin tai toistuviin
 maksuihin. Tippipurkille mikään noista ei haittaa.
+
+Tämä ero kannattaa saada oikein. Stripe sanoo sen näin: tippi annetaan jo tuotetusta
+tavarasta tai palvelusta, kun taas lahjoituksen on liityttävä hyväntekeväisyystarkoitukseen.
+Sinä soitit keikan; tippi maksaa siitä. Siksi myös yllä oleva kutsu lähettää
+`submit_type=pay` eikä `donate` — `donate` veisi linkkisi osoitteeseen `donate.stripe.com`
+ja painaisi nappiin *Lahjoita*. Se on eri ala, ja sellainen jota Stripe tutkii
+huomattavasti tarkemmin.
 
 ## Avain: oleta että se vuotaa — ja tee siitä tylsää
 

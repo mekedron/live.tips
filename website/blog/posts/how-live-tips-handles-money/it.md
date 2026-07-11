@@ -43,7 +43,7 @@ queste storie prendono una brutta piega.
 
 Conserva il profilo pubblico della tua pagina delle mance: il nome visualizzato e gli
 identificativi di pagamento che hai scelto di pubblicare. Tutto qui. Non tiene alcuno
-storico delle donazioni, non vede denaro, non custodisce chiavi e si autoelimina dopo
+storico delle mance, non vede denaro, non custodisce chiavi e si autoelimina dopo
 90 giorni di inattività. Il denaro continua a spostarsi direttamente tra l'app Revolut
 o MobilePay del tuo fan e la tua.
 

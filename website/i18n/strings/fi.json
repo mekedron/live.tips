@@ -69,7 +69,7 @@
   "sec1_h3": "Tuo oma avain, pidä oma avain",
   "sec1_p": "Rajoitettu avain tallennetaan laitteesi avainnippuun ja lähetetään ainoastaan Stripelle TLS-yhteyden yli. Täydet live-tilan salaiset avaimet hylätään suoralta kädeltä.",
   "sec2_h3": "Vähimmät oikeudet lähtökohtaisesti",
-  "sec2_p": "Avain voi luoda tippilinkkisi ja seurata lahjoituksia — ei muuta. Se ei pääse käsiksi saldoihin, tilityksiin, palautuksiin eikä asiakastietoihin.",
+  "sec2_p": "Avain voi luoda tippilinkkisi ja seurata tippejä — ei muuta. Se ei pääse käsiksi saldoihin, tilityksiin, palautuksiin eikä asiakastietoihin.",
   "sec3_h3": "Palautukset ja tilitykset pysyvät Stripessä",
   "sec3_p": "Raha-asiat pysyvät siellä, minne ne kuuluvat: omassa Stripe-hallintapaneelissasi, oman tilisi alla.",
   "perm_title": "Mitä avain voi tehdä",

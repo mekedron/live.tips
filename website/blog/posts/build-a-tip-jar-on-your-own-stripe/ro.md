@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Al treilea apel returnează un `url`. Acel URL *este* borcanul tău de bacșiș. E o pagină
@@ -76,6 +76,12 @@ obții „de la cine a fost?” fără să construiești un formular:
 Stripe are [cerințe pentru acceptarea bacșișurilor și donațiilor](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 citește-le o dată. „Plătește cât vrei” nu se combină nici cu alte line items, reduceri sau plăți
 recurente. Pentru un borcan de bacșiș, nimic din toate astea nu deranjează.
+
+Distincția merită nimerită. Stripe o pune așa: bacșișul se dă pentru un bun sau serviciu
+deja prestat, în timp ce o donație trebuie legată de un scop caritabil. Ai cântat setul;
+bacșișul îl plătește. De aceea apelul de mai sus trimite `submit_type=pay` și nu `donate` —
+`donate` ți-ar găzdui linkul pe `donate.stripe.com` și ar scrie *Donează* pe buton. E altă
+meserie, și una pe care Stripe o verifică mult mai aspru.
 
 ## Cheia: presupune că se scurge — și fă din asta ceva plictisitor
 

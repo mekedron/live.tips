@@ -42,7 +42,7 @@ disse historier går galt.
 
 Det gemmer din offentlige drikkepengesideprofil – visningsnavnet og de
 betalings-handles, du valgte at offentliggøre. Mere er det ikke. Det fører ingen
-donationshistorik, ser ingen penge, holder ingen nøgler og sletter sig selv efter
+drikkepengehistorik, ser ingen penge, holder ingen nøgler og sletter sig selv efter
 90 dages inaktivitet. Pengene bevæger sig stadig direkte mellem dit fans Revolut-
 eller MobilePay-app og din.
 

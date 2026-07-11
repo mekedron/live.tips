@@ -69,7 +69,7 @@
   "sec1_h3": "Hozd a saját kulcsod — és a tiéd is marad",
   "sec1_p": "A korlátozott kulcs a készüléked kulcstárában tárolódik, és kizárólag a Stripe-nak küldjük el, TLS-en keresztül. A teljes jogú, éles titkos kulcsokat kereken elutasítjuk.",
   "sec2_h3": "Eleve minimális jogosultság",
-  "sec2_p": "A kulcs létrehozhatja a borravalólinkedet, és figyelheti az adományokat — semmi mást. Nem nyúlhat hozzá az egyenlegekhez, a kifizetésekhez, a visszatérítésekhez vagy az ügyféladatokhoz.",
+  "sec2_p": "A kulcs létrehozhatja a borravalólinkedet, és figyelheti, ahogy érkeznek — semmi mást. Nem nyúlhat hozzá az egyenlegekhez, a kifizetésekhez, a visszatérítésekhez vagy az ügyféladatokhoz.",
   "sec3_h3": "A visszatérítések és a kifizetések a Stripe-ban maradnak",
   "sec3_p": "A pénzügyek ott maradnak, ahová valók: a saját Stripe-irányítópultodon, a saját fiókod alatt.",
   "perm_title": "Mit tud a kulcs",

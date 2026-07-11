@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Det tredje kald returnerer en `url`. Den URL *er* din drikkepengekrukke. Det er en side, Stripe
@@ -75,6 +75,13 @@ Du kan også indsamle et navn og en besked. Payment Links tager op til tre `cust
 Stripe har [krav til at modtage drikkepenge og donationer](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 læs dem én gang. Betal-hvad-du-vil kan heller ikke kombineres med andre line items, rabatter eller
 tilbagevendende betalinger. For en drikkepengekrukke bider intet af det.
+
+Den skelnen er værd at få rigtigt. Stripe siger det sådan: drikkepenge gives for en vare
+eller ydelse, der allerede er leveret, mens en donation skal være bundet til et velgørende
+formål. Du spillede sættet; drikkepengene betaler for det. Det er også derfor, kaldet
+ovenfor sender `submit_type=pay` og ikke `donate` — `donate` ville lægge dit link på
+`donate.stripe.com` og skrive *Donér* på knappen. Det er en anden branche, og en som Stripe
+gransker langt hårdere.
 
 ## Nøglen: gå ud fra, at den lækker — og gør det kedeligt
 

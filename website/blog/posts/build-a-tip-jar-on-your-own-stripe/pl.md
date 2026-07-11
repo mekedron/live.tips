@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 To trzecie wywołanie zwraca `url`. Ten URL *jest* twoim słoikiem na napiwki. To strona
@@ -76,6 +76,12 @@ zdobywasz „a od kogo to było” bez budowania formularza:
 Stripe ma [wymagania dotyczące przyjmowania napiwków i darowizn](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 przeczytaj je raz. „Zapłać, ile chcesz” nie łączy się też z innymi line itemami, rabatami ani
 płatnościami cyklicznymi. Dla słoika na napiwki nic z tego nie przeszkadza.
+
+Tę różnicę warto mieć po swojej stronie. Stripe ujmuje to tak: napiwek daje się za towar
+lub usługę już wykonaną, a darowizna musi wiązać się z celem charytatywnym. Zagrałeś
+koncert; napiwek za niego płaci. Dlatego wywołanie powyżej wysyła `submit_type=pay`, a nie
+`donate` — `donate` umieściłoby twój link na `donate.stripe.com` i wydrukowało *Przekaż
+darowiznę* na przycisku. To inna branża, i taka, którą Stripe sprawdza znacznie ostrzej.
 
 ## Klucz: załóż, że wycieknie, i zrób z tego nudę
 

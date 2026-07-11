@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 A harmadik hívás visszaad egy `url`-t. Ez az URL *maga* a borravalós perselyed. Stripe által
@@ -76,6 +76,13 @@ jutsz hozzá a „na de kitől volt?”-hoz anélkül, hogy űrlapot építenél
 A Stripe-nak vannak [követelményei a borravaló és az adomány elfogadására](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 olvasd el egyszer. A „fizess, amennyit akarsz” ráadásul nem kombinálható más line itemekkel,
 kedvezményekkel vagy ismétlődő fizetésekkel. Egy borravalós perselynél ezek egyike sem fáj.
+
+Ezt a különbséget érdemes eltalálni. A Stripe így fogalmaz: a borravalót egy már nyújtott
+áruért vagy szolgáltatásért adják, míg az adománynak jótékony célhoz kell kötődnie.
+Lejátszottad a szettet; a borravaló ezt fizeti meg. Ezért küld a fenti hívás is
+`submit_type=pay`-t és nem `donate`-et — a `donate` a `donate.stripe.com`-ra tenné a
+linkedet, és *Adományozás*-t nyomtatna a gombra. Ez másik szakma, és olyan, amelyet a
+Stripe sokkal szigorúbban vizsgál.
 
 ## A kulcs: számíts rá, hogy kiszivárog — és tedd unalmassá
 

@@ -69,7 +69,7 @@
   "sec1_h3": "Neem je eigen sleutel mee, hou je eigen sleutel",
   "sec1_p": "De beperkte sleutel wordt bewaard in de sleutelhanger van je apparaat en alleen via TLS naar Stripe verstuurd. Volledige geheime live-sleutels worden botweg geweigerd.",
   "sec2_h3": "Minimale rechten, van meet af aan",
-  "sec2_p": "De sleutel kan je fooienlink aanmaken en donaties volgen — meer niet. Aan saldo's, uitbetalingen, terugbetalingen of klantgegevens komt hij niet.",
+  "sec2_p": "De sleutel kan je fooienlink aanmaken en ze binnen zien komen — meer niet. Aan saldo's, uitbetalingen, terugbetalingen of klantgegevens komt hij niet.",
   "sec3_h3": "Terugbetalingen en uitbetalingen blijven in Stripe",
   "sec3_p": "Geldzaken blijven waar ze horen: in je eigen Stripe-dashboard, onder je eigen account.",
   "perm_title": "Wat de sleutel kan",

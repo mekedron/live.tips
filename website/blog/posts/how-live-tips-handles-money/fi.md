@@ -42,7 +42,7 @@ joten niiden käyttöönotto kytkee päälle minimaalisen välityspalvelimen oso
 koska ”lisäsimme taustapalvelun” on yleensä kohta, jossa nämä tarinat menevät pieleen.
 
 Se tallentaa julkisen tippisivusi profiilin — näyttönimen ja ne maksutunnisteet,
-jotka valitsit julkaistavaksi. Siinä kaikki. Se ei pidä lahjoitushistoriaa, ei näe
+jotka valitsit julkaistavaksi. Siinä kaikki. Se ei pidä tippihistoriaa, ei näe
 rahaa, ei säilytä avaimia ja poistaa itsensä 90 päivän käyttämättömyyden jälkeen.
 Raha liikkuu edelleen suoraan fanisi Revolut- tai MobilePay-sovelluksen ja sinun
 sovelluksesi välillä.

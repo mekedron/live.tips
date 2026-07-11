@@ -42,7 +42,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Le troisième appel renvoie une `url`. Cette URL *est* votre cagnotte. C'est une page
@@ -78,6 +78,13 @@ construire de formulaire :
 Stripe a des [exigences pour accepter pourboires et dons](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 lisez-les une fois. Le prix libre ne se combine pas non plus avec d'autres line items,
 des remises ou des paiements récurrents. Pour une cagnotte, rien de tout cela ne gêne.
+
+Cette distinction mérite d'être juste. Stripe le dit ainsi : un pourboire récompense un
+bien ou un service déjà rendu, tandis qu'un don doit être lié à une cause caritative. Vous
+avez joué le set ; le pourboire le paie. C'est aussi pourquoi l'appel ci-dessus envoie
+`submit_type=pay` et non `donate` — `donate` hébergerait votre lien sur
+`donate.stripe.com` et afficherait *Faire un don* sur le bouton. C'est un autre métier, et
+Stripe l'examine bien plus sévèrement.
 
 ## La clé : partez du principe qu'elle fuitera, et rendez ça banal
 

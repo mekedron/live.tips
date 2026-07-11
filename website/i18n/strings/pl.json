@@ -69,7 +69,7 @@
   "sec1_h3": "Przynieś własny klucz, zachowaj własny klucz",
   "sec1_p": "Ograniczony klucz jest przechowywany w pęku kluczy Twojego urządzenia i wysyłany wyłącznie do Stripe przez TLS. Pełne, produkcyjne klucze tajne są od razu odrzucane.",
   "sec2_h3": "Minimum uprawnień z założenia",
-  "sec2_p": "Klucz może utworzyć Twój link do napiwków i śledzić wpłaty — i nic więcej. Nie ma dostępu do sald, wypłat, zwrotów ani danych klientów.",
+  "sec2_p": "Klucz może utworzyć Twój link do napiwków i śledzić, jak wpływają — i nic więcej. Nie ma dostępu do sald, wypłat, zwrotów ani danych klientów.",
   "sec3_h3": "Zwroty i wypłaty pozostają w Stripe",
   "sec3_p": "Sprawy finansowe pozostają tam, gdzie ich miejsce: w Twoim własnym panelu Stripe, na Twoim własnym koncie.",
   "perm_title": "Co potrafi klucz",

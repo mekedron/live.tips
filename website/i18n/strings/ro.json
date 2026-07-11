@@ -69,7 +69,7 @@
   "sec1_h3": "Vii cu cheia ta, rămâi cu cheia ta",
   "sec1_p": "Cheia restricționată e păstrată în seiful de chei al dispozitivului tău și trimisă exclusiv către Stripe, prin TLS. Cheile secrete live complete sunt respinse din start.",
   "sec2_h3": "Privilegii minime, din construcție",
-  "sec2_p": "Cheia poate crea linkul tău de bacșiș și poate urmări donațiile — nimic mai mult. Nu se poate atinge de solduri, plăți, rambursări sau de datele clienților.",
+  "sec2_p": "Cheia poate crea linkul tău de bacșiș și le poate urmări cum vin — nimic mai mult. Nu se poate atinge de solduri, plăți, rambursări sau de datele clienților.",
   "sec3_h3": "Rambursările și plățile rămân în Stripe",
   "sec3_p": "Chestiunile cu banii rămân acolo unde le e locul: în propriul tău panou Stripe, în contul tău.",
   "perm_title": "Ce poate face cheia",

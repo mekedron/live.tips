@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Det tredje anropet returnerar en `url`. Den URL:en *är* din dricksburk. Det är en sida som
@@ -76,6 +76,13 @@ Du kan också samla in namn och meddelande. Payment Links tar upp till tre `cust
 Stripe har [krav för att ta emot dricks och donationer](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 läs dem en gång. Betala-vad-du-vill går inte heller att kombinera med andra line items, rabatter eller
 återkommande betalningar. För en dricksburk biter inget av det.
+
+Den skillnaden är värd att få rätt. Stripe säger det så här: dricks ges för en vara eller
+tjänst som redan levererats, medan en donation måste vara kopplad till ett välgörande
+ändamål. Du spelade setet; dricksen betalar för det. Det är också därför anropet ovan
+skickar `submit_type=pay` och inte `donate` — `donate` skulle lägga din länk på
+`donate.stripe.com` och trycka *Donera* på knappen. Det är en annan bransch, och en som
+Stripe granskar betydligt hårdare.
 
 ## Nyckeln: anta att den läcker, och gör det tråkigt
 

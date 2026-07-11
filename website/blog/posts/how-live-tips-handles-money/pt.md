@@ -43,7 +43,7 @@ forma como a Stripe pode, por isso ativá-las liga um relé mínimo em
 
 Guarda o perfil público da tua página de gorjetas — o nome de apresentação e os
 identificadores de pagamento que escolheste publicar. É tudo. Não mantém
-histórico de donativos, não vê dinheiro, não guarda chaves e autoelimina-se após
+histórico de gorjetas, não vê dinheiro, não guarda chaves e autoelimina-se após
 90 dias de inatividade. O dinheiro continua a mover-se diretamente entre a app
 Revolut ou MobilePay do teu fã e a tua.
 

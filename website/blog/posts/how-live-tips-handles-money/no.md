@@ -42,7 +42,7 @@ går galt.
 
 Det lagrer den offentlige tipsside-profilen din – visningsnavnet og
 betalings-håndtakene du valgte å publisere. Mer er det ikke. Det fører ingen
-donasjonshistorikk, ser ingen penger, holder ingen nøkler og sletter seg selv etter
+tipshistorikk, ser ingen penger, holder ingen nøkler og sletter seg selv etter
 90 dager uten aktivitet. Pengene beveger seg fortsatt direkte mellom Revolut- eller
 MobilePay-appen til fanet ditt og din egen.
 

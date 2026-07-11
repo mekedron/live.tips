@@ -69,7 +69,7 @@
   "sec1_h3": "Bring your own key, keep your own key",
   "sec1_p": "The restricted key is stored in your device's keychain and only ever sent to Stripe over TLS. Full live secret keys are refused outright.",
   "sec2_h3": "Least privilege by design",
-  "sec2_p": "The key can create your tip link and watch donations — nothing else. It cannot touch balances, payouts, refunds, or customer data.",
+  "sec2_p": "The key can create your tip link and watch tips arrive — nothing else. It cannot touch balances, payouts, refunds, or customer data.",
   "sec3_h3": "Refunds and payouts stay in Stripe",
   "sec3_p": "Money matters stay where they belong: in your own Stripe dashboard, under your own account.",
   "perm_title": "What the key can do",

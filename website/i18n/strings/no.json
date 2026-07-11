@@ -69,7 +69,7 @@
   "sec1_h3": "Ta med egen nøkkel, behold egen nøkkel",
   "sec1_p": "Den begrensede nøkkelen lagres i enhetens nøkkelring og sendes bare til Stripe, alltid over TLS. Fulle, hemmelige live-nøkler blir blankt avvist.",
   "sec2_h3": "Minst mulig tilgang, innebygd",
-  "sec2_p": "Nøkkelen kan lage tipslenken din og følge med på donasjoner — ingenting annet. Den kan ikke røre saldo, utbetalinger, refusjoner eller kundedata.",
+  "sec2_p": "Nøkkelen kan lage tipslenken din og følge dem komme inn — ingenting annet. Den kan ikke røre saldo, utbetalinger, refusjoner eller kundedata.",
   "sec3_h3": "Refusjoner og utbetalinger blir i Stripe",
   "sec3_p": "Pengesaker blir der de hører hjemme: i ditt eget Stripe-dashbord, på din egen konto.",
   "perm_title": "Hva nøkkelen kan gjøre",

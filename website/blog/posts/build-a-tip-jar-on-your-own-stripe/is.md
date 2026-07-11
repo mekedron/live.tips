@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Þriðja kallið skilar `url`. Sá URL *er* þjórfékrukkan þín. Þetta er síða sem Stripe hýsir, sem sagt
@@ -75,6 +75,13 @@ Tveir stikar sem borgar sig að þekkja:
 Stripe hefur [kröfur um móttöku þjórfés og framlaga](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 lestu þær einu sinni. „Borgaðu það sem þú vilt“ verður ekki heldur sameinað öðrum line items, afsláttum eða
 endurteknum greiðslum. Fyrir þjórfékrukku bítur ekkert af því.
+
+Þennan greinarmun borgar sig að hafa réttan. Stripe orðar það svona: þjórfé er gefið fyrir
+vöru eða þjónustu sem þegar hefur verið veitt, en framlag verður að vera bundið
+góðgerðartilgangi. Þú spilaðir settið; þjórféð borgar fyrir það. Þess vegna sendir kallið
+hér að ofan líka `submit_type=pay` en ekki `donate` — `donate` myndi hýsa hlekkinn þinn á
+`donate.stripe.com` og prenta *Gefa* á hnappinn. Það er annar bransi, og einn sem Stripe
+skoðar mun harðar.
 
 ## Lykillinn: gerðu ráð fyrir að hann leki — og gerðu það leiðinlegt
 

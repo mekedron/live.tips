@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 A terceira chamada devolve uma `url`. Essa URL *é* o seu pote de gorjetas. É uma página
@@ -76,6 +76,12 @@ Também pode recolher um nome e uma mensagem. Os Payment Links aceitam até trê
 A Stripe tem [requisitos para aceitar gorjetas e donativos](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 leia-os uma vez. O preço livre também não se combina com outros line items, descontos ou
 pagamentos recorrentes. Para um pote de gorjetas, nada disso incomoda.
+
+Vale a pena acertar nesta distinção. A Stripe di-lo assim: uma gorjeta é dada por um bem
+ou serviço já prestado, ao passo que um donativo tem de estar ligado a um fim de
+beneficência. Tocaste o set; a gorjeta paga-o. É também por isso que a chamada acima envia
+`submit_type=pay` e não `donate` — `donate` alojaria o teu link em `donate.stripe.com` e
+imprimiria *Doar* no botão. É outro ramo, e um que a Stripe analisa com muito mais rigor.
 
 ## A chave: parta do princípio de que vai vazar, e torne isso aborrecido
 

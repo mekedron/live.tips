@@ -69,7 +69,7 @@
   "sec1_h3": "Porta la tua chiave, tieni la tua chiave",
   "sec1_p": "La chiave con permessi limitati è salvata nel portachiavi del tuo dispositivo e viene inviata solo a Stripe, sempre tramite TLS. Le chiavi segrete live complete vengono rifiutate a priori.",
   "sec2_h3": "Privilegio minimo, per principio",
-  "sec2_p": "La chiave può creare il tuo link per le mance e monitorare le donazioni — nient'altro. Non può toccare saldi, versamenti, rimborsi o dati dei clienti.",
+  "sec2_p": "La chiave può creare il tuo link per le mance e vederle arrivare — nient'altro. Non può toccare saldi, versamenti, rimborsi o dati dei clienti.",
   "sec3_h3": "Rimborsi e versamenti restano su Stripe",
   "sec3_p": "Le questioni di denaro restano dove devono stare: nella tua dashboard Stripe, sul tuo account.",
   "perm_title": "Cosa può fare la chiave",

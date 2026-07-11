@@ -43,7 +43,7 @@ is de moeite waard om precies te zijn over wat die relay doet, want „we hebben
 backend toegevoegd" is meestal het punt waarop deze verhalen misgaan.
 
 Het bewaart je openbare fooienpaginaprofiel – de weergavenaam en de betaal-handles
-die je hebt gekozen om te publiceren. Meer niet. Het houdt geen donatiegeschiedenis
+die je hebt gekozen om te publiceren. Meer niet. Het houdt geen fooiengeschiedenis
 bij, ziet geen geld, bewaart geen sleutels en verwijdert zichzelf na 90 dagen
 inactiviteit. Het geld beweegt nog steeds rechtstreeks tussen de Revolut- of
 MobilePay-app van je fan en die van jou.

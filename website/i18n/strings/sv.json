@@ -69,7 +69,7 @@
   "sec1_h3": "Ta med din egen nyckel, behåll din egen nyckel",
   "sec1_p": "Den begränsade nyckeln sparas i din enhets nyckelring och skickas bara till Stripe via TLS. Fullständiga hemliga live-nycklar avvisas blankt.",
   "sec2_h3": "Minsta möjliga behörighet från grunden",
-  "sec2_p": "Nyckeln kan skapa din dricks-länk och bevaka donationer — inget annat. Den kan inte röra saldon, utbetalningar, återbetalningar eller kunddata.",
+  "sec2_p": "Nyckeln kan skapa din dricks-länk och se den komma in — inget annat. Den kan inte röra saldon, utbetalningar, återbetalningar eller kunddata.",
   "sec3_h3": "Återbetalningar och utbetalningar stannar i Stripe",
   "sec3_p": "Pengafrågor stannar där de hör hemma: i din egen Stripe-panel, under ditt eget konto.",
   "perm_title": "Vad nyckeln kan göra",

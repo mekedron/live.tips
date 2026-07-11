@@ -42,7 +42,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Der dritte Aufruf liefert eine `url` zurück. Diese URL *ist* deine Trinkgeldkasse.
@@ -81,6 +81,13 @@ Stripe hat [Anforderungen für Trinkgelder und Spenden](https://support.stripe.c
 lies sie einmal. Pay what you want lässt sich außerdem nicht mit weiteren Line
 Items, Rabatten oder wiederkehrenden Zahlungen kombinieren. Für eine
 Trinkgeldkasse stört nichts davon.
+
+Diese Unterscheidung lohnt sich. Stripe formuliert es so: Ein Trinkgeld wird für eine
+bereits erbrachte Leistung gegeben, eine Spende muss an einen wohltätigen Zweck gebunden
+sein. Du hast gespielt; das Trinkgeld bezahlt das. Deshalb schickt der Aufruf oben auch
+`submit_type=pay` und nicht `donate` — `donate` würde deinen Link auf `donate.stripe.com`
+legen und *Spenden* auf den Button schreiben. Das ist ein anderes Geschäft, und eines, das
+Stripe deutlich strenger prüft.
 
 ## Der Key: nimm an, dass er leakt — und mach das langweilig
 

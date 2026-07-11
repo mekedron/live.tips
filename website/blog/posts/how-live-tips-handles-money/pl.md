@@ -43,7 +43,7 @@ moment, w którym takie historie idą źle.
 
 Przechowuje publiczny profil twojej strony napiwków — wyświetlaną nazwę i
 identyfikatory płatności, które zdecydowałeś się opublikować. To wszystko. Nie
-prowadzi historii darowizn, nie widzi pieniędzy, nie trzyma kluczy i samoczynnie
+prowadzi historii napiwków, nie widzi pieniędzy, nie trzyma kluczy i samoczynnie
 usuwa się po 90 dniach bezczynności. Pieniądze nadal przepływają bezpośrednio
 między aplikacją Revolut lub MobilePay twojego fana a twoją.
 

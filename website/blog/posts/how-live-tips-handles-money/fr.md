@@ -44,7 +44,7 @@ général le moment où ces histoires tournent mal.
 
 Il stocke le profil public de ta page de pourboires — le nom affiché et les
 identifiants de paiement que tu as choisi de publier. C'est tout. Il ne conserve aucun
-historique de dons, ne voit aucun argent, ne détient aucune clé et s'autodétruit après
+historique de pourboires, ne voit aucun argent, ne détient aucune clé et s'autodétruit après
 90 jours d'inactivité. L'argent circule toujours directement entre l'application
 Revolut ou MobilePay de ton fan et la tienne.
 

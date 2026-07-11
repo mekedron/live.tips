@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Det tredje kallet returnerer en `url`. Den URL-en *er* tipskrukka di. Det er en side Stripe hoster,
@@ -74,6 +74,13 @@ det fra?» på siden uten å bygge et skjema:
 Stripe har [krav for å ta imot tips og donasjoner](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 les dem én gang. Betal-hva-du-vil lar seg heller ikke kombinere med andre line items, rabatter eller
 gjentakende betalinger. For en tipskrukke biter ingenting av det.
+
+Den forskjellen er verdt å få riktig. Stripe sier det slik: tips gis for en vare eller
+tjeneste som allerede er levert, mens en donasjon må være knyttet til et veldedig formål.
+Du spilte settet; tipsen betaler for det. Det er også derfor kallet over sender
+`submit_type=pay` og ikke `donate` — `donate` ville lagt lenken din på `donate.stripe.com`
+og skrevet *Doner* på knappen. Det er en annen bransje, og en Stripe gransker langt
+hardere.
 
 ## Nøkkelen: gå ut fra at den lekker — og gjør det kjedelig
 

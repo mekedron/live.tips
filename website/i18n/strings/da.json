@@ -69,7 +69,7 @@
   "sec1_h3": "Tag din egen nøgle med — og behold den",
   "sec1_p": "Den begrænsede nøgle gemmes i din enheds nøglering og sendes kun til Stripe over TLS. Fulde hemmelige live-nøgler afvises blankt.",
   "sec2_h3": "Færrest mulige rettigheder fra bunden",
-  "sec2_p": "Nøglen kan oprette dit drikkepengelink og følge med i donationer — intet andet. Den kan ikke røre saldi, udbetalinger, refusioner eller kundedata.",
+  "sec2_p": "Nøglen kan oprette dit drikkepengelink og følge dem komme ind — intet andet. Den kan ikke røre saldi, udbetalinger, refusioner eller kundedata.",
   "sec3_h3": "Refusioner og udbetalinger bliver i Stripe",
   "sec3_p": "Pengesager bliver, hvor de hører hjemme: i dit eget Stripe-dashboard, på din egen konto.",
   "perm_title": "Hvad nøglen kan",

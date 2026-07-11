@@ -40,7 +40,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 That third call returns a `url`. That URL is your tip jar. It is a Stripe-hosted
@@ -77,6 +77,13 @@ Stripe has [requirements for accepting tips and donations](https://support.strip
 read them once. Pay-what-you-want also can't be combined with other line items,
 discounts, or recurring payments. For a tip jar, none of that bites.
 
+That distinction is worth getting right. In Stripe's own words, a tip is given for a
+good or service already provided, while a donation must be tied to a charitable purpose.
+You played the set; the tip pays for it. That is also why the call above sends
+`submit_type=pay` and not `donate` — `donate` would host your link on `donate.stripe.com`
+and print *Donate* on the button. That is a different business, and one Stripe reviews
+far more heavily.
+
 ## The key: assume it leaks, and make that boring
 
 Do not put a secret key (`sk_live_…`) on a device that sits on a stage. Use a
@@ -99,7 +106,7 @@ Connect — stays on **None**.
 
 Now do the exercise that makes this worth doing. Your tablet gets nicked from the
 merch table at 1 a.m. What can the thief do with the key in its keychain? Read
-your donation history, and create more tip links in your account. That is the
+your tip history, and create more tip links in your account. That is the
 whole blast radius. They cannot see your balance, cannot trigger a payout, cannot
 issue a refund to a card they control, cannot read a customer list. You revoke the
 key from a phone in the taxi home and the device goes dark. Nothing about your

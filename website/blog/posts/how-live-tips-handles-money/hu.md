@@ -44,8 +44,7 @@ pontosnak lenni abban, mit csinál ez a továbbító, mert a „hozzáadtunk egy
 backendet" általában az a pont, ahol az ilyen történetek félresiklanak.
 
 A borravalós oldalad nyilvános profilját tárolja — a megjelenített nevet és az
-általad közzétenni választott fizetési azonosítókat. Ennyi. Nem őriz adományozási
-előzményeket, nem lát pénzt, nem tart kulcsot, és 90 nap inaktivitás után magától
+általad közzétenni választott fizetési azonosítókat. Ennyi. Nem őriz borravaló-előzményeket, nem lát pénzt, nem tart kulcsot, és 90 nap inaktivitás után magától
 törlődik. A pénz továbbra is közvetlenül a rajongód Revolut- vagy MobilePay-appja
 és a tiéd között mozog.
 

@@ -69,7 +69,7 @@
   "sec1_h3": "Trae tu clave y sigue siendo tuya",
   "sec1_p": "La clave restringida se guarda en el llavero de tu dispositivo y solo se envía a Stripe a través de TLS. Las claves secretas completas de modo real se rechazan de plano.",
   "sec2_h3": "Mínimos privilegios por diseño",
-  "sec2_p": "La clave puede crear tu enlace de propinas y seguir las donaciones, nada más. No puede tocar saldos, transferencias, reembolsos ni datos de clientes.",
+  "sec2_p": "La clave puede crear tu enlace de propinas y verlas llegar, nada más. No puede tocar saldos, transferencias, reembolsos ni datos de clientes.",
   "sec3_h3": "Los reembolsos y las transferencias se quedan en Stripe",
   "sec3_p": "Los asuntos de dinero se quedan donde deben: en tu propio panel de Stripe, bajo tu propia cuenta.",
   "perm_title": "Lo que puede hacer la clave",

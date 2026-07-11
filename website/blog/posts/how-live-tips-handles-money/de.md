@@ -45,7 +45,7 @@ hinzugefügt" ist meist die Stelle, an der solche Geschichten schieflaufen.
 
 Es speichert dein öffentliches Trinkgeld-Seiten-Profil – den Anzeigenamen und die
 Zahlungs-Handles, die du veröffentlichen wolltest. Mehr nicht. Es führt keine
-Spendenhistorie, sieht kein Geld, hält keine Schlüssel und löscht sich nach
+Trinkgeld-Historie, sieht kein Geld, hält keine Schlüssel und löscht sich nach
 90 Tagen Inaktivität selbst. Das Geld bewegt sich weiterhin direkt zwischen der
 Revolut- oder MobilePay-App deines Fans und deiner.
 

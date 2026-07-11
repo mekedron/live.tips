@@ -69,7 +69,7 @@
   "sec1_h3": "Kendi anahtarını getir, kendinde kalsın",
   "sec1_p": "Kısıtlı anahtar, cihazının anahtar zincirinde saklanır ve yalnızca TLS üzerinden Stripe'a gönderilir. Tam yetkili canlı gizli anahtarlar kesinlikle reddedilir.",
   "sec2_h3": "Tasarım gereği en az yetki",
-  "sec2_p": "Anahtar yalnızca bahşiş bağlantını oluşturabilir ve bağışları izleyebilir — başka hiçbir şey yapamaz. Bakiyelere, ödeme aktarımlarına, iadelere ya da müşteri verilerine dokunamaz.",
+  "sec2_p": "Anahtar yalnızca bahşiş bağlantını oluşturabilir ve bahşişleri izleyebilir — başka hiçbir şey yapamaz. Bakiyelere, ödeme aktarımlarına, iadelere ya da müşteri verilerine dokunamaz.",
   "sec3_h3": "İadeler ve ödeme aktarımları Stripe'ta kalır",
   "sec3_p": "Parayla ilgili her şey ait olduğu yerde kalır: kendi Stripe panelinde, kendi hesabında.",
   "perm_title": "Anahtar neler yapabilir",

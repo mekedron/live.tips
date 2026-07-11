@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Die derde call geeft een `url` terug. Die URL *is* je fooienpot. Het is een door Stripe
@@ -76,6 +76,13 @@ Je kunt ook een naam en een bericht ophalen. Payment Links nemen tot drie `custo
 Stripe heeft [eisen voor het accepteren van fooien en donaties](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 lees ze één keer. Pay-what-you-want laat zich ook niet combineren met andere line items,
 kortingen of terugkerende betalingen. Voor een fooienpot bijt daarvan niets.
+
+Dat onderscheid is het waard om goed te hebben. Stripe zegt het zo: een fooi wordt gegeven
+voor een reeds geleverd goed of dienst, terwijl een donatie gekoppeld moet zijn aan een
+goed doel. Jij speelde de set; de fooi betaalt ervoor. Daarom stuurt de call hierboven ook
+`submit_type=pay` en niet `donate` — `donate` zou je link op `donate.stripe.com` zetten en
+*Doneren* op de knop drukken. Dat is een ander vak, en eentje dat Stripe veel strenger
+beoordeelt.
 
 ## De key: ga ervan uit dat hij lekt, en maak dat saai
 

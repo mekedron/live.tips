@@ -43,7 +43,7 @@ backend" e de obicei momentul în care poveștile astea o iau razna.
 
 Stochează profilul public al paginii tale de bacșiș — numele afișat și
 identificatorii de plată pe care ai ales să-i publici. Atât. Nu păstrează niciun
-istoric al donațiilor, nu vede niciun ban, nu ține nicio cheie și se
+istoric al bacșișurilor, nu vede niciun ban, nu ține nicio cheie și se
 autoșterge după 90 de zile de inactivitate. Banii tot circulă direct între
 aplicația Revolut sau MobilePay a fanului tău și a ta.
 

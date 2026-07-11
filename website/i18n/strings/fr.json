@@ -69,7 +69,7 @@
   "sec1_h3": "Apportez votre clé, gardez votre clé",
   "sec1_p": "La clé restreinte est stockée dans le trousseau de votre appareil et n’est jamais transmise qu’à Stripe, via TLS. Les clés secrètes complètes en mode live sont refusées d’office.",
   "sec2_h3": "Le moindre privilège par conception",
-  "sec2_p": "La clé peut créer votre lien de pourboire et suivre les dons — rien de plus. Elle ne peut toucher ni aux soldes, ni aux virements, ni aux remboursements, ni aux données clients.",
+  "sec2_p": "La clé peut créer votre lien de pourboire et les voir arriver — rien de plus. Elle ne peut toucher ni aux soldes, ni aux virements, ni aux remboursements, ni aux données clients.",
   "sec3_h3": "Remboursements et virements restent dans Stripe",
   "sec3_p": "Les questions d’argent restent là où elles doivent être : dans votre propre tableau de bord Stripe, sous votre propre compte.",
   "perm_title": "Ce que la clé peut faire",

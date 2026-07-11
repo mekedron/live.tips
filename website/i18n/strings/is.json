@@ -69,7 +69,7 @@
   "sec1_h3": "Komdu með þinn eigin lykil — og hann helst þinn",
   "sec1_p": "Takmarkaði lykillinn er geymdur í lyklakippu tækisins þíns og aðeins sendur til Stripe um TLS. Fullgildum leynilyklum er hafnað umsvifalaust.",
   "sec2_h3": "Lágmarksréttindi frá grunni",
-  "sec2_p": "Lykillinn getur búið til þjórféhlekkinn þinn og fylgst með framlögum — ekkert annað. Hann kemst ekki í innistæður, útgreiðslur, endurgreiðslur eða gögn viðskiptavina.",
+  "sec2_p": "Lykillinn getur búið til þjórféhlekkinn þinn og fylgst með því berast — ekkert annað. Hann kemst ekki í innistæður, útgreiðslur, endurgreiðslur eða gögn viðskiptavina.",
   "sec3_h3": "Endurgreiðslur og útgreiðslur eru áfram í Stripe",
   "sec3_p": "Peningamálin eru þar sem þau eiga heima: í þínu eigin Stripe-stjórnborði, undir þínum eigin reikningi.",
   "perm_title": "Hvað lykillinn getur",

@@ -42,7 +42,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 Esa tercera llamada devuelve una `url`. Esa URL *es* tu bote de propinas. Es una
@@ -79,6 +79,12 @@ formulario:
 Stripe tiene [requisitos para aceptar propinas y donaciones](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations):
 léelos una vez. El precio libre tampoco se puede combinar con otros line items,
 descuentos ni pagos recurrentes. Para un bote de propinas, nada de eso molesta.
+
+Esa distinción conviene tenerla clara. Stripe lo dice así: una propina se da por un bien
+o servicio ya prestado, mientras que una donación debe estar ligada a un fin benéfico.
+Tocaste el bolo; la propina lo paga. Por eso la llamada de arriba manda `submit_type=pay`
+y no `donate` — `donate` alojaría tu enlace en `donate.stripe.com` y pondría *Donar* en el
+botón. Es otro negocio, y uno que Stripe revisa mucho más a fondo.
 
 ## La clave: da por hecho que se filtrará, y haz que eso sea aburrido
 

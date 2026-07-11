@@ -44,7 +44,7 @@ här berättelserna går fel.
 
 Det lagrar din offentliga dricksside-profil – visningsnamnet och de
 betalnings-handtag du valde att publicera. Mer är det inte. Det för ingen
-donationshistorik, ser inga pengar, håller inga nycklar och raderar sig självt
+dricks-historik, ser inga pengar, håller inga nycklar och raderar sig självt
 efter 90 dagars inaktivitet. Pengarna rör sig fortfarande direkt mellan ditt fans
 Revolut- eller MobilePay-app och din.
 

@@ -41,7 +41,7 @@ curl https://api.stripe.com/v1/payment_links \
   -u "$RK:" \
   -d "line_items[0][price]"=price_... \
   -d "line_items[0][quantity]"=1 \
-  -d submit_type=donate
+  -d submit_type=pay
 ```
 
 To třetí volání vrátí `url`. Ta URL *je* vaše kasička. Je to stránka hostovaná Stripem —
@@ -75,6 +75,12 @@ Můžete taky sbírat jméno a vzkaz. Payment Links berou až tři `custom_field
 Stripe má [požadavky na přijímání spropitného a darů](https://support.stripe.com/questions/requirements-for-accepting-tips-or-donations) —
 přečtěte si je jednou. „Zaplať, kolik chceš“ se také nedá kombinovat s dalšími line items,
 slevami ani opakovanými platbami. U kasičky na spropitné nic z toho nevadí.
+
+Tenhle rozdíl se vyplatí mít správně. Stripe to říká takto: spropitné se dává za zboží
+nebo službu, které už byly poskytnuty, zatímco dar musí být vázán na charitativní účel.
+Odehrál jsi set; spropitné ho platí. Proto také volání výše posílá `submit_type=pay` a ne
+`donate` — `donate` by tvůj odkaz umístilo na `donate.stripe.com` a na tlačítko vytisklo
+*Darovat*. To je jiný obor, a takový, který Stripe prověřuje mnohem přísněji.
 
 ## Klíč: počítejte s tím, že unikne — a udělejte z toho nudu
 

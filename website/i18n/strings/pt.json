@@ -69,7 +69,7 @@
   "sec1_h3": "Traz a tua chave, guarda a tua chave",
   "sec1_p": "A chave restrita é guardada no porta-chaves do teu dispositivo e só é enviada para o Stripe, sempre através de TLS. As chaves secretas completas de produção são recusadas de imediato.",
   "sec2_h3": "Privilégio mínimo por princípio",
-  "sec2_p": "A chave pode criar o teu link de gorjetas e acompanhar os donativos — e nada mais. Não pode mexer em saldos, transferências, reembolsos ou dados de clientes.",
+  "sec2_p": "A chave pode criar o teu link de gorjetas e vê-las chegar — e nada mais. Não pode mexer em saldos, transferências, reembolsos ou dados de clientes.",
   "sec3_h3": "Reembolsos e transferências ficam no Stripe",
   "sec3_p": "As questões de dinheiro ficam onde pertencem: no teu próprio painel do Stripe, na tua própria conta.",
   "perm_title": "O que a chave pode fazer",

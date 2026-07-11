@@ -43,7 +43,7 @@ se tyhle příběhy zvrtnou.
 
 Ukládá veřejný profil tvé stránky se spropitným — zobrazované jméno a platební
 identifikátory, které ses rozhodl zveřejnit. Nic víc. Nevede žádnou historii
-darů, nevidí žádné peníze, nedrží žádné klíče a po 90 dnech nečinnosti se sám
+spropitného, nevidí žádné peníze, nedrží žádné klíče a po 90 dnech nečinnosti se sám
 smaže. Peníze se stále pohybují přímo mezi aplikací Revolut nebo MobilePay tvého
 fanouška a tou tvou.
 

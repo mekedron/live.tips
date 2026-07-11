@@ -69,7 +69,7 @@
   "sec1_h3": "Klíč je tvůj a zůstane tvůj",
   "sec1_p": "Omezený klíč se ukládá do klíčenky tvého zařízení a posílá se výhradně do Stripe přes TLS. Plné živé tajné klíče aplikace rovnou odmítá.",
   "sec2_h3": "Minimum oprávnění už z principu",
-  "sec2_p": "Klíč umí vytvořit tvůj odkaz na spropitné a sledovat příspěvky — nic víc. Nemůže sáhnout na zůstatky, výplaty, refundace ani na data zákazníků.",
+  "sec2_p": "Klíč umí vytvořit tvůj odkaz na spropitné a sledovat, jak přichází — nic víc. Nemůže sáhnout na zůstatky, výplaty, refundace ani na data zákazníků.",
   "sec3_h3": "Refundace a výplaty zůstávají ve Stripe",
   "sec3_p": "Vše kolem peněz zůstává tam, kam patří: ve tvém vlastním Stripe dashboardu, pod tvým vlastním účtem.",
   "perm_title": "Co klíč umí",

@@ -69,7 +69,7 @@
   "sec1_h3": "Dein Schlüssel kommt von dir — und bleibt bei dir",
   "sec1_p": "Der eingeschränkte Schlüssel liegt im Schlüsselbund deines Geräts und wird ausschließlich über TLS an Stripe gesendet. Vollständige geheime Live-Schlüssel werden grundsätzlich abgelehnt.",
   "sec2_h3": "Minimale Rechte von Grund auf",
-  "sec2_p": "Der Schlüssel kann deinen Trinkgeld-Link erstellen und Spenden beobachten — mehr nicht. An Guthaben, Auszahlungen, Rückerstattungen oder Kundendaten kommt er nicht heran.",
+  "sec2_p": "Der Schlüssel kann deinen Trinkgeld-Link erstellen und die Eingänge verfolgen — mehr nicht. An Guthaben, Auszahlungen, Rückerstattungen oder Kundendaten kommt er nicht heran.",
   "sec3_h3": "Rückerstattungen und Auszahlungen bleiben in Stripe",
   "sec3_p": "Geldangelegenheiten bleiben, wo sie hingehören: in deinem eigenen Stripe-Dashboard, unter deinem eigenen Konto.",
   "perm_title": "Was der Schlüssel darf",
