@@ -7,7 +7,7 @@ import 'package:live_tips/features/live/stage/web_stage/web_stage.dart';
 import 'package:live_tips/main.dart' as app;
 
 /// End-to-end demo flow on a real device/simulator:
-/// welcome → demo mode → start a session → demo donations arrive →
+/// welcome → demo mode → start a session → demo tips arrive →
 /// stop → summary. Captures screenshots for visual review.
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +22,7 @@ void main() {
     await binding.takeScreenshot(name);
   }
 
-  testWidgets('demo session collects donations and stops with a summary',
+  testWidgets('demo session collects tips and stops with a summary',
       (tester) async {
     app.main();
     await tester.pumpAndSettle(const Duration(milliseconds: 500));
@@ -70,7 +70,7 @@ void main() {
           reason: 'renderer must reach ready (first frame drawn)');
     }
 
-    // Let a couple more donations roll in (demo polls every ~4s).
+    // Let a couple more tips roll in (demo polls every ~4s).
     for (var i = 0; i < 30; i++) {
       await tester.pump(const Duration(milliseconds: 300));
     }

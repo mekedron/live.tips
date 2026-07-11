@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/app_settings.dart';
 import '../domain/band_account.dart';
 import '../domain/band_settings.dart';
-import '../domain/donation.dart';
+import '../domain/tip.dart';
 import '../domain/fx_rates.dart';
 import '../domain/live_session.dart';
 import '../domain/relay_jar.dart';
@@ -165,49 +165,49 @@ class LocalStore {
   Future<void> writeRelaySeenAt(String accountId, int ms) =>
       _prefs.setInt(accountKey(kRelaySeenAtBase, accountId), ms);
 
-  /// The donate URL of a jar that stopped working and was auto-replaced, kept
+  /// The tip URL of a jar that stopped working and was auto-replaced, kept
   /// until the artist dismisses the "please reprint" notice. Null when there
   /// is nothing to warn about.
   String? readRelayLinkReplaced(String accountId) =>
       _prefs.getString(accountKey(kRelayLinkReplacedBase, accountId));
 
-  Future<void> writeRelayLinkReplaced(String accountId, String oldDonateUrl) =>
+  Future<void> writeRelayLinkReplaced(String accountId, String oldTipUrl) =>
       _prefs.setString(
-          accountKey(kRelayLinkReplacedBase, accountId), oldDonateUrl);
+          accountKey(kRelayLinkReplacedBase, accountId), oldTipUrl);
 
   Future<void> clearRelayLinkReplaced(String accountId) =>
       _prefs.remove(accountKey(kRelayLinkReplacedBase, accountId));
 
   // --- Relay tip history (device-local tip-page archive) ---
 
-  /// Donor-declared tip-page (Revolut/MobilePay) tips recorded on this
+  /// Fan-declared tip-page (Revolut/MobilePay) tips recorded on this
   /// device, newest first. These exist nowhere else — the relay keeps no
   /// ledger — so History serves them from here. Deliberately untouched by
   /// [purgeSimulatedData]: only real (livemode) tips are ever written (the
   /// session controller filters demo tips out at the write site), so there
   /// is nothing simulated to purge.
-  List<Donation> readRelayHistory(String accountId) {
+  List<Tip> readRelayHistory(String accountId) {
     final raw = _prefs.getString(accountKey(kRelayHistoryBase, accountId));
     if (raw == null) return [];
     try {
       return (jsonDecode(raw) as List)
-          .map((d) => Donation.fromJson(Map<String, dynamic>.from(d as Map)))
+          .map((d) => Tip.fromJson(Map<String, dynamic>.from(d as Map)))
           .toList();
     } catch (_) {
       return [];
     }
   }
 
-  /// Prepends [donations] to the archive, skipping ids already stored (the
+  /// Prepends [tips] to the archive, skipping ids already stored (the
   /// relay redelivers and resumed sessions replay — same tip, same id),
   /// capped at [relayHistoryCap] with the oldest dropped beyond it.
   Future<void> appendRelayHistory(
-      String accountId, List<Donation> donations) async {
-    if (donations.isEmpty) return;
+      String accountId, List<Tip> tips) async {
+    if (tips.isEmpty) return;
     final existing = readRelayHistory(accountId);
     final ids = existing.map((d) => d.id).toSet();
     final fresh = [
-      for (final d in donations)
+      for (final d in tips)
         if (ids.add(d.id)) d,
     ];
     if (fresh.isEmpty) return;
@@ -332,7 +332,7 @@ class LocalStore {
   /// test-mode set. Empty sessions count as real: we can't prove they're
   /// fake, and would rather keep a genuine zero-tip live set than delete it.
   static bool _isSimulated(LiveSession s) =>
-      s.donations.isNotEmpty && s.donations.every((d) => !d.livemode);
+      s.tips.isNotEmpty && s.tips.every((d) => !d.livemode);
 
   /// Scrubs locally cached demo/test sessions so a real (live) Stripe account
   /// never shows tips that weren't real money. Called when a real account

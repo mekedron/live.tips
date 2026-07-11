@@ -1,4 +1,4 @@
-/// Every byte an artist or donor can submit passes through this file.
+/// Every byte an artist or fan can submit passes through this file.
 /// Policy: validate atoms against strict patterns, reject over-limit input
 /// (never truncate silently), and keep free text plain — no URLs are ever
 /// accepted as free-form strings anywhere in the API.
@@ -28,7 +28,7 @@ const BYTES = new TextEncoder();
 
 /**
  * Scrub + enforce caps. Over-limit input is a rejection, not a truncation:
- * a donor who typed a 300-char message should know it didn't fit.
+ * a fan who typed a 300-char message should know it didn't fit.
  */
 function textField(
   raw: unknown,
@@ -63,7 +63,7 @@ export function escapeHtml(text: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Payment-method atoms. The phishing/open-redirect gate: the donor page only
+// Payment-method atoms. The phishing/open-redirect gate: the tip page only
 // ever links to URLs composed from these validated pieces.
 
 // Underscore included: test-mode Payment Links look like /test_<code>.
@@ -163,7 +163,7 @@ export function validateProfile(body: Record<string, unknown>): Result<JarProfil
       return err(422, "mobilepayBoxId must be a MobilePay Box UUID");
     }
     // No currency lock: a Box always collects EUR (see methods.ts), whatever
-    // the jar's own currency is. The donor form prices the tip accordingly.
+    // the jar's own currency is. The tip form prices the tip accordingly.
     methods.mobilepayBoxId = v.trim().toLowerCase();
   }
   if (methodsObj["monzoUsername"] !== undefined) {

@@ -3,43 +3,43 @@ import 'package:intl/intl.dart';
 
 import '../core/money.dart';
 import '../core/theme.dart';
-import '../domain/donation.dart';
+import '../domain/tip.dart';
 import '../domain/tip_method.dart';
 import '../l10n/app_localizations.dart';
 import 'lt_ui.dart';
 import 'method_badges.dart';
 
-/// One donation row in the design language: tinted initial avatar, name,
+/// One tip row in the design language: tinted initial avatar, name,
 /// message (or relative time), coral Outfit amount. Used on Home, in
 /// History, and in session details.
-class DonationTile extends StatelessWidget {
-  const DonationTile({
+class TipTile extends StatelessWidget {
+  const TipTile({
     super.key,
-    required this.donation,
+    required this.tip,
     this.showTime = false,
     this.padding = const EdgeInsets.symmetric(vertical: 8),
     this.onTap,
   });
 
-  final Donation donation;
+  final Tip tip;
 
   /// true → right-aligned time under the amount (History style).
   final bool showTime;
   final EdgeInsetsGeometry padding;
 
   /// When set, the row becomes tappable and shows a subtle open-in-new hint —
-  /// History uses it to open the donation's transaction in Stripe.
+  /// History uses it to open the tip's transaction in Stripe.
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
-    final anonymous = donation.name == null || donation.name!.trim().isEmpty;
+    final anonymous = tip.name == null || tip.name!.trim().isEmpty;
     final row = Padding(
       padding: padding,
       child: Row(
         children: [
-          InitialAvatar(name: donation.displayName, anonymous: anonymous),
+          InitialAvatar(name: tip.displayName, anonymous: anonymous),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -49,7 +49,7 @@ class DonationTile extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        donation.displayName,
+                        tip.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -60,36 +60,36 @@ class DonationTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (donation.method != TipMethod.stripe) ...[
+                    if (tip.method != TipMethod.stripe) ...[
                       const SizedBox(width: 6),
-                      MethodBadge(donation.method),
+                      MethodBadge(tip.method),
                     ],
-                    if (donation.inPerson) ...[
+                    if (tip.inPerson) ...[
                       const SizedBox(width: 6),
                       const InPersonTag(),
                     ],
-                    if (!donation.verified) ...[
+                    if (!tip.verified) ...[
                       const SizedBox(width: 6),
                       const UnverifiedTag(),
                     ],
-                    if (!donation.viaService) ...[
+                    if (!tip.viaService) ...[
                       const SizedBox(width: 6),
                       const ExternalTag(),
                     ],
                   ],
                 ),
                 Text(
-                  donation.hasMessage
-                      ? donation.message!.trim()
+                  tip.hasMessage
+                      ? tip.message!.trim()
                       : (showTime
-                            ? context.s.t('widgets.donation_tile.no_message')
-                            : relativeTime(context, donation.createdAt)),
+                            ? context.s.t('widgets.tip_tile.no_message')
+                            : relativeTime(context, tip.createdAt)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: kFontBody,
                     fontSize: 12.5,
-                    color: donation.hasMessage ? c.textSecondary : c.textMuted,
+                    color: tip.hasMessage ? c.textSecondary : c.textMuted,
                   ),
                 ),
               ],
@@ -100,12 +100,12 @@ class DonationTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                formatAmount(donation.amountMinor, donation.currency),
+                formatAmount(tip.amountMinor, tip.currency),
                 style: outfitStyle(15, c.accent, weight: FontWeight.w700),
               ),
               if (showTime)
                 Text(
-                  shortTime(donation.createdAt),
+                  shortTime(tip.createdAt),
                   style: TextStyle(
                     fontFamily: kFontBody,
                     fontSize: 11,
@@ -137,7 +137,7 @@ class ExternalTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     return Tooltip(
-      message: context.s.t('widgets.donation_tile.external_tooltip'),
+      message: context.s.t('widgets.tip_tile.external_tooltip'),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
@@ -145,7 +145,7 @@ class ExternalTag extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
-          context.s.t('widgets.donation_tile.external'),
+          context.s.t('widgets.tip_tile.external'),
           style: outfitStyle(
             10.5,
             c.textMuted,
@@ -162,13 +162,13 @@ class ExternalTag extends StatelessWidget {
 String relativeTime(BuildContext context, DateTime time) {
   final diff = DateTime.now().difference(time);
   if (diff.inSeconds < 60) {
-    return context.s.t('widgets.donation_tile.just_now');
+    return context.s.t('widgets.tip_tile.just_now');
   }
   if (diff.inMinutes < 60) {
-    return context.s.t('widgets.donation_tile.min_ago', {'n': diff.inMinutes});
+    return context.s.t('widgets.tip_tile.min_ago', {'n': diff.inMinutes});
   }
   if (diff.inHours < 24) {
-    return context.s.t('widgets.donation_tile.hours_ago', {'n': diff.inHours});
+    return context.s.t('widgets.tip_tile.hours_ago', {'n': diff.inHours});
   }
   return DateFormat('MMM d').format(time);
 }

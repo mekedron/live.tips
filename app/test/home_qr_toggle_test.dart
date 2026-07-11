@@ -24,7 +24,7 @@ const _tipJar = TipJar(
 
 const _relayJar = RelayJar(
   jarId: 'jar_1',
-  donateUrl: 'https://live.tips/t/jar_1',
+  tipUrl: 'https://live.tips/t/jar_1',
   artistName: 'The Midnight Foxes',
   currency: 'eur',
   revolutUsername: 'foxy',

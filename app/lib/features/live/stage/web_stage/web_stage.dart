@@ -128,7 +128,7 @@ class _WebStageState extends ConsumerState<WebStage> {
           case StageEventKind.goalReached || StageEventKind.zoneFull:
             HapticFeedback.mediumImpact();
           case StageEventKind.milestone:
-            break; // per-donation haptics already fire at screen level
+            break; // per-tip haptics already fire at screen level
         }
       case StagePerf(:final fps):
         if (widget.renderer == '3d' && _ready && !_paused) {
@@ -219,7 +219,7 @@ class _WebStageState extends ConsumerState<WebStage> {
       if (patch.isNotEmpty) _transport.send(StageSetConfig(patch));
     }
 
-    // new donations → pour them exactly as attributed
+    // new tips → pour them exactly as attributed
     if (widget.tipSerial != _seenTipSerial) {
       _seenTipSerial = widget.tipSerial;
       for (final tip in widget.tips) {
@@ -332,7 +332,7 @@ class _WebStageState extends ConsumerState<WebStage> {
                 ),
               ),
             ),
-            // the donation banner rides the same shift so it pops up centred
+            // the tip banner rides the same shift so it pops up centred
             // over the jar, not under the rail
             IgnorePointer(
               child: Transform.translate(

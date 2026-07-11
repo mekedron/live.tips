@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/rollover_math.dart';
 import 'package:live_tips/domain/stage_settings.dart';
 import 'package:live_tips/features/live/stage/classic_stage.dart';
@@ -62,7 +62,7 @@ StageSnapshot snap({
 
 JarTipAttribution tip(String id, double delta, double after, int rolls) =>
     JarTipAttribution(
-      donation: Donation(
+      tip: Tip(
         id: id,
         amountMinor: 500,
         currency: 'eur',

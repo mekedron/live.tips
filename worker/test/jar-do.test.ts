@@ -299,7 +299,7 @@ async function storageDump(jarId: string): Promise<string> {
   return dump;
 }
 
-describe("no donor content at rest", () => {
+describe("no fan content at rest", () => {
   it("keeps nothing but a hashed dedupe signature once the tip is delivered", async () => {
     const { jarId, secret } = await createJar();
     const ws = await authedSocket(jarId, secret);
@@ -320,7 +320,7 @@ describe("no donor content at rest", () => {
     mockTurnstile();
     await postSecretTip(jarId); // nobody connected → queued
 
-    // The one exception to "no donor content at rest": a tip in flight to a
+    // The one exception to "no fan content at rest": a tip in flight to a
     // screen that is away. It lives under `pending` and nowhere else.
     const entries = JSON.parse(await storageDump(jarId)) as [string, unknown][];
     const keysHoldingTheName = entries

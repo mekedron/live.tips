@@ -1,4 +1,4 @@
-import '../../../domain/donation.dart';
+import '../../../domain/tip.dart';
 import '../../../state/live_session_controller.dart';
 
 /// Immutable value snapshot of everything a stage renders. Built fresh from
@@ -16,9 +16,9 @@ class StageSnapshot {
     required this.currency,
     required this.goalReached,
     this.approximateTotal = false,
-    this.lastDonation,
+    this.lastTip,
     this.biggest,
-    this.recentDonations = const [],
+    this.recentTips = const [],
   });
 
   final int totalMinor;
@@ -35,11 +35,11 @@ class StageSnapshot {
 
   /// The set mixed currencies, so [totalMinor] is a converted approximation.
   final bool approximateTotal;
-  final Donation? lastDonation;
-  final Donation? biggest;
+  final Tip? lastTip;
+  final Tip? biggest;
 
   /// Latest first, capped — for the feed / mini-feed.
-  final List<Donation> recentDonations;
+  final List<Tip> recentTips;
 
   factory StageSnapshot.fromState(LiveState live) {
     final s = live.session;
@@ -54,9 +54,9 @@ class StageSnapshot {
       currency: s.currency,
       goalReached: s.goalReached,
       approximateTotal: s.isMixedCurrency,
-      lastDonation: live.lastDonation,
+      lastTip: live.lastTip,
       biggest: s.biggest,
-      recentDonations: s.donations.reversed.take(14).toList(),
+      recentTips: s.tips.reversed.take(14).toList(),
     );
   }
 
@@ -73,9 +73,9 @@ class StageSnapshot {
       other.bankedJars == bankedJars &&
       other.count == count &&
       other.currency == currency &&
-      other.lastDonation?.id == lastDonation?.id;
+      other.lastTip?.id == lastTip?.id;
 
   @override
   int get hashCode => Object.hash(totalMinor, goalMinor, bankedMinor,
-      bankedJars, count, currency, lastDonation?.id);
+      bankedJars, count, currency, lastTip?.id);
 }

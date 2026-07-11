@@ -7,13 +7,13 @@ import '../../l10n/enum_labels.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
-import '../../domain/donation.dart';
+import '../../domain/tip.dart';
 import '../../domain/live_session.dart';
 import '../../domain/tip_method.dart';
 import '../../features/live/live_screen.dart' show formatDuration;
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
-import '../../widgets/donation_tile.dart';
+import '../../widgets/tip_tile.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/method_badges.dart';
 import '../shell/app_shell.dart';
@@ -21,14 +21,14 @@ import '../shell/app_shell.dart';
 // Session-first, then the relay methods artists lean on day to day, with
 // Stripe last — it's the recommended path but the least-used tab in
 // practice.
-enum _HistoryTab { sessions, mobilepay, revolut, monzo, donations }
+enum _HistoryTab { sessions, mobilepay, revolut, monzo, tips }
 
 /// The relay method a tab lists, or null for the tabs that aren't per-method.
 TipMethod? _tabMethod(_HistoryTab tab) => switch (tab) {
   _HistoryTab.mobilepay => TipMethod.mobilepay,
   _HistoryTab.revolut => TipMethod.revolut,
   _HistoryTab.monzo => TipMethod.monzo,
-  _HistoryTab.sessions || _HistoryTab.donations => null,
+  _HistoryTab.sessions || _HistoryTab.tips => null,
 };
 
 /// The tab that lists a relay method, in the fixed left-to-right tab order.
@@ -39,28 +39,28 @@ const _relayTabs = [
 ];
 
 /// Header note over the device-local tip-page lists — honesty first: these
-/// rows are donor-declared, not settled payments.
+/// rows are fan-declared, not settled payments.
 String _relayHistoryNote(BuildContext context) =>
     context.s.t('history.relay_note');
 
 String _relayHistoryEmpty(BuildContext context, TipMethod method) =>
     context.s.t('history.relay_empty', {'method': method.l10nLabel(context)});
 
-/// Opens the donation's transaction in the artist's Stripe Dashboard (a new
+/// Opens the tip's transaction in the artist's Stripe Dashboard (a new
 /// browser tab on web). No-op for tips that have no link — demo tips, or
 /// records archived before the PaymentIntent id was captured.
-void _openDonationInStripe(Donation donation) {
-  final url = donation.stripeDashboardUrl;
+void _openTipInStripe(Tip tip) {
+  final url = tip.stripeDashboardUrl;
   if (url == null) return;
   openExternal(url);
 }
 
-/// The tap handler for a donation row, or null when it has no Stripe link
+/// The tap handler for a tip row, or null when it has no Stripe link
 /// (so the row stays non-interactive rather than looking tappable but dead).
-VoidCallback? _stripeTap(Donation donation) =>
-    donation.stripeDashboardUrl == null
+VoidCallback? _stripeTap(Tip tip) =>
+    tip.stripeDashboardUrl == null
     ? null
-    : () => _openDonationInStripe(donation);
+    : () => _openTipInStripe(tip);
 
 /// A subtle link that opens the artist's whole Stripe payments list in the
 /// Dashboard — the escape hatch to *every* transaction in the account,
@@ -94,7 +94,7 @@ class _ViewInStripeButton extends StatelessWidget {
   }
 }
 
-/// All-time donations (straight from the Stripe API, paginated) and the
+/// All-time tips (straight from the Stripe API, paginated) and the
 /// locally recorded session archive.
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -105,7 +105,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   _HistoryTab _tab = _HistoryTab.sessions;
-  final List<Donation> _donations = [];
+  final List<Tip> _tips = [];
   bool _hasMore = true;
   bool _loading = false;
   String? _error;
@@ -115,7 +115,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(() {
-      if (_tab == _HistoryTab.donations &&
+      if (_tab == _HistoryTab.tips &&
           _scrollController.position.extentAfter < 300) {
         _loadMore();
       }
@@ -138,19 +138,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     setState(() {
       _loading = true;
       if (reset) {
-        _donations.clear();
+        _tips.clear();
         _hasMore = true;
         _error = null;
       }
     });
     try {
       if (!_hasMore) return;
-      final page = await requests.listDonations(
-        startingAfter: _donations.isEmpty ? null : _donations.last.id,
+      final page = await requests.listTips(
+        startingAfter: _tips.isEmpty ? null : _tips.last.id,
       );
       if (!mounted) return;
       setState(() {
-        _donations.addAll(page.donations);
+        _tips.addAll(page.tips);
         _hasMore = page.hasMore;
         _error = null;
       });
@@ -203,11 +203,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     // Demo mode has no real key but still previews the Stripe tab (with its
     // own explanatory empty state below); a real, key-less account gets no
     // tab at all — there's nothing to fetch and nothing archived locally.
-    final showDonations = app.demo || app.hasStripe;
+    final showTips = app.demo || app.hasStripe;
     if (_relayTabs.contains(_tab) && !relayTabs.contains(_tab)) {
       _tab = _HistoryTab.sessions; // the tab just vanished under us
     }
-    if (_tab == _HistoryTab.donations && !showDonations) {
+    if (_tab == _HistoryTab.tips && !showTips) {
       _tab = _HistoryTab.sessions;
     }
     return isRail
@@ -215,14 +215,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             sessions,
             stripeAllUrl,
             relayTabs,
-            showDonations,
+            showTips,
             relayHistory,
           )
         : _buildMobile(
             sessions,
             stripeAllUrl,
             relayTabs,
-            showDonations,
+            showTips,
             relayHistory,
           );
   }
@@ -232,11 +232,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   /// filtered to the ones that currently apply.
   List<_HistoryTab> _visibleTabs(
     Set<_HistoryTab> relayTabs,
-    bool showDonations,
+    bool showTips,
   ) => [
     _HistoryTab.sessions,
     ..._relayTabs.where(relayTabs.contains),
-    if (showDonations) _HistoryTab.donations,
+    if (showTips) _HistoryTab.tips,
   ];
 
   String _tabLabel(
@@ -249,10 +249,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return switch (t) {
       _HistoryTab.sessions => context.s.t('history.tab_sessions'),
       // 'Stripe' only makes sense next to a relay tab — alone it stays
-      // 'Donations', so Stripe-only users see no churn.
+      // 'Tips', so Stripe-only users see no churn.
       _ => relayTabs.isNotEmpty
           ? 'Stripe'
-          : context.s.t('history.tab_donations'),
+          : context.s.t('history.tab_tips'),
     };
   }
 
@@ -280,8 +280,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     List<LiveSession> sessions,
     String? stripeAllUrl,
     Set<_HistoryTab> relayTabs,
-    bool showDonations,
-    List<Donation> relayHistory,
+    bool showTips,
+    List<Tip> relayHistory,
   ) {
     final c = context.lt;
     final stats = _stats(sessions);
@@ -304,7 +304,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       style: outfitStyle(20, c.text, weight: FontWeight.w700),
                     ),
                     const Spacer(),
-                    if (_tab == _HistoryTab.donations && stripeAllUrl != null)
+                    if (_tab == _HistoryTab.tips && stripeAllUrl != null)
                       _ViewInStripeButton(stripeAllUrl),
                   ],
                 ),
@@ -336,14 +336,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 14),
               LtSegmented<_HistoryTab>(
-                values: _visibleTabs(relayTabs, showDonations),
+                values: _visibleTabs(relayTabs, showTips),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
                 labelOf: (t) => _tabLabel(context, t, relayTabs),
               ),
               const SizedBox(height: 14),
-              if (_tab == _HistoryTab.donations) ...[
-                ..._donationGroups(),
+              if (_tab == _HistoryTab.tips) ...[
+                ..._tipGroups(),
               ] else if (_tabMethod(_tab) case final method?)
                 ..._relayGroups(relayHistory, method)
               else
@@ -361,8 +361,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     List<LiveSession> sessions,
     String? stripeAllUrl,
     Set<_HistoryTab> relayTabs,
-    bool showDonations,
-    List<Donation> relayHistory,
+    bool showTips,
+    List<Tip> relayHistory,
   ) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
@@ -383,7 +383,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     style: outfitStyle(32, c.text, weight: FontWeight.w800),
                   ),
                   const Spacer(),
-                  if (_tab == _HistoryTab.donations &&
+                  if (_tab == _HistoryTab.tips &&
                       !app.demo &&
                       stripeAllUrl != null)
                     _ViewInStripeButton(stripeAllUrl),
@@ -423,20 +423,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
               const SizedBox(height: 24),
               LtSegmented<_HistoryTab>(
-                values: _visibleTabs(relayTabs, showDonations),
+                values: _visibleTabs(relayTabs, showTips),
                 selected: _tab,
                 onChanged: (t) => setState(() => _tab = t),
                 labelOf: (t) => _tabLabel(context, t, relayTabs),
               ),
               const SizedBox(height: 24),
-              if (_tab == _HistoryTab.donations)
-                _DonationsTable(
+              if (_tab == _HistoryTab.tips)
+                _TipsTable(
                   title: relayTabs.isNotEmpty
                       ? 'Stripe'
-                      : context.s.t('history.tab_donations'),
+                      : context.s.t('history.tab_tips'),
                   demo: app.demo,
                   relayOnly: !app.demo && !app.hasStripe,
-                  donations: _donations,
+                  tips: _tips,
                   loading: _loading,
                   hasMore: _hasMore,
                   error: _error,
@@ -446,7 +446,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 _RelayTable(
                   title: method.label,
                   method: method,
-                  donations: _byMethod(relayHistory, method),
+                  tips: _byMethod(relayHistory, method),
                 )
               else if (sessions.isEmpty)
                 Text(
@@ -477,9 +477,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     );
   }
 
-  // -------------------------------------------------- donations grouping ---
+  // -------------------------------------------------- tips grouping ---
 
-  List<Widget> _donationGroups() {
+  List<Widget> _tipGroups() {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
 
@@ -501,7 +501,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       ];
     }
     if (!app.hasStripe) {
-      // Relay-only: there's no Stripe account to list donations from.
+      // Relay-only: there's no Stripe account to list tips from.
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -518,7 +518,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         ),
       ];
     }
-    if (_error != null && _donations.isEmpty) {
+    if (_error != null && _tips.isEmpty) {
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -543,12 +543,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         ),
       ];
     }
-    if (_donations.isEmpty && !_loading) {
+    if (_tips.isEmpty && !_loading) {
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Text(
-            context.s.t('history.donations_empty'),
+            context.s.t('history.tips_empty'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: kFontBody,
@@ -560,7 +560,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       ];
     }
 
-    final widgets = _dayGroupedTiles(_donations);
+    final widgets = _dayGroupedTiles(_tips);
 
     if (_hasMore || _loading) {
       widgets.add(
@@ -573,12 +573,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return widgets;
   }
 
-  /// [donations] (newest first) as day-labelled cards of [DonationTile]s —
+  /// [tips] (newest first) as day-labelled cards of [TipTile]s —
   /// the shared body of the Stripe and tip-page mobile lists.
-  List<Widget> _dayGroupedTiles(List<Donation> donations) {
+  List<Widget> _dayGroupedTiles(List<Tip> tips) {
     final c = context.lt;
     final widgets = <Widget>[];
-    List<Donation> group = [];
+    List<Tip> group = [];
     String? groupLabel;
 
     void flush() {
@@ -599,8 +599,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               children: [
                 for (var i = 0; i < rows.length; i++) ...[
                   if (i > 0) Divider(height: 1, color: c.divider),
-                  DonationTile(
-                    donation: rows[i],
+                  TipTile(
+                    tip: rows[i],
                     showTime: true,
                     // Null for tip-page tips (no Stripe transaction to open) —
                     // the row stays inert instead of tappable-but-dead.
@@ -614,7 +614,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       group = [];
     }
 
-    for (final d in donations) {
+    for (final d in tips) {
       final label = _dayLabel(context, d.createdAt);
       if (label != groupLabel) {
         flush();
@@ -628,13 +628,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   // --------------------------------------------------- tip-page history ---
 
-  List<Donation> _byMethod(List<Donation> donations, TipMethod method) =>
-      donations.where((d) => d.method == method).toList();
+  List<Tip> _byMethod(List<Tip> tips, TipMethod method) =>
+      tips.where((d) => d.method == method).toList();
 
-  List<Widget> _relayGroups(List<Donation> relayHistory, TipMethod method) {
+  List<Widget> _relayGroups(List<Tip> relayHistory, TipMethod method) {
     final c = context.lt;
-    final donations = _byMethod(relayHistory, method);
-    if (donations.isEmpty) {
+    final tips = _byMethod(relayHistory, method);
+    if (tips.isEmpty) {
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -664,7 +664,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           ),
         ),
       ),
-      ..._dayGroupedTiles(donations),
+      ..._dayGroupedTiles(tips),
     ];
   }
 
@@ -754,7 +754,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             ),
             Divider(height: 1, color: c.divider),
             Expanded(
-              child: session.donations.isEmpty
+              child: session.tips.isEmpty
                   ? Center(
                       child: Text(
                         context.s.t('history.session_no_tips'),
@@ -768,16 +768,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   : ListView.separated(
                       controller: scrollController,
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                      itemCount: session.donations.length,
+                      itemCount: session.tips.length,
                       separatorBuilder: (_, _) =>
                           Divider(height: 1, color: c.divider),
                       itemBuilder: (context, index) {
-                        final donation = session
-                            .donations[session.donations.length - 1 - index];
-                        return DonationTile(
-                          donation: donation,
+                        final tip = session
+                            .tips[session.tips.length - 1 - index];
+                        return TipTile(
+                          tip: tip,
                           showTime: true,
-                          onTap: _stripeTap(donation),
+                          onTap: _stripeTap(tip),
                         );
                       },
                     ),
@@ -835,27 +835,27 @@ class _TableHeader extends StatelessWidget {
   }
 }
 
-/// Desktop donations table: FAN · MESSAGE · WHEN · AMOUNT · ↗ (Stripe link).
-class _DonationsTable extends StatelessWidget {
-  const _DonationsTable({
+/// Desktop tips table: FAN · MESSAGE · WHEN · AMOUNT · ↗ (Stripe link).
+class _TipsTable extends StatelessWidget {
+  const _TipsTable({
     required this.title,
     required this.demo,
     required this.relayOnly,
-    required this.donations,
+    required this.tips,
     required this.loading,
     required this.hasMore,
     required this.error,
     required this.onLoadMore,
   });
 
-  /// 'Donations' alone; 'Stripe' when the tip-page table sits below it.
+  /// 'Tips' alone; 'Stripe' when the tip-page table sits below it.
   final String title;
 
   final bool demo;
 
   /// Connected-mode jar without a Stripe key: no account to list from.
   final bool relayOnly;
-  final List<Donation> donations;
+  final List<Tip> tips;
   final bool loading;
   final bool hasMore;
   final String? error;
@@ -902,11 +902,11 @@ class _DonationsTable extends StatelessWidget {
           else ...[
             const _TableHeader(),
             Divider(height: 1, color: c.border),
-            if (donations.isEmpty && !loading)
+            if (tips.isEmpty && !loading)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Text(
-                  error ?? context.s.t('history.donations_empty'),
+                  error ?? context.s.t('history.tips_empty'),
                   style: TextStyle(
                     fontFamily: kFontBody,
                     fontSize: 13.5,
@@ -914,11 +914,11 @@ class _DonationsTable extends StatelessWidget {
                   ),
                 ),
               ),
-            for (var i = 0; i < donations.length; i++) ...[
+            for (var i = 0; i < tips.length; i++) ...[
               if (i > 0) Divider(height: 1, color: c.divider),
               _TableRow(
-                donation: donations[i],
-                onTap: _stripeTap(donations[i]),
+                tip: tips[i],
+                onTap: _stripeTap(tips[i]),
               ),
             ],
             if (loading)
@@ -928,7 +928,7 @@ class _DonationsTable extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 ),
               )
-            else if (hasMore && donations.isNotEmpty)
+            else if (hasMore && tips.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Center(
@@ -952,14 +952,14 @@ class _RelayTable extends StatelessWidget {
   const _RelayTable({
     required this.title,
     required this.method,
-    required this.donations,
+    required this.tips,
   });
 
   final String title;
   final TipMethod method;
 
   /// Newest first, already filtered to [method].
-  final List<Donation> donations;
+  final List<Tip> tips;
 
   @override
   Widget build(BuildContext context) {
@@ -982,7 +982,7 @@ class _RelayTable extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          if (donations.isEmpty)
+          if (tips.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
@@ -998,13 +998,13 @@ class _RelayTable extends StatelessWidget {
           else ...[
             const _TableHeader(),
             Divider(height: 1, color: c.border),
-            for (var i = 0; i < donations.length; i++) ...[
+            for (var i = 0; i < tips.length; i++) ...[
               if (i > 0) Divider(height: 1, color: c.divider),
               _TableRow(
-                donation: donations[i],
+                tip: tips[i],
                 // Always null here (no dashboard link) — kept as the shared
                 // helper so the row logic stays identical to the Stripe table.
-                onTap: _stripeTap(donations[i]),
+                onTap: _stripeTap(tips[i]),
               ),
             ],
           ],
@@ -1015,15 +1015,15 @@ class _RelayTable extends StatelessWidget {
 }
 
 class _TableRow extends StatelessWidget {
-  const _TableRow({required this.donation, this.onTap});
+  const _TableRow({required this.tip, this.onTap});
 
-  final Donation donation;
+  final Tip tip;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
-    final anonymous = donation.name == null || donation.name!.trim().isEmpty;
+    final anonymous = tip.name == null || tip.name!.trim().isEmpty;
     final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 11),
       child: Row(
@@ -1033,14 +1033,14 @@ class _TableRow extends StatelessWidget {
             child: Row(
               children: [
                 InitialAvatar(
-                  name: donation.displayName,
+                  name: tip.displayName,
                   anonymous: anonymous,
                   size: 32,
                 ),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
-                    donation.displayName,
+                    tip.displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1051,19 +1051,19 @@ class _TableRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (donation.method != TipMethod.stripe) ...[
+                if (tip.method != TipMethod.stripe) ...[
                   const SizedBox(width: 6),
-                  MethodBadge(donation.method),
+                  MethodBadge(tip.method),
                 ],
-                if (donation.inPerson) ...[
+                if (tip.inPerson) ...[
                   const SizedBox(width: 6),
                   const InPersonTag(),
                 ],
-                if (!donation.verified) ...[
+                if (!tip.verified) ...[
                   const SizedBox(width: 6),
                   const UnverifiedTag(),
                 ],
-                if (!donation.viaService) ...[
+                if (!tip.viaService) ...[
                   const SizedBox(width: 6),
                   const ExternalTag(),
                 ],
@@ -1075,13 +1075,13 @@ class _TableRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(right: 12),
               child: Text(
-                donation.hasMessage ? donation.message!.trim() : '—',
+                tip.hasMessage ? tip.message!.trim() : '—',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 13.5,
-                  color: donation.hasMessage ? c.textSecondary : c.textFaint,
+                  color: tip.hasMessage ? c.textSecondary : c.textFaint,
                 ),
               ),
             ),
@@ -1089,7 +1089,7 @@ class _TableRow extends StatelessWidget {
           Expanded(
             flex: 3,
             child: Text(
-              _when(context, donation.createdAt),
+              _when(context, tip.createdAt),
               style: TextStyle(
                 fontFamily: kFontBody,
                 fontSize: 12.5,
@@ -1100,7 +1100,7 @@ class _TableRow extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              formatAmount(donation.amountMinor, donation.currency),
+              formatAmount(tip.amountMinor, tip.currency),
               textAlign: TextAlign.right,
               style: outfitStyle(15, c.accent, weight: FontWeight.w700),
             ),

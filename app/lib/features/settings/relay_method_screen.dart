@@ -178,7 +178,7 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
         // can't null a field), then push the full profile to the relay.
         final updated = RelayJar(
           jarId: jar.jarId,
-          donateUrl: jar.donateUrl,
+          tipUrl: jar.tipUrl,
           artistName: jar.artistName,
           currency: jar.currency,
           message: jar.message,

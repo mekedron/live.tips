@@ -1,6 +1,6 @@
 /// Single-instance directory of jars for the admin view, plus the per-IP
 /// jar-creation quota. Holds metadata and counters only — tip content and
-/// donor identities never reach this object.
+/// fan identities never reach this object.
 
 import { DurableObject } from "cloudflare:workers";
 import type { Env, RegistryRow } from "./types";

@@ -1,4 +1,4 @@
-// live.tips relay — profile store + tip event pipe. No donation history, ever.
+// live.tips relay — profile store + tip event pipe. No tip history, ever.
 //
 // Secrets (never here): TURNSTILE_SECRET, ADMIN_TOKEN — set via `wrangler secret put`.
 // Local dev: copy .dev.vars.example to .dev.vars.
@@ -25,7 +25,7 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["JarDO", "RegistryDO"] }],
   "vars": {
     // The real, public Turnstile sitekey for live.tips — deployed verbatim,
-    // nothing substitutes it. Safe to commit (sitekeys are served in the donor
+    // nothing substitutes it. Safe to commit (sitekeys are served in the tip
     // page's HTML); its secret half lives in TURNSTILE_SECRET. Tests override
     // both with Cloudflare's always-passing pair, see vitest.config.ts.
     "TURNSTILE_SITE_KEY": "0x4AAAAAADxbXSyz6hPQKTiZ"

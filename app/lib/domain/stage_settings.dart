@@ -161,7 +161,7 @@ class StageSettings {
   final bool soundEnabled;
 
   /// The "ta-da!" fanfare when a new tip arrives — loud enough that the
-  /// artist hears money land mid-song and can thank the donor from the
+  /// artist hears money land mid-song and can thank the fan from the
   /// stage. Independent of [soundEnabled]; on by default.
   final bool tipSoundEnabled;
 

@@ -33,13 +33,13 @@ const kRequiredPermissions = [
     slug: 'checkout_sessions',
     resource: 'Checkout Sessions',
     access: 'Read',
-    why: 'See incoming donations — history and details.',
+    why: 'See incoming tips — history and details.',
   ),
   RequiredPermission(
     slug: 'events',
     resource: 'Events',
     access: 'Read',
-    why: 'Live feed: poll for new donations during a session.',
+    why: 'Live feed: poll for new tips during a session.',
   ),
   // Read-only, like the two above. A restricted key only sees an event whose
   // object it may read, so the charge.succeeded feed — in-person contactless
@@ -55,7 +55,7 @@ const kRequiredPermissions = [
     slug: 'payment_links',
     resource: 'Payment Links',
     access: 'Write',
-    why: 'Create and manage your donation link.',
+    why: 'Create and manage your tip link.',
   ),
   RequiredPermission(
     slug: 'products',

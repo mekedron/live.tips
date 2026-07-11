@@ -1,22 +1,22 @@
 import 'dart:math';
 
-import '../domain/donation.dart';
+import '../domain/tip.dart';
 import '../domain/tip_method.dart';
 import 'stripe/stripe_requests.dart';
 
-/// Feeds a live session with newly arrived donations. The session controller
+/// Feeds a live session with newly arrived tips. The session controller
 /// calls [pollNew] on a timer; the source keeps its own cursor.
-abstract class DonationSource {
+abstract class TipSource {
   /// Prepares the cursor. [resumeCursor] restores a session after an app
-  /// restart so donations made in between are still picked up. [backfill]
+  /// restart so tips made in between are still picked up. [backfill]
   /// (resumed sessions only) means: even without a cursor, everything since
   /// [sessionStart] must be re-fetched — tips that arrived while the app was
   /// dead or the machine slept belong to the session; the caller dedupes.
   Future<void> prime(DateTime sessionStart,
       {String? resumeCursor, bool backfill = false});
 
-  /// Returns only donations not seen before (chronological order).
-  Future<List<Donation>> pollNew();
+  /// Returns only tips not seen before (chronological order).
+  Future<List<Tip>> pollNew();
 
   /// Opaque cursor to persist for crash/restart recovery.
   String? get cursor;
@@ -29,8 +29,8 @@ abstract class DonationSource {
 /// recommends webhooks; a stage device has no public HTTPS endpoint to receive
 /// one, so we poll a documented endpoint deliberately. Stripe's read allocation
 /// (~500 reads/transaction, 10k/month floor) is why the default tick is 4 s.
-class StripeDonationSource extends DonationSource {
-  StripeDonationSource(this._requests,
+class StripeTipSource extends TipSource {
+  StripeTipSource(this._requests,
       {required this.paymentLinkId, this.onDispose});
 
   final StripeRequests _requests;
@@ -47,7 +47,7 @@ class StripeDonationSource extends DonationSource {
 
   String? _cursor;
   int? _createdGte;
-  final Set<String> _seenDonationIds = {};
+  final Set<String> _seenTipIds = {};
 
   @override
   String? get cursor => _cursor;
@@ -61,7 +61,7 @@ class StripeDonationSource extends DonationSource {
     }
     if (backfill) {
       // Resumed session without a cursor: re-read the whole session window.
-      // Duplicates are cheap (the session dedupes by donation id); losing a
+      // Duplicates are cheap (the session dedupes by tip id); losing a
       // tip that arrived while the app was dead is not.
       _createdGte =
           sessionStart.toUtc().millisecondsSinceEpoch ~/ 1000 - 60;
@@ -71,7 +71,7 @@ class StripeDonationSource extends DonationSource {
     // happens after "Start". Falls back to a server-time window when the
     // account has no recent events (device clocks can drift, hence the
     // safety margin).
-    final page = await _requests.listDonationEvents(limit: 1);
+    final page = await _requests.listTipEvents(limit: 1);
     if (page.events.isNotEmpty) {
       _cursor = page.events.first.id;
     } else {
@@ -81,23 +81,23 @@ class StripeDonationSource extends DonationSource {
   }
 
   @override
-  Future<List<Donation>> pollNew() async {
-    final fresh = <Donation>[];
+  Future<List<Tip>> pollNew() async {
+    final fresh = <Tip>[];
     // With `ending_before`, Stripe returns the events immediately newer than
     // the cursor; keep advancing until has_more is false. Page cap is a
-    // safety valve — 500 new donations per tick would be a great problem.
+    // safety valve — 500 new tips per tick would be a great problem.
     for (var page = 0; page < 5; page++) {
-      final result = await _requests.listDonationEvents(
+      final result = await _requests.listTipEvents(
         endingBefore: _cursor,
         createdGte: _cursor == null ? _createdGte : null,
       );
       if (result.events.isEmpty) break;
 
       for (final event in result.events.reversed) {
-        final donation = _donationOf(event);
-        if (donation == null) continue;
+        final tip = _tipOf(event);
+        if (tip == null) continue;
         // completed + async_payment_succeeded can both fire for one payment.
-        if (_seenDonationIds.add(donation.id)) fresh.add(donation);
+        if (_seenTipIds.add(tip.id)) fresh.add(tip);
       }
 
       _cursor = result.events.first.id;
@@ -119,9 +119,9 @@ class StripeDonationSource extends DonationSource {
   ///   accepting charges naively would count every QR tip twice — once as the
   ///   session, once as its own charge, under two different ids that no
   ///   de-duplication could ever tie together. The card the reader taps is
-  ///   card-*present*; the card a donor types into a Checkout page is not. That
+  ///   card-*present*; the card a fan types into a Checkout page is not. That
   ///   one field is the whole guard, so it is asserted on the discriminator
-  ///   ([Donation.isCardPresentCharge]) rather than inferred.
+  ///   ([Tip.isCardPresentCharge]) rather than inferred.
   ///
   /// The in-person path can't be narrowed to our payment link — a tap has no
   /// link, no product, no Checkout Session, nothing of ours on it at all. So
@@ -129,16 +129,16 @@ class StripeDonationSource extends DonationSource {
   /// docs/onboarding/create-restricted-key.md) that the artist's Stripe account
   /// is dedicated to tips: any card-present payment in it is a tip. Sell merch
   /// through the same account and the merch sale lands in the jar.
-  Donation? _donationOf(DonationEvent event) {
+  Tip? _tipOf(TipEvent event) {
     final object = event.object;
     if (event.isCheckoutSession) {
       if (object['payment_link'] != paymentLinkId) return null;
       if (object['payment_status'] != 'paid') return null;
-      return Donation.fromCheckoutSession(object);
+      return Tip.fromCheckoutSession(object);
     }
     // charge.succeeded — the only other type we ask Stripe for.
-    if (!Donation.isCardPresentCharge(object)) return null;
-    return Donation.fromCardPresentCharge(object);
+    if (!Tip.isCardPresentCharge(object)) return null;
+    return Tip.fromCardPresentCharge(object);
   }
 }
 
@@ -146,7 +146,7 @@ class StripeDonationSource extends DonationSource {
 /// account to poll (relay-only installs). Deliberately NOT the demo source:
 /// a real session must never be fed fake tips. Relay tips arrive over their
 /// own channel, wired into the session separately.
-class NullDonationSource extends DonationSource {
+class NullTipSource extends TipSource {
   @override
   String? get cursor => null;
 
@@ -155,13 +155,13 @@ class NullDonationSource extends DonationSource {
       {String? resumeCursor, bool backfill = false}) async {}
 
   @override
-  Future<List<Donation>> pollNew() async => const [];
+  Future<List<Tip>> pollNew() async => const [];
 }
 
-/// Generates believable donations so the whole app can be experienced
+/// Generates believable tips so the whole app can be experienced
 /// without a Stripe account.
-class DemoDonationSource extends DonationSource {
-  DemoDonationSource({Random? random}) : _random = random ?? Random();
+class DemoTipSource extends TipSource {
+  DemoTipSource({Random? random}) : _random = random ?? Random();
 
   final Random _random;
   int _counter = 0;
@@ -193,7 +193,7 @@ class DemoDonationSource extends DonationSource {
       {String? resumeCursor, bool backfill = false}) async {}
 
   @override
-  Future<List<Donation>> pollNew() async {
+  Future<List<Tip>> pollNew() async {
     // First tick always tips, so the demo feels alive immediately.
     final roll = _random.nextDouble();
     final count = _first ? 1 : (roll < 0.55 ? 0 : (roll > 0.92 ? 2 : 1));
@@ -205,7 +205,7 @@ class DemoDonationSource extends DonationSource {
       final method = _random.nextDouble() < 0.25
           ? (_random.nextBool() ? TipMethod.revolut : TipMethod.mobilepay)
           : TipMethod.stripe;
-      return Donation(
+      return Tip(
         id: 'demo_$_counter',
         amountMinor: _amounts[_random.nextInt(_amounts.length)],
         currency: 'usd',

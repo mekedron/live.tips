@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// How a tip reached the artist: straight through Stripe, or relayed by the
-/// live.tips connected-mode worker from a MobilePay/Revolut/Monzo donor page.
+/// live.tips connected-mode worker from a MobilePay/Revolut/Monzo fan page.
 enum TipMethod {
   stripe('stripe', 'Card'),
   revolut('revolut', 'Revolut'),
@@ -13,7 +13,7 @@ enum TipMethod {
   final String wire;
   final String label;
 
-  /// The methods that ride through the live.tips relay (a donor page + jar),
+  /// The methods that ride through the live.tips relay (a fan page + jar),
   /// in the fixed order every method list and setup flow walks them.
   static const relayMethods = [
     TipMethod.revolut,

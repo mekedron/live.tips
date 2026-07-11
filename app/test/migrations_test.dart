@@ -14,7 +14,7 @@ const _legacyTipJar = '{"productId":"prod_1","priceId":"price_1",'
     '"thankYouMessage":"Thanks!"}';
 
 const _legacyRelayJar = '{"jarId":"jar_1",'
-    '"donateUrl":"https://live.tips/t/jar_1","artistName":"Foxy Live",'
+    '"tipUrl":"https://live.tips/t/jar_1","artistName":"Foxy Live",'
     '"currency":"eur","revolutUsername":"foxy","createdAtMs":5}';
 
 const _legacySettings = '{"pollIntervalSec":8,"lastGoalMinor":25000,'
@@ -22,7 +22,7 @@ const _legacySettings = '{"pollIntervalSec":8,"lastGoalMinor":25000,'
     '"poster":{"displayName":"Foxy","headline":"Tip us!"}}';
 
 const _legacyHistory = '[{"id":"ses_1","startedAt":1000,"currency":"eur",'
-    '"goalMinor":5000,"donations":[]}]';
+    '"goalMinor":5000,"tips":[]}]';
 
 /// The full pre-multi-band layout of a connected install, including the
 /// int-typed seen marker that a naive string copy would trip over.
@@ -32,7 +32,7 @@ Map<String, Object> _legacyPrefs() => {
       'settings_v1': _legacySettings,
       'session_history_v1': _legacyHistory,
       'active_session_v1': '{"id":"ses_2","startedAt":2000,'
-          '"currency":"eur","goalMinor":5000,"donations":[]}',
+          '"currency":"eur","goalMinor":5000,"tips":[]}',
       'active_session_cursor_v1': 'evt_123',
       'relay_seen_at_v1': 1751900000000,
       'relay_history_v1': '[]',

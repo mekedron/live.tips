@@ -135,7 +135,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
       } catch (_) {}
     }
     await ref.read(appStateProvider.notifier).setTipJar(jar);
-    // Connected mode: the donor page's card button must follow the new
+    // Connected mode: the fan page's card button must follow the new
     // Stripe link (and name). Best effort — never blocks the artist.
     final relayJar = app.relayJar;
     final relaySecret = app.relaySecret;
@@ -177,7 +177,7 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
     await ref.read(appStateProvider.notifier).cancelStripeSetup();
   }
 
-  /// Tells the relay about the (re)created Stripe link so the donor page's
+  /// Tells the relay about the (re)created Stripe link so the fan page's
   /// card button never points at a retired payment link. Silent on failure:
   /// the page just keeps the old link until the next successful update.
   static Future<void> _syncRelayStripeUrl(

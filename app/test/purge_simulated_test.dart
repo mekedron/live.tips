@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/live_session.dart';
 
 import 'helpers.dart';
 
-Donation _tip(String id, {required bool livemode}) => Donation(
+Tip _tip(String id, {required bool livemode}) => Tip(
       id: id,
       amountMinor: 500,
       currency: 'usd',
@@ -12,13 +12,13 @@ Donation _tip(String id, {required bool livemode}) => Donation(
       livemode: livemode,
     );
 
-LiveSession _session(String id, List<Donation> donations) => LiveSession(
+LiveSession _session(String id, List<Tip> tips) => LiveSession(
       id: id,
       startedAt: DateTime.utc(2026, 7, 3),
       endedAt: DateTime.utc(2026, 7, 3, 1),
       currency: 'usd',
       goalMinor: 10000,
-      donations: donations,
+      tips: tips,
     );
 
 void main() {

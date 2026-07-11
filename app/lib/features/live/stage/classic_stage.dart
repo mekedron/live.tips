@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
-import '../../../domain/donation.dart';
+import '../../../domain/tip.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../widgets/donation_tile.dart';
+import '../../../widgets/tip_tile.dart';
 import 'stage_hud.dart' show kStageAccent, kStageAmount;
 import 'stage_types.dart';
 
 /// The original numbers-first stage: big total, animated goal bar, stat
-/// chips, last-donation hero, feed. Extracted verbatim from the live screen —
+/// chips, last-tip hero, feed. Extracted verbatim from the live screen —
 /// fully native, no WebView, the terminal fallback everywhere.
 class ClassicStage extends StatelessWidget {
   const ClassicStage({super.key, required this.snapshot});
@@ -19,7 +19,7 @@ class ClassicStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final donations = snapshot.recentDonations;
+    final tips = snapshot.recentTips;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -87,10 +87,10 @@ class ClassicStage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        LastDonationHero(donation: snapshot.lastDonation),
+        LastTipHero(tip: snapshot.lastTip),
         const SizedBox(height: 8),
         Expanded(
-          child: donations.isEmpty
+          child: tips.isEmpty
               ? Center(
                   child: Text(
                     context.s.t('stage.waiting_first_tip_qr'),
@@ -101,9 +101,9 @@ class ClassicStage extends StatelessWidget {
                   ),
                 )
               : ListView.builder(
-                  itemCount: donations.length,
+                  itemCount: tips.length,
                   itemBuilder: (context, index) =>
-                      DonationTile(donation: donations[index]),
+                      TipTile(tip: tips[index]),
                 ),
         ),
       ],
@@ -187,10 +187,10 @@ class _StatChip extends StatelessWidget {
 
 /// "💛 Anna tipped €5" card with a fade+slide entrance. Shared with the jar
 /// stages' HUD, hence public.
-class LastDonationHero extends StatelessWidget {
-  const LastDonationHero({super.key, this.donation, this.compact = false});
+class LastTipHero extends StatelessWidget {
+  const LastTipHero({super.key, this.tip, this.compact = false});
 
-  final Donation? donation;
+  final Tip? tip;
 
   /// Jar HUD variant: smaller text, no message body.
   final bool compact;
@@ -209,10 +209,10 @@ class LastDonationHero extends StatelessWidget {
           child: child,
         ),
       ),
-      child: donation == null
+      child: tip == null
           ? SizedBox(height: compact ? 0 : 8, key: const ValueKey('empty'))
           : Container(
-              key: ValueKey(donation!.id),
+              key: ValueKey(tip!.id),
               padding: EdgeInsets.all(compact ? 10 : 16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
@@ -227,10 +227,10 @@ class LastDonationHero extends StatelessWidget {
                 children: [
                   Text(
                     context.s.t('stage.tipped', {
-                      'name': donation!.displayName,
+                      'name': tip!.displayName,
                       'amount': formatAmount(
-                        donation!.amountMinor,
-                        donation!.currency,
+                        tip!.amountMinor,
+                        tip!.currency,
                       ),
                     }),
                     textAlign: TextAlign.center,
@@ -241,10 +241,10 @@ class LastDonationHero extends StatelessWidget {
                       color: Colors.white,
                     ),
                   ),
-                  if (!compact && donation!.hasMessage) ...[
+                  if (!compact && tip!.hasMessage) ...[
                     const SizedBox(height: 6),
                     Text(
-                      '“${donation!.message!.trim()}”',
+                      '“${tip!.message!.trim()}”',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 16,

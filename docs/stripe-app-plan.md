@@ -49,7 +49,7 @@ principle — that lives in the artist's dashboard and:
    form — but a *smaller* one: because the jar already exists, the mobile app
    then only needs **Checkout Sessions: Read + Events: Read**. A read-only
    key on the device is a meaningfully better security story.
-4. **Shows recent donations** in a dashboard widget (nice-to-have).
+4. **Shows recent tips** in a dashboard widget (nice-to-have).
 
 The mobile app gains a matching "I already have a tip link" path in setup:
 paste/pick the existing payment link (found via `GET /v1/payment_links`, which

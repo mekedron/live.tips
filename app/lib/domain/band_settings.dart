@@ -12,7 +12,7 @@ class BandSettings {
     this.poster = const PosterSettings(),
   });
 
-  /// Which donation URL this band's QR encodes.
+  /// Which tip URL this band's QR encodes.
   final QrMode qrMode;
 
   /// Last goal this band used — prefilled next time.

@@ -34,10 +34,14 @@ describe("plumbing", () => {
 
 describe("jar lifecycle", () => {
   it("creates a jar and returns one-time credentials", async () => {
-    const { jarId, secret, donateUrl } = await createJar();
+    const created = await createJar();
+    const { jarId, secret, tipUrl } = created;
     expect(jarId).toMatch(/^[0-9a-z]{26}$/);
     expect(secret).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(donateUrl).toBe(`https://live.tips/t/${jarId}`);
+    expect(tipUrl).toBe(`https://live.tips/t/${jarId}`);
+    // Pins the response shape: `tipUrl` is the only URL key. The old
+    // `donateUrl` is gone and must not come back.
+    expect(Object.keys(created).sort()).toEqual(["jarId", "secret", "tipUrl"]);
   });
 
   it("rejects invalid profiles with 422", async () => {
@@ -92,7 +96,7 @@ describe("jar lifecycle", () => {
     expect(newSeen.status).toBe(204);
   });
 
-  it("deletes a jar; its donor page becomes the uniform 404", async () => {
+  it("deletes a jar; its tip page becomes the uniform 404", async () => {
     const { jarId, secret } = await createJar();
     const del = await SELF.fetch(`https://api.live.tips/v1/jars/${jarId}`, {
       method: "DELETE",
@@ -105,7 +109,7 @@ describe("jar lifecycle", () => {
   });
 });
 
-describe("donor page", () => {
+describe("tip page", () => {
   it("renders configured methods with strict headers", async () => {
     const { jarId } = await createJar();
     const res = await SELF.fetch(`https://live.tips/t/${jarId}`);

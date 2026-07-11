@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../../domain/donation.dart';
+import '../../domain/tip.dart';
 import 'relay_ws_codec.dart';
 
 /// Health of the relay tip feed, as shown on the stage screen.
@@ -57,7 +57,7 @@ class RelayTipChannel {
   final WebSocketChannel Function(Uri) _connect;
   final Duration? Function(int attempt) _backoff;
 
-  final _tips = StreamController<Donation>.broadcast();
+  final _tips = StreamController<Tip>.broadcast();
   final _status = StreamController<RelayHealth>.broadcast();
 
   WebSocketChannel? _channel;
@@ -74,9 +74,9 @@ class RelayTipChannel {
   /// True once the relay has said "never come back" (4401/4410).
   bool _terminal = false;
 
-  /// Donations decoded from the feed. NOT exactly-once — the consumer must
-  /// dedupe by donation id (the session already does for the Stripe poll).
-  Stream<Donation> get tips => _tips.stream;
+  /// Tips decoded from the feed. NOT exactly-once — the consumer must
+  /// dedupe by tip id (the session already does for the Stripe poll).
+  Stream<Tip> get tips => _tips.stream;
 
   /// Emits on every health transition. Subscribe BEFORE [start] — broadcast
   /// streams don't replay.
@@ -184,7 +184,7 @@ class RelayTipChannel {
         case RelayPing():
           _safeSend(encodePong());
         case final RelayTip tip:
-          if (!_tips.isClosed) _tips.add(tip.toDonation(_serial++));
+          if (!_tips.isClosed) _tips.add(tip.toTip(_serial++));
         case null:
           break; // malformed/unknown — dropped by contract
       }

@@ -83,16 +83,16 @@ void main() {
     expect(jsonDecode(encodePong()), {'type': 'pong'});
   });
 
-  test('toDonation falls back to the serial when the relay sends no id', () {
-    final tip = decodeRelayMessage(tipJson(name: '', message: '')) as RelayTip;
-    final donation = tip.toDonation(4);
-    expect(donation.id, 'relay_1751500000000_4');
-    expect(donation.verified, isFalse);
-    expect(donation.livemode, isTrue);
-    expect(donation.method, TipMethod.revolut);
-    expect(donation.name, isNull, reason: 'empty name stays anonymous');
-    expect(donation.hasMessage, isFalse);
-    expect(donation.createdAt.millisecondsSinceEpoch, 1751500000000);
+  test('toTip falls back to the serial when the relay sends no id', () {
+    final msg = decodeRelayMessage(tipJson(name: '', message: '')) as RelayTip;
+    final tip = msg.toTip(4);
+    expect(tip.id, 'relay_1751500000000_4');
+    expect(tip.verified, isFalse);
+    expect(tip.livemode, isTrue);
+    expect(tip.method, TipMethod.revolut);
+    expect(tip.name, isNull, reason: 'empty name stays anonymous');
+    expect(tip.hasMessage, isFalse);
+    expect(tip.createdAt.millisecondsSinceEpoch, 1751500000000);
   });
 
   test("the relay's id wins, so a replayed tip keeps one identity", () {
@@ -109,10 +109,10 @@ void main() {
     final tip = decodeRelayMessage(frame) as RelayTip;
     expect(tip.id, 'ab12');
     // The relay redelivers a queued tip on the next connection, where the
-    // channel's serial has restarted. The donation id must not move with it,
+    // channel's serial has restarted. The tip id must not move with it,
     // or the session dedupe lets the same tip onto the stage twice.
-    expect(tip.toDonation(0).id, tip.toDonation(7).id);
-    expect(tip.toDonation(0).id, 'relay_ab12');
+    expect(tip.toTip(0).id, tip.toTip(7).id);
+    expect(tip.toTip(0).id, 'relay_ab12');
   });
 
   test('a blank or non-string id degrades to the serial form', () {
@@ -129,7 +129,7 @@ void main() {
       });
       final tip = decodeRelayMessage(frame) as RelayTip;
       expect(tip.id, isNull, reason: '$bad is not an id');
-      expect(tip.toDonation(3).id, 'relay_1751500000000_3');
+      expect(tip.toTip(3).id, 'relay_1751500000000_3');
     }
   });
 }

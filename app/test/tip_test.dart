@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/tip_method.dart';
 
 Map<String, dynamic> checkoutSession({
@@ -55,7 +55,7 @@ Map<String, dynamic> cardPresentCharge({
 
 void main() {
   test('parses amount, currency, and custom fields', () {
-    final donation = Donation.fromCheckoutSession(checkoutSession(
+    final tip = Tip.fromCheckoutSession(checkoutSession(
       customFields: [
         {
           'key': 'nickname',
@@ -69,27 +69,27 @@ void main() {
         },
       ],
     ));
-    expect(donation.id, 'cs_test_1');
-    expect(donation.amountMinor, 500);
-    expect(donation.currency, 'eur');
-    expect(donation.displayName, 'Maya');
-    expect(donation.message, 'Great set!');
-    expect(donation.livemode, isFalse);
+    expect(tip.id, 'cs_test_1');
+    expect(tip.amountMinor, 500);
+    expect(tip.currency, 'eur');
+    expect(tip.displayName, 'Maya');
+    expect(tip.message, 'Great set!');
+    expect(tip.livemode, isFalse);
   });
 
   test('falls back to customer_details.name, then Anonymous', () {
-    final named = Donation.fromCheckoutSession(
+    final named = Tip.fromCheckoutSession(
       checkoutSession(customerDetails: {'name': 'Tom H'}),
     );
     expect(named.displayName, 'Tom H');
 
-    final anon = Donation.fromCheckoutSession(checkoutSession());
+    final anon = Tip.fromCheckoutSession(checkoutSession());
     expect(anon.displayName, 'Anonymous');
     expect(anon.hasMessage, isFalse);
   });
 
   test('unfilled custom fields (null value) are ignored', () {
-    final donation = Donation.fromCheckoutSession(checkoutSession(
+    final tip = Tip.fromCheckoutSession(checkoutSession(
       customFields: [
         {
           'key': 'nickname',
@@ -98,11 +98,11 @@ void main() {
         },
       ],
     ));
-    expect(donation.displayName, 'Anonymous');
+    expect(tip.displayName, 'Anonymous');
   });
 
   test('json round trip', () {
-    final original = Donation.fromCheckoutSession(checkoutSession(
+    final original = Tip.fromCheckoutSession(checkoutSession(
       customFields: [
         {
           'key': 'message',
@@ -111,7 +111,7 @@ void main() {
         },
       ],
     ));
-    final restored = Donation.fromJson(original.toJson());
+    final restored = Tip.fromJson(original.toJson());
     expect(restored.id, original.id);
     expect(restored.amountMinor, original.amountMinor);
     expect(restored.message, original.message);
@@ -122,39 +122,39 @@ void main() {
   });
 
   test('captures the payment_intent id and links test-mode payments', () {
-    final donation = Donation.fromCheckoutSession(
+    final tip = Tip.fromCheckoutSession(
       checkoutSession(paymentIntent: 'pi_test_123'),
     );
-    expect(donation.paymentIntentId, 'pi_test_123');
-    expect(donation.stripeDashboardUrl,
+    expect(tip.paymentIntentId, 'pi_test_123');
+    expect(tip.stripeDashboardUrl,
         'https://dashboard.stripe.com/test/payments/pi_test_123');
   });
 
   test('live-mode payments link without the /test/ segment', () {
-    final donation = Donation.fromCheckoutSession(
+    final tip = Tip.fromCheckoutSession(
       checkoutSession(livemode: true, paymentIntent: 'pi_live_456'),
     );
-    expect(donation.stripeDashboardUrl,
+    expect(tip.stripeDashboardUrl,
         'https://dashboard.stripe.com/payments/pi_live_456');
   });
 
   test('unwraps an expanded payment_intent object', () {
-    final donation = Donation.fromCheckoutSession(
+    final tip = Tip.fromCheckoutSession(
       checkoutSession(paymentIntent: {'id': 'pi_expanded_789'}),
     );
-    expect(donation.paymentIntentId, 'pi_expanded_789');
+    expect(tip.paymentIntentId, 'pi_expanded_789');
   });
 
   test('no dashboard link without a payment_intent (e.g. demo tips)', () {
-    final donation = Donation.fromCheckoutSession(
+    final tip = Tip.fromCheckoutSession(
       checkoutSession(paymentIntent: null),
     );
-    expect(donation.paymentIntentId, isNull);
-    expect(donation.stripeDashboardUrl, isNull);
+    expect(tip.paymentIntentId, isNull);
+    expect(tip.stripeDashboardUrl, isNull);
   });
 
   test('flags live.tips payments via the expanded payment_link metadata', () {
-    final ours = Donation.fromCheckoutSession(checkoutSession(paymentLink: {
+    final ours = Tip.fromCheckoutSession(checkoutSession(paymentLink: {
       'id': 'plink_ours',
       'metadata': {'managed_by': 'live.tips'},
     }));
@@ -162,13 +162,13 @@ void main() {
   });
 
   test('a payment link that is not ours does not count as via the service', () {
-    final theirs = Donation.fromCheckoutSession(checkoutSession(paymentLink: {
+    final theirs = Tip.fromCheckoutSession(checkoutSession(paymentLink: {
       'id': 'plink_theirs',
       'metadata': {'managed_by': 'something_else'},
     }));
     expect(theirs.viaService, isFalse);
 
-    final bare = Donation.fromCheckoutSession(checkoutSession(
+    final bare = Tip.fromCheckoutSession(checkoutSession(
       paymentLink: {'id': 'plink_bare'},
     ));
     expect(bare.viaService, isFalse);
@@ -176,25 +176,25 @@ void main() {
 
   test('a transaction with no payment link is not via the service', () {
     final direct =
-        Donation.fromCheckoutSession(checkoutSession(paymentLink: null));
+        Tip.fromCheckoutSession(checkoutSession(paymentLink: null));
     expect(direct.viaService, isFalse);
   });
 
   test('the events feed (a bare plink id) counts as via the service', () {
     // The `/v1/events` poller only ever hands us our own link, unexpanded.
-    final live = Donation.fromCheckoutSession(checkoutSession());
+    final live = Tip.fromCheckoutSession(checkoutSession());
     expect(live.viaService, isTrue);
   });
 
   test('viaService survives a json round trip when false', () {
     final external =
-        Donation.fromCheckoutSession(checkoutSession(paymentLink: null));
+        Tip.fromCheckoutSession(checkoutSession(paymentLink: null));
     expect(external.viaService, isFalse);
-    expect(Donation.fromJson(external.toJson()).viaService, isFalse);
+    expect(Tip.fromJson(external.toJson()).viaService, isFalse);
   });
 
   test('method and verified survive a json round trip when non-default', () {
-    final relayed = Donation.relayTip(
+    final relayed = Tip.relayTip(
       amountMinor: 700,
       currency: 'dkk',
       method: TipMethod.mobilepay,
@@ -203,7 +203,7 @@ void main() {
       ts: 1751500000000,
       serial: 3,
     );
-    final restored = Donation.fromJson(relayed.toJson());
+    final restored = Tip.fromJson(relayed.toJson());
     expect(restored.method, TipMethod.mobilepay);
     expect(restored.verified, isFalse);
     expect(restored.id, relayed.id);
@@ -211,7 +211,7 @@ void main() {
   });
 
   test('legacy json without method/verified keys gets the defaults', () {
-    final legacy = Donation.fromJson({
+    final legacy = Tip.fromJson({
       'id': 'cs_old',
       'amountMinor': 500,
       'currency': 'eur',
@@ -223,7 +223,7 @@ void main() {
 
   test('toJson omits method/verified/inPerson when default — stored history '
       'stays byte-identical', () {
-    final stripe = Donation.fromCheckoutSession(checkoutSession());
+    final stripe = Tip.fromCheckoutSession(checkoutSession());
     expect(stripe.method, TipMethod.stripe);
     expect(stripe.verified, isTrue);
     expect(stripe.inPerson, isFalse);
@@ -235,8 +235,8 @@ void main() {
 
   // ------------------------------------------------- in-person tap tips ---
 
-  test('Donation.fromCardPresentCharge builds a verified, nameless tip', () {
-    final tip = Donation.fromCardPresentCharge(cardPresentCharge());
+  test('Tip.fromCardPresentCharge builds a verified, nameless tip', () {
+    final tip = Tip.fromCardPresentCharge(cardPresentCharge());
     expect(tip.id, 'ch_tap');
     expect(tip.amountMinor, 700);
     expect(tip.currency, 'eur');
@@ -255,8 +255,8 @@ void main() {
         'https://dashboard.stripe.com/payments/pi_tap');
   });
 
-  test('the cardholder name off the chip is never used as a donor name', () {
-    final tip = Donation.fromCardPresentCharge(
+  test('the cardholder name off the chip is never used as a fan name', () {
+    final tip = Tip.fromCardPresentCharge(
       cardPresentCharge()..['billing_details'] = {'name': 'MS J SMITH'},
     );
     expect(tip.name, isNull);
@@ -264,34 +264,34 @@ void main() {
   });
 
   test('isCardPresentCharge accepts only successful in-person payments', () {
-    expect(Donation.isCardPresentCharge(cardPresentCharge()), isTrue);
+    expect(Tip.isCardPresentCharge(cardPresentCharge()), isTrue);
     // The charge Stripe creates behind every online Checkout Session — the one
     // that would double-count every QR tip if it slipped through.
     expect(
-        Donation.isCardPresentCharge(cardPresentCharge(methodType: 'card')),
+        Tip.isCardPresentCharge(cardPresentCharge(methodType: 'card')),
         isFalse);
     expect(
-        Donation.isCardPresentCharge(
+        Tip.isCardPresentCharge(
             cardPresentCharge(methodType: 'sepa_debit')),
         isFalse);
     expect(
-        Donation.isCardPresentCharge(cardPresentCharge(status: 'failed')),
+        Tip.isCardPresentCharge(cardPresentCharge(status: 'failed')),
         isFalse);
-    expect(Donation.isCardPresentCharge(cardPresentCharge(paid: false)),
+    expect(Tip.isCardPresentCharge(cardPresentCharge(paid: false)),
         isFalse);
     // A charge with no payment_method_details at all (nothing to prove it was
     // in person) is not one of ours either.
     expect(
-        Donation.isCardPresentCharge(
+        Tip.isCardPresentCharge(
             cardPresentCharge()..remove('payment_method_details')),
         isFalse);
   });
 
   test('inPerson survives a json round trip', () {
-    final tip = Donation.fromCardPresentCharge(cardPresentCharge());
+    final tip = Tip.fromCardPresentCharge(cardPresentCharge());
     final json = tip.toJson();
     expect(json['inPerson'], isTrue);
-    final restored = Donation.fromJson(json);
+    final restored = Tip.fromJson(json);
     expect(restored.inPerson, isTrue);
     expect(restored.verified, isTrue);
     expect(restored.id, tip.id);
@@ -299,8 +299,8 @@ void main() {
     expect(restored.createdAt, tip.createdAt);
   });
 
-  test('Donation.relayTip builds an unverified live relay tip', () {
-    final tip = Donation.relayTip(
+  test('Tip.relayTip builds an unverified live relay tip', () {
+    final tip = Tip.relayTip(
       amountMinor: 1200,
       currency: 'eur',
       method: TipMethod.revolut,

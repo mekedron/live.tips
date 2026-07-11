@@ -18,7 +18,7 @@ const _tipJar = TipJar(
 
 const _relayJar = RelayJar(
   jarId: 'jar_1',
-  donateUrl: 'https://live.tips/t/jar_1',
+  tipUrl: 'https://live.tips/t/jar_1',
   artistName: 'Foxy Live',
   currency: 'dkk',
   revolutUsername: 'foxy',
@@ -122,7 +122,7 @@ void main() {
       expect(
         _state(tipJar: _tipJar, relayJar: _relayJar, qrMode: QrMode.connected)
             .activeQrUrl,
-        _relayJar.donateUrl,
+        _relayJar.tipUrl,
       );
       expect(
         _state(tipJar: _tipJar, relayJar: _relayJar, qrMode: QrMode.stripe)
@@ -137,9 +137,9 @@ void main() {
           _tipJar.url);
     });
 
-    test('relay-only resolves to the donor page whatever the setting', () {
+    test('relay-only resolves to the fan page whatever the setting', () {
       expect(_state(relayJar: _relayJar, qrMode: QrMode.stripe).activeQrUrl,
-          _relayJar.donateUrl);
+          _relayJar.tipUrl);
     });
 
     test('nothing configured → null (surfaces hide, never crash)', () {
@@ -157,7 +157,7 @@ void main() {
 
     test('demo QR follows the setting like a fully configured install', () {
       expect(_state(demo: true, qrMode: QrMode.connected).activeQrUrl,
-          RelayJar.demo.donateUrl);
+          RelayJar.demo.tipUrl);
       expect(_state(demo: true, qrMode: QrMode.stripe).activeQrUrl,
           TipJar.demo.url);
     });

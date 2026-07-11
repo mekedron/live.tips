@@ -19,7 +19,7 @@ void main() {
       expect(
         s.tipSoundEnabled,
         isTrue,
-        reason: 'donation moments should be audible out of the box',
+        reason: 'tip moments should be audible out of the box',
       );
       expect(s.quality, StageQuality.auto);
       expect(s.railWidth, kStageRailDefaultWidth);

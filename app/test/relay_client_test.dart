@@ -8,7 +8,7 @@ import 'package:live_tips/domain/relay_jar.dart';
 
 const _jar = RelayJar(
   jarId: 'jar_abc',
-  donateUrl: 'https://live.tips/t/jar_abc',
+  tipUrl: 'https://live.tips/t/jar_abc',
   artistName: 'Maya',
   currency: 'eur',
   revolutUsername: 'mayamusic',
@@ -30,7 +30,7 @@ void main() {
         return _json({
           'jarId': 'jar_abc',
           'secret': 's3cret',
-          'donateUrl': 'https://live.tips/t/jar_abc',
+          'tipUrl': 'https://live.tips/t/jar_abc',
         }, 201);
       }),
     );
@@ -55,7 +55,7 @@ void main() {
     expect((body['methods'] as Map).containsKey('mobilepayBoxId'), isFalse);
 
     expect(result.jar.jarId, 'jar_abc');
-    expect(result.jar.donateUrl, 'https://live.tips/t/jar_abc');
+    expect(result.jar.tipUrl, 'https://live.tips/t/jar_abc');
     expect(result.jar.revolutUsername, 'mayamusic');
     expect(result.jar.createdAtMs, greaterThan(0));
     expect(result.secret, 's3cret');
@@ -70,7 +70,7 @@ void main() {
         return _json({
           'jarId': 'j',
           'secret': 's',
-          'donateUrl': 'https://live.tips/t/j',
+          'tipUrl': 'https://live.tips/t/j',
         }, 201);
       }),
     );

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/donation_source.dart';
+import '../data/tip_source.dart';
 import '../data/fx_source.dart';
 import '../data/local_store.dart';
 import '../data/relay/relay_client.dart';
@@ -14,7 +14,7 @@ import '../data/stripe/stripe_requests.dart';
 import '../domain/app_settings.dart';
 import '../domain/band_account.dart';
 import '../domain/band_settings.dart';
-import '../domain/donation.dart';
+import '../domain/tip.dart';
 import '../domain/fx_rates.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
@@ -118,10 +118,10 @@ class AppState {
   }
 
   /// The one URL every QR surface encodes — Stripe payment link or the
-  /// connected-mode donor page, per [effectiveQrMode]. Null only when
+  /// connected-mode fan page, per [effectiveQrMode]. Null only when
   /// nothing is configured at all.
   String? get activeQrUrl => effectiveQrMode == QrMode.connected
-      ? effectiveRelayJar?.donateUrl
+      ? effectiveRelayJar?.tipUrl
       : effectiveTipJar?.url;
 
   /// Whether the artist could actually toggle between the two QR modes.
@@ -196,7 +196,7 @@ class AppStateNotifier extends Notifier<AppState> {
     final trimmed = apiKey.trim();
     await ref.read(secureStoreProvider).writeApiKey(accountId, trimmed);
     // A newly connected account must not inherit demo/test tips from earlier
-    // play — otherwise its history shows donations that never happened.
+    // play — otherwise its history shows tips that never happened.
     await ref.read(localStoreProvider).purgeSimulatedData(accountId);
     if (state.accountId != accountId) return; // switched bands mid-await
     state = state.copyWith(apiKey: trimmed, demo: false);
@@ -260,19 +260,19 @@ class AppStateNotifier extends Notifier<AppState> {
 
   /// Persists a replacement jar minted by the keep-alive when the old one was
   /// gone (404) or its secret was stale (401), for [accountId] (which may not
-  /// be the active band). Records the old donate URL so the artist is told to
+  /// be the active band). Records the old tip URL so the artist is told to
   /// reprint, and updates live state when it's the active band's jar.
   Future<void> adoptRelinkedJar(
     String accountId,
     RelayJar jar,
     String secret,
-    String oldDonateUrl,
+    String oldTipUrl,
   ) async {
     await ref.read(secureStoreProvider).writeRelaySecret(accountId, secret);
     await ref.read(localStoreProvider).saveRelayJar(accountId, jar);
     await ref
         .read(localStoreProvider)
-        .writeRelayLinkReplaced(accountId, oldDonateUrl);
+        .writeRelayLinkReplaced(accountId, oldTipUrl);
     ref.read(relayLinkNoticeProvider.notifier).refresh();
     if (state.accountId == accountId) {
       state = state.copyWith(relayJar: jar, relaySecret: secret);
@@ -427,7 +427,7 @@ class AppStateNotifier extends Notifier<AppState> {
     final secure = ref.read(secureStoreProvider);
 
     // Best effort: retire the band's connected-mode jar on the relay so the
-    // public donor page dies with the local copy. Failures are ignored —
+    // public fan page dies with the local copy. Failures are ignored —
     // the removal must succeed even offline.
     final jar = local.readRelayJar(id);
     String? secret;
@@ -517,7 +517,7 @@ class AppStateNotifier extends Notifier<AppState> {
   /// Disconnects Stripe from the active band: forgets the API key and the tip
   /// jar on this device, leaving relay methods, history, and other bands
   /// intact. The artist's Stripe account and past payments are untouched —
-  /// deactivating the old payment link and dropping it from the relay donor
+  /// deactivating the old payment link and dropping it from the relay fan
   /// page is the caller's job (best effort, needs the network).
   Future<void> disconnectStripe() async {
     final accountId = state.accountId;
@@ -576,28 +576,28 @@ class AppStateNotifier extends Notifier<AppState> {
 final appStateProvider =
     NotifierProvider<AppStateNotifier, AppState>(AppStateNotifier.new);
 
-/// Builds the donation feed for a session — a seam so controller tests can
+/// Builds the tip feed for a session — a seam so controller tests can
 /// inject a scripted source instead of the demo/Stripe pollers. The Stripe
 /// source constructs and OWNS its HTTP client (closed in dispose): sharing
 /// [stripeRequestsProvider]'s client killed every session — any AppState
 /// change rebuilt the provider and closed the client mid-poll.
-typedef DonationSourceFactory = DonationSource Function({
+typedef TipSourceFactory = TipSource Function({
   required bool demo,
   required String? apiKey,
   required TipJar? jar,
 });
 
-final donationSourceFactoryProvider = Provider<DonationSourceFactory>(
+final tipSourceFactoryProvider = Provider<TipSourceFactory>(
   (ref) => ({required demo, required apiKey, required jar}) {
-    if (demo) return DemoDonationSource();
+    if (demo) return DemoTipSource();
     // No Stripe key or no real payment link (relay-only installs): a live
     // session must NEVER pour fake tips, so poll a silent no-op source.
     // Relay tips arrive over their own channel, wired in a later step.
     if (apiKey == null || jar == null || jar.isDemo) {
-      return NullDonationSource();
+      return NullTipSource();
     }
     final client = StripeClient(apiKey);
-    return StripeDonationSource(
+    return StripeTipSource(
       StripeRequests(client),
       paymentLinkId: jar.paymentLinkId,
       onDispose: client.close,
@@ -606,7 +606,7 @@ final donationSourceFactoryProvider = Provider<DonationSourceFactory>(
 );
 
 /// Builds the relay WebSocket tip feed for a session — a seam mirroring
-/// [donationSourceFactoryProvider] so controller tests can hand in a fake
+/// [tipSourceFactoryProvider] so controller tests can hand in a fake
 /// channel. Null means "this session has no relay feed": demo sessions
 /// synthesize their tips, and without a jar + secret there is nothing to
 /// authenticate against.
@@ -635,14 +635,14 @@ final stripeRequestsProvider = Provider<StripeRequests?>((ref) {
   return StripeRequests(client);
 });
 
-/// Small preview of latest donations for the home screen.
-final recentDonationsProvider =
-    FutureProvider.autoDispose<List<Donation>>((ref) async {
+/// Small preview of latest tips for the home screen.
+final recentTipsProvider =
+    FutureProvider.autoDispose<List<Tip>>((ref) async {
   final requests = ref.watch(stripeRequestsProvider);
   final jar = ref.watch(appStateProvider).effectiveTipJar;
   if (requests == null || jar == null || jar.isDemo) return const [];
-  final page = await requests.listDonations(limit: 5);
-  return page.donations;
+  final page = await requests.listTips(limit: 5);
+  return page.tips;
 });
 
 /// The device-local archive of tip-page (Revolut/MobilePay) tips for the
@@ -651,9 +651,9 @@ final recentDonationsProvider =
 /// reads this. Mirrors StoredSessionNotifier: SharedPreferences can't
 /// notify, so the session controller refreshes this explicitly after each
 /// write; watching the account id rebuilds it on every band switch.
-class RelayHistoryNotifier extends Notifier<List<Donation>> {
+class RelayHistoryNotifier extends Notifier<List<Tip>> {
   @override
-  List<Donation> build() {
+  List<Tip> build() {
     final accountId =
         ref.watch(appStateProvider.select((s) => s.accountId));
     return ref.read(localStoreProvider).readRelayHistory(accountId);
@@ -665,7 +665,7 @@ class RelayHistoryNotifier extends Notifier<List<Donation>> {
 }
 
 final relayHistoryProvider =
-    NotifierProvider<RelayHistoryNotifier, List<Donation>>(
+    NotifierProvider<RelayHistoryNotifier, List<Tip>>(
         RelayHistoryNotifier.new);
 
 /// Exchange rates for totalling a set that mixed currencies (a £5 Monzo tip
@@ -709,7 +709,7 @@ class FxRatesNotifier extends Notifier<FxRates?> {
 final fxRatesProvider =
     NotifierProvider<FxRatesNotifier, FxRates?>(FxRatesNotifier.new);
 
-/// The old donate URL of the active band's auto-replaced tip page, or null
+/// The old tip URL of the active band's auto-replaced tip page, or null
 /// when there's nothing to warn about. Home shows a "please reprint" card
 /// while this is set; [AppStateNotifier.dismissRelayLinkNotice] clears it.
 class RelayLinkNoticeNotifier extends Notifier<String?> {

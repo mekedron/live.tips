@@ -13,7 +13,7 @@ import 'helpers.dart';
 
 const _relayCfg = RelayJar(
   jarId: 'jar_cfg',
-  donateUrl: 'https://live.tips/t/jar_cfg',
+  tipUrl: 'https://live.tips/t/jar_cfg',
   artistName: 'The Configured',
   currency: 'eur',
   revolutUsername: 'cfg',

@@ -17,7 +17,7 @@ It takes about two minutes, once.
 
 - You need a Stripe account that can receive payments
   ([stripe.com](https://stripe.com), free to create; Stripe's standard
-  processing fees apply to donations).
+  processing fees apply to tips).
 - Use a laptop/desktop browser if you can — the dashboard is easier there. The
   app shows a QR code that opens the right page on another device.
 - To rehearse without real money first, do everything below inside a Stripe
@@ -56,10 +56,10 @@ In the permissions table, set these six rows — and leave **everything else on
 
 | Resource | Permission | Why the app needs it |
 | --- | --- | --- |
-| **Checkout Sessions** | Read | See incoming donations (history & details) |
-| **Events** | Read | Live feed — poll for new donations during a session |
+| **Checkout Sessions** | Read | See incoming tips (history & details) |
+| **Events** | Read | Live feed — poll for new tips during a session |
 | **Charges** | Read | See in-person tips you tap on a card reader or phone |
-| **Payment Links** | Write | Create your donation link |
+| **Payment Links** | Write | Create your tip link |
 | **Products** | Write | Create the "Tips" product behind the link |
 | **Prices** | Write | Create the pay-what-you-want price |
 
@@ -176,7 +176,7 @@ deliberately don't have. A restricted key you create yourself is the only way
 to give a serverless app scoped access.
 
 **What's the worst case if my device is stolen?** The thief could read the
-payments in your account (donations, and any other charge in it) and create
+payments in your account (tips, and any other charge in it) and create
 payment links. They could *not* move money, refund, change payouts, or see card
 data. Revoke the key from any browser and the app goes dark.
 

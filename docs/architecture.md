@@ -5,7 +5,7 @@ artist's device talks straight to `api.stripe.com` with a restricted key
 created by the artist — there is no live.tips backend. An **optional connected
 mode** adds Revolut/MobilePay via a minimal relay (`worker/`,
 `api.live.tips`); it is described in [Optional relay](#optional-relay-workerapilivetips)
-below and keeps no donation history. This document explains the moving parts and
+below and keeps no tip history. This document explains the moving parts and
 the reasoning.
 
 ## The core loop: polling instead of webhooks
@@ -13,13 +13,13 @@ the reasoning.
 Webhooks need a public HTTPS endpoint — a tablet on a stage doesn't have one.
 Stripe recommends webhooks and does **not** document polling as a sanctioned
 alternative; `/v1/events` is a documented endpoint that we poll deliberately,
-accepting the trade-off, which is what `StripeDonationSource` does during a live
+accepting the trade-off, which is what `StripeTipSource` does during a live
 session:
 
 Two limits this buys us, and they set the poll interval:
 
 - `/v1/events` only lists events **going back 30 days** — fine for a live set,
-  useless as a donation ledger. Tip history lives on the device.
+  useless as a tip ledger. Tip history lives on the device.
 - Stripe allows roughly **500 read requests per transaction** over a rolling
   30 days, with a floor of **10,000 reads/month**. A 4-second poll across a
   3-hour set is ~2,700 reads, so a busy month of long sets on a quiet account can
@@ -32,9 +32,9 @@ Two limits this buys us, and they set the poll interval:
    ending_before=<cursor>` returns only events newer than the cursor.
    Advance the cursor, keep paging while `has_more`.
 3. **Filter:** see the two observed paths below.
-4. Each new donation updates the session total/progress and triggers confetti.
+4. Each new tip updates the session total/progress and triggers confetti.
 
-Donations are de-duplicated by id at the source *and* in the session model
+Tips are de-duplicated by id at the source *and* in the session model
 (belt and suspenders — the model survives restarts).
 
 ### Two observed paths, and why they can't collide
@@ -42,7 +42,7 @@ Donations are de-duplicated by id at the source *and* in the session model
 live.tips never *takes* a payment. It watches the artist's account and
 recognizes tips in it. Two kinds arrive:
 
-| | Event | Object | Id | Donor |
+| | Event | Object | Id | Tipper |
 | --- | --- | --- | --- | --- |
 | **Online (QR)** | `checkout.session.completed`, `checkout.session.async_payment_succeeded` | Checkout Session | `cs_…` | name + message, if they typed them |
 | **In person (tap)** | `charge.succeeded` | Charge | `ch_…` | none — anonymous |
@@ -62,7 +62,7 @@ emits `charge.succeeded`** — so accepting charges without it would count every
 QR tip twice, once as `cs_…` and once as `ch_…`, under two ids that no
 de-duplication can tie together. The card in a reader is card-*present*; a card
 typed into a Checkout page is not. That single field is the whole guard, and
-`donation_source_test.dart` pins it.
+`tip_source_test.dart` pins it.
 
 We watch the **Charge**, not the PaymentIntent: the Charge is the object that
 carries `payment_method_details` (the discriminator) together with the settled
@@ -86,7 +86,7 @@ Event payloads embed the full object, including `amount_total` /
 (restricted key → link → real card payment → polled event with custom fields)
 is verified end-to-end against a Stripe sandbox.
 
-Full donation history doesn't use events (30-day API retention); it pages
+Full tip history doesn't use events (30-day API retention); it pages
 `GET /v1/checkout/sessions?payment_link=…&status=complete` instead. Note that
 in-person taps are *not* Checkout Sessions, so they don't appear in that list:
 they live in the session record they arrived in (History → Sessions) and, of
@@ -138,7 +138,7 @@ loads the target band's secrets from the keychain at runtime; it is refused
 while a live session runs (a session is bound to its band's key and relay
 socket — the controller additionally snapshots the account id at start so
 its writes can't leak across bands). The relay keepalive pings **every**
-band's jar, not just the active one, so idle donor pages never hit the
+band's jar, not just the active one, so idle tip pages never hit the
 90-day expiry. Removing a band deletes its data + secrets (best-effort
 relay DELETE included); secrets that survive a locked keychain are
 tombstoned and wiped on a later boot.
@@ -163,9 +163,9 @@ garbage-collected on switch-away.
 ## Sessions & persistence
 
 `LiveSessionController` (Riverpod `Notifier`) owns the active session: polling
-timer, donations, editable goal, stage lock. Every mutation persists the
+timer, tips, editable goal, stage lock. Every mutation persists the
 session + event cursor to `SharedPreferences`, so a crash or app restart can
-**resume** the session — and the stored cursor means donations made while the
+**resume** the session — and the stored cursor means tips made while the
 app was dead are still collected. Completed sessions are archived locally and
 shown in History → Sessions.
 
@@ -175,14 +175,14 @@ platform keychain/keystore via `flutter_secure_storage`.
 ```
 lib/
 ├── core/        # money/currency helpers, theme, onboarding constants
-├── domain/      # Donation, LiveSession, TipJar, BandAccount, BandSettings,
+├── domain/      # Tip, LiveSession, TipJar, BandAccount, BandSettings,
 │                # AppSettings, StageSettings, JarTipAttribution (pure Dart)
 ├── data/        # StripeClient (REST), StripeRequests (typed ops),
-│                # DonationSource (stripe poller + demo), stores, migrations
+│                # TipSource (stripe poller + demo), stores, migrations
 ├── state/       # Riverpod providers, LiveSessionController
 ├── features/    # onboarding / setup / home / live / lock / history / settings
 │                # live/stage/ = the stage visualizations (see below)
-└── widgets/     # QR blocks, donation tiles, banners, band switcher
+└── widgets/     # QR blocks, tip tiles, banners, band switcher
 ```
 
 ## The stage (live-screen visualization)
@@ -203,7 +203,7 @@ user-selectable styles (`AppSettings.stage`, settings → "Stage look"):
 
 Money truth never leaves Dart. `LiveSession` banks rollovers **eagerly**
 (`bankedMinor`/`bankedJars`: every full `2 × goal` in the current jar retires
-immediately and persists), and each donation is attributed at receipt
+immediately and persists), and each tip is attributed at receipt
 (`JarTipAttribution`: fill delta, absolute fill after, rollovers) — the
 renderer only choreographs what it is told, so a WebView crash can never lose
 or invent a cent. All HUD text (session total, "this jar: X of Y", trophy
@@ -260,7 +260,7 @@ the smallest server that makes this possible:
   authenticates, and deleted on delivery. Every event carries a server-minted
   `id`, so the flush can send before it deletes: a crash mid-flush redelivers,
   and the app's dedupe-by-id keeps the tip off the stage twice. This queue is
-  the *only* place donor text is ever written server-side.
+  the *only* place fan-written text is ever stored server-side.
 - The app treats relayed tips as **unverified**: they count toward the session
   with a visible badge, never get the "big tipper" treatment, and History
   labels them as reported-not-confirmed.
@@ -268,7 +268,7 @@ the smallest server that makes this possible:
   deletes everything 90 days after the last activity. Deleting or regenerating
   the link wipes it immediately. There is no account system.
 - Abuse controls: strict validation and length caps on every field, per-IP and
-  per-jar rate limits, duplicate suppression, Turnstile on the donor form, and
+  per-jar rate limits, duplicate suppression, Turnstile on the tip form, and
   a maintainer-only registry (metadata + counters, no content) behind an admin
   token.
 - The live session keeps two independent channels: the unchanged Stripe poller
@@ -288,7 +288,7 @@ the smallest server that makes this possible:
   advancement, resume cursor, filtering) against a fake `StripeRequests`.
 - Widget: boot → demo mode → home smoke test.
 - Integration (`flutter drive`): full demo session on a simulator — start,
-  donations arrive, stop, summary — with screenshots.
+  tips arrive, stop, summary — with screenshots.
 
 ## Platform notes
 

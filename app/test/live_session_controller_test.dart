@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/data/donation_source.dart';
+import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/local_store.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/state/live_session_controller.dart';
@@ -13,9 +13,9 @@ import 'package:live_tips/state/providers.dart';
 import 'helpers.dart';
 
 /// Hands out pre-scripted batches, one per pollNew() call.
-class ScriptedSource extends DonationSource {
+class ScriptedSource extends TipSource {
   ScriptedSource(this.batches);
-  final List<List<Donation>> batches;
+  final List<List<Tip>> batches;
   var _i = 0;
 
   @override
@@ -23,14 +23,14 @@ class ScriptedSource extends DonationSource {
       {String? resumeCursor, bool backfill = false}) async {}
 
   @override
-  Future<List<Donation>> pollNew() async =>
+  Future<List<Tip>> pollNew() async =>
       _i < batches.length ? batches[_i++] : const [];
 
   @override
   String? get cursor => null;
 }
 
-Donation d(String id, int amountMinor) => Donation(
+Tip d(String id, int amountMinor) => Tip(
       id: id,
       amountMinor: amountMinor,
       currency: 'usd',
@@ -50,11 +50,11 @@ void main() {
 
   late ProviderContainer container;
 
-  Future<void> setUpContainer(List<List<Donation>> batches) async {
+  Future<void> setUpContainer(List<List<Tip>> batches) async {
     final store = await seededStore();
     container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
-      donationSourceFactoryProvider.overrideWithValue(
+      tipSourceFactoryProvider.overrideWithValue(
           ({required demo, required apiKey, required jar}) =>
               ScriptedSource(batches)),
     ]);
@@ -62,7 +62,7 @@ void main() {
     container.read(appStateProvider.notifier).enterDemo();
   }
 
-  test('a multi-donation poll tick surfaces EVERY donation in newTips',
+  test('a multi-tip poll tick surfaces EVERY tip in newTips',
       () async {
     await setUpContainer([
       [d('cs_1', 500), d('cs_2', 1200), d('cs_3', 300)],
@@ -73,9 +73,9 @@ void main() {
 
     final state = container.read(liveSessionProvider)!;
     expect(state.confettiTick, 3);
-    expect(state.newTips.map((t) => t.donation.id),
+    expect(state.newTips.map((t) => t.tip.id),
         ['cs_1', 'cs_2', 'cs_3']); // arrival order preserved
-    expect(state.lastDonation!.id, 'cs_3');
+    expect(state.lastTip!.id, 'cs_3');
     expect(state.newTips[1].deltaPct, closeTo(0.12, 1e-9));
     expect(state.session.totalMinor, 2000);
   });
@@ -83,7 +83,7 @@ void main() {
   test(
       'an in-person tap pours into the jar and counts toward the goal like '
       'any other tip', () async {
-    final tap = Donation(
+    final tap = Tip(
       id: 'ch_tap',
       amountMinor: 2000,
       currency: 'usd',
@@ -102,9 +102,9 @@ void main() {
     expect(state.session.totalMinor, 2500);
     expect(state.session.count, 2);
     expect(state.confettiTick, 2, reason: 'the tap gets its celebration too');
-    expect(state.newTips.last.donation.id, 'ch_tap');
+    expect(state.newTips.last.tip.id, 'ch_tap');
     expect(state.newTips.last.deltaPct, closeTo(0.20, 1e-9));
-    expect(state.lastDonation!.inPerson, isTrue);
+    expect(state.lastTip!.inPerson, isTrue);
 
     // The relay archive is for tips that exist nowhere but this device. A tap
     // is a real Stripe charge in the artist's account, so it must NOT land
@@ -179,7 +179,7 @@ void main() {
       'null source, and never sees a fake tip', () async {
     const relayJar = RelayJar(
       jarId: 'jar_relay',
-      donateUrl: 'https://live.tips/t/jar_relay',
+      tipUrl: 'https://live.tips/t/jar_relay',
       artistName: 'Foxy Live',
       currency: 'eur',
       revolutUsername: 'foxy',
@@ -188,8 +188,8 @@ void main() {
     final store = await seededStore(accountValues: {
       LocalStore.kRelayJarBase: jsonEncode(relayJar.toJson()),
     });
-    // Deliberately NOT overriding donationSourceFactoryProvider: the real
-    // factory must hand out the silent NullDonationSource here — the demo
+    // Deliberately NOT overriding tipSourceFactoryProvider: the real
+    // factory must hand out the silent NullTipSource here — the demo
     // source would pour fake tips into a real set.
     container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
@@ -211,7 +211,7 @@ void main() {
     expect(state!.health, PollHealth.ok);
     expect(state.session.currency, 'eur',
         reason: 'currency comes from the relay jar');
-    expect(state.session.donations, isEmpty,
+    expect(state.session.tips, isEmpty,
         reason: 'no Stripe, no demo — nothing may appear on its own');
     expect(state.confettiTick, 0);
     expect(state.lastError, isNull);
@@ -243,13 +243,13 @@ void main() {
           startedAt: DateTime.utc(2026, 7, 3),
           currency: 'usd',
           goalMinor: 10000,
-          donations: [d('cs_1', 500)],
+          tips: [d('cs_1', 500)],
         ),
         'cur_1',
       );
       container = ProviderContainer(overrides: [
         localStoreProvider.overrideWithValue(store),
-        donationSourceFactoryProvider.overrideWithValue(
+        tipSourceFactoryProvider.overrideWithValue(
             ({required demo, required apiKey, required jar}) =>
                 ScriptedSource(const [])),
       ]);

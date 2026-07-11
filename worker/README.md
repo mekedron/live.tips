@@ -4,9 +4,9 @@ A minimal Cloudflare Worker that lets artists accept **MobilePay Box** and
 **Revolut** tips in addition to Stripe. It is a **profile store + live event
 pipe** — it stores an artist's public tip-jar profile (name, message, payment
 handles) and forwards tip notifications to the artist's device over a
-WebSocket. **It keeps no donation history and never touches money.** A tip that
+WebSocket. **It keeps no tip history and never touches money.** A tip that
 finds nobody connected waits up to an hour for the artist's screen and is then
-deleted unseen; that queue is the only donor text ever written here.
+deleted unseen; that queue is the only fan text ever written here.
 
 Stripe tips do not go through here at all — the app talks to Stripe directly,
 exactly as before. This relay exists only because MobilePay/Revolut have no
@@ -27,7 +27,7 @@ app labels them as such.
   screen authenticates.
 - **One `RegistryDO`** (single instance): a directory of jars for the
   maintainer admin view, plus the per-IP jar-creation quota. Metadata and
-  counters only — never tip content or donor identities.
+  counters only — never tip content or fan identities.
 - **No free-form URLs are ever stored.** Artists register validated *atoms*
   (a `buy|donate.stripe.com` link code, a Revolut username, a MobilePay Box
   UUID); the worker composes every outgoing link itself onto hardcoded hosts.
@@ -37,13 +37,13 @@ app labels them as such.
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| POST | `/v1/jars` | rate-limit | create a jar → `{jarId, secret, donateUrl}` |
+| POST | `/v1/jars` | rate-limit | create a jar → `{jarId, secret, tipUrl}` |
 | PUT | `/v1/jars/:id` | Bearer secret | update profile |
 | DELETE | `/v1/jars/:id` | Bearer secret | delete jar |
 | POST | `/v1/jars/:id/seen` | Bearer secret | daily keepalive ping |
 | POST | `/v1/jars/:id/rotate-secret` | Bearer secret | rotate the secret |
 | GET | `/v1/jars/:id/ws` | first-message auth | artist event socket |
-| GET | `/t/:id` | — | donor page (served on `live.tips/t/*`) |
+| GET | `/t/:id` | — | tip page (served on `live.tips/t/*`) |
 | POST | `/t/:id/tips` | Turnstile | relay a tip, return the deep link |
 | GET | `/admin`, `/admin/jars`, DELETE `/admin/jars/:id` | `ADMIN_TOKEN` | maintainer view |
 | GET | `/healthz` | — | liveness |
@@ -63,6 +63,10 @@ missed the 30-second auth deadline on a slow link.
 a live screen took it, `queued` when it is waiting for one. The fan gets their
 deep link either way.
 
+`POST /v1/jars` answers `{jarId, secret, tipUrl}` — the one and only time the
+secret is ever readable. `tipUrl` is the public page the artist's QR code points
+at (`https://live.tips/t/<jarId>`).
+
 ## Local development
 
 ```sh
@@ -74,7 +78,7 @@ npm test                         # vitest (SELF fetch e2e, DO alarm, WS handshak
 npm run check                    # tsc --noEmit
 ```
 
-`wrangler dev` uses the always-passing Turnstile **test** keys, so the donor
+`wrangler dev` uses the always-passing Turnstile **test** keys, so the tip
 form works locally without a real widget.
 
 ## Production setup (one-time, needs the account owner)
@@ -121,4 +125,4 @@ enter. Do them once; afterwards CI redeploys automatically.
 Free-plan Bot Fight Mode challenges non-browser clients and **cannot** be
 excepted with WAF skip rules. It would break the native app's REST and
 WebSocket calls to `api.live.tips`. Abuse protection here is Turnstile (on the
-donor form) plus per-IP and per-jar rate limits. Leave BFM off.
+tip form) plus per-IP and per-jar rate limits. Leave BFM off.

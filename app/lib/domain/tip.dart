@@ -2,10 +2,10 @@ import 'tip_method.dart';
 
 /// A single tip, derived from a Stripe Checkout Session (one payment made
 /// through the artist's payment link), from a card-present Charge (the artist
-/// took a contactless tap in person), relayed from a MobilePay/Revolut donor
+/// took a contactless tap in person), relayed from a MobilePay/Revolut fan
 /// page in connected mode, or synthesized in demo mode.
-class Donation {
-  const Donation({
+class Tip {
+  const Tip({
     required this.id,
     required this.amountMinor,
     required this.currency,
@@ -44,7 +44,7 @@ class Donation {
   final bool viaService;
 
   /// PaymentIntent id (`pi_…`) behind this checkout session, when known.
-  /// Absent for demo tips and for donations archived before we started
+  /// Absent for demo tips and for tips archived before we started
   /// capturing it. Powers [stripeDashboardUrl].
   final String? paymentIntentId;
 
@@ -53,14 +53,14 @@ class Donation {
   final TipMethod method;
 
   /// Whether the payment is confirmed by a source we trust (Stripe). Relay
-  /// tips are donor-declared — the worker can't see the MobilePay/Revolut
+  /// tips are fan-declared — the worker can't see the MobilePay/Revolut
   /// ledger — so they arrive unverified.
   final bool verified;
 
   /// Whether the artist collected this tip in person — a contactless tap on a
   /// Stripe Terminal reader or Tap to Pay in the Stripe Dashboard app. Stripe
   /// saw the card, so it is every bit as [verified] as a QR tip; what it has
-  /// no room for is a donor: the tap flow collects an amount and nothing else,
+  /// no room for is a fan: the tap flow collects an amount and nothing else,
   /// so [name] and [message] are always null. A third kind of tip, then —
   /// verified but nameless — and the tile says so with its own quiet badge
   /// rather than pretending someone typed a name.
@@ -85,8 +85,8 @@ class Donation {
   }
 
   /// Parses a Checkout Session object (from `/v1/events` payloads or the
-  /// `/v1/checkout/sessions` list) into a donation.
-  factory Donation.fromCheckoutSession(Map<String, dynamic> session) {
+  /// `/v1/checkout/sessions` list) into a tip.
+  factory Tip.fromCheckoutSession(Map<String, dynamic> session) {
     String? customField(String key) {
       final fields = session['custom_fields'];
       if (fields is! List) return null;
@@ -122,7 +122,7 @@ class Donation {
       viaService = paymentLink is String;
     }
 
-    return Donation(
+    return Tip(
       id: session['id'] as String,
       amountMinor: (session['amount_total'] as num?)?.toInt() ?? 0,
       currency: (session['currency'] as String? ?? 'usd').toLowerCase(),
@@ -165,12 +165,12 @@ class Donation {
   /// an amount and nothing else. Guard every call with [isCardPresentCharge] —
   /// a card-not-present Charge is the QR tip we already counted through its
   /// Checkout Session, and constructing one here would double it.
-  factory Donation.fromCardPresentCharge(Map<String, dynamic> charge) {
+  factory Tip.fromCardPresentCharge(Map<String, dynamic> charge) {
     // `payment_intent` is expandable; unexpanded (as in the events feed) it is
     // the bare `pi_…` id. Same guard as [fromCheckoutSession].
     final paymentIntent = charge['payment_intent'];
 
-    return Donation(
+    return Tip(
       id: charge['id'] as String,
       amountMinor: (charge['amount'] as num?)?.toInt() ?? 0,
       currency: (charge['currency'] as String? ?? 'usd').toLowerCase(),
@@ -179,7 +179,7 @@ class Donation {
       ),
       // Deliberately no name and no message — see [inPerson]. The Charge does
       // carry `billing_details.name`, but for a tap it is either null or the
-      // cardholder name off the chip: not a name the donor chose to give the
+      // cardholder name off the chip: not a name the fan chose to give the
       // artist, and not one we will put on a stage.
       livemode: charge['livemode'] as bool? ?? true,
       paymentIntentId: paymentIntent is String
@@ -191,14 +191,14 @@ class Donation {
   }
 
   /// A tip relayed by the connected-mode worker (MobilePay/Revolut). The
-  /// payment is donor-declared, hence unverified.
+  /// payment is fan-declared, hence unverified.
   ///
   /// [relayId] is the relay's own id for this tip, stable across redeliveries:
   /// a tip the relay held while this device was away may be replayed, and the
-  /// session dedupes on the donation id to keep it off the stage twice. Older
+  /// session dedupes on the tip id to keep it off the stage twice. Older
   /// relays send no id, so fall back to a locally-unique one — [serial]
   /// disambiguates tips that share a millisecond.
-  factory Donation.relayTip({
+  factory Tip.relayTip({
     required int amountMinor,
     required String currency,
     required TipMethod method,
@@ -208,7 +208,7 @@ class Donation {
     required int serial,
     String? relayId,
   }) =>
-      Donation(
+      Tip(
         id: relayId == null ? 'relay_${ts}_$serial' : 'relay_$relayId',
         amountMinor: amountMinor,
         currency: currency,
@@ -221,7 +221,7 @@ class Donation {
         verified: false,
       );
 
-  Donation copyWith({
+  Tip copyWith({
     String? id,
     int? amountMinor,
     String? currency,
@@ -235,7 +235,7 @@ class Donation {
     bool? verified,
     bool? inPerson,
   }) =>
-      Donation(
+      Tip(
         id: id ?? this.id,
         amountMinor: amountMinor ?? this.amountMinor,
         currency: currency ?? this.currency,
@@ -267,7 +267,7 @@ class Donation {
         if (inPerson) 'inPerson': inPerson,
       };
 
-  factory Donation.fromJson(Map<String, dynamic> json) => Donation(
+  factory Tip.fromJson(Map<String, dynamic> json) => Tip(
         id: json['id'] as String,
         amountMinor: (json['amountMinor'] as num).toInt(),
         currency: json['currency'] as String,

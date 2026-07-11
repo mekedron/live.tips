@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import '../../domain/donation.dart';
+import '../../domain/tip.dart';
 import '../../domain/tip_method.dart';
 
 /// (En/de)coding for the relay's per-jar WebSocket — pure data, no socket —
@@ -27,7 +27,7 @@ class RelayPing extends RelayInMessage {
   const RelayPing();
 }
 
-/// A donor-declared MobilePay/Revolut tip. Stripe payments never arrive
+/// A fan-declared MobilePay/Revolut tip. Stripe payments never arrive
 /// here — they come through the Stripe poller — so a `stripe` method on
 /// this channel is dropped as malformed.
 class RelayTip extends RelayInMessage {
@@ -49,7 +49,7 @@ class RelayTip extends RelayInMessage {
   final int amountMinor;
   final String currency;
 
-  /// May be '' — donors can stay anonymous.
+  /// May be '' — fans can stay anonymous.
   final String name;
 
   /// May be ''.
@@ -60,7 +60,7 @@ class RelayTip extends RelayInMessage {
 
   /// [serial] keeps ids unique when several tips share the same millisecond,
   /// for relays that send no [id] of their own.
-  Donation toDonation(int serial) => Donation.relayTip(
+  Tip toTip(int serial) => Tip.relayTip(
         amountMinor: amountMinor,
         currency: currency,
         method: method,

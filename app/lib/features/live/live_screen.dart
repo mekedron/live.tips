@@ -28,7 +28,7 @@ import 'stage/stage_resolver.dart';
 import 'stage/stage_types.dart';
 
 /// The stage screen: the jar fills full-bleed, glass controls float on top —
-/// big total, goal progress, live donation feed, celebration. Designed to be
+/// big total, goal progress, live tip feed, celebration. Designed to be
 /// readable from a distance on a dark stage, to keep the screen awake, and
 /// to be lockable while the device is unattended.
 class LiveScreen extends ConsumerStatefulWidget {
@@ -299,7 +299,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                         name: app.displayName,
                         onResize: _onRailResize,
                         onResizeCommit: _commitRailWidth,
-                        messages: live.session.donations.reversed
+                        messages: live.session.tips.reversed
                             .where((d) => d.hasMessage)
                             .take(3)
                             .toList(),
@@ -626,7 +626,7 @@ class _HealthPill extends StatelessWidget {
   }
 }
 
-/// Second health pill: the relay tip feed (the MobilePay/Revolut donor
+/// Second health pill: the relay tip feed (the MobilePay/Revolut fan
 /// page). Rendered only for sessions that actually have a relay channel.
 class _RelayPill extends StatelessWidget {
   const _RelayPill({
@@ -724,7 +724,7 @@ class _StatusPill extends StatelessWidget {
 }
 
 /// Full-width banner for the worst case: a relay-only session whose feed is
-/// down. Fans can still pay (the donor page itself is fine) but NOTHING will
+/// down. Fans can still pay (the fan page itself is fine) but NOTHING will
 /// appear on stage until the socket comes back — the artist must know, so
 /// this is deliberately louder than a pill.
 class _RelayDownBanner extends StatelessWidget {

@@ -207,7 +207,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
   }
 
   /// Forgets the Stripe key + tip jar for this band. The payment link is
-  /// retired and dropped from the connected-mode donor page (both best
+  /// retired and dropped from the connected-mode fan page (both best
   /// effort). The Stripe account itself is untouched.
   Future<void> _disconnect() async {
     final app = ref.read(appStateProvider);
@@ -253,7 +253,7 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
           // Best effort — forgetting the key locally matters more.
         }
       }
-      // Drop the card button from the connected-mode donor page.
+      // Drop the card button from the connected-mode fan page.
       if (relayJar != null && relaySecret != null) {
         final client = RelayClient();
         try {

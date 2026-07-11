@@ -1,4 +1,4 @@
-/// Server-rendered donor page. Two invariants keep it XSS-proof:
+/// Server-rendered tip page. Two invariants keep it XSS-proof:
 /// 1. every interpolated value passes through escapeHtml() (or is a number),
 /// 2. the single inline <script> is a static constant — no template holes —
 ///    so its CSP hash is stable by construction. Page data reaches the
@@ -14,7 +14,7 @@ const INLINE_SCRIPT = `(function () {
   var form = document.getElementById('tipform');
   if (!form) return;
   // Per-method pricing: a Box always collects EUR and Monzo always GBP, so the
-  // amount the donor types is denominated by the METHOD they picked, not by the
+  // amount the fan types is denominated by the METHOD they picked, not by the
   // jar. Picking a method reprices the whole field.
   var methods = JSON.parse(document.querySelector('main').getAttribute('data-methods'));
   var current = null;
@@ -152,14 +152,14 @@ function pricing(currency: string) {
   };
 }
 
-export function renderDonorPage(profile: JarProfile, siteKey: string): string {
+export function renderTipPage(profile: JarProfile, siteKey: string): string {
   const name = escapeHtml(profile.artistName);
   const message = profile.message ? `<p class="msg">${escapeHtml(profile.message)}</p>` : "";
   const currency = profile.currency; // validated ^[a-z]{3}$
 
   // One pricing entry per offered method. MobilePay and Monzo bring their own
   // currency, so a single page can price a €-Box tip and a £-Monzo tip side by
-  // side; the script swaps the field over when the donor picks one.
+  // side; the script swaps the field over when the fan picks one.
   const offered = TIP_METHODS.filter((m) => bareMethodUrl(profile, m) !== null);
   const priced = offered.map((m) => ({ method: m, price: pricing(methodCurrency(m, currency)) }));
   const methodPricing = Object.fromEntries(priced.map((p) => [p.method, p.price]));
@@ -178,7 +178,7 @@ export function renderDonorPage(profile: JarProfile, siteKey: string): string {
   for (const { method, price } of priced) {
     const label = LABELS[method];
     // The currency rides on the button when it isn't the jar's own, so the
-    // donor knows a Monzo tip is priced in pounds before they tap it.
+    // fan knows a Monzo tip is priced in pounds before they tap it.
     const suffix = price.code === initial.code ? "" : ` · ${price.code}`;
     buttons.push(
       `<button type="button" data-method="${method}" data-label="Tip with ${label}">${label}${suffix}</button>`,
@@ -236,7 +236,7 @@ export function renderDonorPage(profile: JarProfile, siteKey: string): string {
   <footer>
     Tips you send here go straight to the performer's screen. If their screen is
     away, your tip waits up to an hour for it and is then deleted unseen — live.tips
-    keeps no donation history. The performer's name and payment methods are kept
+    keeps no tip history. The performer's name and payment methods are kept
     until they delete this page or after 90 days of inactivity.
     Powered by <a href="https://live.tips" rel="noopener">live.tips</a>.
   </footer>
@@ -270,8 +270,8 @@ export function renderNotFoundPage(): string {
 
 let cspCache: string | null = null;
 
-/** CSP for donor pages — inline-script hash computed from the real constant. */
-export async function donorPageCsp(): Promise<string> {
+/** CSP for tip pages — inline-script hash computed from the real constant. */
+export async function tipPageCsp(): Promise<string> {
   if (cspCache === null) {
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(INLINE_SCRIPT));
     const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));

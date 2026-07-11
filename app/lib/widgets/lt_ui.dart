@@ -358,7 +358,7 @@ class LtIconCircleButton extends StatelessWidget {
   }
 }
 
-/// Circle with the donor's initial: named donors get the coral tint,
+/// Circle with the fan's initial: named fans get the coral tint,
 /// anonymous ones stay neutral.
 class InitialAvatar extends StatelessWidget {
   const InitialAvatar({

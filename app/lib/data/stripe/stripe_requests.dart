@@ -1,4 +1,4 @@
-import '../../domain/donation.dart';
+import '../../domain/tip.dart';
 import '../../domain/tip_jar.dart';
 import 'stripe_client.dart';
 
@@ -6,11 +6,11 @@ import 'stripe_client.dart';
 ///
 /// Two shapes ride this class, told apart by [type]: a Checkout Session (a tip
 /// paid online through the QR link) and a Charge (a tip tapped in person). The
-/// reader — [StripeDonationSource] — must branch on [type] before touching
+/// reader — [StripeTipSource] — must branch on [type] before touching
 /// [object]; their fields overlap by name (`created`, `currency`, `livemode`)
 /// but not by meaning, and the amount lives in different keys entirely.
-class DonationEvent {
-  const DonationEvent({
+class TipEvent {
+  const TipEvent({
     required this.id,
     required this.created,
     required this.type,
@@ -30,19 +30,19 @@ class DonationEvent {
   bool get isCheckoutSession => type.startsWith('checkout.session.');
 }
 
-class DonationEventsPage {
-  const DonationEventsPage({required this.events, required this.hasMore});
+class TipEventsPage {
+  const TipEventsPage({required this.events, required this.hasMore});
 
   /// Newest first, exactly as Stripe returns them.
-  final List<DonationEvent> events;
+  final List<TipEvent> events;
   final bool hasMore;
 }
 
-class DonationsPage {
-  const DonationsPage({required this.donations, required this.hasMore});
+class TipsPage {
+  const TipsPage({required this.tips, required this.hasMore});
 
   /// Newest first.
-  final List<Donation> donations;
+  final List<Tip> tips;
   final bool hasMore;
 }
 
@@ -85,10 +85,10 @@ class StripeRequests {
   /// a second API call per tip *and* a second read permission. One event type,
   /// one object, everything we need.
   ///
-  /// The catch, and the reason [StripeDonationSource] is careful: a Checkout
+  /// The catch, and the reason [StripeTipSource] is careful: a Checkout
   /// Session payment ALSO emits `charge.succeeded`. See the filter there — the
   /// card-present check is what keeps every QR tip counted exactly once.
-  static const _donationEventTypes = [
+  static const _tipEventTypes = [
     'checkout.session.completed',
     'checkout.session.async_payment_succeeded',
     'charge.succeeded',
@@ -111,7 +111,7 @@ class StripeRequests {
     }
 
     final checks = await Future.wait([
-      probe('Checkout Sessions — Read (see donations)',
+      probe('Checkout Sessions — Read (see tips)',
           () => client.get('checkout/sessions', query: {'limit': '1'})),
       probe('Events — polling (live feed)',
           () => client.get('events', query: {'limit': '1'})),
@@ -210,48 +210,48 @@ class StripeRequests {
     await client.post('payment_links/$paymentLinkId', {'active': 'false'});
   }
 
-  /// Lists the [_donationEventTypes] success events, newest first.
+  /// Lists the [_tipEventTypes] success events, newest first.
   ///
   /// Pass [endingBefore] (an event id) to get only events newer than it, or
   /// [createdGte] for the first poll of a session.
-  Future<DonationEventsPage> listDonationEvents({
+  Future<TipEventsPage> listTipEvents({
     String? endingBefore,
     int? createdGte,
     int limit = 100,
   }) async {
     final response = await client.get('events', query: {
-      'types[]': _donationEventTypes,
+      'types[]': _tipEventTypes,
       'limit': '$limit',
       'ending_before': ?endingBefore,
       if (createdGte != null) 'created[gte]': '$createdGte',
     });
 
-    final events = <DonationEvent>[];
+    final events = <TipEvent>[];
     for (final item in (response['data'] as List? ?? const [])) {
       if (item is! Map<String, dynamic>) continue;
       final object = (item['data'] as Map<String, dynamic>?)?['object'];
       if (object is! Map<String, dynamic>) continue;
       final type = item['type'];
       if (type is! String) continue;
-      events.add(DonationEvent(
+      events.add(TipEvent(
         id: item['id'] as String,
         created: (item['created'] as num?)?.toInt() ?? 0,
         type: type,
         object: object,
       ));
     }
-    return DonationEventsPage(
+    return TipEventsPage(
       events: events,
       hasMore: response['has_more'] as bool? ?? false,
     );
   }
 
-  /// Every completed donation in the account, newest first — the full history
+  /// Every completed tip in the account, newest first — the full history
   /// across *all* of the artist's payment links, not just the current one, so
   /// regenerating the link no longer wipes the history. Each session's
-  /// `payment_link` is expanded so [Donation.viaService] can flag which
+  /// `payment_link` is expanded so [Tip.viaService] can flag which
   /// payments actually came in through live.tips.
-  Future<DonationsPage> listDonations({
+  Future<TipsPage> listTips({
     String? startingAfter,
     int limit = 25,
   }) async {
@@ -262,14 +262,14 @@ class StripeRequests {
       'starting_after': ?startingAfter,
     });
 
-    final donations = <Donation>[];
+    final tips = <Tip>[];
     for (final item in (response['data'] as List? ?? const [])) {
       if (item is! Map<String, dynamic>) continue;
       if (item['payment_status'] != 'paid') continue;
-      donations.add(Donation.fromCheckoutSession(item));
+      tips.add(Tip.fromCheckoutSession(item));
     }
-    return DonationsPage(
-      donations: donations,
+    return TipsPage(
+      tips: tips,
       hasMore: response['has_more'] as bool? ?? false,
     );
   }

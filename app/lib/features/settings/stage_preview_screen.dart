@@ -11,7 +11,7 @@ import '../../app.dart';
 import '../../core/fullscreen.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
-import '../../domain/donation.dart';
+import '../../domain/tip.dart';
 import '../../domain/live_session.dart';
 import '../../domain/rollover_math.dart';
 import '../../domain/stage_settings.dart';
@@ -47,7 +47,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
 
   /// The pretend set, mutated in place exactly like a real [LiveSession].
   late final LiveSession _session;
-  Donation? _lastDonation;
+  Tip? _lastTip;
 
   /// Advances once per pretend tip — the serial the stage/banner act on.
   var _tipSerial = 0;
@@ -107,7 +107,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
       goalMinor: goal,
     );
     for (final s in _seedTips) {
-      final donation = Donation(
+      final tip = Tip(
         id: 'preview_seed_${s.minutesAgo}',
         amountMinor: (s.goalFraction * goal).round().clamp(1, goal),
         currency: currency,
@@ -116,8 +116,8 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
         message: s.message,
         livemode: false,
       );
-      session.addDonationAttributed(donation);
-      _lastDonation = donation;
+      session.addTipAttributed(tip);
+      _lastTip = tip;
     }
     return session;
   }
@@ -129,8 +129,8 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
   /// [context] must come from below the forced-dark [Theme] so the form sheet
   /// inherits the stage's dark palette (State.context sits above it).
   Future<void> _onPretendTip(BuildContext context) async {
-    final tip = await showPretendTipSheet(context, _session.currency);
-    if (tip == null || !mounted) return;
+    final pretend = await showPretendTipSheet(context, _session.currency);
+    if (pretend == null || !mounted) return;
 
     final seq = ++_seq;
     setState(() => _pending = true);
@@ -138,22 +138,22 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
     await Future<void>.delayed(const Duration(seconds: 1));
     if (!mounted || seq != _seq) return;
 
-    final donation = Donation(
+    final tip = Tip(
       id: 'preview_tip_$seq',
-      amountMinor: tip.amountMinor,
+      amountMinor: pretend.amountMinor,
       currency: _session.currency,
       createdAt: DateTime.now(),
-      name: tip.name,
-      message: tip.message,
+      name: pretend.name,
+      message: pretend.message,
       livemode: false,
     );
-    final attributed = _session.addDonationAttributed(donation);
+    final attributed = _session.addTipAttributed(tip);
     setState(() {
       _pending = false;
       if (attributed != null) {
         _tipSerial += 1;
         _newTips = [attributed];
-        _lastDonation = donation;
+        _lastTip = tip;
       }
     });
 
@@ -208,7 +208,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
         ? TipJar.demo.displayName
         : app.displayName;
     final snapshot = StageSnapshot.fromState(
-      LiveState(session: _session, lastDonation: _lastDonation),
+      LiveState(session: _session, lastTip: _lastTip),
     );
 
     // Forced dark regardless of the app's light/dark setting — this previews
@@ -274,7 +274,7 @@ class _StagePreviewScreenState extends ConsumerState<StagePreviewScreen> {
                       name: artistName,
                       onResize: _onRailResize,
                       onResizeCommit: _commitRailWidth,
-                      messages: _session.donations.reversed
+                      messages: _session.tips.reversed
                           .where((d) => d.hasMessage)
                           .take(3)
                           .toList(),

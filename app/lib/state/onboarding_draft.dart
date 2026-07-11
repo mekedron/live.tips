@@ -41,7 +41,7 @@ class OnboardingDraft {
   bool get wantsMobilePay => methods.contains(TipMethod.mobilepay);
   bool get wantsMonzo => methods.contains(TipMethod.monzo);
 
-  /// Any method that needs the live.tips relay (a donor page + jar).
+  /// Any method that needs the live.tips relay (a fan page + jar).
   bool get wantsRelay => methods.any(TipMethod.relayMethods.contains);
 
   /// The selected methods in the fixed setup order: Stripe, then the relay

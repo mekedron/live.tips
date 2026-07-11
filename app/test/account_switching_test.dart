@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/data/donation_source.dart';
+import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/band_account.dart';
@@ -28,7 +28,7 @@ const _jarA = TipJar(
 
 const _relayB = RelayJar(
   jarId: 'jar_b',
-  donateUrl: 'https://live.tips/t/jar_b',
+  tipUrl: 'https://live.tips/t/jar_b',
   artistName: 'The Midnight Foxes',
   currency: 'dkk',
   revolutUsername: 'foxes',
@@ -66,9 +66,9 @@ ProviderContainer _container(LocalStore local, SecureStore secure,
     secureStoreProvider.overrideWithValue(secure),
     initialApiKeyProvider.overrideWithValue(initialApiKey),
     initialRelaySecretProvider.overrideWithValue(null),
-    donationSourceFactoryProvider.overrideWithValue(
+    tipSourceFactoryProvider.overrideWithValue(
         ({required demo, required apiKey, required jar}) =>
-            NullDonationSource()),
+            NullTipSource()),
     relayChannelFactoryProvider.overrideWithValue(
         ({required demo, required jar, required secret}) => null),
   ]);
@@ -98,7 +98,7 @@ void main() {
     expect(app.relaySecret, 'sec_b');
     expect(app.band.lastGoalMinor, 7000);
     expect(app.displayName, 'The Midnight Foxes');
-    expect(app.activeQrUrl, _relayB.donateUrl);
+    expect(app.activeQrUrl, _relayB.tipUrl);
     expect(local.readAccountsRegistry()?.activeId, 'acc_b',
         reason: 'the next boot opens on the switched band');
     expect(app.switching, isFalse);

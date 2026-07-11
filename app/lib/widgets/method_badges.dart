@@ -51,7 +51,7 @@ class MethodBadge extends StatelessWidget {
 /// (Terminal reader / Tap to Pay). Stripe saw the card, so the tip is verified
 /// — this is not [UnverifiedTag] and must never be confused with it. What the
 /// pill says instead is why the row has no name and no message: the reader asks
-/// for an amount, and the donor never gets a field to type into.
+/// for an amount, and the fan never gets a field to type into.
 class InPersonTag extends StatelessWidget {
   const InPersonTag({super.key});
 
@@ -87,9 +87,9 @@ class InPersonTag extends StatelessWidget {
   }
 }
 
-/// Muted "unverified" pill for donor-declared tips: the relay can't see the
+/// Muted "unverified" pill for fan-declared tips: the relay can't see the
 /// MobilePay/Revolut ledger, so it can't confirm the money actually moved.
-/// Modeled on [ExternalTag] in donation_tile.dart — same size, same chip.
+/// Modeled on [ExternalTag] in tip_tile.dart — same size, same chip.
 class UnverifiedTag extends StatelessWidget {
   const UnverifiedTag({super.key});
 

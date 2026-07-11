@@ -44,7 +44,7 @@ class SeenPingService {
     required String secret,
     required RelayClient client,
     String? stripeUrl,
-    Future<void> Function(RelayJar newJar, String newSecret, String oldDonateUrl)?
+    Future<void> Function(RelayJar newJar, String newSecret, String oldTipUrl)?
         onRelinked,
     DateTime Function()? now,
   }) async {
@@ -92,7 +92,7 @@ class SeenPingService {
         mobilepayBoxId: jar.mobilepayBoxId,
         monzoUsername: jar.monzoUsername,
       );
-      await onRelinked(created.jar, created.secret, jar.donateUrl);
+      await onRelinked(created.jar, created.secret, jar.tipUrl);
       await store.writeRelaySeenAt(accountId, nowMs);
     } catch (_) {
       // Recreate failed (offline, rate-limited) — try again next launch.
@@ -102,7 +102,7 @@ class SeenPingService {
 
 /// Invisible wrapper that fires [SeenPingService.maybePing] once after launch
 /// and on every return to the foreground — for EVERY band with a relay jar,
-/// not just the active one, so an idle band's donor page (and its printed QR
+/// not just the active one, so an idle band's fan page (and its printed QR
 /// posters) never expires while the artist plays with another band. Uses the
 /// *stored* jars (not the demo substitute) so real jars stay alive even
 /// while playing with demo mode.

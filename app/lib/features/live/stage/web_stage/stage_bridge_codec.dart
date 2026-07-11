@@ -67,7 +67,7 @@ class StageTipMsg extends StageOutMessage {
   @override
   Map<String, dynamic> toJson() => {
         'type': 'tip',
-        'id': tip.donation.id,
+        'id': tip.tip.id,
         'deltaPct': tip.deltaPct,
         'jarPctAfter': tip.jarPctAfter,
         'rollovers': tip.rollovers,

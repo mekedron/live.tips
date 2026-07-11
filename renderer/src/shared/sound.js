@@ -3,7 +3,7 @@
  * Two independent channels, each gated by the HOST (bridge `setConfig`):
  *   coins   — clinks while money lands, milestone blips, goal chimes
  *   fanfare — the "ta-da!" that announces a NEW TIP, loud enough for the
- *             artist to hear it mid-song and thank the donor
+ *             artist to hear it mid-song and thank the fan
  * Nothing persists here; the host owns both toggles.
  * Coin clinks = two inharmonic sine partials with a fast exponential decay.
  */

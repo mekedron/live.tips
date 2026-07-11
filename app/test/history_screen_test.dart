@@ -6,25 +6,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/secure_store.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/features/history/history_screen.dart';
 import 'package:live_tips/state/providers.dart';
-import 'package:live_tips/widgets/donation_tile.dart';
+import 'package:live_tips/widgets/tip_tile.dart';
 
 import 'helpers.dart';
 
 const relayJar = RelayJar(
   jarId: 'jar_relay',
-  donateUrl: 'https://live.tips/t/jar_relay',
+  tipUrl: 'https://live.tips/t/jar_relay',
   artistName: 'Foxy Live',
   currency: 'eur',
   revolutUsername: 'foxy',
   createdAtMs: 1,
 );
 
-Donation relayTip(int serial) => Donation.relayTip(
+Tip relayTip(int serial) => Tip.relayTip(
   amountMinor: 700,
   currency: 'eur',
   method: TipMethod.mobilepay,
@@ -38,7 +38,7 @@ Donation relayTip(int serial) => Donation.relayTip(
 /// bytes a real device would have (per-band keys plus the registry).
 Future<void> pumpHistory(
   WidgetTester tester, {
-  List<Donation> relayHistory = const [],
+  List<Tip> relayHistory = const [],
   bool withRelayJar = false,
   bool withStripe = false,
 }) async {
@@ -80,7 +80,7 @@ void main() {
       await pumpHistory(tester, withStripe: true);
 
       expect(find.text('Sessions'), findsOneWidget);
-      expect(find.text('Donations'), findsOneWidget);
+      expect(find.text('Tips'), findsOneWidget);
       expect(find.text('MobilePay'), findsNothing);
       expect(find.text('Revolut'), findsNothing);
       expect(find.text('Stripe'), findsNothing);
@@ -93,7 +93,7 @@ void main() {
       await pumpHistory(tester);
 
       expect(find.text('Sessions'), findsOneWidget);
-      expect(find.text('Donations'), findsNothing);
+      expect(find.text('Tips'), findsNothing);
       expect(find.text('Stripe'), findsNothing);
       expect(find.text('MobilePay'), findsNothing);
       expect(find.text('Revolut'), findsNothing);
@@ -101,14 +101,14 @@ void main() {
   );
 
   testWidgets('a connected-mode jar (Revolut) brings a second tab, and the '
-      'donations tab is relabelled Stripe', (tester) async {
+      'tips tab is relabelled Stripe', (tester) async {
     await pumpHistory(tester, withRelayJar: true, withStripe: true);
 
     expect(find.text('Sessions'), findsOneWidget);
     expect(find.text('Stripe'), findsOneWidget);
     expect(find.text('Revolut'), findsOneWidget);
     expect(find.text('MobilePay'), findsNothing);
-    expect(find.text('Donations'), findsNothing);
+    expect(find.text('Tips'), findsNothing);
 
     // No archived tips yet → the honest empty state.
     await tester.tap(find.text('Revolut'));
@@ -118,19 +118,19 @@ void main() {
 
   testWidgets(
     'a connected-mode jar (Revolut) with no Stripe key → Revolut tab only, '
-    'no Stripe/Donations tab',
+    'no Stripe/Tips tab',
     (tester) async {
       await pumpHistory(tester, withRelayJar: true);
 
       expect(find.text('Sessions'), findsOneWidget);
       expect(find.text('Revolut'), findsOneWidget);
       expect(find.text('Stripe'), findsNothing);
-      expect(find.text('Donations'), findsNothing);
+      expect(find.text('Tips'), findsNothing);
     },
   );
 
   testWidgets(
-    'the MobilePay tab lists archived tips as badged DonationTiles under '
+    'the MobilePay tab lists archived tips as badged TipTiles under '
     'the recorded-on-this-device note',
     (tester) async {
       await pumpHistory(
@@ -148,7 +148,7 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('Recorded on this device'), findsOneWidget);
-      final tile = find.byType(DonationTile);
+      final tile = find.byType(TipTile);
       expect(tile, findsOneWidget);
       expect(find.text('Maya'), findsOneWidget);
       expect(find.text('Encore!'), findsOneWidget);

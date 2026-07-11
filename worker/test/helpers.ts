@@ -9,7 +9,7 @@ export function uniqueIp(): string {
 
 export async function createJar(
   overrides: Record<string, unknown> = {},
-): Promise<{ jarId: string; secret: string; donateUrl: string }> {
+): Promise<{ jarId: string; secret: string; tipUrl: string }> {
   const res = await SELF.fetch("https://api.live.tips/v1/jars", {
     method: "POST",
     headers: { "content-type": "application/json", "CF-Connecting-IP": uniqueIp() },

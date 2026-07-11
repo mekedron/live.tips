@@ -4,7 +4,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import '../../../core/fullscreen.dart';
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
-import '../../../domain/donation.dart';
+import '../../../domain/tip.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../widgets/install_steps.dart';
 import '../../../widgets/qr_card.dart';
@@ -242,7 +242,7 @@ class StageQrPanel extends StatelessWidget {
   final String name;
 
   /// Latest tips that came with a message, newest first (capped upstream).
-  final List<Donation> messages;
+  final List<Tip> messages;
 
   @override
   Widget build(BuildContext context) {
@@ -337,7 +337,7 @@ class StageQrPanel extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                for (final d in shown) _QrPanelMessage(donation: d),
+                for (final d in shown) _QrPanelMessage(tip: d),
               ],
             ],
           );
@@ -372,7 +372,7 @@ class ResizableQrRail extends StatelessWidget {
   final double maxWidth;
   final String url;
   final String name;
-  final List<Donation> messages;
+  final List<Tip> messages;
   final ValueChanged<double> onResize;
   final VoidCallback onResizeCommit;
 
@@ -500,9 +500,9 @@ class _RailResizeHandleState extends State<_RailResizeHandle> {
 }
 
 class _QrPanelMessage extends StatelessWidget {
-  const _QrPanelMessage({required this.donation});
+  const _QrPanelMessage({required this.tip});
 
-  final Donation donation;
+  final Tip tip;
 
   @override
   Widget build(BuildContext context) {
@@ -521,7 +521,7 @@ class _QrPanelMessage extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  donation.displayName,
+                  tip.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -533,7 +533,7 @@ class _QrPanelMessage extends StatelessWidget {
                 ),
               ),
               Text(
-                formatAmount(donation.amountMinor, donation.currency),
+                formatAmount(tip.amountMinor, tip.currency),
                 style: const TextStyle(
                   fontFamily: kFontOutfit,
                   fontSize: 12,
@@ -545,7 +545,7 @@ class _QrPanelMessage extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           Text(
-            '“${donation.message!.trim()}”',
+            '“${tip.message!.trim()}”',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(

@@ -5,7 +5,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/relay/relay_tip_channel.dart';
 import 'package:live_tips/data/relay/relay_ws_codec.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/tip_method.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -103,13 +103,13 @@ class Harness {
       backoff: backoff ?? (_) => const Duration(seconds: 5),
     );
     channel.status.listen(statuses.add, onDone: () => statusDone = true);
-    channel.tips.listen(donations.add, onDone: () => tipsDone = true);
+    channel.tips.listen(tips.add, onDone: () => tipsDone = true);
   }
 
   late final RelayTipChannel channel;
   final sockets = <FakeSocket>[];
   final statuses = <RelayHealth>[];
-  final donations = <Donation>[];
+  final tips = <Tip>[];
   bool statusDone = false;
   bool tipsDone = false;
 
@@ -143,7 +143,7 @@ void main() {
     });
   });
 
-  test('a tip frame becomes an unverified Donation with the method mapped',
+  test('a tip frame becomes an unverified Tip with the method mapped',
       () {
     fakeAsync((async) {
       final h = Harness();
@@ -153,20 +153,20 @@ void main() {
       h.socket.serverSend(tipFrame(method: 'mobilepay', amountMinor: 700));
       async.flushMicrotasks();
 
-      expect(h.donations, hasLength(1));
-      final donation = h.donations.single;
-      expect(donation.verified, isFalse);
-      expect(donation.method, TipMethod.mobilepay);
-      expect(donation.amountMinor, 700);
-      expect(donation.currency, 'eur');
-      expect(donation.name, 'Maya');
-      expect(donation.id, 'relay_1751500000000_0',
+      expect(h.tips, hasLength(1));
+      final tip = h.tips.single;
+      expect(tip.verified, isFalse);
+      expect(tip.method, TipMethod.mobilepay);
+      expect(tip.amountMinor, 700);
+      expect(tip.currency, 'eur');
+      expect(tip.name, 'Maya');
+      expect(tip.id, 'relay_1751500000000_0',
           reason: 'serials start at 0 and go into the id');
 
       // Serials advance so same-millisecond tips never collide.
       h.socket.serverSend(tipFrame());
       async.flushMicrotasks();
-      expect(h.donations[1].id, 'relay_1751500000000_1');
+      expect(h.tips[1].id, 'relay_1751500000000_1');
     });
   });
 
@@ -214,7 +214,7 @@ void main() {
       h.socket.serverSend(tipFrame());
       async.flushMicrotasks();
 
-      expect(h.donations, hasLength(1));
+      expect(h.tips, hasLength(1));
       expect(h.statuses.last, RelayHealth.ok);
     });
   });
@@ -269,7 +269,7 @@ void main() {
       h.sockets[1].serverSend(tipFrame());
       async.flushMicrotasks();
       expect(h.statuses.last, RelayHealth.ok);
-      expect(h.donations.single.id, 'relay_1751500000000_0');
+      expect(h.tips.single.id, 'relay_1751500000000_0');
     });
   });
 

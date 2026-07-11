@@ -62,7 +62,7 @@ on Cloudflare at `api.live.tips`):
   out of signal — would otherwise miss the tip entirely, since the fan has already
   paid by then. So an undelivered tip waits in its jar for **up to one hour**, is
   handed over the moment the artist's screen reconnects, and is deleted unseen if it
-  never does. That is the relay's only storage of donor text, and the only exception
+  never does. That is the relay's only storage of fan-written text, and the only exception
   to "no tip history".
 - Revolut/MobilePay tips are shown as **unverified**: they appear the moment a fan
   submits the form, whether or not the payment completes. The artist reconciles against

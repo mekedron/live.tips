@@ -193,7 +193,7 @@ class _TrophyLine extends StatelessWidget {
   }
 }
 
-/// Compact donation ticker for the jar stages: the last few tips as fading
+/// Compact tip ticker for the jar stages: the last few tips as fading
 /// glass pills, bottom-left — the jar is the show, the feed just whispers.
 class StageMiniFeed extends StatelessWidget {
   const StageMiniFeed({super.key, required this.snapshot});
@@ -202,7 +202,7 @@ class StageMiniFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tips = snapshot.recentDonations.take(3).toList();
+    final tips = snapshot.recentTips.take(3).toList();
     if (tips.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -259,7 +259,7 @@ class StageMiniFeed extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      // "~" flags an unverified (donor-declared) amount.
+                      // "~" flags an unverified (fan-declared) amount.
                       '${tips[i].verified ? '' : '~'}'
                       '${formatAmount(tips[i].amountMinor, tips[i].currency)}',
                       style: const TextStyle(
@@ -296,7 +296,7 @@ const kTipBannerWrapUp = Duration(milliseconds: 2500);
 const _kTipBannerGap = Duration(milliseconds: 260);
 
 /// Long-lived "a tip arrived" banner over the stage — the artist-facing
-/// notification. One donation at a time: name, amount and the full message,
+/// notification. One tip at a time: name, amount and the full message,
 /// held long enough to be read from a music stand; arrivals queue instead
 /// of overlapping, so nobody's message is lost in a burst.
 class TipBannerLayer extends StatefulWidget {
@@ -347,7 +347,7 @@ class _TipBannerLayerState extends State<TipBannerLayer> {
     setState(() => _current = _queue.removeAt(0));
     final hold = _queue.isNotEmpty
         ? kTipBannerHoldCrowded
-        : _current!.donation.hasMessage
+        : _current!.tip.hasMessage
         ? kTipBannerHoldWithMessage
         : kTipBannerHold;
     _timer = Timer(hold, _dismiss);
@@ -408,7 +408,7 @@ class _TipBannerLayerState extends State<TipBannerLayer> {
               child: _current == null
                   ? const SizedBox.shrink(key: ValueKey('no-banner'))
                   : _TipBanner(
-                      key: ValueKey(_current!.donation.id),
+                      key: ValueKey(_current!.tip.id),
                       tip: _current!,
                     ),
             ),
@@ -426,8 +426,8 @@ class _TipBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final d = tip.donation;
-    // A tenth of tonight's goal in one tip — but never crown a donor-declared
+    final d = tip.tip;
+    // A tenth of tonight's goal in one tip — but never crown a fan-declared
     // (unverified) relay tip: the crown must stay worth trusting.
     final big = tip.deltaPct >= 0.1 && d.verified;
     final anonymous = d.name == null || d.name!.trim().isEmpty;
@@ -488,7 +488,7 @@ class _TipBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  // "~" flags an unverified (donor-declared) amount.
+                  // "~" flags an unverified (fan-declared) amount.
                   '${big ? '👑 ' : ''}${context.s.t('stage.tipped', {'name': d.displayName, 'amount': '${d.verified ? '' : '~'}${formatAmount(d.amountMinor, d.currency)}'})}',
                   style: TextStyle(
                     fontFamily: kFontOutfit,

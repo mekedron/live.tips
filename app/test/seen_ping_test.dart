@@ -11,7 +11,7 @@ import 'helpers.dart';
 
 const _jar = RelayJar(
   jarId: 'jar_ping',
-  donateUrl: 'https://live.tips/t/jar_ping',
+  tipUrl: 'https://live.tips/t/jar_ping',
   artistName: 'Maya',
   currency: 'eur',
   revolutUsername: 'maya',
@@ -133,7 +133,7 @@ void main() {
             jsonEncode({
               'jarId': 'jar_new',
               'secret': 'newsecret',
-              'donateUrl': 'https://live.tips/t/jar_new',
+              'tipUrl': 'https://live.tips/t/jar_new',
             }),
             201),
       });

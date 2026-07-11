@@ -1,7 +1,7 @@
 /// One Durable Object per jar: ~1 KB of profile, a hashed secret, the artist's
 /// live WebSockets (hibernated between messages), and — only while the artist's
 /// screen is away — the handful of tips that have not reached it yet. Keeps NO
-/// donation history: a tip is deleted the moment it is delivered, and swept
+/// tip history: a tip is deleted the moment it is delivered, and swept
 /// unseen after PENDING_TTL_MS regardless. Self-destructs via its own alarm 90
 /// days after the artist was last seen; there is no global cleanup job.
 
@@ -29,7 +29,7 @@ const DEDUPE_WINDOW_MS = 60_000;
  * reasons — the phone locks, they tab over to MobilePay to check a payment,
  * they walk behind a wall — and a fan who has already paid must not lose their
  * message to any of that. Long enough to cover a set break; short enough that
- * the relay never becomes a donation history.
+ * the relay never becomes a tip history.
  */
 const PENDING_TTL_MS = 60 * 60_000;
 
@@ -172,7 +172,7 @@ export class JarDO extends DurableObject<Env> {
 
     // Identical repeats inside the window are accepted but not relayed —
     // the sender learns nothing, the stage stays clean. The signature is
-    // HASHED before it touches storage so donor name/message text is never
+    // HASHED before it touches storage so fan name/message text is never
     // written at rest (the whole point of the relay). `\u0000` separates the
     // fields so `|` inside a name/message can't forge a collision.
     const sig = await sha256Hex(`${tip.method}\u0000${tip.amountMinor}\u0000${tip.name}\u0000${tip.message}`);
@@ -193,7 +193,7 @@ export class JarDO extends DurableObject<Env> {
         ts: now,
         method: tip.method,
         amountMinor: tip.amountMinor,
-        // The currency the donor actually paid in — EUR for a Box, GBP for
+        // The currency the fan actually paid in — EUR for a Box, GBP for
         // Monzo — not the jar's. This is what the artist's device records.
         currency: methodCurrency(tip.method, profile.currency),
         name: tip.name,
@@ -371,7 +371,7 @@ export class JarDO extends DurableObject<Env> {
       }
     }
 
-    // Undelivered tips are the only thing here with a donor's name on it, so
+    // Undelivered tips are the only thing here with a fan's name on it, so
     // they age out on schedule whether or not the artist ever comes back.
     let nextPendingExpiry: number | null = null;
     const pending = await this.ctx.storage.get<TipEvent[]>("pending");

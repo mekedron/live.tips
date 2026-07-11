@@ -16,7 +16,7 @@ import '../poster/poster_screen.dart';
 /// method the artist entered, then show the one QR they'll actually use.
 ///
 /// The Stripe payment link was already created on its step (its QR would work
-/// on its own). Here we build the live.tips donor page that fans open — the
+/// on its own). Here we build the live.tips fan page that fans open — the
 /// "main" QR. If that fails (offline, relay hiccup) we fall back to the Stripe
 /// link, which is always created reliably. With no relay methods at all, the
 /// Stripe QR is the main QR outright.
@@ -71,7 +71,7 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
             .setRelayJar(result.jar, result.secret);
         if (!mounted) return;
         setState(() {
-          _url = result.jar.donateUrl;
+          _url = result.jar.tipUrl;
           _connectedPage = true;
           _working = false;
         });

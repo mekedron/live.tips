@@ -19,7 +19,7 @@ enum AppThemeMode {
 }
 
 /// What the on-stage QR code points at: the Stripe payment link directly, or
-/// the connected-mode donor page that offers every configured method
+/// the connected-mode fan page that offers every configured method
 /// (card via Stripe, MobilePay, Revolut).
 enum QrMode {
   stripe('stripe', 'Stripe only'),
@@ -45,7 +45,7 @@ class AppSettings {
     this.localeCode,
   });
 
-  /// How often the live session polls Stripe for new donations.
+  /// How often the live session polls Stripe for new tips.
   final int pollIntervalSec;
 
   /// The app's appearance — system-follows by default, or a manual override.

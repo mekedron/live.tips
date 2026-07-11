@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/data/donation_source.dart';
+import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/stripe/stripe_client.dart';
 import 'package:live_tips/data/stripe/stripe_requests.dart';
 
@@ -43,21 +43,21 @@ Map<String, dynamic> charge(
       },
     };
 
-DonationEvent sessionEvent(
+TipEvent sessionEvent(
   String eventId, {
   required int created,
   required Map<String, dynamic> session,
   String type = 'checkout.session.completed',
 }) =>
-    DonationEvent(
+    TipEvent(
         id: eventId, created: created, type: type, object: session);
 
-DonationEvent chargeEvent(
+TipEvent chargeEvent(
   String eventId, {
   required int created,
   required Map<String, dynamic> object,
 }) =>
-    DonationEvent(
+    TipEvent(
         id: eventId,
         created: created,
         type: 'charge.succeeded',
@@ -66,13 +66,13 @@ DonationEvent chargeEvent(
 class FakeRequests extends StripeRequests {
   FakeRequests(this.pages) : super(StripeClient('rk_test_fake'));
 
-  final List<DonationEventsPage> pages;
+  final List<TipEventsPage> pages;
   final List<String?> endingBeforeCalls = [];
   final List<int?> createdGteCalls = [];
   int _next = 0;
 
   @override
-  Future<DonationEventsPage> listDonationEvents({
+  Future<TipEventsPage> listTipEvents({
     String? endingBefore,
     int? createdGte,
     int limit = 100,
@@ -80,7 +80,7 @@ class FakeRequests extends StripeRequests {
     endingBeforeCalls.add(endingBefore);
     createdGteCalls.add(createdGte);
     if (_next >= pages.length) {
-      return const DonationEventsPage(events: [], hasMore: false);
+      return const TipEventsPage(events: [], hasMore: false);
     }
     return pages[_next++];
   }
@@ -89,7 +89,7 @@ class FakeRequests extends StripeRequests {
 void main() {
   test('prime anchors on the newest existing event', () async {
     final requests = FakeRequests([
-      DonationEventsPage(
+      TipEventsPage(
         events: [
           sessionEvent('evt_anchor', created: 1, session: paidSession('cs_old')),
         ],
@@ -97,11 +97,11 @@ void main() {
       ),
     ]);
     final source =
-        StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+        StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now());
     expect(source.cursor, 'evt_anchor');
 
-    // Nothing new yet → no donations, cursor unchanged.
+    // Nothing new yet → no tips, cursor unchanged.
     final none = await source.pollNew();
     expect(none, isEmpty);
     expect(source.cursor, 'evt_anchor');
@@ -113,7 +113,7 @@ void main() {
       'anchoring on the newest event (tips from while the app was dead)',
       () async {
     final requests = FakeRequests([
-      DonationEventsPage(
+      TipEventsPage(
         events: [
           sessionEvent('evt_missed',
               created: 1751500100, session: paidSession('cs_missed')),
@@ -122,7 +122,7 @@ void main() {
       ),
     ]);
     final source =
-        StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+        StripeTipSource(requests, paymentLinkId: 'plink_ours');
     final startedAt =
         DateTime.fromMillisecondsSinceEpoch(1751500000 * 1000, isUtc: true);
     await source.prime(startedAt, backfill: true);
@@ -137,13 +137,13 @@ void main() {
     expect(source.cursor, 'evt_missed');
   });
 
-  test('pollNew returns fresh donations chronologically and advances cursor',
+  test('pollNew returns fresh tips chronologically and advances cursor',
       () async {
     final requests = FakeRequests([
       // prime call
-      const DonationEventsPage(events: [], hasMore: false),
+      const TipEventsPage(events: [], hasMore: false),
       // first poll: two new events, newest first (Stripe order)
-      DonationEventsPage(
+      TipEventsPage(
         events: [
           sessionEvent('evt_2', created: 20, session: paidSession('cs_b')),
           sessionEvent('evt_1', created: 10, session: paidSession('cs_a')),
@@ -152,7 +152,7 @@ void main() {
       ),
     ]);
     final source =
-        StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+        StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now());
 
     final fresh = await source.pollNew();
@@ -160,12 +160,12 @@ void main() {
     expect(source.cursor, 'evt_2');
   });
 
-  test('filters other links, unpaid sessions, and duplicate donations',
+  test('filters other links, unpaid sessions, and duplicate tips',
       () async {
     final unpaid = paidSession('cs_unpaid')..['payment_status'] = 'unpaid';
     final requests = FakeRequests([
-      const DonationEventsPage(events: [], hasMore: false),
-      DonationEventsPage(
+      const TipEventsPage(events: [], hasMore: false),
+      TipEventsPage(
         events: [
           // duplicate pair: completed + async_payment_succeeded for cs_dup
           sessionEvent('evt_5',
@@ -183,7 +183,7 @@ void main() {
       ),
     ]);
     final source =
-        StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+        StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now());
 
     final fresh = await source.pollNew();
@@ -193,7 +193,7 @@ void main() {
 
   test('resume cursor is used verbatim', () async {
     final requests = FakeRequests([
-      DonationEventsPage(
+      TipEventsPage(
         events: [
           sessionEvent('evt_9', created: 90, session: paidSession('cs_missed')),
         ],
@@ -201,7 +201,7 @@ void main() {
       ),
     ]);
     final source =
-        StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+        StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now(), resumeCursor: 'evt_stored');
 
     final fresh = await source.pollNew();
@@ -221,8 +221,8 @@ void main() {
     // silently double every tip on the stage, and no id-based de-duplication
     // could ever catch it.
     final requests = FakeRequests([
-      const DonationEventsPage(events: [], hasMore: false),
-      DonationEventsPage(
+      const TipEventsPage(events: [], hasMore: false),
+      TipEventsPage(
         events: [
           chargeEvent('evt_2',
               created: 20,
@@ -234,7 +234,7 @@ void main() {
         hasMore: false,
       ),
     ]);
-    final source = StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+    final source = StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now());
 
     final fresh = await source.pollNew();
@@ -247,8 +247,8 @@ void main() {
   test('a card-present charge becomes an anonymous, verified in-person tip',
       () async {
     final requests = FakeRequests([
-      const DonationEventsPage(events: [], hasMore: false),
-      DonationEventsPage(
+      const TipEventsPage(events: [], hasMore: false),
+      TipEventsPage(
         events: [
           chargeEvent('evt_1',
               created: 10,
@@ -257,7 +257,7 @@ void main() {
         hasMore: false,
       ),
     ]);
-    final source = StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+    final source = StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now());
 
     final tip = (await source.pollNew()).single;
@@ -276,8 +276,8 @@ void main() {
   test('in-person taps and QR tips arrive together, each counted once',
       () async {
     final requests = FakeRequests([
-      const DonationEventsPage(events: [], hasMore: false),
-      DonationEventsPage(
+      const TipEventsPage(events: [], hasMore: false),
+      TipEventsPage(
         events: [
           // A tap. Emits only a charge — no session exists for it.
           chargeEvent('evt_4', created: 40, object: charge('ch_tap')),
@@ -291,7 +291,7 @@ void main() {
         hasMore: false,
       ),
     ]);
-    final source = StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+    final source = StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now());
 
     final fresh = await source.pollNew();
@@ -303,18 +303,18 @@ void main() {
   test('a tap already seen in an earlier poll is never counted twice',
       () async {
     final requests = FakeRequests([
-      const DonationEventsPage(events: [], hasMore: false),
-      DonationEventsPage(
+      const TipEventsPage(events: [], hasMore: false),
+      TipEventsPage(
         events: [chargeEvent('evt_1', created: 10, object: charge('ch_tap'))],
         hasMore: false,
       ),
       // The backfill window (resume after a restart) re-reads the same charge.
-      DonationEventsPage(
+      TipEventsPage(
         events: [chargeEvent('evt_1', created: 10, object: charge('ch_tap'))],
         hasMore: false,
       ),
     ]);
-    final source = StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+    final source = StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now());
 
     expect((await source.pollNew()).single.id, 'ch_tap');
@@ -324,8 +324,8 @@ void main() {
   test('failed, unpaid and non-card-present charges never reach the jar',
       () async {
     final requests = FakeRequests([
-      const DonationEventsPage(events: [], hasMore: false),
-      DonationEventsPage(
+      const TipEventsPage(events: [], hasMore: false),
+      TipEventsPage(
         events: [
           // A bank transfer / wallet payment in the account — not a tap.
           chargeEvent('evt_4',
@@ -343,15 +343,15 @@ void main() {
         hasMore: false,
       ),
     ]);
-    final source = StripeDonationSource(requests, paymentLinkId: 'plink_ours');
+    final source = StripeTipSource(requests, paymentLinkId: 'plink_ours');
     await source.prime(DateTime.now());
 
     expect(await source.pollNew(), isEmpty);
     expect(source.cursor, 'evt_4', reason: 'the cursor still advances');
   });
 
-  test('demo source produces donations', () async {
-    final source = DemoDonationSource();
+  test('demo source produces tips', () async {
+    final source = DemoTipSource();
     await source.prime(DateTime.now());
     final first = await source.pollNew();
     expect(first, hasLength(1)); // first tick always tips
@@ -359,8 +359,8 @@ void main() {
     expect(first.single.livemode, isFalse);
   });
 
-  test('null source never produces donations (relay-only sessions)', () async {
-    final source = NullDonationSource();
+  test('null source never produces tips (relay-only sessions)', () async {
+    final source = NullTipSource();
     await source.prime(DateTime.now());
     expect(await source.pollNew(), isEmpty);
     expect(await source.pollNew(), isEmpty, reason: 'stays empty forever');

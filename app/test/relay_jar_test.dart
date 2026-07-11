@@ -4,7 +4,7 @@ import 'package:live_tips/domain/relay_jar.dart';
 void main() {
   const jar = RelayJar(
     jarId: 'jar_abc',
-    donateUrl: 'https://live.tips/t/jar_abc',
+    tipUrl: 'https://live.tips/t/jar_abc',
     artistName: 'Maya',
     currency: 'eur',
     revolutUsername: 'mayamusic',
@@ -15,7 +15,7 @@ void main() {
   test('json round trip', () {
     final restored = RelayJar.fromJson(jar.toJson());
     expect(restored.jarId, jar.jarId);
-    expect(restored.donateUrl, jar.donateUrl);
+    expect(restored.tipUrl, jar.tipUrl);
     expect(restored.artistName, jar.artistName);
     expect(restored.currency, jar.currency);
     expect(restored.revolutUsername, jar.revolutUsername);
@@ -33,7 +33,7 @@ void main() {
 
     const none = RelayJar(
       jarId: 'j',
-      donateUrl: 'https://live.tips/t/j',
+      tipUrl: 'https://live.tips/t/j',
       artistName: 'A',
       currency: 'usd',
       createdAtMs: 0,
@@ -49,7 +49,7 @@ void main() {
 
     const none = RelayJar(
       jarId: 'j',
-      donateUrl: 'https://live.tips/t/j',
+      tipUrl: 'https://live.tips/t/j',
       artistName: 'A',
       currency: 'usd',
       revolutUsername: '  ',
@@ -62,7 +62,7 @@ void main() {
 
   test('demo jar is safe and secret-free', () {
     expect(RelayJar.demo.jarId, 'demo');
-    expect(RelayJar.demo.donateUrl, 'https://live.tips/t/demo');
+    expect(RelayJar.demo.tipUrl, 'https://live.tips/t/demo');
     expect(RelayJar.demo.hasRevolut, isTrue);
     expect(RelayJar.demo.hasMobilePay, isFalse);
   });

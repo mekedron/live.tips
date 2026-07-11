@@ -1,6 +1,6 @@
 /// Server-side Turnstile verification. Tokens are single-use; siteverify
 /// handles replay. Fails closed: an unreachable siteverify rejects the tip
-/// (the donor page keeps a bare deep-link fallback, so payment still works).
+/// (the tip page keeps a bare deep-link fallback, so payment still works).
 
 import type { Env } from "./types";
 

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/features/home/home_screen.dart';
 
@@ -8,14 +8,14 @@ import 'package:live_tips/features/home/home_screen.dart';
 /// never sees — could not appear in it. The card now merges the device-local
 /// archive in via [mergeRecentTips].
 void main() {
-  Donation stripe(String id, DateTime at) => Donation(
+  Tip stripe(String id, DateTime at) => Tip(
         id: id,
         amountMinor: 500,
         currency: 'eur',
         createdAt: at,
       );
 
-  Donation relay(int serial, DateTime at) => Donation.relayTip(
+  Tip relay(int serial, DateTime at) => Tip.relayTip(
         amountMinor: 700,
         currency: 'eur',
         method: TipMethod.revolut,

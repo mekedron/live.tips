@@ -3,10 +3,10 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/data/donation_source.dart';
+import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/relay/relay_tip_channel.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/state/live_session_controller.dart';
@@ -16,9 +16,9 @@ import 'helpers.dart';
 
 /// Hands out pre-scripted batches, one per pollNew() call (same scaffold as
 /// live_session_controller_test.dart).
-class ScriptedSource extends DonationSource {
+class ScriptedSource extends TipSource {
   ScriptedSource(this.batches);
-  final List<List<Donation>> batches;
+  final List<List<Tip>> batches;
   var _i = 0;
 
   @override
@@ -26,26 +26,26 @@ class ScriptedSource extends DonationSource {
       {String? resumeCursor, bool backfill = false}) async {}
 
   @override
-  Future<List<Donation>> pollNew() async =>
+  Future<List<Tip>> pollNew() async =>
       _i < batches.length ? batches[_i++] : const [];
 
   @override
   String? get cursor => null;
 }
 
-/// A relay channel the test drives by hand: push donations/health through
+/// A relay channel the test drives by hand: push tips/health through
 /// the controllers, observe start/dispose through the flags.
 class FakeRelayChannel extends RelayTipChannel {
   FakeRelayChannel()
       : super(wsUri: Uri.parse('wss://fake.invalid/ws'), secret: 'sec_fake');
 
-  final tipsCtrl = StreamController<Donation>.broadcast();
+  final tipsCtrl = StreamController<Tip>.broadcast();
   final statusCtrl = StreamController<RelayHealth>.broadcast();
   var started = false;
   var disposed = false;
 
   @override
-  Stream<Donation> get tips => tipsCtrl.stream;
+  Stream<Tip> get tips => tipsCtrl.stream;
 
   @override
   Stream<RelayHealth> get status => statusCtrl.stream;
@@ -59,14 +59,14 @@ class FakeRelayChannel extends RelayTipChannel {
 
 const relayJar = RelayJar(
   jarId: 'jar_relay',
-  donateUrl: 'https://live.tips/t/jar_relay',
+  tipUrl: 'https://live.tips/t/jar_relay',
   artistName: 'Foxy Live',
   currency: 'eur',
   revolutUsername: 'foxy',
   createdAtMs: 1,
 );
 
-Donation relayTip(int serial, {int amountMinor = 500}) => Donation.relayTip(
+Tip relayTip(int serial, {int amountMinor = 500}) => Tip.relayTip(
       amountMinor: amountMinor,
       currency: 'eur',
       method: TipMethod.mobilepay,
@@ -91,7 +91,7 @@ void main() {
 
   /// Relay-only install: a relay jar + secret, NO Stripe key, NO demo.
   Future<void> setUpContainer(
-      {List<List<Donation>> stripeBatches = const []}) async {
+      {List<List<Tip>> stripeBatches = const []}) async {
     store = await seededStore(accountValues: {
       LocalStore.kRelayJarBase: jsonEncode(relayJar.toJson()),
     });
@@ -99,7 +99,7 @@ void main() {
     container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
       initialRelaySecretProvider.overrideWithValue('sec_1'),
-      donationSourceFactoryProvider.overrideWithValue(
+      tipSourceFactoryProvider.overrideWithValue(
           ({required demo, required apiKey, required jar}) =>
               ScriptedSource(stripeBatches)),
       relayChannelFactoryProvider.overrideWithValue(
@@ -128,17 +128,17 @@ void main() {
     expect(state.session.totalMinor, 700);
     expect(state.confettiTick, 1, reason: 'same celebration path as Stripe');
     expect(state.newTips, hasLength(1));
-    expect(state.newTips.single.donation.verified, isFalse);
-    expect(state.lastDonation!.id, 'relay_1751500000000_0');
+    expect(state.newTips.single.tip.verified, isFalse);
+    expect(state.lastTip!.id, 'relay_1751500000000_0');
 
     // Crash-recovery snapshot carries the relay tip.
     final stored = store.readActiveSession(kTestAccountId)!;
-    expect(stored.donations.map((d) => d.id), ['relay_1751500000000_0']);
-    expect(stored.donations.single.method, TipMethod.mobilepay);
-    expect(stored.donations.single.verified, isFalse);
+    expect(stored.tips.map((d) => d.id), ['relay_1751500000000_0']);
+    expect(stored.tips.single.method, TipMethod.mobilepay);
+    expect(stored.tips.single.verified, isFalse);
   });
 
-  test('a duplicate donation id is ingested exactly once', () async {
+  test('a duplicate tip id is ingested exactly once', () async {
     await setUpContainer();
     final controller = container.read(liveSessionProvider.notifier);
     await controller.start(goalMinor: 10000);
@@ -201,7 +201,7 @@ void main() {
       () async {
     await setUpContainer(stripeBatches: [
       [
-        Donation(
+        Tip(
           id: 'cs_1',
           amountMinor: 1200,
           currency: 'eur',
@@ -268,7 +268,7 @@ void main() {
     test('Stripe tips never enter the relay archive', () async {
       await setUpContainer(stripeBatches: [
         [
-          Donation(
+          Tip(
             id: 'cs_1',
             amountMinor: 1200,
             currency: 'eur',
@@ -287,7 +287,7 @@ void main() {
       expect(store.readRelayHistory(kTestAccountId).map((d) => d.id),
           ['relay_1751500000000_0'],
           reason: 'verified (Stripe) tips live in the Stripe account — only '
-              'donor-declared tip-page tips belong to the device archive');
+              'fan-declared tip-page tips belong to the device archive');
     });
 
     test('demo relay tips (livemode:false) are never archived', () async {

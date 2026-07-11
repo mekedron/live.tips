@@ -1,13 +1,13 @@
 /// live.tips relay — router.
 ///
 /// Origins: api.live.tips (custom domain: device API + WS + admin) and
-/// live.tips/t/* (zone route: donor pages). Same worker, same handlers.
+/// live.tips/t/* (zone route: tip pages). Same worker, same handlers.
 ///
 /// Log hygiene: nothing here logs names, messages, secrets, or headers.
 
 import { isAdmin, renderAdminPage, adminPageCsp } from "./admin";
 import { newJarId, newSecret, sha256Hex } from "./auth";
-import { donorPageCsp, renderDonorPage, renderNotFoundPage } from "./donor-page";
+import { tipPageCsp, renderTipPage, renderNotFoundPage } from "./tip-page";
 import { verifyTurnstile } from "./turnstile";
 import { isValidJarId, readJsonBody, validateProfile, validateTip } from "./validate";
 import type { Env, JarProfile } from "./types";
@@ -15,7 +15,7 @@ import type { Env, JarProfile } from "./types";
 export { JarDO } from "./jar-do";
 export { RegistryDO } from "./registry-do";
 
-const DONATE_URL_BASE = "https://live.tips/t/";
+const TIP_URL_BASE = "https://live.tips/t/";
 
 const CORS_ORIGINS = new Set(["https://live.tips"]);
 
@@ -99,22 +99,22 @@ export default {
     if (path === "/healthz") return new Response("ok", { headers: { "Cache-Control": "no-store" } });
     if (path === "/robots.txt") return new Response("User-agent: *\nDisallow: /\n");
 
-    // ---------------------------------------------------------------- donor
-    const donorMatch = path.match(/^\/t\/([^/]+)(\/tips)?$/);
-    if (donorMatch) {
-      const jarId = donorMatch[1]!;
-      const isTips = donorMatch[2] === "/tips";
+    // ------------------------------------------------------------- tip page
+    const tipPageMatch = path.match(/^\/t\/([^/]+)(\/tips)?$/);
+    if (tipPageMatch) {
+      const jarId = tipPageMatch[1]!;
+      const isTips = tipPageMatch[2] === "/tips";
       // The registry is the existence gate: unknown ids never instantiate a
       // JarDO, so id-guessing costs one registry lookup and nothing else.
       if (!isValidJarId(jarId) || !(await registryStub(env).has(jarId))) {
         if (isTips) return json({ error: "not found" }, 404);
-        return htmlPage(renderNotFoundPage(), 404, await donorPageCsp());
+        return htmlPage(renderNotFoundPage(), 404, await tipPageCsp());
       }
 
       if (!isTips && (request.method === "GET" || request.method === "HEAD")) {
         const profile = await jarStub(env, jarId).getProfile();
-        if (!profile) return htmlPage(renderNotFoundPage(), 404, await donorPageCsp());
-        return htmlPage(renderDonorPage(profile, env.TURNSTILE_SITE_KEY), 200, await donorPageCsp());
+        if (!profile) return htmlPage(renderNotFoundPage(), 404, await tipPageCsp());
+        return htmlPage(renderTipPage(profile, env.TURNSTILE_SITE_KEY), 200, await tipPageCsp());
       }
 
       if (isTips && request.method === "POST") {
@@ -213,7 +213,7 @@ export default {
         lastSeenDay: Math.floor(Date.now() / 86_400_000),
       });
 
-      return json({ jarId, secret, donateUrl: `${DONATE_URL_BASE}${jarId}` }, 201, cors);
+      return json({ jarId, secret, tipUrl: `${TIP_URL_BASE}${jarId}` }, 201, cors);
     }
 
     const jarMatch = path.match(/^\/v1\/jars\/([^/]+)(\/ws|\/seen|\/rotate-secret)?$/);
@@ -279,7 +279,7 @@ export default {
       if (sub === "" && request.method === "DELETE") {
         const r = await stub.destroy(secret);
         if (r !== "ok") return fail(r);
-        // Awaited so the donate URL is dead the moment the app hears 204.
+        // Awaited so the tip URL is dead the moment the app hears 204.
         await registryStub(env).remove(jarId);
         return new Response(null, { status: 204, headers: cors });
       }

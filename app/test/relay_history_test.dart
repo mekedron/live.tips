@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/local_store.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/tip_method.dart';
 
 import 'helpers.dart';
 
-Donation relayTip(int serial, {int ts = 1751500000000}) => Donation.relayTip(
+Tip relayTip(int serial, {int ts = 1751500000000}) => Tip.relayTip(
       amountMinor: 500 + serial,
       currency: 'eur',
       method: TipMethod.mobilepay,

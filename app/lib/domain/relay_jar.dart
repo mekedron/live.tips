@@ -1,10 +1,10 @@
 /// The artist's connected-mode jar registered with the live.tips relay
-/// worker: a public donor page URL plus the payment methods it offers.
+/// worker: a public fan page URL plus the payment methods it offers.
 /// The jar secret is NEVER stored here — it lives in the SecureStore only.
 class RelayJar {
   const RelayJar({
     required this.jarId,
-    required this.donateUrl,
+    required this.tipUrl,
     required this.artistName,
     required this.currency,
     this.message,
@@ -18,13 +18,13 @@ class RelayJar {
 
   /// Public `https://live.tips/t/<jarId>` URL — what goes on the QR code in
   /// connected mode.
-  final String donateUrl;
+  final String tipUrl;
   final String artistName;
   final String currency;
 
-  /// The artist's thank-you / welcome message shown on the donor page. The
+  /// The artist's thank-you / welcome message shown on the fan page. The
   /// tip-page equivalent of the Stripe link's thank-you message; edited from
-  /// Account Details. Null/empty means the donor page shows no message line.
+  /// Account Details. Null/empty means the fan page shows no message line.
   final String? message;
   final String? revolutUsername;
   final String? mobilepayBoxId;
@@ -39,7 +39,7 @@ class RelayJar {
 
   static const demo = RelayJar(
     jarId: 'demo',
-    donateUrl: 'https://live.tips/t/demo',
+    tipUrl: 'https://live.tips/t/demo',
     artistName: 'Demo Artist',
     currency: 'usd',
     revolutUsername: 'demo',
@@ -50,7 +50,7 @@ class RelayJar {
 
   RelayJar copyWith({
     String? jarId,
-    String? donateUrl,
+    String? tipUrl,
     String? artistName,
     String? currency,
     String? message,
@@ -61,7 +61,7 @@ class RelayJar {
   }) =>
       RelayJar(
         jarId: jarId ?? this.jarId,
-        donateUrl: donateUrl ?? this.donateUrl,
+        tipUrl: tipUrl ?? this.tipUrl,
         artistName: artistName ?? this.artistName,
         currency: currency ?? this.currency,
         message: message ?? this.message,
@@ -73,7 +73,7 @@ class RelayJar {
 
   Map<String, dynamic> toJson() => {
         'jarId': jarId,
-        'donateUrl': donateUrl,
+        'tipUrl': tipUrl,
         'artistName': artistName,
         'currency': currency,
         if (message != null) 'message': message,
@@ -85,7 +85,7 @@ class RelayJar {
 
   factory RelayJar.fromJson(Map<String, dynamic> json) => RelayJar(
         jarId: json['jarId'] as String,
-        donateUrl: json['donateUrl'] as String,
+        tipUrl: json['tipUrl'] as String,
         artistName: json['artistName'] as String? ?? '',
         currency: json['currency'] as String? ?? 'usd',
         message: json['message'] as String?,

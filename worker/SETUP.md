@@ -85,8 +85,8 @@ curl https://api.live.tips/healthz          # → ok
 curl -s -X POST https://api.live.tips/v1/jars \
   -H 'content-type: application/json' \
   -d '{"artistName":"Setup Test","message":"","currency":"eur","methods":{"revolutUsername":"mekedron"}}'
-# → 201 with {jarId, secret, donateUrl}. Open the donateUrl on your phone —
-#   you should see the donor page with a working Turnstile widget.
+# → 201 with {jarId, secret, tipUrl}. Open the tipUrl on your phone —
+#   you should see the tip page with a working Turnstile widget.
 # Clean up: open https://api.live.tips/admin, paste the ADMIN_TOKEN, delete the test jar.
 ```
 

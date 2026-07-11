@@ -17,7 +17,7 @@ export const MOBILEPAY_AMOUNT_UNIT: "minor" = "minor";
  */
 export const REVOLUT_AMOUNT_UNIT: "major" | "minor" = "minor";
 
-/** Revolut rejects sub-€1 requests; enforced here and in the donor form. */
+/** Revolut rejects sub-€1 requests; enforced here and in the tip form. */
 export const REVOLUT_MIN_MINOR = 100;
 
 /**
@@ -25,7 +25,7 @@ export const REVOLUT_MIN_MINOR = 100;
  * segment in MAJOR units, not a query param in minor ones — `/daniel/5` bills
  * "£5.00" and `/daniel/500` bills "£500.00". Decimals ride along fine:
  * `/daniel/5.50` bills "£5.50". Getting this backwards would overcharge a
- * donor 100×, which is why it is spelled out rather than inferred.
+ * fan 100×, which is why it is spelled out rather than inferred.
  */
 export const MONZO_AMOUNT_UNIT: "major" | "minor" = "major";
 
@@ -49,7 +49,7 @@ export const REVOLUT_NOTE_MAX = 64;
  * untruncated (2026-07-11), and the description is never rendered on the web
  * page at all — it is handed to the Monzo app, whose own reference field we
  * cannot inspect from here. So this is our own conservative clamp, set to the
- * same 200 the donor form already caps messages at: a message that fits the
+ * same 200 the tip form already caps messages at: a message that fits the
  * form fits the link, and nothing is silently dropped in between.
  */
 export const MONZO_DESCRIPTION_MAX = 200;
@@ -94,7 +94,7 @@ export function buildMonzoUrl(username: string, amountMinor: number, note: strin
   return url.toString();
 }
 
-/** Bare method links (no prefill) — donor-page fallbacks when JS/API fails. */
+/** Bare method links (no prefill) — tip-page fallbacks when JS/API fails. */
 export function bareMethodUrl(profile: JarProfile, method: TipRequest["method"]): string | null {
   if (method === "revolut" && profile.methods.revolutUsername) {
     return `https://revolut.me/${encodeURIComponent(profile.methods.revolutUsername)}`;

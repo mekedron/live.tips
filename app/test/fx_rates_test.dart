@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/fx_rates.dart';
 import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/domain/tip_method.dart';
@@ -11,8 +11,8 @@ final rates = FxRates(
   fetchedAt: DateTime(2026, 7, 11),
 );
 
-Donation tip(int amountMinor, String currency, TipMethod method) =>
-    Donation.relayTip(
+Tip tip(int amountMinor, String currency, TipMethod method) =>
+    Tip.relayTip(
       amountMinor: amountMinor,
       currency: currency,
       method: method,
@@ -65,22 +65,22 @@ void main() {
 
     test('totals a £ Monzo tip into a € session at the reference rate', () {
       final s = session()..fx = rates;
-      s.addDonation(tip(1000, 'eur', TipMethod.revolut)); // €10
-      s.addDonation(tip(850, 'gbp', TipMethod.monzo)); // £8.50 → €10
+      s.addTip(tip(1000, 'eur', TipMethod.revolut)); // €10
+      s.addTip(tip(850, 'gbp', TipMethod.monzo)); // £8.50 → €10
 
       expect(s.totalMinor, 2000, reason: '€10 + £8.50 ≈ €20');
       expect(s.isMixedCurrency, isTrue);
-      expect(s.uncountedDonations, isEmpty);
+      expect(s.uncountedTips, isEmpty);
       // The stored tip is untouched — it is still £8.50, in GBP.
-      final monzo = s.donations.last;
+      final monzo = s.tips.last;
       expect(monzo.amountMinor, 850);
       expect(monzo.currency, 'gbp');
     });
 
     test('ranks the biggest tip in the session currency, not on raw units', () {
       final s = session()..fx = rates;
-      s.addDonation(tip(1100, 'eur', TipMethod.revolut)); // €11.00
-      s.addDonation(tip(1000, 'gbp', TipMethod.monzo)); // £10 ≈ €11.76
+      s.addTip(tip(1100, 'eur', TipMethod.revolut)); // €11.00
+      s.addTip(tip(1000, 'gbp', TipMethod.monzo)); // £10 ≈ €11.76
 
       // Naive minor-unit comparison would have crowned the €11 tip.
       expect(s.biggest!.currency, 'gbp');
@@ -88,18 +88,18 @@ void main() {
 
     test('without rates, a foreign tip is shown but not counted', () {
       final s = session(); // fx left null — offline, no cached table
-      s.addDonation(tip(1000, 'eur', TipMethod.revolut));
-      s.addDonation(tip(850, 'gbp', TipMethod.monzo));
+      s.addTip(tip(1000, 'eur', TipMethod.revolut));
+      s.addTip(tip(850, 'gbp', TipMethod.monzo));
 
       expect(s.totalMinor, 1000, reason: 'the £ tip is never folded in blind');
       expect(s.count, 2, reason: 'it still happened, and still shows');
-      expect(s.uncountedDonations.single.currency, 'gbp');
+      expect(s.uncountedTips.single.currency, 'gbp');
     });
 
     test('a single-currency session is exact and never marked approximate', () {
       final s = session()..fx = rates;
-      s.addDonation(tip(1000, 'eur', TipMethod.revolut));
-      s.addDonation(tip(500, 'eur', TipMethod.mobilepay));
+      s.addTip(tip(1000, 'eur', TipMethod.revolut));
+      s.addTip(tip(500, 'eur', TipMethod.mobilepay));
 
       expect(s.totalMinor, 1500);
       expect(s.isMixedCurrency, isFalse);
@@ -107,7 +107,7 @@ void main() {
 
     test('rates arriving mid-set re-total the tips already in the jar', () {
       final s = session();
-      s.addDonation(tip(850, 'gbp', TipMethod.monzo));
+      s.addTip(tip(850, 'gbp', TipMethod.monzo));
       expect(s.totalMinor, 0);
 
       s.fx = rates; // the background refresh landed

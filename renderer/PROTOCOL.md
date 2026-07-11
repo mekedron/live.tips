@@ -49,7 +49,7 @@ bridge.
 | type | payload | notes |
 |---|---|---|
 | `init` | `renderer:'3d'\|'2d'`, `config{…}`, `state{jarPct, bankedJars}` | once per page load; a second `init` is ignored |
-| `tip` | `id, deltaPct, jarPctAfter, rollovers` | one per donation, in arrival order; `rollovers ≥ 1` commands that many retire-to-trophy cycles before landing on `jarPctAfter` |
+| `tip` | `id, deltaPct, jarPctAfter, rollovers` | one per tip, in arrival order; `rollovers ≥ 1` commands that many retire-to-trophy cycles before landing on `jarPctAfter` |
 | `syncState` | `state{jarPct, bankedJars}`, `instant?:bool` | absolute resync (goal edit, restore, reconciliation); animated unless `instant` |
 | `setConfig` | any subset of `config` | live-applies; `vessel`/`scene`/`quality` are ignored by the 2D renderer |
 | `setPaused` | `paused:bool` | stop/resume all rendering (app backgrounded); `visibilitychange` is honored as backup |
@@ -79,7 +79,7 @@ panning the pivot/camera; omitted sides default to 0).
 
 ## Rollover contract (the important part)
 
-The host accounts eagerly: on every donation (and goal edit) it banks
+The host accounts eagerly: on every tip (and goal edit) it banks
 `2 × goal` per earned jar **immediately** and persists. The renderer is then
 COMMANDED via `tip.rollovers`: it pours to the visual 200%, celebrates, plays
 the retire-to-trophy animation (per rollover; intermediate jars of a multi-roll

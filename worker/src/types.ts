@@ -30,7 +30,7 @@ export interface JarProfile {
 
 export type TipMethod = "revolut" | "mobilepay" | "monzo";
 
-/** What the donor form submits (after validation). */
+/** What the tip form submits (after validation). */
 export interface TipRequest {
   method: TipMethod;
   amountMinor: number;

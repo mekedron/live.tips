@@ -7,14 +7,14 @@ import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../domain/app_settings.dart';
-import '../../domain/donation.dart';
+import '../../domain/tip.dart';
 import '../../domain/live_session.dart';
 import '../onboarding/relay_setup_screen.dart'
     show confirmAndRegenerateRelayJar;
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
-import '../../widgets/donation_tile.dart';
+import '../../widgets/tip_tile.dart';
 import '../../widgets/goal_editor.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
@@ -1057,14 +1057,14 @@ class _NewTipLinkButton extends ConsumerWidget {
 // Recent tips + last session
 // ---------------------------------------------------------------------------
 
-/// One preview list from two feeds: the Stripe API's latest donations and
+/// One preview list from two feeds: the Stripe API's latest tips and
 /// the device-local tip-page (Revolut/MobilePay) archive — which Stripe
 /// never sees, so without this merge relay tips were invisible here.
 /// Both inputs arrive newest-first; the result is newest-first, capped.
 @visibleForTesting
-List<Donation> mergeRecentTips(
-  List<Donation> stripe,
-  List<Donation> relay, {
+List<Tip> mergeRecentTips(
+  List<Tip> stripe,
+  List<Tip> relay, {
   int limit = 5,
 }) {
   final merged = [...stripe.take(limit), ...relay.take(limit)]
@@ -1081,7 +1081,7 @@ class _RecentTipsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
-    final recent = ref.watch(recentDonationsProvider);
+    final recent = ref.watch(recentTipsProvider);
     // Refreshed by the session controller the moment a tip-page tip lands,
     // so this card updates mid-session — just like it shows Stripe tips.
     final relayRecent = ref.watch(relayHistoryProvider);
@@ -1126,8 +1126,8 @@ class _RecentTipsCard extends ConsumerWidget {
             )
           else
             recent.when(
-              data: (donations) {
-                final shown = mergeRecentTips(donations, relayRecent);
+              data: (tips) {
+                final shown = mergeRecentTips(tips, relayRecent);
                 return shown.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1144,8 +1144,8 @@ class _RecentTipsCard extends ConsumerWidget {
                         children: [
                           for (var i = 0; i < shown.length; i++) ...[
                             if (i > 0) Divider(height: 1, color: c.divider),
-                            DonationTile(
-                              donation: shown[i],
+                            TipTile(
+                              tip: shown[i],
                               showTime: !compact,
                             ),
                           ],

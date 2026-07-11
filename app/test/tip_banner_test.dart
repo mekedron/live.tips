@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:live_tips/domain/donation.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/rollover_math.dart';
 import 'package:live_tips/features/live/stage/stage_chrome.dart';
 import 'package:live_tips/features/live/stage/stage_hud.dart';
@@ -14,7 +14,7 @@ JarTipAttribution tip(
   double delta = 0.05,
   bool verified = true,
 }) => JarTipAttribution(
-  donation: Donation(
+  tip: Tip(
     id: id,
     amountMinor: amount,
     currency: 'eur',
@@ -81,7 +81,7 @@ void main() {
       expect(find.text('“Great show!”'), findsNothing);
     });
 
-    testWidgets('a burst queues — every donor gets their own moment', (
+    testWidgets('a burst queues — every fan gets their own moment', (
       tester,
     ) async {
       await tester.pumpWidget(host(const [], 0));
@@ -161,7 +161,7 @@ void main() {
     });
 
     testWidgets(
-      'an unverified (donor-declared) tip shows ~ before the amount and '
+      'an unverified (fan-declared) tip shows ~ before the amount and '
       'NEVER gets the crown, however big',
       (tester) async {
         await tester.pumpWidget(host(const [], 0));

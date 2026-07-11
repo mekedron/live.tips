@@ -107,7 +107,7 @@ class RelayClient {
     return (
       jar: RelayJar(
         jarId: json['jarId'] as String,
-        donateUrl: json['donateUrl'] as String,
+        tipUrl: json['tipUrl'] as String,
         artistName: artistName,
         currency: currency,
         message: (message?.trim().isEmpty ?? true) ? null : message!.trim(),

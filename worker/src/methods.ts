@@ -7,14 +7,14 @@
 ///
 /// This table is what lets one tip page offer all three at once: the jar's
 /// currency stops being a lock and becomes the default that the unfixed methods
-/// inherit. Everything downstream — the amount the donor types, the bounds it
+/// inherit. Everything downstream — the amount the fan types, the bounds it
 /// is checked against, the deep link, and the currency stamped on the tip the
 /// artist's device records — resolves through here, so a £5 Monzo tip is a £5
 /// Monzo tip on a EUR jar.
 
 import type { TipMethod } from "./types";
 
-/** Every relay method, in the fixed order the donor page lists them. */
+/** Every relay method, in the fixed order the tip page lists them. */
 export const TIP_METHODS: TipMethod[] = ["revolut", "mobilepay", "monzo"];
 
 /** Methods that collect in one currency, always. */
