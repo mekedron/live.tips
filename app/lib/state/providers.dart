@@ -681,17 +681,25 @@ class FxRatesNotifier extends Notifier<FxRates?> {
     if (cached == null || cached.isStaleAt(DateTime.now())) {
       unawaited(refresh());
     }
-    return cached;
+    // Never leave the stage with no table at all: a first run with no network
+    // still gets the compiled-in rates, so a foreign tip counts (approximately)
+    // instead of being dropped from the night's total. A real cached table
+    // always wins over them.
+    return cached ?? FxRates.builtin();
   }
 
+  /// Walks the provider chain. A total failure is not an error state — the
+  /// cached (or built-in) table simply stands until the next attempt.
   Future<void> refresh() async {
     final source = FxSource();
     try {
       final fresh = await source.fetch();
+      // Only a fetched table is ever written back; the built-in one must never
+      // be cached over a real one, or it would look like a successful fetch.
       await ref.read(localStoreProvider).saveFxRates(fresh);
       state = fresh;
     } catch (_) {
-      // Offline, rate-limited, or the service moved — keep whatever we have.
+      // Every provider is down, or we're offline. Keep what we have.
     } finally {
       source.close();
     }
