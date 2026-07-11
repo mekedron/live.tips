@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — et les huit secondes que tu as vraiment
-description: Trois produits corrects pour les créateurs sur internet. Un musicien de rue n'est pas un créateur sur internet. Ce qui change quand ton public est devant toi — pourquoi 0 % n'est pas la même chose que rien, et pourquoi un pourboire de 5 € doit arriver comme 5 €.
+title: Cagnotte en ligne pour musicien de rue : Ko-fi, Buy Me a Coffee et TipTopJar comparés
+description: Trois produits corrects pour les créateurs sur internet. Un musicien de rue n'est pas un créateur sur internet. Ton public est devant toi et tu as huit secondes — pourquoi 0 % n'est pas la même chose que rien, et pourquoi un pourboire de 5 € doit arriver comme 5 €.
 slug: cagnottes-comparees-pour-la-scene
 ---
 

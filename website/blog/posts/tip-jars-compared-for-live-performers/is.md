@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — og sekúndurnar átta sem þú raunverulega hefur
-description: Þrjár ágætar vörur fyrir efnishöfunda á netinu. Götuspilari er ekki efnishöfundur á netinu. Hvað breytist þegar áhorfendur þínir standa fyrir framan þig — af hverju 0 % er ekki það sama og ekkert, og af hverju þjórfé upp á 5 € ætti að skila sér sem 5 €.
+title: Þjórfékrukka á netinu fyrir götutónlistarfólk: Ko-fi, Buy Me a Coffee og TipTopJar borin saman
+description: Þrjár ágætar vörur fyrir efnishöfunda á netinu. Götuspilari er ekki efnishöfundur á netinu. Áhorfendur standa fyrir framan þig og þú hefur átta sekúndur — af hverju 0 % er ekki það sama og ekkert, og af hverju þjórfé upp á 5 € ætti að skila sér sem 5 €.
 slug: thjorfekrukkur-i-samanburdi
 ---
 

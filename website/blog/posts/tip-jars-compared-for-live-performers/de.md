@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — und die acht Sekunden, die du wirklich hast
-description: Drei ordentliche Produkte für Creator im Internet. Ein Straßenmusiker ist kein Creator im Internet. Was sich ändert, wenn dein Publikum vor dir steht — warum 0% nicht dasselbe ist wie nichts, und warum ein Trinkgeld von €5 als €5 ankommen sollte.
+title: Online-Trinkgeldkasse für Straßenmusiker: Ko-fi, Buy Me a Coffee und TipTopJar im Vergleich
+description: Drei ordentliche Produkte für Creator im Internet. Ein Straßenmusiker ist kein Creator im Internet. Dein Publikum steht vor dir, und du hast acht Sekunden — warum 0% nicht dasselbe ist wie nichts, und warum ein Trinkgeld von €5 als €5 ankommen sollte.
 slug: trinkgeld-tools-im-vergleich
 ---
 

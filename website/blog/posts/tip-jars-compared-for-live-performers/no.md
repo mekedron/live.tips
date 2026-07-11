@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — og de åtte sekundene du faktisk har
-description: Tre gode produkter for skapere på nettet. En gatemusikant er ikke en skaper på nettet. Hva endrer seg når publikummet ditt står rett foran deg — hvorfor 0 % ikke er det samme som ingenting, og hvorfor et tips på 5 € bør komme fram som 5 €.
+title: Tipskrukke på nett for gatemusikanter: Ko-fi, Buy Me a Coffee og TipTopJar sammenlignet
+description: Tre gode produkter for skapere på nettet. En gatemusikant er ikke en skaper på nettet. Publikummet ditt står rett foran deg, og du har åtte sekunder — hvorfor 0 % ikke er det samme som ingenting, og hvorfor et tips på 5 € bør komme fram som 5 €.
 slug: tipskrukker-sammenlignet
 ---
 

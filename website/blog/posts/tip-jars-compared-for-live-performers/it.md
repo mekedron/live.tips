@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — e gli otto secondi che hai davvero
-description: Tre prodotti dignitosi per i creator su internet. Un artista di strada non è un creator su internet. Cosa cambia quando il tuo pubblico è davanti a te — perché 0% non è la stessa cosa di niente, e perché una mancia da 5 € dovrebbe arrivare come 5 €.
+title: Barattolo delle mance online per musicisti di strada: Ko-fi, Buy Me a Coffee e TipTopJar a confronto
+description: Tre prodotti dignitosi per i creator su internet. Un musicista di strada non è un creator su internet. Il tuo pubblico è davanti a te e hai otto secondi — perché 0% non è la stessa cosa di niente, e perché una mancia da 5 € dovrebbe arrivare come 5 €.
 slug: barattoli-delle-mance-a-confronto
 ---
 

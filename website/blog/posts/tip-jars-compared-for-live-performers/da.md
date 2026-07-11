@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — og de otte sekunder, du faktisk har
-description: Tre udmærkede produkter til kreative på nettet. En gademusiker er ikke en kreativ på nettet. Hvad ændrer sig, når dit publikum står lige foran dig — hvorfor 0 % ikke er det samme som ingenting, og hvorfor et tip på 5 € bør ankomme som 5 €.
+title: Tipkrukke online til gademusikere: Ko-fi, Buy Me a Coffee og TipTopJar sammenlignet
+description: Tre udmærkede produkter til kreative på nettet. En gademusiker er ikke en kreativ på nettet. Dit publikum står lige foran dig, og du har otte sekunder — hvorfor 0 % ikke er det samme som ingenting, og hvorfor et tip på 5 € bør ankomme som 5 €.
 slug: tipkrukker-sammenlignet
 ---
 

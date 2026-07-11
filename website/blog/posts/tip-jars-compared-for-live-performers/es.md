@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — y los ocho segundos que de verdad tienes
-description: Tres productos decentes para creadores en internet. Un músico callejero no es un creador en internet. Lo que cambia cuando tu público está delante de ti — por qué 0 % no es lo mismo que nada, y por qué una propina de 5 € debería llegar como 5 €.
+title: Bote de propinas online para músicos callejeros: Ko-fi, Buy Me a Coffee y TipTopJar comparados
+description: Tres productos decentes para creadores en internet. Un músico callejero no es un creador en internet. Tu público está delante de ti y tienes ocho segundos — por qué 0 % no es lo mismo que nada, y por qué una propina de 5 € debería llegar como 5 €.
 slug: botes-de-propinas-comparados
 ---
 

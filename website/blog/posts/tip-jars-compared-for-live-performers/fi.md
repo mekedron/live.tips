@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — ja ne kahdeksan sekuntia, jotka sinulla oikeasti on
-description: Kolme kelvollista tuotetta netin sisällöntekijöille. Katusoittaja ei ole netin sisällöntekijä. Mikä muuttuu, kun yleisösi seisoo edessäsi — miksi 0 % ei ole sama kuin ei mitään, ja miksi 5 euron tipin pitäisi saapua 5 eurona.
+title: Tippipurkki verkossa katusoittajalle: Ko-fi, Buy Me a Coffee ja TipTopJar vertailussa
+description: Kolme kelvollista tuotetta netin sisällöntekijöille. Katusoittaja ei ole netin sisällöntekijä. Yleisösi seisoo edessäsi, ja sinulla on kahdeksan sekuntia — miksi 0 % ei ole sama kuin ei mitään, ja miksi 5 euron tipin pitäisi saapua 5 eurona.
 slug: tippipurkit-vertailussa
 ---
 

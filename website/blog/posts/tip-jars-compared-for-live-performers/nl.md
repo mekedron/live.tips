@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — en de acht seconden die je echt hebt
-description: Drie prima producten voor makers op internet. Een straatmuzikant is geen maker op internet. Wat er verandert als je publiek vóór je staat — waarom 0% niet hetzelfde is als niks, en waarom een fooi van €5 als €5 moet aankomen.
+title: Online fooienpot voor straatmuzikanten: Ko-fi, Buy Me a Coffee en TipTopJar vergeleken
+description: Drie prima producten voor makers op internet. Een straatmuzikant is geen maker op internet. Je publiek staat vóór je en je hebt acht seconden — waarom 0% niet hetzelfde is als niks, en waarom een fooi van €5 als €5 moet aankomen.
 slug: fooienpotten-vergeleken
 ---
 

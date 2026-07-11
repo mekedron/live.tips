@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — and the eight seconds you actually have
-description: Three decent products for creators on the internet. A busker is not a creator on the internet. What changes when your audience is standing in front of you — why 0% is not the same as nothing, and why a €5 tip should arrive as €5.
+title: Online tip jars for buskers: Ko-fi, Buy Me a Coffee and TipTopJar compared
+description: Three decent products for creators on the internet. A busker is not a creator on the internet. Your audience is standing in front of you and you have eight seconds — why 0% is not the same as nothing, and why a €5 tip should arrive as €5.
 ---
 
 You finish the set. The room is loud, somebody near the bar is shouting for one

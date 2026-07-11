@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — ve gerçekten sahip olduğun sekiz saniye
-description: İnternette içerik üreticileri için üç düzgün ürün. Sokak müzisyeni internette bir içerik üreticisi değildir. Seyircin tam önünde dururken ne değişir — neden 0% hiçbir şeyle aynı değil ve neden €5'lik bir bahşiş €5 olarak ulaşmalı.
+title: Sokak müzisyenleri için online bahşiş kavanozu: Ko-fi, Buy Me a Coffee ve TipTopJar karşılaştırması
+description: İnternette içerik üreticileri için üç düzgün ürün. Sokak müzisyeni internette bir içerik üreticisi değildir. Seyircin tam önünde duruyor ve sekiz saniyen var — neden 0% hiçbir şeyle aynı değil ve neden €5'lik bir bahşiş €5 olarak ulaşmalı.
 slug: bahsis-kavanozlari-karsilastirmasi
 ---
 

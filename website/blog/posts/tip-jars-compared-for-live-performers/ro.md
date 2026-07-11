@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — și cele opt secunde pe care le ai cu adevărat
-description: Trei produse decente pentru creatori pe internet. Un muzicant de stradă nu e un creator pe internet. Ce se schimbă când publicul îți stă chiar în față — de ce 0% nu e totuna cu nimic și de ce un bacșiș de €5 ar trebui să ajungă ca €5.
+title: Borcan de bacșiș online pentru muzicanți stradali: Ko-fi, Buy Me a Coffee și TipTopJar comparate
+description: Trei produse decente pentru creatori pe internet. Un muzicant stradal nu e un creator pe internet. Publicul îți stă chiar în față și ai opt secunde — de ce 0% nu e totuna cu nimic și de ce un bacșiș de €5 ar trebui să ajungă ca €5.
 slug: borcane-de-bacsis-comparate
 ---
 

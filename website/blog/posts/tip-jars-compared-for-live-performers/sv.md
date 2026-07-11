@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — och de åtta sekunder du faktiskt har
-description: Tre hyfsade produkter för kreatörer på internet. En gatumusiker är ingen kreatör på internet. Vad som ändras när publiken står framför dig — varför 0% inte är samma sak som ingenting, och varför en dricks på €5 borde komma fram som €5.
+title: Dricksburk online för gatumusikanter: Ko-fi, Buy Me a Coffee och TipTopJar i jämförelse
+description: Tre hyfsade produkter för kreatörer på internet. En gatumusikant är ingen kreatör på internet. Publiken står framför dig och du har åtta sekunder — varför 0% inte är samma sak som ingenting, och varför en dricks på €5 borde komma fram som €5.
 slug: dricksburkar-i-jamforelse
 ---
 

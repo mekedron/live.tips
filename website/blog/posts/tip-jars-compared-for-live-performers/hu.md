@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — és az a nyolc másodperc, amennyi tényleg a tiéd
-description: Három tisztességes termék internetes alkotóknak. Egy utcazenész nem internetes alkotó. Mi változik, amikor a közönség ott áll előtted — miért nem ugyanaz a 0%, mint a semmi, és miért kell egy €5-ös borravalónak €5-ként megérkeznie.
+title: Online borravalós persely utcazenészeknek: Ko-fi, Buy Me a Coffee és TipTopJar összehasonlítva
+description: Három tisztességes termék internetes alkotóknak. Egy utcazenész nem internetes alkotó. A közönség ott áll előtted, és nyolc másodperced van — miért nem ugyanaz a 0%, mint a semmi, és miért kell egy €5-ös borravalónak €5-ként megérkeznie.
 slug: borravalos-eszkozok-osszehasonlitva
 ---
 

@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — a těch osm sekund, které vážně máš
-description: Tři slušné produkty pro tvůrce na internetu. Pouliční muzikant není tvůrce na internetu. Co se změní, když ti publikum stojí přímo před tebou — proč 0% není totéž co nic a proč má spropitné €5 dorazit jako €5.
+title: Online kasička na spropitné pro pouliční muzikanty: Ko-fi, Buy Me a Coffee a TipTopJar v porovnání
+description: Tři slušné produkty pro tvůrce na internetu. Pouliční muzikant není tvůrce na internetu. Publikum ti stojí přímo před tebou a máš osm sekund — proč 0% není totéž co nic a proč má spropitné €5 dorazit jako €5.
 slug: srovnani-nastroju-na-spropitne
 ---
 

@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — i te osiem sekund, które naprawdę masz
-description: Trzy porządne produkty dla twórców w internecie. Uliczny grajek nie jest twórcą w internecie. Co się zmienia, gdy publiczność stoi tuż przed tobą — dlaczego 0% to nie to samo co nic i dlaczego napiwek €5 powinien dotrzeć jako €5.
+title: Napiwki online dla ulicznego muzyka: Ko-fi, Buy Me a Coffee i TipTopJar w porównaniu
+description: Trzy porządne produkty dla twórców w internecie. Uliczny muzyk nie jest twórcą w internecie. Publiczność stoi tuż przed tobą, a ty masz osiem sekund — dlaczego 0% to nie to samo co nic i dlaczego napiwek €5 powinien dotrzeć jako €5.
 slug: porownanie-narzedzi-do-napiwkow
 ---
 

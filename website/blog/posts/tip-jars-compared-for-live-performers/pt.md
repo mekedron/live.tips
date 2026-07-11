@@ -1,6 +1,6 @@
 ---
-title: Ko-fi, Buy Me a Coffee, TipTopJar — e os oito segundos que tens de verdade
-description: Três produtos decentes para criadores na internet. Um artista de rua não é um criador na internet. O que muda quando o teu público está à tua frente — porque 0% não é o mesmo que nada, e porque uma gorjeta de 5 € deve chegar como 5 €.
+title: Pote de gorjetas online para músicos de rua: Ko-fi, Buy Me a Coffee e TipTopJar comparados
+description: Três produtos decentes para criadores na internet. Um músico de rua não é um criador na internet. O teu público está à tua frente e tens oito segundos — porque 0% não é o mesmo que nada, e porque uma gorjeta de 5 € deve chegar como 5 €.
 slug: potes-de-gorjetas-comparados
 ---
 
