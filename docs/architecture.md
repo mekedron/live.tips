@@ -11,8 +11,19 @@ the reasoning.
 ## The core loop: polling instead of webhooks
 
 Webhooks need a public HTTPS endpoint — a tablet on a stage doesn't have one.
-Stripe explicitly supports polling `/v1/events` as a webhook alternative, which
-is what `StripeDonationSource` does during a live session:
+Stripe recommends webhooks and does **not** document polling as a sanctioned
+alternative; `/v1/events` is a documented endpoint that we poll deliberately,
+accepting the trade-off, which is what `StripeDonationSource` does during a live
+session:
+
+Two limits this buys us, and they set the poll interval:
+
+- `/v1/events` only lists events **going back 30 days** — fine for a live set,
+  useless as a donation ledger. Tip history lives on the device.
+- Stripe allows roughly **500 read requests per transaction** over a rolling
+  30 days, with a floor of **10,000 reads/month**. A 4-second poll across a
+  3-hour set is ~2,700 reads, so a busy month of long sets on a quiet account can
+  approach the floor. This is why the default interval is 4 s and not 1 s.
 
 1. **Prime:** fetch the newest `checkout.session.completed` /
    `checkout.session.async_payment_succeeded` event id → that's the cursor.

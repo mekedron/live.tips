@@ -27,10 +27,12 @@ paid. Stripe-only setups still talk to no live.tips server at all — see
 - The app creates a **Product + pay-what-you-want Price + Payment Link** in the
   artist's account. The Payment Link URL becomes their QR code — print it, tape it to
   the guitar case, put it on the merch table.
-- During a **live session**, the app long-polls Stripe's
-  [`/v1/events`](https://docs.stripe.com/api/events) endpoint (the documented
-  webhook alternative — perfect for a tablet on a stage) and shows each new donation
-  in real time against tonight's goal, which can be edited mid-set.
+- During a **live session**, the app polls Stripe's
+  [`/v1/events`](https://docs.stripe.com/api/events) endpoint and shows each new
+  donation in real time against tonight's goal, which can be edited mid-set.
+  Stripe recommends webhooks; a tablet on a stage has no public HTTPS endpoint to
+  receive one, so this polls a documented endpoint instead — a deliberate trade-off,
+  not a blessed path. See [architecture notes](docs/architecture.md).
 - **Stage lock** blocks the screen from casual tampering while the device sits on
   stage; unlocking uses Face ID / Touch ID / device passcode, with an in-app PIN as
   fallback.

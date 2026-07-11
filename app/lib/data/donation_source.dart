@@ -24,9 +24,11 @@ abstract class DonationSource {
   void dispose() {}
 }
 
-/// Polls the artist's own Stripe account via `/v1/events` — the documented
-/// webhook alternative, which is what lets this app run on a tablet on a
-/// stage with no server anywhere.
+/// Polls the artist's own Stripe account via `/v1/events`, which is what lets
+/// this app run on a tablet on a stage with no server anywhere. Stripe
+/// recommends webhooks; a stage device has no public HTTPS endpoint to receive
+/// one, so we poll a documented endpoint deliberately. Stripe's read allocation
+/// (~500 reads/transaction, 10k/month floor) is why the default tick is 4 s.
 class StripeDonationSource extends DonationSource {
   StripeDonationSource(this._requests,
       {required this.paymentLinkId, this.onDispose});
