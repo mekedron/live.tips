@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Alege tot ce folosești — oricum, fanii primesc un singur cod QR.",
   "onboarding.method_select.title": "Primește bacșiș",
   "onboarding.relay_setup.cancel": "Anulează",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay e doar în EUR — borcanul tău de bacșiș folosește {currency}. Schimbă moneda în EUR sau elimină MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo e doar în GBP — borcanul tău de bacșiș folosește {currency}. Schimbă moneda în GBP sau elimină Monzo.",
   "onboarding.relay_setup.regenerate_body": "Aceasta înlocuiește linkul paginii tale de bacșiș. Codurile QR printate cu linkul vechi nu mai funcționează.",
   "onboarding.relay_setup.regenerate_success": "Link nou de pagină de bacșiș creat",
   "onboarding.relay_setup.regenerate_title": "Link nou de pagină de bacșiș?",

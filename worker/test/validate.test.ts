@@ -7,6 +7,7 @@ import {
   validateProfile,
   validateTip,
 } from "../src/validate";
+import { methodCurrency } from "../src/methods";
 
 const baseProfile = {
   artistName: "Käärijä",
@@ -81,13 +82,15 @@ describe("validateProfile", () => {
     }
   });
 
-  it("rejects MobilePay for non-EUR jars", () => {
+  it("accepts a MobilePay Box on a jar of any currency", () => {
+    // The Box still collects EUR — that's methodCurrency's job, not a lock on
+    // the jar. A USD jar may absolutely offer one.
     const r = validateProfile({
       ...baseProfile,
       currency: "usd",
       methods: { mobilepayBoxId: "a76b1e43-1958-483c-b602-da5869f57212" },
     });
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
   });
 
   it("accepts a Monzo handle on a GBP jar, stripping @ and casing", () => {
@@ -100,13 +103,28 @@ describe("validateProfile", () => {
     if (r.ok) expect(r.value.methods.monzoUsername).toBe("daniel");
   });
 
-  it("rejects Monzo for non-GBP jars", () => {
+  it("accepts Monzo on a jar of any currency", () => {
     const r = validateProfile({
       ...baseProfile,
       currency: "eur",
       methods: { monzoUsername: "daniel" },
     });
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
+  });
+
+  it("lets one jar offer Revolut, MobilePay and Monzo together", () => {
+    // The whole point of unlocking the currency: three methods, three
+    // currencies, one QR code.
+    const r = validateProfile({
+      ...baseProfile,
+      currency: "eur",
+      methods: {
+        revolutUsername: "mekedron",
+        mobilepayBoxId: "a76b1e43-1958-483c-b602-da5869f57212",
+        monzoUsername: "daniel",
+      },
+    });
+    expect(r.ok).toBe(true);
   });
 
   it("rejects Monzo handles that could escape the URL path", () => {
@@ -158,9 +176,29 @@ describe("validateTip", () => {
     expect(amountBounds("jpy")).toEqual({ min: 1, max: 10_000 });
   });
 
+  it("bounds the amount by the METHOD's currency, not the jar's", () => {
+    // A JPY jar is zero-decimal: ¥50 is a valid Revolut tip there. But a
+    // MobilePay Box collects EUR, so the same 50 means €0.50 — under the €1
+    // floor — and must be refused. Bounding by the jar would have let it in.
+    expect(validateTip({ ...tip, method: "revolut", amountMinor: 50 }, "jpy").ok).toBe(true);
+    expect(validateTip({ ...tip, method: "mobilepay", amountMinor: 50 }, "jpy").ok).toBe(false);
+    expect(validateTip({ ...tip, method: "mobilepay", amountMinor: 500 }, "jpy").ok).toBe(true);
+    // Monzo is GBP (two-decimal) on a JPY jar for the same reason.
+    expect(validateTip({ ...tip, method: "monzo", amountMinor: 50 }, "jpy").ok).toBe(false);
+    expect(validateTip({ ...tip, method: "monzo", amountMinor: 750 }, "jpy").ok).toBe(true);
+  });
+
   it("requires a turnstile token and rejects unknown fields", () => {
     expect(validateTip({ ...tip, turnstileToken: "" }, "eur").ok).toBe(false);
     expect(validateTip({ ...tip, extra: true }, "eur").ok).toBe(false);
+  });
+});
+
+describe("methodCurrency", () => {
+  it("pins the fixed-currency methods and passes the jar's through otherwise", () => {
+    expect(methodCurrency("mobilepay", "usd")).toBe("eur");
+    expect(methodCurrency("monzo", "usd")).toBe("gbp");
+    expect(methodCurrency("revolut", "usd")).toBe("usd");
   });
 });
 

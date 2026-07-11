@@ -722,7 +722,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               child: Column(
                 children: [
                   Text(
-                    formatAmount(session.totalMinor, session.currency),
+                    formatAmount(
+                      session.totalMinor,
+                      session.currency,
+                      approximate: session.isMixedCurrency,
+                    ),
                     style: moneyStyle(34, c.text),
                   ),
                   const SizedBox(height: 6),
@@ -1168,7 +1172,11 @@ class _SessionCard extends StatelessWidget {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          formatAmount(session.totalMinor, session.currency),
+                          formatAmount(
+                      session.totalMinor,
+                      session.currency,
+                      approximate: session.isMixedCurrency,
+                    ),
                           style: moneyStyle(22, c.text, height: 1.1),
                         ),
                       ),

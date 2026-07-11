@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Choisissez tout ce que vous utilisez — les fans obtiennent un seul QR dans tous les cas.",
   "onboarding.method_select.title": "Recevoir des pourboires",
   "onboarding.relay_setup.cancel": "Annuler",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay est en EUR uniquement — votre pot à pourboires utilise {currency}. Passez la devise en EUR ou retirez MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo est en GBP uniquement — votre pot à pourboires utilise {currency}. Passez la devise en GBP ou retirez Monzo.",
   "onboarding.relay_setup.regenerate_body": "Cela remplace le lien de votre page de pourboires. Les QR codes imprimés avec l'ancien lien cessent de fonctionner.",
   "onboarding.relay_setup.regenerate_success": "Nouveau lien de page de pourboires créé",
   "onboarding.relay_setup.regenerate_title": "Nouveau lien de page de pourboires ?",

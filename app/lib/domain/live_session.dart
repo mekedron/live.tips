@@ -1,4 +1,5 @@
 import 'donation.dart';
+import 'fx_rates.dart';
 import 'rollover_math.dart';
 
 /// One "set" on stage: from Start to Stop. Collects every donation that
@@ -35,9 +36,34 @@ class LiveSession {
   final List<Donation> donations;
   final Set<String> _ids = {};
 
+  /// Rates for adding up tips paid in a currency other than [currency] — a £5
+  /// Monzo tip on a EUR jar. Injected by the live controller, never persisted
+  /// (rates are refetched, and a stored one would silently go stale). Null,
+  /// or missing a currency, means such tips are shown but not counted: see
+  /// [uncountedDonations]. Tips in [currency] never need it.
+  FxRates? fx;
+
   bool get isRunning => endedAt == null;
+
+  /// A donation's amount expressed in the session's currency. Null when it was
+  /// paid in another currency and no rate is available to bring it over.
+  int? amountInSessionCurrency(Donation d) =>
+      d.currency.toLowerCase() == currency.toLowerCase()
+      ? d.amountMinor
+      : fx?.convertMinor(d.amountMinor, d.currency, currency);
+
+  /// Tips that arrived in a currency we can't convert, so they're absent from
+  /// [totalMinor]. Not silent: the stage and history flag them rather than
+  /// fold a £ into a € and call it a total.
+  List<Donation> get uncountedDonations =>
+      [for (final d in donations) if (amountInSessionCurrency(d) == null) d];
+
+  /// True once any tip needed converting — the cue to show totals as "≈".
+  bool get isMixedCurrency =>
+      donations.any((d) => d.currency.toLowerCase() != currency.toLowerCase());
+
   int get totalMinor =>
-      donations.fold(0, (sum, d) => sum + d.amountMinor);
+      donations.fold(0, (sum, d) => sum + (amountInSessionCurrency(d) ?? 0));
   int get count => donations.length;
 
   double get progress =>
@@ -45,9 +71,16 @@ class LiveSession {
 
   bool get goalReached => goalMinor > 0 && totalMinor >= goalMinor;
 
+  /// Compared in the session's currency, so a £5 tip doesn't out-rank a €6 one
+  /// just because 5 < 6 is evaluated on raw minor units.
   Donation? get biggest => donations.isEmpty
       ? null
-      : donations.reduce((a, b) => b.amountMinor > a.amountMinor ? b : a);
+      : donations.reduce(
+          (a, b) =>
+              (amountInSessionCurrency(b) ?? 0) > (amountInSessionCurrency(a) ?? 0)
+              ? b
+              : a,
+        );
 
   int get averageMinor => count == 0 ? 0 : totalMinor ~/ count;
 

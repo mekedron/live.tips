@@ -171,6 +171,37 @@ describe("tip relay to connected device", () => {
     ws.close();
   });
 
+  it("delivers a Monzo tip as GBP even though the jar is EUR", async () => {
+    // The tip event is what the artist's device records into its local history.
+    // If this said "eur", a £5 Monzo tip would be filed as €5 forever — the
+    // whole reason a tip's currency follows the method, not the jar.
+    const { jarId, secret } = await createJar({
+      currency: "eur",
+      methods: { revolutUsername: "mekedron", monzoUsername: "daniel" },
+    });
+    const ws = await authedSocket(jarId, secret);
+    const incoming = nextMessage(ws);
+    mockTurnstile();
+    const res = await SELF.fetch(`https://live.tips/t/${jarId}/tips`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "CF-Connecting-IP": "198.51.100.9" },
+      body: JSON.stringify({
+        method: "monzo",
+        amountMinor: 500,
+        name: "Grace",
+        message: "encore!",
+        turnstileToken: "test-token",
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(await incoming)).toMatchObject({
+      method: "monzo",
+      amountMinor: 500,
+      currency: "gbp", // …not the jar's eur
+    });
+    ws.close();
+  });
+
   it("does not relay identical duplicates inside the window", async () => {
     const { jarId, secret } = await createJar();
     const ws = await authedSocket(jarId, secret);

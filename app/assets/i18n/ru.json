@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Выберите всё, чем пользуетесь — зрители в любом случае получат один QR.",
   "onboarding.method_select.title": "Получайте чаевые",
   "onboarding.relay_setup.cancel": "Отмена",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay работает только с EUR — ваша копилка использует {currency}. Смените валюту на EUR или удалите MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo работает только с GBP — ваша копилка использует {currency}. Смените валюту на GBP или удалите Monzo.",
   "onboarding.relay_setup.regenerate_body": "Это заменит ссылку на вашу страницу чаевых. Распечатанные QR-коды со старой ссылкой перестанут работать.",
   "onboarding.relay_setup.regenerate_success": "Новая ссылка на страницу чаевых создана",
   "onboarding.relay_setup.regenerate_title": "Новая ссылка на страницу чаевых?",

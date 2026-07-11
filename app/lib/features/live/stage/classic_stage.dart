@@ -28,7 +28,11 @@ class ClassicStage extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            formatAmount(snapshot.totalMinor, snapshot.currency),
+            formatAmount(
+              snapshot.totalMinor,
+              snapshot.currency,
+              approximate: snapshot.approximateTotal,
+            ),
             style: const TextStyle(
               fontFamily: kFontOutfit,
               fontSize: 96,

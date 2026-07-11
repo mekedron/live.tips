@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Elige todo lo que uses: el público recibe un solo QR en cualquier caso.",
   "onboarding.method_select.title": "Recibe propinas",
   "onboarding.relay_setup.cancel": "Cancelar",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay solo funciona en EUR y tu bote de propinas usa {currency}. Cambia la moneda a EUR o quita MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo solo funciona en GBP y tu bote de propinas usa {currency}. Cambia la moneda a GBP o quita Monzo.",
   "onboarding.relay_setup.regenerate_body": "Esto reemplaza el enlace de tu página de propinas. Los códigos QR impresos con el enlace antiguo dejan de funcionar.",
   "onboarding.relay_setup.regenerate_success": "Nuevo enlace de página de propinas creado",
   "onboarding.relay_setup.regenerate_title": "¿Nuevo enlace de página de propinas?",

@@ -8,6 +8,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { newSecret, sha256Hex, verifySecret } from "./auth";
 import { buildRedirectUrl } from "./deeplinks";
+import { methodCurrency } from "./methods";
 import type { Env, JarProfile, TipEvent, TipRequest } from "./types";
 
 const DAY_MS = 86_400_000;
@@ -192,7 +193,9 @@ export class JarDO extends DurableObject<Env> {
         ts: now,
         method: tip.method,
         amountMinor: tip.amountMinor,
-        currency: profile.currency,
+        // The currency the donor actually paid in — EUR for a Box, GBP for
+        // Monzo — not the jar's. This is what the artist's device records.
+        currency: methodCurrency(tip.method, profile.currency),
         name: tip.name,
         message: tip.message,
       };

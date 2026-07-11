@@ -10,7 +10,7 @@ import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
 import 'onboarding_flow.dart';
 import 'relay_setup_screen.dart'
-    show parseRelayMethodValue, relayMethodCurrencyError, relayMethodHint;
+    show parseRelayMethodValue, relayMethodHint;
 
 /// One onboarding step for a relay method — Revolut, MobilePay or Monzo. The
 /// value is stashed in the draft (no jar is created yet; the final screen
@@ -90,25 +90,17 @@ class _OnboardingMethodScreenState
   }
 
   void _save() {
-    final draft = ref.read(onboardingDraftProvider);
     final raw = _controller.text.trim();
     if (raw.isEmpty) {
       _skip();
       return;
     }
 
+    // No currency gate: a Box collects EUR and Monzo GBP whatever the band's
+    // currency is, and the tip is recorded in the currency it was paid in.
     final value = parseRelayMethodValue(widget.method, raw);
     if (value == null) {
       setState(() => _error = context.s.t('onboarding.method.${_wire}_invalid'));
-      return;
-    }
-    final curErr = relayMethodCurrencyError(
-      widget.method,
-      draft?.currency ?? 'eur',
-      context: context,
-    );
-    if (curErr != null) {
-      setState(() => _error = curErr);
       return;
     }
     ref

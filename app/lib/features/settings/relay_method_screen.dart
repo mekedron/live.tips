@@ -11,7 +11,7 @@ import '../../l10n/enum_labels.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../onboarding/relay_setup_screen.dart'
-    show parseRelayMethodValue, relayMethodCurrencyError, relayMethodHint;
+    show parseRelayMethodValue, relayMethodHint;
 
 /// Edits a single connected-mode payment method — Revolut, MobilePay or Monzo
 /// — on its own full-page screen (back arrow), mirroring the Stripe key editor.
@@ -96,15 +96,6 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
             'settings.relay_method.error_${_wire}_invalid',
           ),
         );
-        return;
-      }
-      final curErr = relayMethodCurrencyError(
-        widget.method,
-        app.currency,
-        context: context,
-      );
-      if (curErr != null) {
-        setState(() => _error = curErr);
         return;
       }
     }

@@ -3,6 +3,7 @@
 /// (never truncate silently), and keep free text plain — no URLs are ever
 /// accepted as free-form strings anywhere in the API.
 
+import { methodCurrency } from "./methods";
 import type { JarProfile, TipRequest } from "./types";
 
 export type Ok<T> = { ok: true; value: T };
@@ -161,7 +162,8 @@ export function validateProfile(body: Record<string, unknown>): Result<JarProfil
     if (typeof v !== "string" || !MOBILEPAY_BOX_ID.test(v.trim().toLowerCase())) {
       return err(422, "mobilepayBoxId must be a MobilePay Box UUID");
     }
-    if (currency !== "eur") return err(422, "MobilePay Box requires EUR");
+    // No currency lock: a Box always collects EUR (see methods.ts), whatever
+    // the jar's own currency is. The donor form prices the tip accordingly.
     methods.mobilepayBoxId = v.trim().toLowerCase();
   }
   if (methodsObj["monzoUsername"] !== undefined) {
@@ -169,10 +171,7 @@ export function validateProfile(body: Record<string, unknown>): Result<JarProfil
     if (typeof v !== "string") return err(422, "monzoUsername must be a string");
     const lowered = v.trim().toLowerCase().replace(/^@/, "");
     if (!MONZO_USERNAME.test(lowered)) return err(422, "monzoUsername is not a valid Monzo.me handle");
-    // Monzo.me only ever collects in sterling. Note this also makes Monzo and
-    // MobilePay mutually exclusive on one jar — a jar has a single currency,
-    // and their locks (GBP / EUR) can't both hold.
-    if (currency !== "gbp") return err(422, "Monzo requires GBP");
+    // Likewise unlocked: Monzo.me always collects GBP (see methods.ts).
     methods.monzoUsername = lowered;
   }
 
@@ -191,7 +190,7 @@ const TIP_KEYS = ["method", "amountMinor", "name", "message", "turnstileToken"] 
 
 export function validateTip(
   body: Record<string, unknown>,
-  currency: string,
+  jarCurrency: string,
 ): Result<TipRequest & { turnstileToken: string }> {
   const unknown = rejectUnknownKeys(body, TIP_KEYS, "tip");
   if (unknown) return unknown;
@@ -201,8 +200,12 @@ export function validateTip(
     return err(422, "method must be revolut, mobilepay or monzo");
   }
 
+  // The amount is denominated in the currency the METHOD collects — EUR for a
+  // MobilePay Box, GBP for Monzo — not necessarily the jar's. Bounds (and the
+  // zero-decimal question) have to follow it, or a JPY jar would mis-scale a
+  // MobilePay tip.
   const amount = body["amountMinor"];
-  const { min, max } = amountBounds(currency);
+  const { min, max } = amountBounds(methodCurrency(method, jarCurrency));
   if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < min || amount > max) {
     return err(422, `amountMinor must be an integer between ${min} and ${max}`);
   }

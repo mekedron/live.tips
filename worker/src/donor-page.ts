@@ -5,16 +5,23 @@
 ///    script only via escaped data-* attributes.
 
 import { bareMethodUrl } from "./deeplinks";
+import { methodCurrency, TIP_METHODS } from "./methods";
 import { amountBounds, escapeHtml, ZERO_DECIMAL } from "./validate";
 import type { JarProfile } from "./types";
 
 /** Static — never interpolate into this string (it is hashed for CSP). */
 const INLINE_SCRIPT = `(function () {
-  var cfg = document.querySelector('main').dataset;
   var form = document.getElementById('tipform');
   if (!form) return;
+  // Per-method pricing: a Box always collects EUR and Monzo always GBP, so the
+  // amount the donor types is denominated by the METHOD they picked, not by the
+  // jar. Picking a method reprices the whole field.
+  var methods = JSON.parse(document.querySelector('main').getAttribute('data-methods'));
+  var current = null;
   var methodInput = document.getElementById('f-method');
   var amountEl = document.getElementById('f-amount');
+  var labelEl = document.getElementById('f-amount-label');
+  var chipsEl = document.getElementById('f-chips');
   var errEl = document.getElementById('f-error');
   var successEl = document.getElementById('f-success');
   var redirected = false;
@@ -27,6 +34,20 @@ const INLINE_SCRIPT = `(function () {
     show(successEl);
     successEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  function reprice(method) {
+    current = methods[method];
+    labelEl.textContent = 'Amount (' + current.code + ')';
+    amountEl.value = '';
+    amountEl.placeholder = String(current.chips[1]);
+    chipsEl.textContent = '';
+    current.chips.forEach(function (c) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = String(c);
+      b.addEventListener('click', function () { amountEl.value = String(c); });
+      chipsEl.appendChild(b);
+    });
+  }
   document.addEventListener('visibilitychange', function () {
     if (redirected && document.visibilityState === 'visible') showSuccess();
   });
@@ -34,26 +55,24 @@ const INLINE_SCRIPT = `(function () {
     btn.addEventListener('click', function () {
       methodInput.value = btn.getAttribute('data-method');
       document.getElementById('f-title').textContent = btn.getAttribute('data-label');
+      reprice(btn.getAttribute('data-method'));
       show(form);
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
       amountEl.focus();
     });
   });
-  Array.prototype.forEach.call(document.querySelectorAll('button[data-chip]'), function (btn) {
-    btn.addEventListener('click', function () { amountEl.value = btn.getAttribute('data-chip'); });
-  });
   form.addEventListener('submit', function (ev) {
     ev.preventDefault();
     hide(errEl);
+    if (!current) return;
     var name = document.getElementById('f-name').value.trim();
     if (name.indexOf(':') !== -1) {
       errEl.textContent = 'Please leave the ":" character out of your name.';
       show(errEl);
       return;
     }
-    var factor = parseInt(cfg.factor, 10);
-    var amount = Math.round(parseFloat(amountEl.value.replace(',', '.')) * factor);
-    if (!isFinite(amount) || amount < parseInt(cfg.min, 10) || amount > parseInt(cfg.max, 10)) {
+    var amount = Math.round(parseFloat(amountEl.value.replace(',', '.')) * current.factor);
+    if (!isFinite(amount) || amount < current.min || amount > current.max) {
       errEl.textContent = 'Please enter a valid amount.';
       show(errEl);
       return;
@@ -122,15 +141,33 @@ footer { margin-top: 28px; font-size: 0.75rem; color: var(--muted); }
 footer a { color: inherit; }
 `;
 
+/** How one method prices a tip: its currency, minor-unit factor, and bounds. */
+function pricing(currency: string) {
+  const zeroDecimal = ZERO_DECIMAL.has(currency);
+  return {
+    code: currency.toUpperCase(),
+    factor: zeroDecimal ? 1 : 100,
+    chips: zeroDecimal ? [500, 1000, 2000] : [2, 5, 10],
+    ...amountBounds(currency),
+  };
+}
+
 export function renderDonorPage(profile: JarProfile, siteKey: string): string {
   const name = escapeHtml(profile.artistName);
   const message = profile.message ? `<p class="msg">${escapeHtml(profile.message)}</p>` : "";
   const currency = profile.currency; // validated ^[a-z]{3}$
-  const zeroDecimal = ZERO_DECIMAL.has(currency);
-  const { min, max } = amountBounds(currency);
-  const factor = zeroDecimal ? 1 : 100;
-  const chips = zeroDecimal ? [500, 1000, 2000] : [2, 5, 10];
-  const currencyLabel = currency.toUpperCase();
+
+  // One pricing entry per offered method. MobilePay and Monzo bring their own
+  // currency, so a single page can price a €-Box tip and a £-Monzo tip side by
+  // side; the script swaps the field over when the donor picks one.
+  const offered = TIP_METHODS.filter((m) => bareMethodUrl(profile, m) !== null);
+  const priced = offered.map((m) => ({ method: m, price: pricing(methodCurrency(m, currency)) }));
+  const methodPricing = Object.fromEntries(priced.map((p) => [p.method, p.price]));
+
+  // The pre-selection default the label shows before any method is picked.
+  const initial = pricing(currency);
+
+  const LABELS: Record<string, string> = { revolut: "Revolut", mobilepay: "MobilePay", monzo: "Monzo" };
 
   const buttons: string[] = [];
   if (profile.methods.stripeUrl) {
@@ -138,35 +175,29 @@ export function renderDonorPage(profile: JarProfile, siteKey: string): string {
       `<a class="paybtn primary" href="${escapeHtml(profile.methods.stripeUrl)}" rel="noopener">Card · Apple Pay · Google Pay</a>`,
     );
   }
-  if (profile.methods.revolutUsername) {
-    buttons.push(`<button type="button" data-method="revolut" data-label="Tip with Revolut">Revolut</button>`);
-  }
-  if (profile.methods.mobilepayBoxId) {
-    buttons.push(`<button type="button" data-method="mobilepay" data-label="Tip with MobilePay">MobilePay</button>`);
-  }
-  if (profile.methods.monzoUsername) {
-    buttons.push(`<button type="button" data-method="monzo" data-label="Tip with Monzo">Monzo</button>`);
+  for (const { method, price } of priced) {
+    const label = LABELS[method];
+    // The currency rides on the button when it isn't the jar's own, so the
+    // donor knows a Monzo tip is priced in pounds before they tap it.
+    const suffix = price.code === initial.code ? "" : ` · ${price.code}`;
+    buttons.push(
+      `<button type="button" data-method="${method}" data-label="Tip with ${label}">${label}${suffix}</button>`,
+    );
   }
 
-  const fallbackLinks: string[] = [];
-  const revolutBare = bareMethodUrl(profile, "revolut");
-  const mobilepayBare = bareMethodUrl(profile, "mobilepay");
-  const monzoBare = bareMethodUrl(profile, "monzo");
-  if (revolutBare) fallbackLinks.push(`<a href="${escapeHtml(revolutBare)}" rel="noopener">Open Revolut</a>`);
-  if (mobilepayBare) fallbackLinks.push(`<a href="${escapeHtml(mobilepayBare)}" rel="noopener">Open MobilePay</a>`);
-  if (monzoBare) fallbackLinks.push(`<a href="${escapeHtml(monzoBare)}" rel="noopener">Open Monzo</a>`);
-
-  const hasForm = Boolean(
-    profile.methods.revolutUsername || profile.methods.mobilepayBoxId || profile.methods.monzoUsername,
+  const fallbackLinks = offered.map(
+    (m) => `<a href="${escapeHtml(bareMethodUrl(profile, m)!)}" rel="noopener">Open ${LABELS[m]}</a>`,
   );
+
+  const hasForm = offered.length > 0;
   const form = hasForm
     ? `
 <form id="tipform" hidden>
   <h2 id="f-title">Send a tip</h2>
   <input type="hidden" id="f-method" value="">
-  <label for="f-amount">Amount (${currencyLabel})</label>
-  <input id="f-amount" inputmode="decimal" autocomplete="off" placeholder="${chips[1]}" required>
-  <div class="chips">${chips.map((c) => `<button type="button" data-chip="${c}">${c}</button>`).join("")}</div>
+  <label id="f-amount-label" for="f-amount">Amount (${initial.code})</label>
+  <input id="f-amount" inputmode="decimal" autocomplete="off" placeholder="${initial.chips[1]}" required>
+  <div class="chips" id="f-chips"></div>
   <label for="f-name">Your name (optional)</label>
   <input id="f-name" maxlength="40" autocomplete="off" placeholder="Anonymous">
   <label for="f-message">Message (optional)</label>
@@ -197,7 +228,7 @@ export function renderDonorPage(profile: JarProfile, siteKey: string): string {
 <style>${STYLE}</style>
 </head>
 <body>
-<main data-factor="${factor}" data-min="${min}" data-max="${max}">
+<main data-methods="${escapeHtml(JSON.stringify(methodPricing))}">
   <h1>${name}</h1>
   ${message}
   ${buttons.join("\n  ")}

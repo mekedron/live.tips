@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Veldu allt sem þú notar — aðdáendur fá einn QR hvort sem er.",
   "onboarding.method_select.title": "Fáðu þjórfé",
   "onboarding.relay_setup.cancel": "Hætta við",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay er aðeins í EUR — þjórfékrukkan þín notar {currency}. Skiptu gjaldmiðlinum yfir í EUR eða fjarlægðu MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo er aðeins í GBP — þjórfékrukkan þín notar {currency}. Skiptu gjaldmiðlinum yfir í GBP eða fjarlægðu Monzo.",
   "onboarding.relay_setup.regenerate_body": "Þetta kemur í stað þjórfjársíðuhlekksins þíns. Prentaðir QR-kóðar með gamla hlekknum hætta að virka.",
   "onboarding.relay_setup.regenerate_success": "Nýr þjórfjársíðuhlekkur búinn til",
   "onboarding.relay_setup.regenerate_title": "Nýr þjórfjársíðuhlekkur?",

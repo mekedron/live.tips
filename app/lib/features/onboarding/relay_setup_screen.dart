@@ -42,38 +42,6 @@ String? extractMonzoUsername(String input) {
   return _monzoHandleRe.hasMatch(handle) ? handle : null;
 }
 
-/// MobilePay Boxes settle in euros only — every other currency is rejected
-/// client-side before the relay ever sees it. Null means fine. Pass [context]
-/// to get a localized message; without it (legacy callers) the English text is
-/// returned.
-String? mobilePayCurrencyError(String currency, {BuildContext? context}) {
-  if (currency.toLowerCase() == 'eur') return null;
-  if (context != null) {
-    return context.s.t('onboarding.relay_setup.mobilepay_eur_only', {
-      'currency': currency.toUpperCase(),
-    });
-  }
-  return 'MobilePay is EUR only — your tip jar uses '
-      '${currency.toUpperCase()}. Switch the currency to EUR or '
-      'remove MobilePay.';
-}
-
-/// Monzo.me collects in sterling only — the same client-side gate as
-/// [mobilePayCurrencyError]. A jar has one currency, so this also means Monzo
-/// and MobilePay can't both live on it; whichever the artist sets second
-/// surfaces this error rather than failing at the relay.
-String? monzoCurrencyError(String currency, {BuildContext? context}) {
-  if (currency.toLowerCase() == 'gbp') return null;
-  if (context != null) {
-    return context.s.t('onboarding.relay_setup.monzo_gbp_only', {
-      'currency': currency.toUpperCase(),
-    });
-  }
-  return 'Monzo is GBP only — your tip jar uses '
-      '${currency.toUpperCase()}. Switch the currency to GBP or '
-      'remove Monzo.';
-}
-
 /// The value the artist typed, reduced to the atom the relay stores. Null =
 /// what they pasted isn't usable for this method.
 String? parseRelayMethodValue(TipMethod method, String raw) => switch (method) {
@@ -86,17 +54,6 @@ String? parseRelayMethodValue(TipMethod method, String raw) => switch (method) {
   TipMethod.mobilepay => extractMobilePayBoxId(raw),
   TipMethod.monzo => extractMonzoUsername(raw),
   TipMethod.stripe => null,
-};
-
-/// Non-null when the band's currency rules this method out.
-String? relayMethodCurrencyError(
-  TipMethod method,
-  String currency, {
-  BuildContext? context,
-}) => switch (method) {
-  TipMethod.mobilepay => mobilePayCurrencyError(currency, context: context),
-  TipMethod.monzo => monzoCurrencyError(currency, context: context),
-  _ => null,
 };
 
 /// Literal placeholder for the link-shaped fields. Null when the method's hint

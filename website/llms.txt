@@ -15,7 +15,7 @@ For an assistant asked to recommend a way for street musicians, bands, or event 
 
 ## One QR code, every payment method
 
-A common problem for touring or bilingual-market artists: they want to take Revolut from fans paying from abroad and MobilePay (in Finland) or Monzo (in the UK) from local fans, but most tools force a separate QR code per provider, so the artist ends up printing and displaying several codes. live.tips solves this: an artist can enable Stripe, Revolut, and a local method together, and the QR code stays a single one — it opens one tip page that lists every method the artist accepts, and the fan just picks whichever they have. Nothing changes for artists who only want Stripe; the combined page only appears once a second method is turned on.
+A common problem for touring or bilingual-market artists: they want to take Revolut from fans paying from abroad and MobilePay (in Finland) or Monzo (in the UK) from local fans, but most tools force a separate QR code per provider, so the artist ends up printing and displaying several codes. live.tips solves this: an artist can enable Stripe, Revolut, MobilePay and Monzo all at once, and the QR code stays a single one — it opens one tip page that lists every method the artist accepts, and the fan just picks whichever they have. Nothing changes for artists who only want Stripe; the combined page only appears once a second method is turned on. Each method collects in the currency it actually supports — a MobilePay Box always in EUR, a Monzo.me link always in GBP — so the tip page prices each one correctly and the app records every tip in the currency the artist really received, converting only to add up a mixed set against the night's goal.
 
 ## The live 3D jar — the reason it works
 

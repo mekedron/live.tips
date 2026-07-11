@@ -6,6 +6,7 @@ import '../domain/app_settings.dart';
 import '../domain/band_account.dart';
 import '../domain/band_settings.dart';
 import '../domain/donation.dart';
+import '../domain/fx_rates.dart';
 import '../domain/live_session.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
@@ -26,6 +27,7 @@ class LocalStore {
   static const kAccounts = 'accounts_v1';
   static const _kSettings = 'settings_v1';
   static const _kPendingSecretWipes = 'pending_secret_wipes_v1';
+  static const _kFxRates = 'fx_rates_v1';
 
   // Per-band key bases — suffixed with `_<accountId>`. The unsuffixed names
   // are the pre-multi-band slots; the boot migration moves them.
@@ -234,6 +236,25 @@ class LocalStore {
 
   Future<void> saveSettings(AppSettings settings) =>
       _prefs.setString(_kSettings, jsonEncode(settings.toJson()));
+
+  // --- Exchange rates (device-wide) ---
+  //
+  // Cached so a stage with no signal can still total a mixed-currency set from
+  // the last rates it saw, and so we hit the rates service once a day, not once
+  // a session.
+
+  FxRates? readFxRates() {
+    final raw = _prefs.getString(_kFxRates);
+    if (raw == null) return null;
+    try {
+      return FxRates.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveFxRates(FxRates rates) =>
+      _prefs.setString(_kFxRates, jsonEncode(rates.toJson()));
 
   // --- Band settings ---
 

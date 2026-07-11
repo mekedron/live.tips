@@ -195,6 +195,37 @@ describe("tips endpoint", () => {
     expect(url.searchParams.get("d")).toBe("Grace: encore!");
   });
 
+  it("prices each method in its own currency on one EUR jar", async () => {
+    // The point of unlocking the jar currency: one QR code, three methods,
+    // and each tip denominated by the method the fan actually picked.
+    const { jarId } = await createJar({
+      currency: "eur",
+      methods: {
+        revolutUsername: "mekedron",
+        mobilepayBoxId: "a76b1e43-1958-483c-b602-da5869f57212",
+        monzoUsername: "daniel",
+      },
+    });
+    mockTurnstile();
+
+    const monzo = await postTip(jarId, { method: "monzo", amountMinor: 500 });
+    const url = new URL((await monzo.json<{ redirectUrl: string }>()).redirectUrl);
+    expect(url.origin).toBe("https://monzo.me");
+    expect(url.pathname).toBe("/daniel/5"); // £5, on a EUR jar
+
+    mockTurnstile();
+    const revolut = await postTip(jarId, { method: "revolut", amountMinor: 500 });
+    const rUrl = new URL((await revolut.json<{ redirectUrl: string }>()).redirectUrl);
+    expect(rUrl.origin).toBe("https://revolut.me");
+    expect(rUrl.searchParams.get("currency")).toBe("eur"); // Revolut takes the jar's
+
+    mockTurnstile();
+    const mp = await postTip(jarId, { method: "mobilepay", amountMinor: 500 });
+    expect(new URL((await mp.json<{ redirectUrl: string }>()).redirectUrl).origin).toBe(
+      "https://qr.mobilepay.fi",
+    );
+  });
+
   it("refuses a Monzo tip on a jar that has no Monzo handle", async () => {
     const { jarId } = await createJar(); // revolut + mobilepay only
     mockTurnstile();

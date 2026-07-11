@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Оберіть усе, чим користуєтеся — глядачі у будь-якому разі отримають один QR.",
   "onboarding.method_select.title": "Отримуйте чайові",
   "onboarding.relay_setup.cancel": "Скасувати",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay працює лише з EUR — ваша банка для чайових використовує {currency}. Змініть валюту на EUR або видаліть MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo працює лише з GBP — ваша банка для чайових використовує {currency}. Змініть валюту на GBP або видаліть Monzo.",
   "onboarding.relay_setup.regenerate_body": "Це замінить посилання на вашу сторінку чайових. Роздруковані QR-коди зі старим посиланням перестануть працювати.",
   "onboarding.relay_setup.regenerate_success": "Створено нове посилання на сторінку чайових",
   "onboarding.relay_setup.regenerate_title": "Нове посилання на сторінку чайових?",

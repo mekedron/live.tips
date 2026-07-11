@@ -20,17 +20,22 @@ int? parseMajorToMinor(String input, String currency) {
 ///
 /// Whole amounts are shown without decimals ("€50"), fractional ones with
 /// two ("€12.50"). Zero-decimal currencies (JPY, …) never show decimals.
+/// Set [approximate] when the figure had to convert currencies to exist —
+/// a set that mixed a £ tip into a € total. It renders "≈ €95", because the
+/// number depends on today's reference rate and isn't the exact sum of any
+/// ledger. Per-tip amounts are never approximate and never take this flag.
 String formatAmount(int amountMinor, String currency,
-    {bool alwaysShowDecimals = false}) {
+    {bool alwaysShowDecimals = false, bool approximate = false}) {
   final perMajor = minorUnitsPerMajor(currency);
   final value = amountMinor / perMajor;
   final hasFraction = amountMinor % perMajor != 0;
   final decimalDigits =
       perMajor == 1 ? 0 : (hasFraction || alwaysShowDecimals ? 2 : 0);
-  return NumberFormat.simpleCurrency(
+  final formatted = NumberFormat.simpleCurrency(
     name: currency.toUpperCase(),
     decimalDigits: decimalDigits,
   ).format(value);
+  return approximate ? '≈ $formatted' : formatted;
 }
 
 /// Bare number without symbol, for text fields ("50" / "12.50").

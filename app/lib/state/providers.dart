@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/donation_source.dart';
+import '../data/fx_source.dart';
 import '../data/local_store.dart';
 import '../data/relay/relay_client.dart';
 import '../data/relay/relay_config.dart';
@@ -12,6 +15,7 @@ import '../domain/app_settings.dart';
 import '../domain/band_account.dart';
 import '../domain/band_settings.dart';
 import '../domain/donation.dart';
+import '../domain/fx_rates.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
 import 'live_session_controller.dart';
@@ -663,6 +667,39 @@ class RelayHistoryNotifier extends Notifier<List<Donation>> {
 final relayHistoryProvider =
     NotifierProvider<RelayHistoryNotifier, List<Donation>>(
         RelayHistoryNotifier.new);
+
+/// Exchange rates for totalling a set that mixed currencies (a £5 Monzo tip
+/// alongside €10 Revolut ones). Serves the cached table immediately — the
+/// stage must never block on the network — and refreshes it in the background
+/// when it's missing or stale. A failed refresh is a no-op: the last good table
+/// stands, and with none at all the session declines to count foreign tips
+/// rather than guess. See [FxRates].
+class FxRatesNotifier extends Notifier<FxRates?> {
+  @override
+  FxRates? build() {
+    final cached = ref.read(localStoreProvider).readFxRates();
+    if (cached == null || cached.isStaleAt(DateTime.now())) {
+      unawaited(refresh());
+    }
+    return cached;
+  }
+
+  Future<void> refresh() async {
+    final source = FxSource();
+    try {
+      final fresh = await source.fetch();
+      await ref.read(localStoreProvider).saveFxRates(fresh);
+      state = fresh;
+    } catch (_) {
+      // Offline, rate-limited, or the service moved — keep whatever we have.
+    } finally {
+      source.close();
+    }
+  }
+}
+
+final fxRatesProvider =
+    NotifierProvider<FxRatesNotifier, FxRates?>(FxRatesNotifier.new);
 
 /// The old donate URL of the active band's auto-replaced tip page, or null
 /// when there's nothing to warn about. Home shows a "please reprint" card

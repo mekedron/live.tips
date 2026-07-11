@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Scegli tutto quello che usi — i fan ricevono un solo QR in ogni caso.",
   "onboarding.method_select.title": "Ricevi mance",
   "onboarding.relay_setup.cancel": "Annulla",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay è solo in EUR — il tuo barattolo delle mance usa {currency}. Cambia la valuta in EUR o rimuovi MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo è solo in GBP — il tuo barattolo delle mance usa {currency}. Cambia la valuta in GBP o rimuovi Monzo.",
   "onboarding.relay_setup.regenerate_body": "Questo sostituisce il link della tua pagina delle mance. I QR code stampati con il vecchio link smettono di funzionare.",
   "onboarding.relay_setup.regenerate_success": "Nuovo link pagina delle mance creato",
   "onboarding.relay_setup.regenerate_title": "Nuovo link pagina delle mance?",

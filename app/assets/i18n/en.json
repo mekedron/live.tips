@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Pick everything you use — fans get one QR either way.",
   "onboarding.method_select.title": "Get tipped",
   "onboarding.relay_setup.cancel": "Cancel",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay is EUR only — your tip jar uses {currency}. Switch the currency to EUR or remove MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo is GBP only — your tip jar uses {currency}. Switch the currency to GBP or remove Monzo.",
   "onboarding.relay_setup.regenerate_body": "This replaces your tip page link. Printed QR codes with the old link stop working.",
   "onboarding.relay_setup.regenerate_success": "New tip page link created",
   "onboarding.relay_setup.regenerate_title": "New tip page link?",

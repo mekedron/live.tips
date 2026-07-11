@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Välj allt du använder — fansen får en QR oavsett.",
   "onboarding.method_select.title": "Få dricks",
   "onboarding.relay_setup.cancel": "Avbryt",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay tar bara EUR — din dricksburk använder {currency}. Byt valuta till EUR eller ta bort MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo tar bara GBP — din dricksburk använder {currency}. Byt valuta till GBP eller ta bort Monzo.",
   "onboarding.relay_setup.regenerate_body": "Detta ersätter din länk till drickssidan. Utskrivna QR-koder med den gamla länken slutar fungera.",
   "onboarding.relay_setup.regenerate_success": "Ny länk till drickssidan skapad",
   "onboarding.relay_setup.regenerate_title": "Ny länk till drickssidan?",

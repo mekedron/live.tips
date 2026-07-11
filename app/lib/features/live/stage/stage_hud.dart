@@ -61,7 +61,11 @@ class StageHud extends StatelessWidget {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      formatAmount(s.totalMinor, s.currency),
+                      formatAmount(
+                        s.totalMinor,
+                        s.currency,
+                        approximate: s.approximateTotal,
+                      ),
                       style: TextStyle(
                         fontFamily: kFontOutfit,
                         fontSize: wide ? 60 : 46,

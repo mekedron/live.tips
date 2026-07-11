@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Valitse kaikki käyttämäsi — fanit saavat yhden QR-koodin joka tapauksessa.",
   "onboarding.method_select.title": "Ota vastaan tippejä",
   "onboarding.relay_setup.cancel": "Peruuta",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay on vain EUR — tippipurkkisi käyttää valuuttaa {currency}. Vaihda valuutaksi EUR tai poista MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo on vain GBP — tippipurkkisi käyttää valuuttaa {currency}. Vaihda valuutaksi GBP tai poista Monzo.",
   "onboarding.relay_setup.regenerate_body": "Tämä korvaa tippisivusi linkin. Vanhalla linkillä tulostetut QR-koodit lakkaavat toimimasta.",
   "onboarding.relay_setup.regenerate_success": "Uusi tippisivun linkki luotu",
   "onboarding.relay_setup.regenerate_title": "Uusi tippisivun linkki?",

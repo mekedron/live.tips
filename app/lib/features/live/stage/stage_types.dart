@@ -15,6 +15,7 @@ class StageSnapshot {
     required this.count,
     required this.currency,
     required this.goalReached,
+    this.approximateTotal = false,
     this.lastDonation,
     this.biggest,
     this.recentDonations = const [],
@@ -31,6 +32,9 @@ class StageSnapshot {
   final int count;
   final String currency;
   final bool goalReached;
+
+  /// The set mixed currencies, so [totalMinor] is a converted approximation.
+  final bool approximateTotal;
   final Donation? lastDonation;
   final Donation? biggest;
 
@@ -49,6 +53,7 @@ class StageSnapshot {
       count: s.count,
       currency: s.currency,
       goalReached: s.goalReached,
+      approximateTotal: s.isMixedCurrency,
       lastDonation: live.lastDonation,
       biggest: s.biggest,
       recentDonations: s.donations.reversed.take(14).toList(),

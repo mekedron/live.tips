@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Διάλεξε ό,τι χρησιμοποιείς — οι θαυμαστές παίρνουν ένα QR σε κάθε περίπτωση.",
   "onboarding.method_select.title": "Δέξου φιλοδωρήματα",
   "onboarding.relay_setup.cancel": "Άκυρο",
-  "onboarding.relay_setup.mobilepay_eur_only": "Το MobilePay δέχεται μόνο EUR — το βάζο φιλοδωρημάτων σου χρησιμοποιεί {currency}. Άλλαξε το νόμισμα σε EUR ή αφαίρεσε το MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Το Monzo δέχεται μόνο GBP — το βάζο φιλοδωρημάτων σου χρησιμοποιεί {currency}. Άλλαξε το νόμισμα σε GBP ή αφαίρεσε το Monzo.",
   "onboarding.relay_setup.regenerate_body": "Αυτό αντικαθιστά τον σύνδεσμο της σελίδας φιλοδωρημάτων σου. Τα τυπωμένα QR codes με τον παλιό σύνδεσμο σταματούν να λειτουργούν.",
   "onboarding.relay_setup.regenerate_success": "Δημιουργήθηκε νέος σύνδεσμος σελίδας φιλοδωρημάτων",
   "onboarding.relay_setup.regenerate_title": "Νέος σύνδεσμος σελίδας φιλοδωρημάτων;",

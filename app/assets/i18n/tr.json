@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Kullandığın her şeyi seç — hayranlar her durumda tek QR alır.",
   "onboarding.method_select.title": "Bahşiş al",
   "onboarding.relay_setup.cancel": "İptal",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay yalnızca EUR'dur — bahşiş kavanozun {currency} kullanıyor. Para birimini EUR'a çevir ya da MobilePay'i kaldır.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo yalnızca GBP'dir — bahşiş kavanozun {currency} kullanıyor. Para birimini GBP'ye çevir ya da Monzo'yu kaldır.",
   "onboarding.relay_setup.regenerate_body": "Bu, bahşiş sayfası bağlantını değiştirir. Eski bağlantıyı içeren yazdırılmış QR kodları çalışmayı durdurur.",
   "onboarding.relay_setup.regenerate_success": "Yeni bahşiş sayfası bağlantısı oluşturuldu",
   "onboarding.relay_setup.regenerate_title": "Yeni bahşiş sayfası bağlantısı?",

@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Escolhe tudo o que usas — os fãs recebem um só QR de qualquer forma.",
   "onboarding.method_select.title": "Recebe gorjetas",
   "onboarding.relay_setup.cancel": "Cancelar",
-  "onboarding.relay_setup.mobilepay_eur_only": "O MobilePay é só em EUR — o teu frasco de gorjetas usa {currency}. Muda a moeda para EUR ou remove o MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "O Monzo é só em GBP — o teu frasco de gorjetas usa {currency}. Muda a moeda para GBP ou remove o Monzo.",
   "onboarding.relay_setup.regenerate_body": "Isto substitui o link da tua página de gorjetas. Os códigos QR impressos com o link antigo deixam de funcionar.",
   "onboarding.relay_setup.regenerate_success": "Novo link da página de gorjetas criado",
   "onboarding.relay_setup.regenerate_title": "Novo link da página de gorjetas?",

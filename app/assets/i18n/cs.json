@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Vyber všechno, co používáš — fanoušci tak jako tak dostanou jeden QR.",
   "onboarding.method_select.title": "Přijímej spropitné",
   "onboarding.relay_setup.cancel": "Zrušit",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay je jen v EUR — tvoje kasička používá {currency}. Přepni měnu na EUR nebo MobilePay odeber.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo je jen v GBP — tvoje kasička používá {currency}. Přepni měnu na GBP nebo Monzo odeber.",
   "onboarding.relay_setup.regenerate_body": "Tímto nahradíš odkaz na svou stránku se spropitným. Vytištěné QR kódy se starým odkazem přestanou fungovat.",
   "onboarding.relay_setup.regenerate_success": "Nový odkaz na stránku se spropitným vytvořen",
   "onboarding.relay_setup.regenerate_title": "Nový odkaz na stránku se spropitným?",

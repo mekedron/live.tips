@@ -41,20 +41,6 @@ void main() {
     });
   });
 
-  group('mobilePayCurrencyError', () {
-    test('eur is fine, case-insensitively', () {
-      expect(mobilePayCurrencyError('eur'), isNull);
-      expect(mobilePayCurrencyError('EUR'), isNull);
-    });
-
-    test('any other currency is rejected with a readable message', () {
-      final error = mobilePayCurrencyError('usd');
-      expect(error, isNotNull);
-      expect(error, contains('EUR'));
-      expect(error, contains('USD'));
-      expect(mobilePayCurrencyError('dkk'), isNotNull);
-    });
-  });
 
   group('extractMonzoUsername', () {
     test('pulls the handle out of a pasted monzo.me link', () {
@@ -87,17 +73,4 @@ void main() {
     });
   });
 
-  group('monzoCurrencyError', () {
-    test('gbp is fine, case-insensitively', () {
-      expect(monzoCurrencyError('gbp'), isNull);
-      expect(monzoCurrencyError('GBP'), isNull);
-    });
-
-    test('any other currency is rejected with a readable message', () {
-      final error = monzoCurrencyError('eur');
-      expect(error, isNotNull);
-      expect(error, contains('GBP'));
-      expect(error, contains('EUR'));
-    });
-  });
 }

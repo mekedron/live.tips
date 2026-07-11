@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Válaszd ki mindet, amit használsz — a rajongók mindenképp egyetlen QR-kódot kapnak.",
   "onboarding.method_select.title": "Kapj borravalót",
   "onboarding.relay_setup.cancel": "Mégse",
-  "onboarding.relay_setup.mobilepay_eur_only": "A MobilePay csak EUR-ban működik — a borravalós perselyed {currency} pénznemet használ. Válts EUR-ra, vagy távolítsd el a MobilePayt.",
-  "onboarding.relay_setup.monzo_gbp_only": "A Monzo csak GBP-ben működik — a borravalós perselyed {currency} pénznemet használ. Válts GBP-re, vagy távolítsd el a Monzo-t.",
   "onboarding.relay_setup.regenerate_body": "Ez lecseréli a borravalóoldalad linkjét. A régi linket tartalmazó nyomtatott QR-kódok nem működnek tovább.",
   "onboarding.relay_setup.regenerate_success": "Új borravalóoldal-link létrehozva",
   "onboarding.relay_setup.regenerate_title": "Új borravalóoldal-link?",

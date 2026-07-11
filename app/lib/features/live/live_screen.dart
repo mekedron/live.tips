@@ -891,7 +891,11 @@ class _SessionSummaryDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            formatAmount(session.totalMinor, session.currency),
+            formatAmount(
+              session.totalMinor,
+              session.currency,
+              approximate: session.isMixedCurrency,
+            ),
             style: moneyStyle(36, c.accent),
           ),
           const SizedBox(height: 14),

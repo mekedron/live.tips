@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Wybierz wszystko, czego używasz — fani i tak dostają jeden kod QR.",
   "onboarding.method_select.title": "Przyjmuj napiwki",
   "onboarding.relay_setup.cancel": "Anuluj",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay obsługuje tylko EUR — Twój słoik na napiwki używa {currency}. Zmień walutę na EUR lub usuń MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo obsługuje tylko GBP — Twój słoik na napiwki używa {currency}. Zmień walutę na GBP lub usuń Monzo.",
   "onboarding.relay_setup.regenerate_body": "To zastąpi link do Twojej strony napiwków. Wydrukowane kody QR ze starym linkiem przestaną działać.",
   "onboarding.relay_setup.regenerate_success": "Utworzono nowy link do strony napiwków",
   "onboarding.relay_setup.regenerate_title": "Nowy link do strony napiwków?",

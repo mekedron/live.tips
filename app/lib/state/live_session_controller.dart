@@ -7,6 +7,7 @@ import '../data/donation_source.dart';
 import '../data/relay/relay_tip_channel.dart';
 import '../data/stripe/stripe_client.dart';
 import '../domain/donation.dart';
+import '../domain/fx_rates.dart';
 import '../domain/live_session.dart';
 import '../domain/rollover_math.dart';
 import 'providers.dart';
@@ -78,6 +79,7 @@ class LiveSessionController extends Notifier<LiveState?> {
   DonationSource? _source;
   RelayTipChannel? _relay;
   StreamSubscription<Donation>? _relayTipsSub;
+  ProviderSubscription<FxRates?>? _fxSub;
   StreamSubscription<RelayHealth>? _relayStatusSub;
   bool _polling = false;
   int _skipTicks = 0;
@@ -137,6 +139,19 @@ class LiveSessionController extends Notifier<LiveState?> {
     _teardown();
     final app = ref.read(appStateProvider);
     _accountId = app.accountId;
+    // Rates for the goal bar when a set mixes currencies (a £5 Monzo tip in a
+    // EUR session). Whatever is cached right now — the stage never waits on the
+    // network — and the listener below swaps in a fresher table if one lands
+    // mid-set, which re-totals the existing tips rather than leaving them out.
+    session.fx = ref.read(fxRatesProvider);
+    _fxSub?.close();
+    _fxSub = ref.listen<FxRates?>(fxRatesProvider, (_, rates) {
+      final current = state;
+      if (current == null) return;
+      current.session.fx = rates;
+      current.session.applyRollovers();
+      state = current.copyWith();
+    });
     // No tip jar is fine (relay-only): the factory returns a silent source.
     _source = ref.read(donationSourceFactoryProvider)(
         demo: app.demo, apiKey: app.apiKey, jar: app.effectiveTipJar);
@@ -302,6 +317,8 @@ class LiveSessionController extends Notifier<LiveState?> {
   void _teardown() {
     _timer?.cancel();
     _timer = null;
+    _fxSub?.close();
+    _fxSub = null;
     _source?.dispose();
     _source = null;
     _relayTipsSub?.cancel();

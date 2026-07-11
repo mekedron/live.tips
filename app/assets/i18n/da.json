@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Vælg alt, hvad du bruger — fans får én QR uanset hvad.",
   "onboarding.method_select.title": "Modtag drikkepenge",
   "onboarding.relay_setup.cancel": "Annuller",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay er kun i EUR — din drikkepengekrukke bruger {currency}. Skift valutaen til EUR eller fjern MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo er kun i GBP — din drikkepengekrukke bruger {currency}. Skift valutaen til GBP eller fjern Monzo.",
   "onboarding.relay_setup.regenerate_body": "Dette erstatter dit link til drikkepengesiden. Printede QR-koder med det gamle link holder op med at virke.",
   "onboarding.relay_setup.regenerate_success": "Nyt link til drikkepengeside oprettet",
   "onboarding.relay_setup.regenerate_title": "Nyt link til drikkepengeside?",

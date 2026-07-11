@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Kies alles wat je gebruikt — fans krijgen hoe dan ook één QR.",
   "onboarding.method_select.title": "Fooien ontvangen",
   "onboarding.relay_setup.cancel": "Annuleren",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay is alleen in EUR — je fooienpot gebruikt {currency}. Wissel de valuta naar EUR of verwijder MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo is alleen in GBP — je fooienpot gebruikt {currency}. Wissel de valuta naar GBP of verwijder Monzo.",
   "onboarding.relay_setup.regenerate_body": "Dit vervangt je fooienpagina-link. Geprinte QR-codes met de oude link werken niet meer.",
   "onboarding.relay_setup.regenerate_success": "Nieuwe fooienpagina-link aangemaakt",
   "onboarding.relay_setup.regenerate_title": "Nieuwe fooienpagina-link?",

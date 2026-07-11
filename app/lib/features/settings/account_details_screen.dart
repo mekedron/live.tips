@@ -9,8 +9,6 @@ import '../../domain/tip_jar.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
-import '../onboarding/relay_setup_screen.dart'
-    show mobilePayCurrencyError, monzoCurrencyError;
 
 /// Edits everything a band carries from onboarding — the artist/band name,
 /// its currency, and the thank-you message — from one page, and pushes the
@@ -81,17 +79,6 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
       return;
     }
     final relayJar = app.relayJar;
-    // The currency-locked methods veto a switch away from their currency.
-    final currencyErr = (relayJar?.hasMobilePay ?? false)
-        ? mobilePayCurrencyError(currency, context: context)
-        : (relayJar?.hasMonzo ?? false)
-        ? monzoCurrencyError(currency, context: context)
-        : null;
-    if (currencyErr != null) {
-      setState(() => _error = currencyErr);
-      return;
-    }
-
     final tipJar = app.tipJar;
     final currencyChanged =
         tipJar != null && !tipJar.isDemo && tipJar.currency != currency;

@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Wähle alles, was du nutzt — Fans bekommen so oder so einen QR-Code.",
   "onboarding.method_select.title": "Trinkgeld erhalten",
   "onboarding.relay_setup.cancel": "Abbrechen",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay gibt es nur in EUR — dein Trinkgeldglas nutzt {currency}. Wechsle die Währung zu EUR oder entferne MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo gibt es nur in GBP — dein Trinkgeldglas nutzt {currency}. Wechsle die Währung zu GBP oder entferne Monzo.",
   "onboarding.relay_setup.regenerate_body": "Das ersetzt deinen Trinkgeldseiten-Link. Ausgedruckte QR-Codes mit dem alten Link funktionieren nicht mehr.",
   "onboarding.relay_setup.regenerate_success": "Neuer Trinkgeldseiten-Link erstellt",
   "onboarding.relay_setup.regenerate_title": "Neuer Trinkgeldseiten-Link?",

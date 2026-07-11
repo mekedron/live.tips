@@ -286,8 +286,6 @@
   "onboarding.method_select.subtitle": "Velg alt du bruker — fansen får én QR uansett.",
   "onboarding.method_select.title": "Få tips",
   "onboarding.relay_setup.cancel": "Avbryt",
-  "onboarding.relay_setup.mobilepay_eur_only": "MobilePay er kun i EUR — tipskrukka di bruker {currency}. Bytt valuta til EUR eller fjern MobilePay.",
-  "onboarding.relay_setup.monzo_gbp_only": "Monzo er kun i GBP — tipskrukka di bruker {currency}. Bytt valuta til GBP eller fjern Monzo.",
   "onboarding.relay_setup.regenerate_body": "Dette erstatter lenken til tipssiden din. Utskrevne QR-koder med den gamle lenken slutter å virke.",
   "onboarding.relay_setup.regenerate_success": "Ny lenke til tipsside opprettet",
   "onboarding.relay_setup.regenerate_title": "Ny lenke til tipsside?",
