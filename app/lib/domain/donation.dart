@@ -1,8 +1,9 @@
 import 'tip_method.dart';
 
 /// A single tip, derived from a Stripe Checkout Session (one payment made
-/// through the artist's payment link), relayed from a MobilePay/Revolut
-/// donor page in connected mode, or synthesized in demo mode.
+/// through the artist's payment link), from a card-present Charge (the artist
+/// took a contactless tap in person), relayed from a MobilePay/Revolut donor
+/// page in connected mode, or synthesized in demo mode.
 class Donation {
   const Donation({
     required this.id,
@@ -16,9 +17,11 @@ class Donation {
     this.paymentIntentId,
     this.method = TipMethod.stripe,
     this.verified = true,
+    this.inPerson = false,
   });
 
-  /// Checkout Session id (`cs_…`) — stable, used for de-duplication.
+  /// Stable id, used for de-duplication: the Checkout Session id (`cs_…`) for
+  /// online tips, the Charge id (`ch_…`) for in-person taps.
   final String id;
   final int amountMinor;
   final String currency;
@@ -34,6 +37,10 @@ class Donation {
   /// here because History lists the whole account, not just the current link.
   /// Defaults to true: demo tips and everything archived from a live session
   /// came in through our link.
+  ///
+  /// In-person taps ([inPerson]) keep it true even though they touch no
+  /// payment link: the flag exists to mark money live.tips did *not* set out
+  /// to collect, and a tap the artist took during a set is not that.
   final bool viaService;
 
   /// PaymentIntent id (`pi_…`) behind this checkout session, when known.
@@ -49,6 +56,15 @@ class Donation {
   /// tips are donor-declared — the worker can't see the MobilePay/Revolut
   /// ledger — so they arrive unverified.
   final bool verified;
+
+  /// Whether the artist collected this tip in person — a contactless tap on a
+  /// Stripe Terminal reader or Tap to Pay in the Stripe Dashboard app. Stripe
+  /// saw the card, so it is every bit as [verified] as a QR tip; what it has
+  /// no room for is a donor: the tap flow collects an amount and nothing else,
+  /// so [name] and [message] are always null. A third kind of tip, then —
+  /// verified but nameless — and the tile says so with its own quiet badge
+  /// rather than pretending someone typed a name.
+  final bool inPerson;
 
   String get displayName {
     final trimmed = name?.trim() ?? '';
@@ -123,6 +139,57 @@ class Donation {
     );
   }
 
+  /// Whether this Charge object is an in-person card payment — the one thing
+  /// that separates a tap the artist took at the front of the stage from the
+  /// charge that Stripe *also* creates behind every QR checkout.
+  ///
+  /// A Charge names the payment method it was taken with in
+  /// `payment_method_details.type`; `card_present` is the value Stripe uses for
+  /// Terminal readers and Tap to Pay (an online card checkout says `card`).
+  /// The check is on the discriminator itself, not on the presence of the
+  /// `payment_method_details.card_present` hash, so nothing else in the account
+  /// can drift into the jar. See https://docs.stripe.com/api/charges/object.
+  ///
+  /// `status`/`paid` guard the rest: `charge.succeeded` only fires for a
+  /// successful charge, but a failed or unpaid object must never reach the jar
+  /// even if Stripe's event stream one day says otherwise.
+  static bool isCardPresentCharge(Map<String, dynamic> charge) {
+    final details = charge['payment_method_details'];
+    if (details is! Map || details['type'] != 'card_present') return false;
+    if (charge['status'] != 'succeeded') return false;
+    return charge['paid'] == true;
+  }
+
+  /// An in-person contactless tip, parsed from a card-present Charge object
+  /// (from the `/v1/events` feed). No name, no message: the reader asked for
+  /// an amount and nothing else. Guard every call with [isCardPresentCharge] —
+  /// a card-not-present Charge is the QR tip we already counted through its
+  /// Checkout Session, and constructing one here would double it.
+  factory Donation.fromCardPresentCharge(Map<String, dynamic> charge) {
+    // `payment_intent` is expandable; unexpanded (as in the events feed) it is
+    // the bare `pi_…` id. Same guard as [fromCheckoutSession].
+    final paymentIntent = charge['payment_intent'];
+
+    return Donation(
+      id: charge['id'] as String,
+      amountMinor: (charge['amount'] as num?)?.toInt() ?? 0,
+      currency: (charge['currency'] as String? ?? 'usd').toLowerCase(),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        ((charge['created'] as num?)?.toInt() ?? 0) * 1000,
+      ),
+      // Deliberately no name and no message — see [inPerson]. The Charge does
+      // carry `billing_details.name`, but for a tap it is either null or the
+      // cardholder name off the chip: not a name the donor chose to give the
+      // artist, and not one we will put on a stage.
+      livemode: charge['livemode'] as bool? ?? true,
+      paymentIntentId: paymentIntent is String
+          ? paymentIntent
+          : (paymentIntent is Map ? paymentIntent['id'] as String? : null),
+      verified: true,
+      inPerson: true,
+    );
+  }
+
   /// A tip relayed by the connected-mode worker (MobilePay/Revolut). The
   /// payment is donor-declared, hence unverified.
   ///
@@ -166,6 +233,7 @@ class Donation {
     String? paymentIntentId,
     TipMethod? method,
     bool? verified,
+    bool? inPerson,
   }) =>
       Donation(
         id: id ?? this.id,
@@ -179,6 +247,7 @@ class Donation {
         paymentIntentId: paymentIntentId ?? this.paymentIntentId,
         method: method ?? this.method,
         verified: verified ?? this.verified,
+        inPerson: inPerson ?? this.inPerson,
       );
 
   Map<String, dynamic> toJson() => {
@@ -195,6 +264,7 @@ class Donation {
         // byte-identical on re-save.
         if (method != TipMethod.stripe) 'method': method.wire,
         if (!verified) 'verified': verified,
+        if (inPerson) 'inPerson': inPerson,
       };
 
   factory Donation.fromJson(Map<String, dynamic> json) => Donation(
@@ -212,5 +282,6 @@ class Donation {
         method: TipMethod.fromWire(json['method'] as String?) ??
             TipMethod.stripe,
         verified: json['verified'] as bool? ?? true,
+        inPerson: json['inPerson'] as bool? ?? false,
       );
 }

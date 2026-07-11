@@ -47,6 +47,46 @@ class MethodBadge extends StatelessWidget {
   }
 }
 
+/// Muted "in person" pill for a contactless tap the artist took themselves
+/// (Terminal reader / Tap to Pay). Stripe saw the card, so the tip is verified
+/// — this is not [UnverifiedTag] and must never be confused with it. What the
+/// pill says instead is why the row has no name and no message: the reader asks
+/// for an amount, and the donor never gets a field to type into.
+class InPersonTag extends StatelessWidget {
+  const InPersonTag({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Tooltip(
+      message: context.s.t('widgets.method_badges.in_person_tooltip'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: c.chip,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.contactless_rounded, size: 11, color: c.textMuted),
+            const SizedBox(width: 3),
+            Text(
+              context.s.t('widgets.method_badges.in_person'),
+              style: outfitStyle(
+                10.5,
+                c.textMuted,
+                weight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Muted "unverified" pill for donor-declared tips: the relay can't see the
 /// MobilePay/Revolut ledger, so it can't confirm the money actually moved.
 /// Modeled on [ExternalTag] in donation_tile.dart — same size, same chip.

@@ -25,27 +25,72 @@ Two limits this buys us, and they set the poll interval:
   3-hour set is ~2,700 reads, so a busy month of long sets on a quiet account can
   approach the floor. This is why the default interval is 4 s and not 1 s.
 
-1. **Prime:** fetch the newest `checkout.session.completed` /
-   `checkout.session.async_payment_succeeded` event id → that's the cursor.
+1. **Prime:** fetch the newest event id of the polled types → that's the cursor.
    (If the account has none, fall back to `created[gte] = session start − 60 s`
    so device clock drift can't hide tips.)
 2. **Tick (every 2–15 s, configurable):** `GET /v1/events?types[]=…&
    ending_before=<cursor>` returns only events newer than the cursor.
    Advance the cursor, keep paging while `has_more`.
-3. **Filter:** keep sessions where `payment_link == our link` and
-   `payment_status == "paid"`. Both event types can fire for one payment, so
-   donations are de-duplicated by Checkout Session id at the source *and* in
-   the session model (belt and suspenders — the model survives restarts).
+3. **Filter:** see the two observed paths below.
 4. Each new donation updates the session total/progress and triggers confetti.
 
-Event payloads embed the full Checkout Session, including `amount_total`,
-`currency`, `customer_details`, and our two custom fields (`nickname`,
-`message`) — no follow-up API calls needed. This whole pipeline (restricted
-key → link → real card payment → polled event with custom fields) is verified
-end-to-end against a Stripe sandbox.
+Donations are de-duplicated by id at the source *and* in the session model
+(belt and suspenders — the model survives restarts).
+
+### Two observed paths, and why they can't collide
+
+live.tips never *takes* a payment. It watches the artist's account and
+recognizes tips in it. Two kinds arrive:
+
+| | Event | Object | Id | Donor |
+| --- | --- | --- | --- | --- |
+| **Online (QR)** | `checkout.session.completed`, `checkout.session.async_payment_succeeded` | Checkout Session | `cs_…` | name + message, if they typed them |
+| **In person (tap)** | `charge.succeeded` | Charge | `ch_…` | none — anonymous |
+
+- **Online.** Keep sessions where `payment_link == our link` and
+  `payment_status == "paid"`. Both event types can fire for one payment; the id
+  is the same, so the dedupe absorbs it.
+- **In person.** The artist takes a contactless tap into the same Stripe
+  account — Tap to Pay in Stripe's own Dashboard app, or a Terminal reader.
+  live.tips does not drive the reader and knows nothing about it; it just sees
+  the Charge. Keep charges where
+  **`payment_method_details.type == "card_present"`** (plus `status ==
+  "succeeded"` and `paid == true`).
+
+That `card_present` check is load-bearing. **A Checkout Session payment also
+emits `charge.succeeded`** — so accepting charges without it would count every
+QR tip twice, once as `cs_…` and once as `ch_…`, under two ids that no
+de-duplication can tie together. The card in a reader is card-*present*; a card
+typed into a Checkout page is not. That single field is the whole guard, and
+`donation_source_test.dart` pins it.
+
+We watch the **Charge**, not the PaymentIntent: the Charge is the object that
+carries `payment_method_details` (the discriminator) together with the settled
+`amount` and `currency`. A PaymentIntent carries neither — its payment-method
+detail hangs off `latest_charge`, unexpanded in the event payload — so
+`payment_intent.succeeded` would cost an extra API call per tip and an extra
+read scope. See <https://docs.stripe.com/api/charges/object>.
+
+> **The assumption in-person tips rest on: the artist's Stripe account is
+> dedicated to tips.** A tap has no payment link, no product, nothing of ours
+> on it — we cannot narrow it to "a live.tips tip" the way we narrow a Checkout
+> Session to our link. So live.tips treats *any* card-present payment in the
+> account as a tip. Sell merch on a card reader through the same account and
+> the merch sale drops into the jar. This is stated in the onboarding doc as
+> well; if it ever stops being true, the in-person path needs a real
+> discriminator (a dedicated Terminal location, or metadata on the charge).
+
+Event payloads embed the full object, including `amount_total` /
+`amount`, `currency`, `customer_details`, and our two custom fields
+(`nickname`, `message`) — no follow-up API calls needed. This whole pipeline
+(restricted key → link → real card payment → polled event with custom fields)
+is verified end-to-end against a Stripe sandbox.
 
 Full donation history doesn't use events (30-day API retention); it pages
-`GET /v1/checkout/sessions?payment_link=…&status=complete` instead.
+`GET /v1/checkout/sessions?payment_link=…&status=complete` instead. Note that
+in-person taps are *not* Checkout Sessions, so they don't appear in that list:
+they live in the session record they arrived in (History → Sessions) and, of
+course, in the artist's own Stripe dashboard.
 
 Failure handling: 401 → "key revoked" message; 429 → skip a few ticks;
 network errors → keep retrying and show a status dot. The poller never
@@ -57,12 +102,23 @@ Created once in the artist's account, all tagged `metadata[managed_by]=live.tips
 
 - **Product** "Tips — <artist>"
 - **Price** with `custom_unit_amount[enabled]=true` (pay what you want)
-- **Payment Link** with `submit_type=donate`, two optional custom text fields
+- **Payment Link** with `submit_type=pay`, two optional custom text fields
   (nickname, message), and a custom thank-you confirmation
 
-The link URL (`donate.stripe.com/…`) is rendered as a QR code — on the home
-screen, fullscreen for printing, and on the live screen's side panel so the
-audience can scan straight from the stage display.
+`submit_type` is load-bearing and it is not cosmetic: it also picks the checkout
+**hostname**. `donate` — which this used to send — puts the link on
+`donate.stripe.com` behind a "Donate" button, i.e. every artist's printed QR code
+told them, and Stripe, that they were collecting donations. They are not. A tip
+is paid for a service rendered (the performance); a donation is tied to a
+charitable purpose. Stripe treats those as different businesses, and charitable
+fundraising is approval-gated — *prohibited* outside AU/CA/GB/US, which is most
+of where live.tips artists are. Sending `pay` keeps the link on
+`checkout.stripe.com` and stops the app priming its own users into a category
+that gets them refused. See [tips, not donations](onboarding/tips-not-donations.md).
+
+The link URL is rendered as a QR code — on the home screen, fullscreen for
+printing, and on the live screen's side panel so the audience can scan straight
+from the stage display.
 
 ## Bands (local multi-account)
 
@@ -169,8 +225,10 @@ thing. The screen stays awake during sessions via `wakelock_plus`.
 
 ## Security posture
 
-- Restricted key, least privilege (5 permissions), verified per-permission at
-  connect time with clear errors.
+- Restricted key, least privilege (6 permissions — three of them read-only, and
+  the in-person path added a read, never a write), verified per-permission at
+  connect time with clear errors. Nothing the key can do moves money: no
+  refunds, no balance, no payouts.
 - `sk_live_…` keys are refused outright; test keys get a loud banner.
 - No analytics, no third-party services. In Stripe-only mode the app makes no
   network calls except `api.stripe.com` and Stripe's own checkout page; in

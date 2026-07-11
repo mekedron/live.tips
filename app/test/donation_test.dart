@@ -25,6 +25,34 @@ Map<String, dynamic> checkoutSession({
       'customer_details': customerDetails,
     };
 
+/// A Charge object as `/v1/events` delivers it. [methodType] is the
+/// `payment_method_details.type` discriminator — `card_present` for a tap on a
+/// reader or Tap to Pay, `card` for the charge behind an online Checkout
+/// Session.
+Map<String, dynamic> cardPresentCharge({
+  String id = 'ch_tap',
+  int amount = 700,
+  String methodType = 'card_present',
+  String status = 'succeeded',
+  bool paid = true,
+  bool livemode = true,
+}) =>
+    {
+      'id': id,
+      'object': 'charge',
+      'amount': amount,
+      'currency': 'eur',
+      'created': 1751500000,
+      'livemode': livemode,
+      'status': status,
+      'paid': paid,
+      'payment_intent': 'pi_tap',
+      'payment_method_details': {
+        'type': methodType,
+        methodType: const {'brand': 'visa', 'last4': '4242'},
+      },
+    };
+
 void main() {
   test('parses amount, currency, and custom fields', () {
     final donation = Donation.fromCheckoutSession(checkoutSession(
@@ -193,14 +221,82 @@ void main() {
     expect(legacy.verified, isTrue);
   });
 
-  test('toJson omits method/verified when default — stored history stays '
-      'byte-identical', () {
+  test('toJson omits method/verified/inPerson when default — stored history '
+      'stays byte-identical', () {
     final stripe = Donation.fromCheckoutSession(checkoutSession());
     expect(stripe.method, TipMethod.stripe);
     expect(stripe.verified, isTrue);
+    expect(stripe.inPerson, isFalse);
     final json = stripe.toJson();
     expect(json.containsKey('method'), isFalse);
     expect(json.containsKey('verified'), isFalse);
+    expect(json.containsKey('inPerson'), isFalse);
+  });
+
+  // ------------------------------------------------- in-person tap tips ---
+
+  test('Donation.fromCardPresentCharge builds a verified, nameless tip', () {
+    final tip = Donation.fromCardPresentCharge(cardPresentCharge());
+    expect(tip.id, 'ch_tap');
+    expect(tip.amountMinor, 700);
+    expect(tip.currency, 'eur');
+    expect(tip.createdAt,
+        DateTime.fromMillisecondsSinceEpoch(1751500000 * 1000));
+    expect(tip.inPerson, isTrue);
+    expect(tip.verified, isTrue, reason: 'Stripe saw the card — not a claim');
+    expect(tip.name, isNull, reason: 'the tap flow collects no name');
+    expect(tip.message, isNull);
+    expect(tip.hasMessage, isFalse);
+    expect(tip.displayName, 'Anonymous');
+    expect(tip.method, TipMethod.stripe, reason: 'it is a Stripe card payment');
+    expect(tip.viaService, isTrue);
+    expect(tip.paymentIntentId, 'pi_tap');
+    expect(tip.stripeDashboardUrl,
+        'https://dashboard.stripe.com/payments/pi_tap');
+  });
+
+  test('the cardholder name off the chip is never used as a donor name', () {
+    final tip = Donation.fromCardPresentCharge(
+      cardPresentCharge()..['billing_details'] = {'name': 'MS J SMITH'},
+    );
+    expect(tip.name, isNull);
+    expect(tip.displayName, 'Anonymous');
+  });
+
+  test('isCardPresentCharge accepts only successful in-person payments', () {
+    expect(Donation.isCardPresentCharge(cardPresentCharge()), isTrue);
+    // The charge Stripe creates behind every online Checkout Session — the one
+    // that would double-count every QR tip if it slipped through.
+    expect(
+        Donation.isCardPresentCharge(cardPresentCharge(methodType: 'card')),
+        isFalse);
+    expect(
+        Donation.isCardPresentCharge(
+            cardPresentCharge(methodType: 'sepa_debit')),
+        isFalse);
+    expect(
+        Donation.isCardPresentCharge(cardPresentCharge(status: 'failed')),
+        isFalse);
+    expect(Donation.isCardPresentCharge(cardPresentCharge(paid: false)),
+        isFalse);
+    // A charge with no payment_method_details at all (nothing to prove it was
+    // in person) is not one of ours either.
+    expect(
+        Donation.isCardPresentCharge(
+            cardPresentCharge()..remove('payment_method_details')),
+        isFalse);
+  });
+
+  test('inPerson survives a json round trip', () {
+    final tip = Donation.fromCardPresentCharge(cardPresentCharge());
+    final json = tip.toJson();
+    expect(json['inPerson'], isTrue);
+    final restored = Donation.fromJson(json);
+    expect(restored.inPerson, isTrue);
+    expect(restored.verified, isTrue);
+    expect(restored.id, tip.id);
+    expect(restored.amountMinor, tip.amountMinor);
+    expect(restored.createdAt, tip.createdAt);
   });
 
   test('Donation.relayTip builds an unverified live relay tip', () {

@@ -2,14 +2,14 @@
 
 live.tips talks to Stripe **as you** — there is no middleman server. To make that
 possible you create a *restricted API key* in your own Stripe dashboard and paste
-it into the app. The key can only do the five things the app needs, nothing else:
+it into the app. The key can only do the six things the app needs, nothing else:
 it cannot move money, issue refunds, see your balance, or touch payouts.
 
 It takes about two minutes, once.
 
 > **Tip — the fast path:** on the app's *Connect Stripe* screen, tap
 > **“Create the key (pre-filled) in Stripe”** (or scan the QR with your laptop).
-> It opens the form from step 4 with the key name and all five permissions
+> It opens the form from step 4 with the key name and all six permissions
 > already selected — you just review and click **Create key**. The steps below
 > are the manual path, and useful to understand what you're granting.
 
@@ -49,15 +49,16 @@ third-party application).
 
 ![Filling the third-party details](img/03-key-details.png)
 
-## Step 4 — Grant exactly five permissions
+## Step 4 — Grant exactly six permissions
 
-In the permissions table, set these five rows — and leave **everything else on
+In the permissions table, set these six rows — and leave **everything else on
 “None”** (also leave the whole *Connect permissions* column on “None”):
 
 | Resource | Permission | Why the app needs it |
 | --- | --- | --- |
 | **Checkout Sessions** | Read | See incoming donations (history & details) |
 | **Events** | Read | Live feed — poll for new donations during a session |
+| **Charges** | Read | See in-person tips you tap on a card reader or phone |
 | **Payment Links** | Write | Create your donation link |
 | **Products** | Write | Create the "Tips" product behind the link |
 | **Prices** | Write | Create the pay-what-you-want price |
@@ -67,6 +68,11 @@ In the permissions table, set these five rows — and leave **everything else on
 > Rows are grouped by product area — *Checkout Sessions* and *Payment Links*
 > have their own sections further down the page; *Prices* is under the Billing
 > group. The search box in your browser (Cmd/Ctrl-F) finds them quickly.
+
+**All three reads are read-only, and there is no fourth kind.** *Charges: Read*
+lets the app *see* payments; it cannot create one, refund one, or move a cent.
+Leave *Charges* on **Read** — never Write. Least privilege is the whole point of
+this key.
 
 Click **Create key** at the bottom.
 
@@ -94,6 +100,36 @@ was created differently.
   working until you connect a new one. Revoking does not affect your money or
   your Stripe account.
 
+## Tips you tap in person
+
+Not everyone will scan the QR. Someone walks up with a card and wants to give
+you a fiver — take it with **Tap to Pay** in the Stripe Dashboard app (your
+phone *is* the reader) or with a Stripe Terminal reader, into this same Stripe
+account. The tip lands in the jar on stage within a few seconds, animates, and
+counts toward tonight's goal, exactly like a QR tip.
+
+live.tips does not drive the reader and never asks for the permission to. It
+only *watches* your account — the same thing it already does for QR tips — and
+recognizes the tap when Stripe reports it.
+
+Two things to know:
+
+- **In-person tips are anonymous.** The tap collects an amount and nothing
+  else: there is no field for a name or a message, so the stage shows the tip
+  as *Anonymous*, with a small **in person** badge. It is a confirmed Stripe
+  payment, so it is *not* marked "unverified" — that badge means something
+  different (see the tip-page methods).
+- **Use a Stripe account dedicated to tips.** ⚠️ A tap carries nothing that
+  identifies it as a tip — no payment link, no product, nothing of ours. So
+  live.tips treats **every card-present payment in this account as a tip**. If
+  you also sell merch on a card reader through the same account, that T-shirt
+  sale will land in the tip jar on stage and count toward your goal. Keep a
+  separate Stripe account (or a separate business) for anything you sell, and
+  connect only the tips one here.
+
+If you never take in-person payments, nothing changes for you — the app simply
+never sees a card-present charge.
+
 ## Troubleshooting
 
 - **“The API key is missing a permission …”** — open
@@ -108,9 +144,14 @@ was created differently.
 - **“That's a publishable key”** — `pk_…` keys are for websites, not for this
   app. Copy the restricted key instead.
 - **Nothing shows up in the live feed** — check the device's internet
-  connection and that the tip was paid through *your* payment link (the app
-  ignores other traffic in your account). Refunded or unpaid sessions don't
-  appear.
+  connection and that the tip was paid through *your* payment link, or tapped
+  in person on a card reader (the app ignores other traffic in your account).
+  Refunded or unpaid sessions don't appear.
+- **In-person taps don't show up** — the key is missing the **Charges: Read**
+  row. Stripe only shows a restricted key the events whose contents that key
+  may read, so without it the taps are invisible rather than an error. Edit the
+  key (⋯ → **Edit key**), set *Charges* to **Read**, and verify again in the
+  app.
 
 ## Test mode (rehearsal)
 
@@ -134,13 +175,13 @@ server owned by the app developer to hold your access token — a middleman we
 deliberately don't have. A restricted key you create yourself is the only way
 to give a serverless app scoped access.
 
-**What's the worst case if my device is stolen?** The thief could see your
-donation history and create payment links in your account. They could *not*
-move money, refund, change payouts, or see card data. Revoke the key from any
-browser and the app goes dark.
+**What's the worst case if my device is stolen?** The thief could read the
+payments in your account (donations, and any other charge in it) and create
+payment links. They could *not* move money, refund, change payouts, or see card
+data. Revoke the key from any browser and the app goes dark.
 
 **Why does the app need "Write" for products/prices/links?** Only to create
 your tip jar (and recreate it if you change name or currency). It happens a
 handful of times, but Stripe permissions aren't time-boxed, so the grant stays.
 If you prefer, you can remove Products/Prices Write after the tip jar is
-created — the live feed and history only need the two Read permissions.
+created — the live feed and history only need the three Read permissions.

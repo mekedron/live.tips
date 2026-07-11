@@ -41,6 +41,16 @@ const kRequiredPermissions = [
     access: 'Read',
     why: 'Live feed: poll for new donations during a session.',
   ),
+  // Read-only, like the two above. A restricted key only sees an event whose
+  // object it may read, so the charge.succeeded feed — in-person contactless
+  // tips — needs this row as well as Events. Nothing here grants a write, a
+  // refund, a balance or a payout; that promise is the point.
+  RequiredPermission(
+    slug: 'charges',
+    resource: 'Charges',
+    access: 'Read',
+    why: 'See in-person tips you tap on a card reader or phone.',
+  ),
   RequiredPermission(
     slug: 'payment_links',
     resource: 'Payment Links',
@@ -65,17 +75,24 @@ const kRequiredPermissions = [
 const kApiKeysDashboardUrl = 'https://dashboard.stripe.com/apikeys';
 
 /// Opens the dashboard's "create restricted key" form with the key name and
-/// exactly the five permissions above pre-selected. The artist still reviews
+/// exactly the six permissions above pre-selected. The artist still reviews
 /// everything and clicks "Create key" in their own dashboard — we never see
 /// the account. (Slugs verified by creating a key from this URL and
 /// exercising it against the API.)
+///
+/// An unknown slug is ignored by the form rather than rejected, so a wrong one
+/// fails quietly: the row simply arrives unticked, and the app's permission
+/// check then names the missing row. That is the safety net behind
+/// `rak_charge_read` — re-verify it in the dashboard the next time you open
+/// this form.
 const kCreateKeyUrl =
     'https://dashboard.stripe.com/apikeys/create?name=live.tips%20app'
     '&permissions[0]=rak_bucket_checkout_read'
     '&permissions[1]=rak_event_read'
-    '&permissions[2]=rak_bucket_payment_links_write'
-    '&permissions[3]=rak_product_write'
-    '&permissions[4]=rak_plan_write'
+    '&permissions[2]=rak_charge_read'
+    '&permissions[3]=rak_bucket_payment_links_write'
+    '&permissions[4]=rak_product_write'
+    '&permissions[5]=rak_plan_write'
     '&thirdparty_integration_name=live.tips'
     '&thirdparty_integration_url=https%3A%2F%2Flive.tips';
 

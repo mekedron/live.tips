@@ -64,6 +64,10 @@ class DonationTile extends StatelessWidget {
                       const SizedBox(width: 6),
                       MethodBadge(donation.method),
                     ],
+                    if (donation.inPerson) ...[
+                      const SizedBox(width: 6),
+                      const InPersonTag(),
+                    ],
                     if (!donation.verified) ...[
                       const SizedBox(width: 6),
                       const UnverifiedTag(),

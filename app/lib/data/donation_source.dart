@@ -94,10 +94,8 @@ class StripeDonationSource extends DonationSource {
       if (result.events.isEmpty) break;
 
       for (final event in result.events.reversed) {
-        final session = event.session;
-        if (session['payment_link'] != paymentLinkId) continue;
-        if (session['payment_status'] != 'paid') continue;
-        final donation = Donation.fromCheckoutSession(session);
+        final donation = _donationOf(event);
+        if (donation == null) continue;
         // completed + async_payment_succeeded can both fire for one payment.
         if (_seenDonationIds.add(donation.id)) fresh.add(donation);
       }
@@ -106,6 +104,41 @@ class StripeDonationSource extends DonationSource {
       if (!result.hasMore) break;
     }
     return fresh;
+  }
+
+  /// The tip an event represents, or null if it is not one of ours.
+  ///
+  /// Two paths, and the whole correctness of the jar lives in keeping them
+  /// disjoint:
+  ///
+  /// * **Online (QR).** A Checkout Session against *our* payment link, paid.
+  ///   Unchanged, and still the only thing the checkout.session.* events can
+  ///   produce.
+  /// * **In person (tap).** A Charge, but ONLY a card-present one. This is the
+  ///   trap: a Checkout Session payment also emits `charge.succeeded`, so
+  ///   accepting charges naively would count every QR tip twice — once as the
+  ///   session, once as its own charge, under two different ids that no
+  ///   de-duplication could ever tie together. The card the reader taps is
+  ///   card-*present*; the card a donor types into a Checkout page is not. That
+  ///   one field is the whole guard, so it is asserted on the discriminator
+  ///   ([Donation.isCardPresentCharge]) rather than inferred.
+  ///
+  /// The in-person path can't be narrowed to our payment link — a tap has no
+  /// link, no product, no Checkout Session, nothing of ours on it at all. So
+  /// it rests on the documented assumption (docs/architecture.md,
+  /// docs/onboarding/create-restricted-key.md) that the artist's Stripe account
+  /// is dedicated to tips: any card-present payment in it is a tip. Sell merch
+  /// through the same account and the merch sale lands in the jar.
+  Donation? _donationOf(DonationEvent event) {
+    final object = event.object;
+    if (event.isCheckoutSession) {
+      if (object['payment_link'] != paymentLinkId) return null;
+      if (object['payment_status'] != 'paid') return null;
+      return Donation.fromCheckoutSession(object);
+    }
+    // charge.succeeded — the only other type we ask Stripe for.
+    if (!Donation.isCardPresentCharge(object)) return null;
+    return Donation.fromCardPresentCharge(object);
   }
 }
 

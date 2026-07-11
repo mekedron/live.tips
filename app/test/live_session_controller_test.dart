@@ -80,6 +80,42 @@ void main() {
     expect(state.session.totalMinor, 2000);
   });
 
+  test(
+      'an in-person tap pours into the jar and counts toward the goal like '
+      'any other tip', () async {
+    final tap = Donation(
+      id: 'ch_tap',
+      amountMinor: 2000,
+      currency: 'usd',
+      createdAt: DateTime.utc(2026, 7, 3),
+      livemode: false,
+      inPerson: true,
+    );
+    await setUpContainer([
+      [d('cs_1', 500), tap],
+    ]);
+    final controller = container.read(liveSessionProvider.notifier);
+    await controller.start(goalMinor: 10000);
+    await settle();
+
+    final state = container.read(liveSessionProvider)!;
+    expect(state.session.totalMinor, 2500);
+    expect(state.session.count, 2);
+    expect(state.confettiTick, 2, reason: 'the tap gets its celebration too');
+    expect(state.newTips.last.donation.id, 'ch_tap');
+    expect(state.newTips.last.deltaPct, closeTo(0.20, 1e-9));
+    expect(state.lastDonation!.inPerson, isTrue);
+
+    // The relay archive is for tips that exist nowhere but this device. A tap
+    // is a real Stripe charge in the artist's account, so it must NOT land
+    // there — that archive is keyed on `verified == false`, and a tap is
+    // verified.
+    expect(
+      container.read(localStoreProvider).readRelayHistory(kTestAccountId),
+      isEmpty,
+    );
+  });
+
   test('rollovers are attributed inside the batch and persisted', () async {
     await setUpContainer([
       [d('cs_1', 15000), d('cs_2', 6000)],

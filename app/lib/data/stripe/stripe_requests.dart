@@ -2,18 +2,32 @@ import '../../domain/donation.dart';
 import '../../domain/tip_jar.dart';
 import 'stripe_client.dart';
 
-/// One `/v1/events` entry we care about (checkout.session.*), with the
-/// embedded Checkout Session payload.
+/// One `/v1/events` entry we care about, with its embedded `data.object`.
+///
+/// Two shapes ride this class, told apart by [type]: a Checkout Session (a tip
+/// paid online through the QR link) and a Charge (a tip tapped in person). The
+/// reader — [StripeDonationSource] — must branch on [type] before touching
+/// [object]; their fields overlap by name (`created`, `currency`, `livemode`)
+/// but not by meaning, and the amount lives in different keys entirely.
 class DonationEvent {
   const DonationEvent({
     required this.id,
     required this.created,
-    required this.session,
+    required this.type,
+    required this.object,
   });
 
   final String id;
   final int created;
-  final Map<String, dynamic> session;
+
+  /// The Stripe event type, e.g. `checkout.session.completed`, `charge.succeeded`.
+  final String type;
+
+  /// `data.object`: a Checkout Session or a Charge, per [type].
+  final Map<String, dynamic> object;
+
+  /// True for the checkout.session.* family — an online tip through the link.
+  bool get isCheckoutSession => type.startsWith('checkout.session.');
 }
 
 class DonationEventsPage {
@@ -57,9 +71,27 @@ class StripeRequests {
 
   final StripeClient client;
 
+  /// The event types the live feed polls.
+  ///
+  /// The checkout.session.* pair covers tips paid online through the QR link.
+  /// `charge.succeeded` covers the other observed path: a contactless tap the
+  /// artist takes in person (Terminal reader, or Tap to Pay in Stripe's own
+  /// Dashboard app). We watch the *Charge*, not the PaymentIntent, because the
+  /// Charge is the object that carries `payment_method_details` — the
+  /// `card_present` discriminator that tells a tap apart from a QR checkout —
+  /// alongside the settled `amount` and `currency`. A PaymentIntent has
+  /// neither: its payment-method detail sits on its `latest_charge`, which the
+  /// event payload leaves unexpanded, so `payment_intent.succeeded` would force
+  /// a second API call per tip *and* a second read permission. One event type,
+  /// one object, everything we need.
+  ///
+  /// The catch, and the reason [StripeDonationSource] is careful: a Checkout
+  /// Session payment ALSO emits `charge.succeeded`. See the filter there — the
+  /// card-present check is what keeps every QR tip counted exactly once.
   static const _donationEventTypes = [
     'checkout.session.completed',
     'checkout.session.async_payment_succeeded',
+    'charge.succeeded',
   ];
 
   /// Verifies the key can do everything the app needs, without creating any
@@ -83,6 +115,12 @@ class StripeRequests {
           () => client.get('checkout/sessions', query: {'limit': '1'})),
       probe('Events — polling (live feed)',
           () => client.get('events', query: {'limit': '1'})),
+      // A restricted key sees an event only if it may also read the object
+      // inside it, so the in-person tap feed (charge.succeeded) needs Charges
+      // read on top of Events read — otherwise taps would silently never
+      // arrive, which is exactly the failure this screen exists to prevent.
+      probe('Charges — Read (in-person tap tips)',
+          () => client.get('charges', query: {'limit': '1'})),
       probe('Payment Links — access (your tip link)',
           () => client.get('payment_links', query: {'limit': '1'})),
       probe('Products & Prices — access (the “Tip” item)',
@@ -100,7 +138,9 @@ class StripeRequests {
   }) async {
     final product = await client.post('products', {
       'name': 'Tips — $displayName',
-      'description': 'Live tips collected with the open-source live.tips app.',
+      'description':
+          'Tips for a live performance, collected with the open-source '
+          'live.tips app.',
       'metadata[managed_by]': 'live.tips',
     });
 
@@ -114,7 +154,14 @@ class StripeRequests {
     final link = await client.post('payment_links', {
       'line_items[0][price]': price['id'] as String,
       'line_items[0][quantity]': '1',
-      'submit_type': 'donate',
+      // `pay`, never `donate`. submit_type also picks the checkout hostname:
+      // `donate` would put every artist's QR on donate.stripe.com behind a
+      // "Donate" button. These are tips for a performance — a service — not
+      // charitable donations, and Stripe treats those as different businesses
+      // (charitable fundraising is approval-gated, and prohibited outside
+      // AU/CA/GB/US). Priming an artist to describe their own account as
+      // "donations" is how they get refused. See docs/onboarding/tips-not-donations.md.
+      'submit_type': 'pay',
       'custom_fields[0][key]': 'nickname',
       'custom_fields[0][label][type]': 'custom',
       'custom_fields[0][label][custom]': 'Your name or nickname',
@@ -163,7 +210,7 @@ class StripeRequests {
     await client.post('payment_links/$paymentLinkId', {'active': 'false'});
   }
 
-  /// Lists checkout.session.* success events, newest first.
+  /// Lists the [_donationEventTypes] success events, newest first.
   ///
   /// Pass [endingBefore] (an event id) to get only events newer than it, or
   /// [createdGte] for the first poll of a session.
@@ -184,10 +231,13 @@ class StripeRequests {
       if (item is! Map<String, dynamic>) continue;
       final object = (item['data'] as Map<String, dynamic>?)?['object'];
       if (object is! Map<String, dynamic>) continue;
+      final type = item['type'];
+      if (type is! String) continue;
       events.add(DonationEvent(
         id: item['id'] as String,
         created: (item['created'] as num?)?.toInt() ?? 0,
-        session: object,
+        type: type,
+        object: object,
       ));
     }
     return DonationEventsPage(

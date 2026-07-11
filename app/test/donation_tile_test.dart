@@ -73,6 +73,24 @@ void main() {
     expect(find.text('unverified'), findsOneWidget);
   });
 
+  testWidgets(
+      'an in-person tap shows the in-person pill — anonymous, but never '
+      '"unverified": Stripe saw the card', (tester) async {
+    final donation = Donation(
+      id: 'ch_tap',
+      amountMinor: 700,
+      currency: 'eur',
+      createdAt: DateTime.utc(2026, 7, 4),
+      inPerson: true,
+    );
+    await tester.pumpWidget(host(DonationTile(donation: donation)));
+
+    expect(find.text('in person'), findsOneWidget);
+    expect(find.byIcon(Icons.contactless_rounded), findsOneWidget);
+    expect(find.text('Anonymous'), findsOneWidget);
+    expect(find.text('unverified'), findsNothing);
+  });
+
   testWidgets('an ordinary Stripe tip shows neither badge', (tester) async {
     await tester.pumpWidget(host(DonationTile(donation: tip())));
 
