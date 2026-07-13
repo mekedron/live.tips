@@ -24,9 +24,11 @@ import 'secure_store.dart';
 /// 3. Commit point: [FirebaseFirestore.waitForPendingWrites] — reached only
 ///    online, so the local wipe below can never outrun the upload.
 /// 4. Wipe each local band, reset the local registry to one fresh empty
-///    band (the same last-band-removed shape the notifier keeps), clear the
-///    flag. Keychain entries stay put: they are now the cloud profile's
-///    keychain cache under the same band ids.
+///    band (a pristine placeholder — unlike removal, the move is not "get
+///    rid of the local profile", so switching back to it should land on a
+///    ready band and not on the account picker), clear the flag. Keychain
+///    entries stay put: they are now the cloud profile's keychain cache
+///    under the same band ids.
 ///
 /// A locked keychain skips step 2's secrets for the affected band and
 /// nothing else. The secret is not lost — it stays in the keychain, which
@@ -122,8 +124,12 @@ class CloudMigrator {
         if (!uploadedIds.contains(band.id)) band,
     ];
     if (remaining.isEmpty) {
-      // The local profile never has zero bands — it gets one fresh empty
-      // band, mirroring removeAccount's last-band behavior.
+      // One fresh empty band, a deliberate placeholder: a move is not a
+      // removal, so the local profile stays switchable-to (see the class
+      // note on step 4). It is unnamed and empty, so the upload offer and
+      // the Settings move-row both ignore it — and with an empty registry
+      // routable now (see AppStateNotifier.removeAccount), even this band
+      // can be removed for good.
       final fresh = BandAccount(
         id: BandAccount.newId(),
         name: '',

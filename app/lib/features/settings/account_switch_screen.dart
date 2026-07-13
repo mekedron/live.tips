@@ -20,6 +20,13 @@ import '../../widgets/sign_in_sheet.dart';
 /// which band you're playing tonight (the profile switcher sheet). Two
 /// concepts, two surfaces — mixing them into one list is how a user ends up
 /// signing into a second account when they meant to switch bands.
+///
+/// Also RootGate's landing for "the local profile has no bands left": after
+/// the last local profile is removed there is nothing to build the shell
+/// around, and this list — every account the device knows, plus a fresh
+/// sign-in — is the honest set of ways forward. The pops below are guarded
+/// for that use: as the root screen there is nothing to pop, and the
+/// switched-to account re-routes through RootGate on its own.
 class AccountSwitchScreen extends ConsumerWidget {
   const AccountSwitchScreen({super.key});
 
@@ -53,7 +60,7 @@ class AccountSwitchScreen extends ConsumerWidget {
         account.id == liveUid ||
         sessions.isAlive(account.id)) {
       await ref.read(accountsDirectoryProvider.notifier).setActive(account.id);
-      if (context.mounted) navigator.pop();
+      if (context.mounted && navigator.canPop()) navigator.pop();
       return;
     }
     final controller = ref.read(authControllerProvider.notifier);
@@ -69,7 +76,9 @@ class AccountSwitchScreen extends ConsumerWidget {
       _ => null,
     };
     // Null is a cancel or a failure: stay put, the error renders inline.
-    if (user != null && context.mounted) navigator.pop();
+    if (user != null && context.mounted && navigator.canPop()) {
+      navigator.pop();
+    }
   }
 
   /// Drops a guest account whose session is gone. There is nothing to
@@ -109,7 +118,9 @@ class AccountSwitchScreen extends ConsumerWidget {
   Future<void> _signInAnother(BuildContext context) async {
     final navigator = Navigator.of(context);
     final user = await showSignInSheet(context);
-    if (user != null && context.mounted) navigator.pop();
+    if (user != null && context.mounted && navigator.canPop()) {
+      navigator.pop();
+    }
   }
 
   @override

@@ -323,7 +323,7 @@ void main() {
     expect(local.readAccountsRegistry()?.accounts, hasLength(2));
   });
 
-  test('removing the last band leaves a fresh empty one', () async {
+  test('removing the last band leaves the registry honestly empty', () async {
     final (local, secure) = await _twoBands();
     final container = _container(local, secure, initialApiKey: 'rk_live_a');
     final notifier = container.read(appStateProvider.notifier);
@@ -331,9 +331,14 @@ void main() {
     await notifier.removeAccount('acc_b');
     await notifier.removeAccount('acc_a');
     final app = container.read(appStateProvider);
-    expect(app.accounts, hasLength(1));
+    // No fresh replacement: minting one is what made the last profile
+    // impossible to delete (remove → new empty band → remove → …). "No
+    // profile" is a routable state now — RootGate owns where it lands.
+    expect(app.accounts, isEmpty);
     expect(app.connected, isFalse);
-    expect(app.accountId, isNot(anyOf('acc_a', 'acc_b')));
+    expect(app.accountId, '');
+    expect(local.readAccountsRegistry()!.accounts, isEmpty,
+        reason: 'the emptiness must survive a reboot, or the trap returns');
   });
 
   test('cancelStripeSetup removes only the key', () async {

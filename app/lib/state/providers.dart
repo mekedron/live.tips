@@ -250,9 +250,12 @@ class AppStateNotifier extends Notifier<AppState> {
     final repo = ref.read(accountDataRepositoryProvider);
     // main() migrates/creates the registry before runApp; the seeding here
     // covers a genuinely fresh cloud account (and tests that wire a bare
-    // store straight into the ProviderScope).
+    // store straight into the ProviderScope). A DELIBERATELY emptied local
+    // registry is not repaired — see _maySeedFirstBand.
     var accounts = _bandsOf(repo);
-    if (repo.isWarm && accounts.isEmpty) accounts = [_seedFirstBand(repo)];
+    if (repo.isWarm && accounts.isEmpty && _maySeedFirstBand) {
+      accounts = [_seedFirstBand(repo)];
+    }
     final accountId = _pickActive(accounts, repo.readActiveBandId());
     // Booting straight into a cloud profile: main() read the keychain for
     // the LOCAL registry's band, not this one — fetch the right secrets as
@@ -278,6 +281,17 @@ class AppStateNotifier extends Notifier<AppState> {
   /// and [_onRemoteChange] adopts the real ones when the snapshot lands.
   static List<BandAccount> _bandsOf(AccountDataRepository repo) =>
       repo.isWarm ? repo.listBands() : const [];
+
+  /// Whether an empty band list may be repaired by seeding one. A fresh
+  /// CLOUD account with no bands gets its first one; the LOCAL profile only
+  /// when its registry was never created at all (bare test containers —
+  /// main() seeds every real install before runApp). An EXISTING empty
+  /// registry is an answer, not an accident: the artist removed the last
+  /// profile (see [removeAccount]), and conjuring a band back is the trap
+  /// that made that profile impossible to delete.
+  bool get _maySeedFirstBand =>
+      !ref.read(accountsDirectoryProvider).active.isLocal ||
+      ref.read(localStoreProvider).readAccountsRegistry() == null;
 
   /// The first profile of an account that genuinely has none. Only ever
   /// called on a WARM repository: conjuring one on a cold mirror's silence
@@ -318,8 +332,12 @@ class AppStateNotifier extends Notifier<AppState> {
     final repo = ref.read(accountDataRepositoryProvider);
     var accounts = _bandsOf(repo);
     // A warm profile with no bands is a fresh account: it gets its first,
-    // empty band. A cold one gets nothing until its snapshot speaks.
-    if (repo.isWarm && accounts.isEmpty) accounts = [_seedFirstBand(repo)];
+    // empty band. A cold one gets nothing until its snapshot speaks — and
+    // the local profile's deliberately emptied registry is real (see
+    // _maySeedFirstBand), so it stays empty and RootGate routes it.
+    if (repo.isWarm && accounts.isEmpty && _maySeedFirstBand) {
+      accounts = [_seedFirstBand(repo)];
+    }
     var accountId = _pickActive(accounts, repo.readActiveBandId());
     String? apiKey;
     String? relaySecret;
@@ -712,10 +730,16 @@ class AppStateNotifier extends Notifier<AppState> {
   }
 
   /// Deletes [id]'s local data and secrets (and, best effort, its relay jar
-  /// on the server), then activates the first remaining band — or a fresh
-  /// empty one when it was the last. Refused during a live session, and
-  /// when a cloud band's server-side wipe is unreachable (offline) — a
-  /// refusal deletes nothing and returns false.
+  /// on the server), then activates the first remaining band. Removing the
+  /// LAST band leaves the registry honestly empty — no replacement is
+  /// minted. That used to be the trap: removal always produced a fresh
+  /// empty profile and the router always had somewhere to put it, so the
+  /// last profile could never actually be deleted. "No profile" is a
+  /// routable state now: RootGate lands it on the account picker (when the
+  /// device knows other accounts) or back on Welcome (when nothing at all
+  /// remains). Refused during a live session, and when a cloud band's
+  /// server-side wipe is unreachable (offline) — a refusal deletes nothing
+  /// and returns false.
   Future<bool> removeAccount(String id) async {
     if (accountActionsBlocked) return false;
     if (!_registry.contains(id)) return false;
@@ -761,35 +785,27 @@ class AppStateNotifier extends Notifier<AppState> {
       state = state.copyWith(switching: false);
       return false;
     }
-    var registry = _registry.withoutAccount(id);
+    final registry = _registry.withoutAccount(id);
     await repo.removeBandEntry(id);
-    if (registry.accounts.isEmpty) {
-      final fresh = BandAccount(
-        id: BandAccount.newId(),
-        name: '',
-        createdAtMs: DateTime.now().millisecondsSinceEpoch,
-      );
-      registry =
-          AccountsRegistry(accounts: [fresh], activeId: fresh.id);
-      await repo.upsertBandEntry(fresh);
-    }
 
     // Load the successor BEFORE wiping, so the UI lands on coherent state.
+    // '' when [id] was the last band: there is no successor, and nothing
+    // below reads or writes on its behalf.
     final successorId = id == state.accountId
-        ? registry.accounts.first.id
+        ? (registry.accounts.firstOrNull?.id ?? '')
         : state.accountId;
     String? apiKey;
     String? relaySecret;
     if (successorId == state.accountId) {
       apiKey = state.apiKey;
       relaySecret = state.relaySecret;
-    } else {
+    } else if (successorId.isNotEmpty) {
       try {
         apiKey = await repo.readApiKey(successorId);
         relaySecret = await repo.readRelaySecret(successorId);
       } catch (_) {}
     }
-    await repo.saveActiveBandId(successorId);
+    if (successorId.isNotEmpty) await repo.saveActiveBandId(successorId);
     state = AppState(
       accountId: successorId,
       accounts: registry.accounts,
@@ -897,8 +913,8 @@ class AppStateNotifier extends Notifier<AppState> {
 final appStateProvider =
     NotifierProvider<AppStateNotifier, AppState>(AppStateNotifier.new);
 
-/// Whether this device has anything set up at all — the ONE question that
-/// decides between the first-run pitch (WelcomeScreen) and the shell.
+/// Whether this device has anything set up at all — the question that
+/// decides whether the first-run pitch (WelcomeScreen) shows.
 ///
 /// True as soon as SOME band of the active profile has a payment method, or a
 /// cloud account is signed in, or the device knows a cloud account it could
@@ -906,6 +922,11 @@ final appStateProvider =
 /// first run; everywhere else the artist has something to come back to, and
 /// must land in the shell where the switcher, Settings and sign-out live —
 /// never on a marketing page with no chrome.
+///
+/// Deliberately NOT "whether there is a profile to put on screen" — that is
+/// [activeProfileHasBandsProvider]'s question. Conflating the two is how
+/// removing the last local profile used to render AppShell around a band
+/// that didn't exist, just because a cloud account was in the directory.
 ///
 /// Bands of OTHER profiles aren't consulted: their jars sit in a repository
 /// this profile can't read. The directory entry stands in for them, which is
@@ -924,6 +945,23 @@ final deviceIsSetUpProvider = Provider<bool>((ref) {
   final repo = ref.watch(accountDataRepositoryProvider);
   return app.accounts.any((a) =>
       repo.readTipJar(a.id) != null || repo.readRelayJar(a.id) != null);
+});
+
+/// Whether the ACTIVE profile has a band to put on screen — the other half
+/// of the question [deviceIsSetUpProvider] used to answer alone: "this
+/// device has an account somewhere" and "this profile has a band to render"
+/// are two different questions, and they get two answers.
+///
+/// False only for the local profile over an empty registry — the artist
+/// removed (or moved out) every local band, and RootGate sends that state
+/// to the account picker instead of the shell. A cloud profile always
+/// renders: a cold mirror's silence is still the shell, and a genuinely
+/// empty account seeds its first band the moment its snapshot says so.
+final activeProfileHasBandsProvider = Provider<bool>((ref) {
+  final activeIsLocal =
+      ref.watch(accountsDirectoryProvider.select((d) => d.active.isLocal));
+  if (!activeIsLocal) return true;
+  return ref.watch(appStateProvider.select((s) => s.accounts.isNotEmpty));
 });
 
 /// Builds the tip feed for a session — a seam so controller tests can

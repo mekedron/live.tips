@@ -25,6 +25,16 @@ import 'onboarding_flow.dart';
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
+  /// A device that removed its last profile arrives here with an EMPTY
+  /// registry (see AppStateNotifier.removeAccount) — everything past this
+  /// screen configures the ACTIVE band, so walking in mints the first one.
+  /// A fresh install already got its band from main() and this is a no-op.
+  static Future<void> _ensureFirstBand(WidgetRef ref) async {
+    if (ref.read(appStateProvider).accounts.isEmpty) {
+      await ref.read(appStateProvider.notifier).addAccount();
+    }
+  }
+
   /// "Get started" — the performer path. This device is the performer's own
   /// (the overwhelmingly common case), so the old "What is this device?"
   /// question is answered here implicitly and onboarding continues with the
@@ -33,6 +43,7 @@ class WelcomeScreen extends ConsumerWidget {
     final navigator = Navigator.of(context);
     // A fresh run: the step counter starts clean.
     ref.read(onboardingPreludeProvider.notifier).reset();
+    await _ensureFirstBand(ref);
     await ref.read(deviceKindProvider.notifier).choose(DeviceKind.performer);
     if (!context.mounted) return;
     final offerSignIn = platformSupportsCloudAccounts &&
@@ -179,7 +190,8 @@ class WelcomeScreen extends ConsumerWidget {
                             // Demo from Welcome is the same choice as the
                             // demo card on the kind step — record it so the
                             // Settings row can say what this device is.
-                            onPressed: () {
+                            onPressed: () async {
+                              await _ensureFirstBand(ref);
                               ref
                                   .read(deviceKindProvider.notifier)
                                   .choose(DeviceKind.demo);

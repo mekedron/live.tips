@@ -36,6 +36,12 @@ const kKeychainTargetId = 'keychain_target_id_v1';
 /// Idempotent: returns the existing registry, or migrates/creates one.
 /// Also sweeps legacy prefs keys left behind by a downgraded app version
 /// back into a (new) account, so downgrade-era data never becomes invisible.
+///
+/// An existing registry with NO accounts is returned as-is: it means the
+/// artist removed the last local profile, and "no profile" is a routable
+/// state the app renders (RootGate) — minting a band here is how a removed
+/// profile used to come back at the next boot. Only a genuinely fresh
+/// install (no registry at all) gets its first band created.
 Future<AccountsRegistry> ensureAccountsRegistry(LocalStore local) async {
   final prefs = local.prefs;
   final existing = local.readAccountsRegistry();
@@ -122,7 +128,11 @@ Future<void> migrateKeychainIfNeeded(
   final stored = prefs.getString(kKeychainTargetId);
   final targetAccountId = (stored != null && registry.contains(stored))
       ? stored
-      : registry.accounts.first.id;
+      : registry.accounts.firstOrNull?.id;
+  // An empty registry (last profile removed) has nowhere to adopt legacy
+  // secrets into — the flag stays unset, and a later registry with a band
+  // retries.
+  if (targetAccountId == null) return;
   try {
     final legacyKey = await secure.readLegacyApiKey();
     final legacySecret = await secure.readLegacyRelaySecret();

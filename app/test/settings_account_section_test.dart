@@ -5,6 +5,7 @@ import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/app_account.dart';
+import 'package:live_tips/features/account/cloud_upload_offer.dart';
 import 'package:live_tips/features/settings/settings_screen.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
@@ -12,11 +13,19 @@ import 'package:live_tips/state/providers.dart';
 import 'helpers.dart';
 
 /// Settings over a seeded store; [auth] null exercises the default
-/// no-Firebase [authServiceProvider] (cloud section must vanish).
-Future<void> _pumpSettings(WidgetTester tester, {AuthService? auth}) async {
+/// no-Firebase [authServiceProvider] (cloud section must vanish). A non-null
+/// [uploads] wires a recording cloud-upload runner in (the move row hides
+/// without one); [bandName] names the seeded local band — a NAMED band is
+/// one worth moving.
+Future<void> _pumpSettings(
+  WidgetTester tester, {
+  AuthService? auth,
+  String bandName = '',
+  List<String>? uploads,
+}) async {
   await tester.binding.setSurfaceSize(const Size(600, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
-  final localStore = await seededStore();
+  final localStore = await seededStore(bandName: bandName);
   // An anonymous uid is an account only when the directory knows it (the
   // relay's transport sign-in is anonymous too, and stays invisible).
   final user = auth?.currentUser;
@@ -44,6 +53,11 @@ Future<void> _pumpSettings(WidgetTester tester, {AuthService? auth}) async {
         secureStoreProvider.overrideWithValue(SecureStore()),
         initialApiKeyProvider.overrideWithValue(null),
         if (auth != null) authServiceProvider.overrideWithValue(auth),
+        if (uploads != null)
+          cloudUploadRunnerProvider.overrideWithValue((uid, {onProgress}) async {
+            uploads.add(uid);
+            return null;
+          }),
       ],
       child: MaterialApp(
         localizationsDelegates: kTestL10nDelegates,
@@ -118,5 +132,73 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  // The permanent door #25 asked for: the sign-in offer is one-shot per
+  // profile, so a local profile created after that answer needs a home in
+  // Settings that is ALWAYS there while a local profile and a signed-in
+  // account coexist.
+
+  testWidgets(
+      'signed in beside a local profile worth moving: the move row shows '
+      'and runs the migrator', (tester) async {
+    final uploads = <String>[];
+    await _pumpSettings(
+      tester,
+      auth: FakeAuthService(
+        user: const AuthUser(
+          uid: 'uid_1',
+          kind: AccountKind.google,
+          displayName: 'Casey',
+        ),
+      ),
+      bandName: 'Solo Act',
+      uploads: uploads,
+    );
+
+    await tester.tap(find.text('Move profiles into this account'));
+    await tester.pumpAndSettle();
+    // The same question the sign-in offer asks — walked up to, not waited on.
+    expect(find.text('Move your profiles to this account?'), findsOneWidget);
+
+    await tester.tap(find.text('Move profiles'));
+    await tester.pumpAndSettle();
+
+    expect(uploads, ['uid_1']);
+    expect(
+        find.text('Your profiles now live in your account.'), findsOneWidget);
+  });
+
+  testWidgets('a pristine placeholder profile earns no move row', (
+    tester,
+  ) async {
+    // Unnamed and holding no data: noise, not value — same rule as the
+    // sign-in offer.
+    await _pumpSettings(
+      tester,
+      auth: FakeAuthService(
+        user: const AuthUser(
+          uid: 'uid_1',
+          kind: AccountKind.google,
+          displayName: 'Casey',
+        ),
+      ),
+      uploads: <String>[],
+    );
+
+    expect(find.text('Move profiles into this account'), findsNothing);
+  });
+
+  testWidgets('signed out: no move row — there is no account to move into', (
+    tester,
+  ) async {
+    await _pumpSettings(
+      tester,
+      auth: FakeAuthService(),
+      bandName: 'Solo Act',
+      uploads: <String>[],
+    );
+
+    expect(find.text('Move profiles into this account'), findsNothing);
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/features/account/cloud_upload_offer.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
@@ -12,13 +13,17 @@ import 'package:live_tips/state/route_depth.dart';
 
 import 'helpers.dart';
 
-/// The data-loss bug: the offer to move this device's profiles into a freshly
-/// signed-in account marked itself "already offered" BEFORE the user answered
-/// — and it was raised while onboarding was pushing its next screen, so it
-/// landed under an opaque route and was never seen. One burned flag, and the
-/// local profiles stayed stranded on the device forever.
+/// The data-loss bug, in two acts. First: the offer to move this device's
+/// profiles into a freshly signed-in account marked itself "already offered"
+/// BEFORE the user answered — and it was raised while onboarding was pushing
+/// its next screen, so it landed under an opaque route and was never seen.
+/// One burned flag, and the local profiles stayed stranded forever. Second:
+/// the flag was account-wide, so a profile created AFTER the answer was
+/// covered by an answer nobody gave about it — stranded again, from the
+/// other side.
 ///
-/// The flag may only be written once an answer exists.
+/// The flag may only be written once an answer exists, and it only covers
+/// the profiles the question was about.
 class _Harness {
   _Harness(this.local, this.uploads, this.container);
 
@@ -39,7 +44,9 @@ Future<_Harness> _pump(
   addTearDown(() => tester.binding.setSurfaceSize(null));
   // A named profile is worth moving — that is what brings the offer up at all.
   final local = await seededStore(bandName: 'Solo Act');
-  if (alreadyOffered) await local.markCloudUploadOffered('uid_test');
+  if (alreadyOffered) {
+    await local.markCloudUploadOffered('uid_test', [kTestAccountId]);
+  }
   final uploads = <String>[];
 
   final container = ProviderContainer(overrides: [
@@ -113,7 +120,7 @@ void main() {
     expect(find.text(_title), findsNothing);
     // The whole bug in one line: nothing recorded, so the profiles can still
     // be offered a home.
-    expect(h.local.readCloudUploadOffered('uid_test'), isFalse);
+    expect(h.local.readCloudUploadOfferedBands('uid_test'), isEmpty);
     expect(h.uploads, isEmpty);
   });
 
@@ -123,7 +130,8 @@ void main() {
     await tester.tap(find.text('Not now'));
     await tester.pumpAndSettle();
 
-    expect(h.local.readCloudUploadOffered('uid_test'), isTrue);
+    expect(h.local.readCloudUploadOfferedBands('uid_test'),
+        contains(kTestAccountId));
     expect(h.uploads, isEmpty);
   });
 
@@ -134,16 +142,50 @@ void main() {
     await tester.tap(find.text('Move profiles'));
     await tester.pumpAndSettle();
 
-    expect(h.local.readCloudUploadOffered('uid_test'), isTrue);
+    expect(h.local.readCloudUploadOfferedBands('uid_test'),
+        contains(kTestAccountId));
     expect(h.uploads, ['uid_test']);
     expect(find.text('Your profiles now live in your account.'), findsOneWidget);
   });
 
-  testWidgets('an account that already answered is never asked again',
-      (tester) async {
+  testWidgets('an account that answered about these profiles is not re-asked '
+      '— but the sign-in still says where they stayed', (tester) async {
     await _pump(tester, alreadyOffered: true);
 
     expect(find.text(_title), findsNothing);
+    // The switch happened anyway: without a word it reads, to the artist,
+    // as "my band is gone".
+    expect(find.textContaining('Your local profiles stayed on this device'),
+        findsOneWidget);
+  });
+
+  testWidgets('a profile created after the first answer is a new question',
+      (tester) async {
+    // The stranding bug from the other side: the account answered once, and
+    // the account-wide flag then covered a profile that did not even exist
+    // when the question was asked.
+    final h = await _pump(tester, alreadyOffered: true, signIn: false);
+    await h.local.saveAccountsRegistry(const AccountsRegistry(
+      accounts: [
+        BandAccount(id: kTestAccountId, name: 'Solo Act', createdAtMs: 0),
+        BandAccount(id: 'acc_later', name: 'The Later Band', createdAtMs: 1),
+      ],
+      activeId: kTestAccountId,
+    ));
+
+    await tester.tap(find.text('sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(_title), findsOneWidget,
+        reason: 'the flag means "asked about THESE profiles", not '
+            '"asked, ever"');
+
+    // The answer covers the new profile too — the next sign-in is quiet.
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(h.local.readCloudUploadOfferedBands('uid_test'),
+        containsAll(<String>[kTestAccountId, 'acc_later']));
+    expect(h.uploads, isEmpty);
   });
 
   testWidgets(
@@ -197,7 +239,7 @@ void main() {
 
     expect(find.text('onboarding step'), findsOneWidget);
     expect(find.text(_title), findsNothing);
-    expect(h.local.readCloudUploadOffered('uid_test'), isFalse);
+    expect(h.local.readCloudUploadOfferedBands('uid_test'), isEmpty);
 
     // Onboarding ends (popUntil isFirst) — now the question can be seen, and
     // it is still there to be asked.

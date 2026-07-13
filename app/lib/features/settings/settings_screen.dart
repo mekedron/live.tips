@@ -18,6 +18,7 @@ import '../../widgets/band_switcher.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/sign_in_sheet.dart';
+import '../account/cloud_upload_offer.dart';
 import '../shell/app_shell.dart';
 import '../onboarding/account_name_screen.dart';
 import '../venue/venue_reapproval_screen.dart';
@@ -196,6 +197,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  /// The permanent home of the local→cloud move. The offer that pops after
+  /// a sign-in is a convenience with a memory — it only asks about profiles
+  /// it hasn't asked about — so without this row, an account that once said
+  /// "Not now" had no way to ever bring those profiles over. Same question,
+  /// same dialog, same migrator; the only difference is that the artist
+  /// walked up to it.
+  Future<void> _confirmMoveLocalProfiles() async {
+    final s = context.s;
+    // The move ends by switching to the migrated profile — the same guard
+    // add/switch/remove ask, for the same reason: no reshuffling under a
+    // live set.
+    final block = ref.read(appStateProvider.notifier).accountActionBlock;
+    if (block != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(block == AccountActionBlock.switching
+              ? s.t('widgets.band_switcher.switching')
+              : s.t('settings.account.stop_session_move')),
+        ),
+      );
+      return;
+    }
+    final uid = ref.read(accountsDirectoryProvider).activeAccountId;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.t('account.profile_upload.title')),
+        content: Text(s.t('account.profile_upload.body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(s.t('common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(s.t('account.profile_upload.accept')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    // The account this screen was about must still be the signed-in one —
+    // the dialog sat open, and the upload writes into ITS subtree.
+    if (ref.read(authControllerProvider).user?.uid != uid) return;
+    await runCloudUpload(context, ref, uid);
+  }
+
   /// Changing what this device is wipes it — the dialog says exactly that,
   /// because there is no half-way: data written under one trust model must
   /// not be inherited by another.
@@ -279,6 +327,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 email: auth.user!.email ?? activeProfile.email,
               )
             : activeProfile);
+    // Whether this device still holds local profiles worth moving into the
+    // signed-in account (named, or holding data — pristine placeholders are
+    // noise, not value). Needs the account's OWN session alive: the upload
+    // writes into its Firestore subtree.
+    final localStore = ref.watch(localStoreProvider);
+    final canMoveLocalProfiles = cloudEntry != null &&
+        auth.user?.uid == activeProfile.id &&
+        ref.watch(cloudUploadRunnerProvider) != null &&
+        (localStore.readAccountsRegistry()?.accounts.any((a) =>
+                a.name.trim().isNotEmpty ||
+                localStore.accountHasData(a.id)) ??
+            false);
 
     final sections = <Widget>[
       // --------------------------------------------------- cloud account ---
@@ -326,6 +386,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const SecurityScreen()),
                   ),
+                ),
+              // The way over for a local profile stranded beside this
+              // account. Always here while both coexist — the sign-in offer
+              // is one-shot per profile, and a dialog that already ran must
+              // never be the only door to the migrator.
+              if (!venueMode && canMoveLocalProfiles)
+                LtRow(
+                  icon: Icons.cloud_upload_outlined,
+                  title: s.t('settings.account.move_profiles_row'),
+                  subtitle: s.t('settings.account.move_profiles_subtitle'),
+                  chevron: true,
+                  onTap: _confirmMoveLocalProfiles,
                 ),
               if (!venueMode)
                 LtRow(

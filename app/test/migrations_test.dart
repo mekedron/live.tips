@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/migrations.dart';
 import 'package:live_tips/data/secure_store.dart';
+import 'package:live_tips/domain/band_account.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers.dart';
@@ -119,6 +120,23 @@ void main() {
       expect(registry.accounts, hasLength(1));
       expect(registry.accounts.single.name, '');
       expect(local.accountHasData(registry.activeId), isFalse);
+    });
+
+    test('a deliberately emptied registry stays empty across boots',
+        () async {
+      // Removing the last local profile leaves the registry with no
+      // accounts. That is an ANSWER, not a fresh install — the boot
+      // migration re-minting a band here is how a removed profile used to
+      // come back on the next launch, un-deletable forever.
+      final local = await _store({});
+      await local.saveAccountsRegistry(
+          const AccountsRegistry(accounts: [], activeId: ''));
+
+      final registry = await ensureAccountsRegistry(local);
+      expect(registry.accounts, isEmpty);
+      // …and the keychain phase has no band to adopt legacy secrets into —
+      // it must skip, never crash.
+      await migrateKeychainIfNeeded(local, FakeSecureStore(), registry);
     });
 
     test('relay-only install names the band from the relay jar', () async {

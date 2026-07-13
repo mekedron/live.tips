@@ -125,13 +125,16 @@ class LocalStore {
 
   // --- Accounts registry ---
 
+  /// Null means "never migrated/created" (a fresh install); a registry with
+  /// NO accounts is a different answer — the artist removed the last local
+  /// profile, and that removal must survive a reboot. Reading empty as null
+  /// is how the boot migration used to mint the removed profile back.
   AccountsRegistry? readAccountsRegistry() {
     final raw = _getString(kAccounts);
     if (raw == null) return null;
     try {
-      final registry = AccountsRegistry.fromJson(
+      return AccountsRegistry.fromJson(
           jsonDecode(raw) as Map<String, dynamic>);
-      return registry.accounts.isEmpty ? null : registry;
     } catch (_) {
       return null;
     }
@@ -294,13 +297,21 @@ class LocalStore {
     await _prefs.remove(_kPendingRedirect);
   }
 
-  /// Whether [uid] was already offered the local→cloud band upload —
-  /// declining is an answer, and re-asking on every sign-in is nagging.
-  bool readCloudUploadOffered(String uid) =>
-      _prefs.getBool('cloud_upload_offered_v1_$uid') ?? false;
+  /// The local profiles [uid] was already offered the local→cloud upload
+  /// FOR — declining is an answer, and re-asking about the same profiles on
+  /// every sign-in is nagging. Per profile, not per account: a profile
+  /// created after the answer is a NEW question, and an account-wide flag
+  /// read as "asked, ever" is how such a profile stayed stranded on the
+  /// device with no way over. (The old boolean under `_v1` couldn't say
+  /// WHICH profiles it covered, so it is deliberately ignored: an account
+  /// that answered under it gets asked once more, and this time the answer
+  /// is recorded per profile.)
+  List<String> readCloudUploadOfferedBands(String uid) =>
+      _prefs.getStringList('cloud_upload_offered_v2_$uid') ?? const [];
 
-  Future<void> markCloudUploadOffered(String uid) =>
-      _prefs.setBool('cloud_upload_offered_v1_$uid', true);
+  Future<void> markCloudUploadOffered(String uid, List<String> bandIds) =>
+      _prefs.setStringList('cloud_upload_offered_v2_$uid',
+          {...readCloudUploadOfferedBands(uid), ...bandIds}.toList());
 
   // --- Tip jar ---
 

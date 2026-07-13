@@ -41,9 +41,12 @@ class BandAccount {
       );
 }
 
-/// The device's list of bands plus which one is active. Invariants (kept by
-/// the notifier and the boot migration): never empty, [activeId] always
-/// names an existing account.
+/// The device's list of bands plus which one is active. Invariant (kept by
+/// the notifier and the boot migration): [activeId] always names an existing
+/// account — or '' when the list is empty. Empty is a REAL state, not a
+/// corruption: removing the last local profile leaves it that way on
+/// purpose, and everything that boots over it must keep it empty rather
+/// than mint a band back (see AppStateNotifier.removeAccount).
 class AccountsRegistry {
   const AccountsRegistry({required this.accounts, required this.activeId});
 
@@ -66,13 +69,18 @@ class AccountsRegistry {
         activeId: activeId,
       );
 
-  AccountsRegistry withoutAccount(String id) => AccountsRegistry(
-        accounts: [
-          for (final a in accounts)
-            if (a.id != id) a,
-        ],
-        activeId: activeId,
-      );
+  AccountsRegistry withoutAccount(String id) {
+    final remaining = [
+      for (final a in accounts)
+        if (a.id != id) a,
+    ];
+    return AccountsRegistry(
+      accounts: remaining,
+      // An emptied registry names no active band — a stale id here would
+      // read, to anything that trusts it, as a band that still exists.
+      activeId: remaining.isEmpty ? '' : activeId,
+    );
+  }
 
   AccountsRegistry withRenamed(String id, String name) => AccountsRegistry(
         accounts: [

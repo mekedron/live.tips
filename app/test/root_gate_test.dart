@@ -9,6 +9,7 @@ import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/features/home/setup_home_screen.dart';
 import 'package:live_tips/features/onboarding/welcome_screen.dart';
+import 'package:live_tips/features/settings/account_switch_screen.dart';
 import 'package:live_tips/features/shell/app_shell.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
@@ -133,5 +134,81 @@ void main() {
 
     expect(find.byType(WelcomeScreen), findsNothing);
     expect(find.byType(SetupHomeScreen), findsOneWidget);
+  });
+
+  // The un-deletable-profile loop: removing the LAST local profile used to
+  // mint a fresh empty one and land the app right back in the shell on it —
+  // because a cloud account in the directory said "set up", and the router
+  // read that as "something to render". The removal tests always asserted on
+  // the registry and the wiped data; these assert on where the user LANDS.
+
+  testWidgets(
+      'removing the last local profile beside a cloud account lands on the '
+      'account picker — not in the shell on a fabricated profile',
+      (tester) async {
+    final local = await _store();
+    await local.saveAccountsRegistry(const AccountsRegistry(
+      accounts: [BandAccount(id: 'acc_solo', name: 'Solo Act', createdAtMs: 0)],
+      activeId: 'acc_solo',
+    ));
+    await local.saveRelayJar('acc_solo', _jar);
+    await local.saveAccountsDirectory(
+      AccountsDirectory.initial().withAccount(const AppAccount(
+        id: 'uid_cloud',
+        name: 'Casey',
+        kind: AccountKind.google,
+      )),
+    );
+    await _pumpApp(tester, local);
+    expect(find.byType(AppShell), findsOneWidget);
+
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(AppShell)));
+    expect(
+        await container
+            .read(appStateProvider.notifier)
+            .removeAccount(container.read(appStateProvider).accountId),
+        isTrue);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AccountSwitchScreen), findsOneWidget);
+    expect(find.byType(AppShell), findsNothing);
+    expect(find.byType(WelcomeScreen), findsNothing);
+    expect(container.read(appStateProvider).accounts, isEmpty,
+        reason: 'no replacement profile may be conjured back');
+    expect(local.readAccountsRegistry()!.accounts, isEmpty,
+        reason: 'the removal must survive a reboot too');
+  });
+
+  testWidgets(
+      'removing the last local profile with no account of any kind left '
+      'lands back on Welcome — onboarding is reachable again', (tester) async {
+    final local = await _store();
+    await local.saveAccountsRegistry(const AccountsRegistry(
+      accounts: [BandAccount(id: 'acc_solo', name: 'Solo Act', createdAtMs: 0)],
+      activeId: 'acc_solo',
+    ));
+    await local.saveRelayJar('acc_solo', _jar);
+    await _pumpApp(tester, local);
+    expect(find.byType(AppShell), findsOneWidget);
+
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(AppShell)));
+    expect(
+        await container
+            .read(appStateProvider.notifier)
+            .removeAccount(container.read(appStateProvider).accountId),
+        isTrue);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+    expect(find.byType(AppShell), findsNothing);
+    expect(container.read(appStateProvider).accounts, isEmpty);
+
+    // And Welcome is not a dead end: walking into onboarding mints the
+    // first band again, so setup has something to configure.
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+    expect(container.read(appStateProvider).accounts, hasLength(1));
   });
 }

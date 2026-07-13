@@ -13,6 +13,7 @@ import 'features/account/device_session_guard.dart';
 import 'features/account/redirect_sign_in_gate.dart';
 import 'features/live/stage/stage_overlay.dart';
 import 'features/onboarding/welcome_screen.dart';
+import 'features/settings/account_switch_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
 import 'features/shell/app_shell.dart';
 import 'features/venue/venue_banner.dart';
@@ -105,6 +106,12 @@ class LiveTipsApp extends ConsumerWidget {
 /// half-made band used to be a room with no door: welcome had no chrome, the
 /// shell was unreachable, and the user's other bands were invisible.
 ///
+/// One state has no band to build the shell AROUND: the local profile after
+/// its last band was removed ([activeProfileHasBandsProvider]). That routes
+/// to the account PICKER — the accounts this device still knows, plus a
+/// fresh sign-in — never to AppShell over a band that doesn't exist, and
+/// never to a fabricated replacement profile.
+///
 /// The Stripe-key-without-a-jar case still gets its own screen: that band is
 /// mid-setup with a key already in the keychain, and JarSetupScreen is what
 /// finishes it.
@@ -127,8 +134,11 @@ class RootGate extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final setUp = ref.watch(deviceIsSetUpProvider);
+    final hasProfile = ref.watch(activeProfileHasBandsProvider);
     final screen = !setUp
         ? const WelcomeScreen()
+        : !hasProfile
+        ? const AccountSwitchScreen()
         : (app.hasStripe && app.effectiveTipJar == null)
         ? const JarSetupScreen()
         : const AppShell();
