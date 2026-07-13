@@ -1,9 +1,10 @@
 name: Deploy firebase (livetips-app)
 
 # The Firebase pipeline — Firestore rules/indexes, the gen2 functions, and
-# Hosting for live.tips's tip pages. Independent of worker.yml (the relay)
-# and pages.yml (the site). Authenticates as the github-deployer service
-# account (FIREBASE_SERVICE_ACCOUNT holds its JSON key).
+# Hosting for live.tips's tip pages. This IS the relay; pages.yml (the
+# marketing site on GitHub Pages) is the only other deploy. Authenticates as
+# the github-deployer service account (FIREBASE_SERVICE_ACCOUNT holds its
+# JSON key).
 
 on:
   push:

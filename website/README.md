@@ -54,7 +54,7 @@ the only one).
 
 The content is not decoration: it describes what the code actually does — the
 one-hour undelivered-tip window, the 90-day profile expiry, the hashed-IP quota.
-**If you change that behaviour in `worker/`, the policy is part of the change.**
+**If you change that behaviour in `firebase/`, the policy is part of the change.**
 
 ## The rendered site contacts no third party
 

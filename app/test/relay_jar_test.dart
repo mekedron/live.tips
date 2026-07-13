@@ -62,7 +62,7 @@ void main() {
 
   test('demo jar is safe and secret-free', () {
     expect(RelayJar.demo.jarId, 'demo');
-    expect(RelayJar.demo.tipUrl, 'https://live.tips/t/demo');
+    expect(RelayJar.demo.tipUrl, 'https://tip.live.tips/t/demo');
     expect(RelayJar.demo.hasRevolut, isTrue);
     expect(RelayJar.demo.hasMobilePay, isFalse);
   });

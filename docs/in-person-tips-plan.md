@@ -87,7 +87,7 @@ question we ask is "does a *restricted* key do it", and if the answer is no, the
 option gets reconsidered rather than the promise.
 
 **We will not put a live.tips server in the money path.** The relay
-(`worker/`) exists, but it forwards notifications for payment methods with no API
+(`firebase/`) exists, but it forwards notifications for payment methods with no API
 — it never touches money, and it never will. If an in-person option needs a
 server that mints credentials or initiates charges, that server is a middleman
 regardless of how thin it is, and the option loses.

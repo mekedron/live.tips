@@ -1,6 +1,6 @@
-/// The artist's connected-mode jar registered with the live.tips relay
-/// worker: a public fan page URL plus the payment methods it offers.
-/// The jar secret is NEVER stored here — it lives in the SecureStore only.
+/// The artist's connected-mode jar registered with the live.tips relay:
+/// a public fan page URL plus the payment methods it offers. The jar secret
+/// is NEVER stored here — it lives in the SecureStore only.
 class RelayJar {
   const RelayJar({
     required this.jarId,
@@ -16,8 +16,9 @@ class RelayJar {
 
   final String jarId;
 
-  /// Public `https://live.tips/t/<jarId>` URL — what goes on the QR code in
-  /// connected mode.
+  /// Public `https://tip.live.tips/t/<jarId>` URL — what goes on the QR code
+  /// in connected mode. Minted by the relay, never assembled on the device:
+  /// the server owns the host.
   final String tipUrl;
   final String artistName;
   final String currency;
@@ -39,7 +40,7 @@ class RelayJar {
 
   static const demo = RelayJar(
     jarId: 'demo',
-    tipUrl: 'https://live.tips/t/demo',
+    tipUrl: 'https://tip.live.tips/t/demo',
     artistName: 'Demo Artist',
     currency: 'usd',
     revolutUsername: 'demo',

@@ -1,9 +1,10 @@
 # live.tips relay — Firebase Cloud Functions
 
-Port of the Cloudflare Worker relay (`worker/`) to 2nd-gen Cloud Functions
-(europe-west1, Node 20) + Firestore. Same validation, deep-link composition,
-SSR tip page, rate caps, dedupe, and privacy invariants; Durable Object
-storage becomes the Firestore model below.
+The relay: 2nd-gen Cloud Functions (europe-west1, Node 20) + Firestore. It
+replaces the Cloudflare Worker relay this project used to run (`worker/`, now
+deleted) and keeps its validation, deep-link composition, SSR tip page, rate
+caps, dedupe, and privacy invariants; the Worker's Durable Object storage
+became the Firestore model below.
 
 ## Data model
 
@@ -110,7 +111,7 @@ npm test        # vitest, pure logic only (no emulator)
 Emulators (auth, firestore, functions, hosting): `firebase emulators:start`
 from `firebase/`. Nothing is deployed yet — billing is not enabled.
 
-## Deliberate deviations from the worker
+## Deliberate deviations from the old Worker
 
 - No WebSockets: the artist's app reads `pendingTips` via Firestore listeners
   and deletes docs on display (delivery IS deletion). POST /tips therefore

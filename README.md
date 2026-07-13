@@ -12,11 +12,16 @@ tip live, with a goal progress bar, the latest message, and confetti.
 
 Artists can optionally also accept **Revolut** and **MobilePay Box** tips. Those two
 have no API to confirm a payment, so they route through a tiny open-source relay
-([`worker/`](worker/), `api.live.tips`) that forwards tip notifications to the artist's
-device and **keeps no tip history and never touches money**. Tips from these
+([`firebase/`](firebase/), `tip.live.tips`) that forwards tip notifications to the
+artist's device and **keeps no tip history and never touches money**. Tips from these
 methods are shown as *unverified* because live.tips cannot confirm they were actually
 paid. Stripe-only setups still talk to no live.tips server at all — see
 [Connected mode](#connected-mode-revolut--mobilepay) below.
+
+An **account is optional too.** The default is still a device-local profile, and it
+still keeps everything on the device. Signing in buys one thing: the same bands, keys,
+settings and history on a second device, and a live session several devices can watch
+at once — see [Accounts](#accounts-optional) below.
 
 ## How it works
 
@@ -48,20 +53,21 @@ their Stripe account as live performance, not fundraising: see
 
 Stripe is the default and needs no server. Artists who also want to accept **Revolut**
 or **MobilePay Box** tips can opt in during onboarding. Because those services offer no
-way to confirm a payment, this mode uses a minimal relay ([`worker/`](worker/), running
-on Cloudflare at `api.live.tips`):
+way to confirm a payment, this mode uses a minimal relay ([`firebase/`](firebase/):
+Cloud Functions + Firestore, with the fan page at `tip.live.tips`):
 
-- The QR code points to a small hosted page (`live.tips/t/<id>`) that offers every
+- The QR code points to a small hosted page (`tip.live.tips/t/<id>`) that offers every
   method the artist enabled. Card / Apple Pay / Google Pay still go straight to the
   artist's Stripe link; Revolut and MobilePay open a short form (amount, name, message).
-- Submitting the form relays the tip to the artist's device over a WebSocket and
-  redirects the fan to the Revolut/MobilePay deep link. The relay keeps **no tip
-  history, no accounts, no analytics**, and the artist's profile (name, message,
-  payment handles, all plain text) self-deletes after 90 days of inactivity.
+- Submitting the form queues the tip for the artist's device and redirects the fan to
+  the Revolut/MobilePay deep link. The artist's app listens for it and **deletes it as
+  it shows it** — that delete is the delivery receipt. The relay keeps **no tip
+  history, no analytics**, and the artist's profile (name, message, payment handles,
+  all plain text) self-deletes after 90 days of inactivity.
 - A device that is away — phone locked, artist checking their MobilePay app, walked
   out of signal — would otherwise miss the tip entirely, since the fan has already
   paid by then. So an undelivered tip waits in its jar for **up to one hour**, is
-  handed over the moment the artist's screen reconnects, and is deleted unseen if it
+  handed over the moment the artist's screen comes back, and is deleted unseen if it
   never does. That is the relay's only storage of fan-written text, and the only exception
   to "no tip history".
 - Revolut/MobilePay tips are shown as **unverified**: they appear the moment a fan
@@ -71,12 +77,36 @@ on Cloudflare at `api.live.tips`):
   history stays on the device regardless of mode — which is one more reason Stripe (the
   only method with a real payment record) is recommended.
 
+## Accounts (optional)
+
+The app boots into a **local profile** — no sign-in, no uid, nothing off the device.
+An artist who wants a second device can sign in with **Apple**, **Google**, or as a
+**guest** (an anonymous account: it syncs, but nothing recovers it if the device is
+lost). An account owns the artist's **bands** — the per-gig profiles, each with its own
+Stripe key, tip jar and QR code.
+
+- **What syncs:** bands, the Stripe restricted key and relay jar secret (kept in each
+  device's keychain, mirrored through an owner-only Firestore doc), settings, and tip +
+  session history.
+- **One live session per account**, enforced by a single Firestore doc rather than by
+  policy. The device that starts it polls Stripe; every other device joins from a
+  "Live session running in <band>" banner and follows the same tip feed.
+- **Devices** are listed in Settings → Security: revoke one, or sign out everywhere
+  else. A new device is added by scanning a QR — and the signed-in device has to
+  confirm the request before anything is issued.
+- **The trade-off, stated plainly:** a signed-in account's tips (names and messages
+  included) are stored in Firestore under the artist's own uid, where no other account
+  can read them. The local profile stores them nowhere but the device. Syncing is
+  opt-in for exactly that reason.
+
+See [architecture notes](docs/architecture.md) for how any of this holds together.
+
 ## Repository layout
 
 | Path | What it is |
 | --- | --- |
 | [`app/`](app/) | Flutter app (iPhone, iPad, Android phone/tablet, macOS, web; Windows/Linux scaffolded) |
-| [`worker/`](worker/) | Cloudflare Worker relay for optional Revolut/MobilePay tips (`api.live.tips`) |
+| [`firebase/`](firebase/) | Cloud Functions + Firestore relay for optional Revolut/MobilePay tips, and the fan page (`tip.live.tips`) |
 | [`docs/`](docs/) | Onboarding guide, architecture notes |
 | [`docs/stripe-app-plan.md`](docs/stripe-app-plan.md) | Plan for the phase-2 Stripe App Marketplace companion |
 | [`stripe-app/`](stripe-app/) | The future Stripe Apps (marketplace) companion — not started |

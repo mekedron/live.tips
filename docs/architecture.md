@@ -3,10 +3,14 @@
 One Flutter app, serverless by default. In the default Stripe-only mode the
 artist's device talks straight to `api.stripe.com` with a restricted key
 created by the artist — there is no live.tips backend. An **optional connected
-mode** adds Revolut/MobilePay via a minimal relay (`worker/`,
-`api.live.tips`); it is described in [Optional relay](#optional-relay-workerapilivetips)
-below and keeps no tip history. This document explains the moving parts and
-the reasoning.
+mode** adds Revolut/MobilePay via a minimal relay (`firebase/`,
+`tip.live.tips`); it is described in [Optional relay](#optional-relay-firebasetiplivetips)
+below and keeps no tip history. An **optional account** (Firebase Auth) syncs
+bands, keys, settings and history across an artist's devices and lets several
+of them watch one live session — see
+[Accounts](#accounts-optional-and-what-signing-in-changes); without one, the
+app is as device-local as it ever was. This document explains the moving parts
+and the reasoning.
 
 ## The core loop: polling instead of webhooks
 
@@ -120,7 +124,7 @@ The link URL is rendered as a QR code — on the home screen, fullscreen for
 printing, and on the live screen's side panel so the audience can scan straight
 from the stage display.
 
-## Bands (local multi-account)
+## Bands (multi-account)
 
 One artist, several acts: a solo set tonight, the band on Friday — each with
 its own links, so nothing gets re-generated or renamed between gigs. A
@@ -136,11 +140,11 @@ entry is suffixed with the band's account id (`tip_jar_v1_<id>`,
 keys its subtree by account id so a switch remounts every screen. Switching
 loads the target band's secrets from the keychain at runtime; it is refused
 while a live session runs (a session is bound to its band's key and relay
-socket — the controller additionally snapshots the account id at start so
+jar — the controller additionally snapshots the account id at start so
 its writes can't leak across bands). The relay keepalive pings **every**
 band's jar, not just the active one, so idle tip pages never hit the
-90-day expiry. Removing a band deletes its data + secrets (best-effort
-relay DELETE included); secrets that survive a locked keychain are
+90-day expiry. Removing a band deletes its data + secrets (a best-effort
+`deleteJar` included); secrets that survive a locked keychain are
 tombstoned and wiped on a later boot.
 
 Migration from the single-band layout is crash-safe and two-phase: the prefs
@@ -159,6 +163,68 @@ every band with its configured methods, plus "Add a band" — which creates
 an empty active band and runs the normal onboarding, since every screen
 already reads "the active band". Abandoned, never-configured bands are
 garbage-collected on switch-away.
+
+## Accounts (optional), and what signing in changes
+
+A band is a gig identity; an **account** is a person, and it owns bands.
+Accounts are optional and off by default: the app still boots into the **local
+profile**, which is exactly what it always was — SharedPreferences plus the
+keychain, no uid, no live.tips backend at all. Everything in this section
+happens only when the artist deliberately signs in.
+
+Four ways to be, three of them Firebase Auth:
+
+- **No account** — the default, device-local, unchanged.
+- **Apple** or **Google**.
+- **Guest** — an *explicit* anonymous account. It syncs and can be revoked, but
+  there is nothing to recover it with if the device is lost.
+
+That last one collides with something: the relay *also* signs in anonymously,
+purely as a transport credential (see [Optional relay](#optional-relay-firebasetiplivetips)),
+so "is this Firebase user anonymous?" cannot be the question that decides
+whether the artist has an account. The **accounts directory** — the device-local
+list of profiles this device knows (`AccountsDirectory`, in prefs) — is the
+discriminator instead: a uid is an account **iff the directory says so**, and
+the only thing that puts one there is `AuthController._run`, i.e. a sign-in the
+artist actually asked for. A relay transport uid is a Firebase user like any
+other and still never reaches the switcher, the repository selection, or the
+device list.
+
+### What syncs, and what deliberately does not
+
+`AccountDataRepository` is the seam: one contract, two implementations —
+`LocalStoreRepository` (prefs + keychain, unchanged) and `FirestoreRepository`
+(`users/{uid}/**`). The contract's reads are **synchronous** and Firestore has
+no synchronous reads, so every non-secret read is served from an in-memory
+mirror fed by snapshot listeners: writes update the mirror *before* the network
+ack (a read-back right after a write must see the new value, exactly like
+prefs), and offline persistence means the first snapshot after a restart
+arrives from cache. Another device's edit lands as a mirror update plus an
+`onChanged` nudge, which is how it reaches the UI.
+
+Synced under the account: the band list, each band's Stripe tip jar and relay
+jar, band settings, app settings, session history, and the relay-tip archive.
+Deliberately **not** synced, in every implementation: which band is active
+(what a device is looking at is a device's business) and the in-flight session
+crash snapshot (two devices' half-finished sets must never overwrite each
+other). Both stay in prefs.
+
+Secrets stay **keychain-first**. The Stripe restricted key and the relay jar
+secret live in `users/{uid}/bands/{bandId}/secrets/v1`, a doc no other uid can
+read, and every snapshot of it is written *through* to the device keychain
+under the same key names the local profile uses. The keychain is therefore both
+the fast path and the cloud profile's cache — it is what the app trusts while
+offline, and everything downstream of `SecureStore` keeps working unchanged.
+
+**Signing in changes the privacy story, and the change deserves to be said out
+loud.** In the local profile the device is the only witness: tips, fan names and
+fan messages never leave it. In a signed-in account they do — a night's tips,
+messages included, are stored in Firestore under the artist's own uid, because
+that is what makes them appear on the second device. No other account can read
+them: the rules grant `users/{uid}/**` to that uid alone, so cross-account reads
+(URL-guessing included) are impossible by construction. But "no server ever sees
+a tip" holds only for the local profile now. That is the price of the second
+device, and it is the artist's to pay or refuse.
 
 ## Sessions & persistence
 
@@ -184,6 +250,80 @@ lib/
 │                # live/stage/ = the stage visualizations (see below)
 └── widgets/     # QR blocks, tip tiles, banners, band switcher
 ```
+
+## Live sessions across devices
+
+Only for signed-in accounts: the local profile keeps its sessions device-local
+through `LocalSessionCoordinator`, exactly as before. `CloudSessionCoordinator`
+implements the same `SessionCoordinator` seam over Firestore.
+
+**One live session per account, and it is structural rather than policed.** The
+coordination doc sits at a *fixed* path — `users/{uid}/live/current` — so two
+"Go live" taps contend on the same document and the claim transaction lets
+exactly one through. The loser is told which band is already live, and the shell
+shows "Live session running in {band}" with a Join button instead.
+
+Two roles:
+
+- The **leader** (the device that started, or resumed, the session) is the only
+  one that runs the Stripe poll and the relay listener. It writes every fresh
+  tip to `users/{uid}/bands/{bandId}/sessions/{sessionId}/tips/{tipId}` —
+  doc id = tip id, and Stripe and relay ids are both stable, so redeliveries and
+  racing writers overwrite instead of duplicating.
+- **Every** device, the leader included, *ingests* only from a listener on that
+  subcollection. One code path, identical ordering everywhere. The leader's own
+  tips come back through Firestore's latency-compensated local echo, so nothing
+  is delayed, and the dedupe-by-id makes the echo free.
+
+The leader holds a **lease**: `leaderLeaseUntilMs = now + 45 s`, stamped on
+every poll tick — and stamped *before* the poll, so a failing Stripe call still
+keeps the lease. (An outage must not hand leadership around for nobody's
+benefit.) A follower that sees the lease stale by more than two minutes may take
+over, in another transaction, and backfills the session window in case the dead
+leader died holding unpublished tips. It may do so **only if it has the band's
+Stripe key** to poll with — a key-less device (someone's tablet on the merch
+table) stays a follower forever. A zombie leader waking from a long sleep keeps
+polling harmlessly: its writes are idempotent and its stop still flips the same
+doc.
+
+Stop belongs to the stopping device: it flips `active: false` — but only if the
+doc still names *its* session, because a stale-lease successor's night is not
+its to end — and finalizes `sessions/{sessionId}` with the full assembled set.
+That finalized doc **is** the history entry, which is exactly why stop must not
+also append through the repository: the night would be archived twice. Every
+other device watches the doc go inactive, tears down, and drops its snapshot.
+
+## Devices, revocation, and adding one by QR
+
+Settings → Security lists the account's devices (`users/{uid}/devices/{deviceId}`).
+The app writes its own row — name, platform, model, timestamps — but `revoked` /
+`revokedAtMs` are function-owned and pinned by the rules, and clients may not
+delete a device row at all: delete-and-recreate would launder a revocation away.
+
+Revocation comes in two strengths, and it is worth being clear which is which:
+
+- **Revoke a device** is *cooperative*. It sets the flag; the device watches its
+  own doc and signs itself out when it sees it. A device that never comes back
+  online never finds out.
+- **Sign out everywhere else** is the real kill switch. `revokeAllOtherDevices`
+  stamps a watermark at `users/{uid}/private/security.sessionsValidAfterMs` and
+  calls Firebase's `revokeRefreshTokens`. Every rule under `users/**` compares
+  the caller's token `auth_time` against that watermark, so an ID token minted
+  before the revocation loses the whole subtree **immediately**, rather than
+  after the ≤1 h of cryptographic validity it has left. Accounts that never
+  revoked have no security doc and short-circuit on `exists()`; the calling
+  device re-authenticates silently afterwards.
+
+Adding a device is a QR handshake, and the load-bearing part is that the
+already-signed-in device must **confirm** it. The signed-in device displays
+`https://tip.live.tips/link#c=<code>`. The new device is unauthenticated — which
+is why `linkCodes/{codeId}` is a top-level collection and why redeeming is
+IP-quota'd — so it redeems the code, names itself, and then polls. Nothing has
+been minted yet: the signed-in device sees the requester's name appear and must
+tap to confirm, and only then does `collectLinkToken` return a single-use custom
+token. Codes are single-use, attempt-capped, and expire in two minutes. Without
+that confirm tap a code shoulder-surfed off a screen would be a silent account
+takeover; with it, it is a request the artist can refuse.
 
 ## The stage (live-screen visualization)
 
@@ -230,55 +370,76 @@ thing. The screen stays awake during sessions via `wakelock_plus`.
   connect time with clear errors. Nothing the key can do moves money: no
   refunds, no balance, no payouts.
 - `sk_live_…` keys are refused outright; test keys get a loud banner.
-- No analytics, no third-party services. In Stripe-only mode the app makes no
-  network calls except `api.stripe.com` and Stripe's own checkout page; in
-  connected mode it additionally talks to `api.live.tips` (see below).
+- No analytics, no third-party services. In Stripe-only mode on the local
+  profile the app makes no network calls except `api.stripe.com` and Stripe's
+  own checkout page; connected mode adds the relay, and a signed-in account
+  adds Firebase Auth + Firestore (see below).
+- Signing in moves data off the device on purpose: an account's bands, secrets,
+  settings and tip history (fan names and messages included) live in Firestore
+  under its own uid, readable by that uid alone. The local profile stores none
+  of it anywhere but the device.
 - Pinned `Stripe-Version: 2024-06-20` so parsing is stable regardless of the
   account's default API version.
 
-## Optional relay (`worker/`, api.live.tips)
+## Optional relay (`firebase/`, tip.live.tips)
 
 Revolut and MobilePay Box have no API to confirm a payment, so tips through
 them cannot be verified — but artists still want to accept them. The relay is
-the smallest server that makes this possible:
+the smallest server that makes this possible: Cloud Functions (2nd gen, Node
+20, `europe-west1`) over Firestore, with the fan page on Firebase Hosting.
 
-- **One Durable Object per jar** stores ~1 KB of plain text: artist name,
+- **One `jars/{jarId}` document** holds ~1 KB of plain text: artist name,
   message, currency, and validated payment *atoms* (a Stripe payment-link code,
-  a Revolut username, a MobilePay box UUID — never free-form URLs). A SHA-256
-  hash of the device's secret, never the secret itself.
-- The QR points to `live.tips/t/<jarId>` — a server-rendered page offering the
-  enabled methods. Revolut/MobilePay show a Turnstile-gated form (amount, name,
-  message). Submitting relays a `tip` event over a WebSocket to the artist's
-  device (first-message auth, hibernation-friendly), then redirects the fan to
-  the payment deep link.
-- **A tip outlives a missing screen, but only just.** The artist's socket dies
-  for ordinary reasons — the phone locks, they switch to MobilePay to check a
-  payment, they walk behind a wall — and the fan has already been sent off to
-  pay by the time we notice. So an undelivered `tip` event is queued in the jar
-  (bounded by `MAX_PENDING`, swept after `PENDING_TTL_MS` = 1 h by the same
-  alarm that handles the 90-day expiry), flushed to the next socket that
-  authenticates, and deleted on delivery. Every event carries a server-minted
-  `id`, so the flush can send before it deletes: a crash mid-flush redelivers,
-  and the app's dedupe-by-id keeps the tip off the stage twice. This queue is
-  the *only* place fan-written text is ever stored server-side.
+  a Revolut username, a MobilePay box UUID — never free-form URLs). The
+  device's secret lives beside it as a SHA-256 hash under `private/auth`,
+  never the secret itself, and is compared in constant time.
+- The QR points to `tip.live.tips/t/<jarId>` — a page rendered by the `tip`
+  function (a Hosting rewrite of `/t/**`) offering the enabled methods.
+  Revolut/MobilePay show a Turnstile-gated form (amount, name, message).
+  Submitting writes the tip to the jar and redirects the fan to the payment
+  deep link. Fans never touch Firestore from the browser.
+- **Delivery is deletion.** A tip is written to `jars/{jarId}/pendingTips/{id}`
+  and the artist's device listens to that collection; showing a tip means
+  deleting its document, and that delete is the only acknowledgement there is.
+  The device emits the tip *before* it deletes, so a crash in between
+  redelivers rather than loses — the app dedupes by document id. The queue is
+  bounded (`MAX_PENDING`) and swept after `PENDING_TTL_MS` = 1 h whether or not
+  anyone came back for it. This queue is the *only* place fan-written text is
+  ever stored server-side, and nothing in it is a tip history: it is a delivery
+  buffer that empties itself.
+- Jar lifecycle runs through six callables — `createJar`, `claimJar`,
+  `updateJarProfile`, `rotateJarSecret`, `jarSeen`, `deleteJar`. The secret
+  remains the root credential; `claimJar` exchanges it for read access by
+  adding the caller's uid to the jar's `readerUids`, which is what the Firestore
+  rules check. `rotateJarSecret` empties that list, so every other device must
+  re-claim with the new secret or stay out.
+- **Every caller is signed in, and most of them are nobody.** The callables and
+  the rules need a uid, but a local-profile artist has no account — so the app
+  signs in anonymously purely as a *transport credential*
+  (`RelayAuth.ensureRelayUid`). That uid never enters the accounts directory,
+  the switcher, or the cloud repository: it exists to be authorized and nothing
+  else. Only a real (Apple/Google) account is recorded as a jar's `ownerUid`.
 - The app treats relayed tips as **unverified**: they count toward the session
   with a visible badge, never get the "big tipper" treatment, and History
   labels them as reported-not-confirmed.
-- Lifecycle: the device pings `/seen` at most once a day; the jar's own alarm
-  deletes everything 90 days after the last activity. Deleting or regenerating
-  the link wipes it immediately. There is no account system.
-- Abuse controls: strict validation and length caps on every field, per-IP and
-  per-jar rate limits, duplicate suppression, Turnstile on the tip form, and
-  a maintainer-only registry (metadata + counters, no content) behind an admin
-  token.
+- Lifecycle: the device calls `jarSeen` at most once a day; a scheduled sweep
+  deletes everything 90 days after the last activity (`EXPIRE_DAYS`), and an
+  expired jar is treated as gone the moment it lapses, before the sweep reaches
+  it. Deleting or regenerating the link wipes it immediately.
+- Abuse controls: strict validation and length caps on every field, per-IP
+  (salted-hash) and per-uid quotas, duplicate suppression, and Turnstile on the
+  tip form. The Firestore rules are default-deny: no client writes a jar, ever;
+  the artist's devices may only read and delete their own pending tips.
 - The live session keeps two independent channels: the unchanged Stripe poller
-  and the relay WebSocket. Relay failures degrade to Stripe-only with a status
-  pill; they never block a session. Returning to the foreground redials the
-  socket at once (`RelayTipChannel.reconnectNow`) rather than waiting out a
-  backoff on a connection the OS has not yet admitted is dead.
-- Close codes are a contract: `4401` (bad or rotated secret) and `4410` (jar
-  gone) are terminal and send the artist to re-link; everything else, including
-  `4408` (auth deadline missed on a slow link), is transient and retried.
+  and the Firestore listener. Relay failures degrade to Stripe-only with a
+  status pill; they never block a session. Returning to the foreground
+  re-attaches the listener at once (`FirestoreTipChannel.reconnectNow`) rather
+  than waiting out a backoff on a stream the OS has not yet admitted is dead.
+- Health is a contract: a jar that is gone (`not-found`) or a secret that no
+  longer works (`unauthenticated` / `permission-denied`, from the claim or from
+  the listener) is **terminal** — no retry can fix it and the artist is sent to
+  re-link. Everything else, including an unreachable backend, is transient and
+  retried with backoff.
 
 ## Testing
 
