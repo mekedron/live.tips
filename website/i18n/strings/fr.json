@@ -91,6 +91,8 @@
   "cta_p": "Fonctionne dans votre navigateur dès aujourd’hui — sans installation, sans inscription. Les apps natives et d’autres moyens de paiement sont au programme.",
   "cta_foot": "Fait pour les musiciens de rue, les groupes de bar et les saltimbanques — par l’un des vôtres.",
   "foot_blog": "Blog",
+  "foot_privacy": "Confidentialité",
+  "foot_terms": "Conditions",
   "foot_note": "Open source sous licence MIT. Les pourboires vont directement sur le compte Stripe de l’artiste — live.tips ne touche jamais à l’argent.",
   "a11y_dismiss": "Fermer",
   "banner": "Ce site est aussi disponible en français.",

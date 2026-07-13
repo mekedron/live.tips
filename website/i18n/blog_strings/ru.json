@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Блог",
+  "blog_index_description": "Заметки о том, как получать чаевые: QR-коды на сцене, приём карт без посредника и то, чему мы учимся, строя live.tips открыто.",
+  "title_suffix": " — live.tips",
+  "feed_title": "блог live.tips",
+  "read_more": "Читать дальше",
+  "published_on": "{date}",
+  "updated_on": "Обновлено {date}",
+  "reading_time_tmpl": "{min} мин чтения",
+  "back_to_blog": "Все статьи",
+  "english_badge": "На английском",
+  "empty_state": "Здесь пока пусто. Первая статья уже в пути.",
+  "tags_label": "Темы",
+  "breadcrumb_home": "Главная",
+  "breadcrumb_blog": "Блог"
+}

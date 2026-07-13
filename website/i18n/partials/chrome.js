@@ -69,17 +69,3 @@
     localStorage.setItem(THEME_KEY, theme);
     applyTheme(theme);
   });
-
-  /* ================= GitHub stars ================= */
-  var GH_REPO = 'mekedron/live.tips';
-  fetch('https://api.github.com/repos/' + GH_REPO)
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (d) {
-      if (!d || typeof d.stargazers_count !== 'number') return;
-      var n = d.stargazers_count;
-      var txt = n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
-      var el = document.getElementById('gh-stars');
-      el.textContent = txt;
-      el.style.display = 'block';
-    })
-    .catch(function () {});

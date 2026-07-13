@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Jegyzetek a borravalóról: QR-kódok a színpadon, kártyás fizetés közvetítő nélkül, és amit a live.tips nyílt építése közben tanulunk.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips blog",
+  "read_more": "Tovább",
+  "published_on": "{date}",
+  "updated_on": "Frissítve: {date}",
+  "reading_time_tmpl": "{min} perc olvasás",
+  "back_to_blog": "Összes bejegyzés",
+  "english_badge": "Angolul",
+  "empty_state": "Itt még nincs semmi. Az első bejegyzés úton van.",
+  "tags_label": "Témák",
+  "breadcrumb_home": "Főoldal",
+  "breadcrumb_blog": "Blog"
+}

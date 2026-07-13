@@ -10,6 +10,8 @@ import html
 import json
 import os
 import re
+import urllib.error
+import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB = os.path.join(ROOT, "website")
@@ -48,6 +50,16 @@ def home_path(code, default):
 
 def loc_url(base, code, default):
     return base + "/" if code == default else "%s/%s/" % (base, code)
+
+
+def legal_path(slug, code, default):
+    """URL of a legal page (`privacy` | `terms`) in one language.
+
+    Lives here rather than in build_legal.py because the shared footer links to
+    both documents from every page, so all three builders need it — and routing
+    it through build_legal would make build_blog import it circularly.
+    """
+    return "/%s/" % slug if code == default else "/%s/%s/" % (code, slug)
 
 
 def resolve_includes(text, depth=0):
@@ -122,6 +134,33 @@ def load_strings(directory, codes, warn_on_missing_file=True):
         merged.update({k: v for k, v in data.items() if k in en})
         all_strings[code] = merged
     return all_strings, warnings
+
+
+GH_REPO = "mekedron/live.tips"
+
+
+def gh_stars_badge(repo=GH_REPO, timeout=5):
+    """The header's star count, resolved HERE rather than in the browser.
+
+    The page used to `fetch()` api.github.com on every load, which handed every
+    visitor's IP, User-Agent and Referer to GitHub's API — for a number that
+    changes a few times a day. Baking it in at deploy time keeps the badge and
+    leaves the rendered site talking to nobody but its own origin, which is what
+    /privacy/ promises. A build with no network (or a rate-limited CI runner)
+    silently drops the badge rather than failing the deploy.
+    """
+    req = urllib.request.Request(
+        "https://api.github.com/repos/%s" % repo,
+        headers={"User-Agent": "live.tips-site-build", "Accept": "application/vnd.github+json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            n = json.load(resp).get("stargazers_count")
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return ""
+    if not isinstance(n, int):
+        return ""
+    txt = "%sk" % ("%.1f" % (n / 1000)).rstrip("0").rstrip(".") if n >= 1000 else str(n)
+    return '<span class="star-badge" aria-hidden="true">%s</span>' % esc(txt)
 
 
 def font_preloads(loc):

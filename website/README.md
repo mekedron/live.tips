@@ -31,6 +31,46 @@ cluster (`en` and `x-default` → root), `og:locale` alternates, and a
 language. `sitemap.xml` (with hreflang alternates) is generated alongside; the
 app and stage are excluded there and disallowed in `robots.txt`.
 
+## The legal pages are Markdown, in every language
+
+`/privacy/` and `/terms/` are rendered by
+[`scripts/build_legal.py`](../scripts/build_legal.py) from one Markdown file per
+language per document, into the same chrome as everything else:
+
+    website/legal/privacy/en.md  →  /privacy/      (and /de/privacy/, /ru/privacy/, …)
+    website/legal/terms/en.md    →  /terms/        (and /de/terms/,   /ru/terms/,   …)
+
+Unlike a blog post, a legal document **may not be missing in a language** — the
+footer links to it from every page, so a gap would be a 404. A missing
+translation falls back to the English body with a build warning rather than
+failing the deploy, and the hreflang cluster always names all twenty locales.
+
+`en.md` is the source of truth, and each document says so: if a translation and
+the English disagree, the English governs. **Edit `en.md` first, then re-translate
+— never patch a translation alone**, or the two drift and the page is lying to
+someone. The frontmatter (`title`, `description`, `updated`, `updated_label`) is
+required in every file; the body must not contain an `<h1>` (the template owns
+the only one).
+
+The content is not decoration: it describes what the code actually does — the
+one-hour undelivered-tip window, the 90-day profile expiry, the hashed-IP quota.
+**If you change that behaviour in `worker/`, the policy is part of the change.**
+
+## The rendered site contacts no third party
+
+This is a promise `/privacy/` makes out loud, so the build keeps it true:
+
+- The **Product Hunt badge** is served from `ph-badge-light.svg` /
+  `ph-badge-dark.svg` in this directory, not from `api.producthunt.com`. Re-download
+  those two files if the badge's ranking text goes stale.
+- The **GitHub star count** is fetched **at build time** by `site_common.gh_stars_badge()`
+  and baked into the header. There is no `fetch()` in the browser. A build with no
+  network just omits the badge and warns.
+
+Fonts, icons and images are all local. Do not add a script, an image, an iframe or
+a `fetch()` pointing at another origin without updating `/privacy/` in all twenty
+languages first.
+
 ### Editing copy
 - **English wording** → edit the value in `i18n/strings/en.json`
   (and `i18n/template.html` if you're changing markup/structure).
@@ -124,7 +164,7 @@ to `website/`.
 | `favicon.png`, `apple-touch-icon.png`, inline SVG favicon | `python3 scripts/gen_icons.py` |
 | `og-image.png` (social share banner) | `python3 scripts/gen_og_image.py` |
 | `fonts/*.woff2` (Outfit + Noto Sans subsets, split latin / latin-ext / Cyrillic / Greek) | `python3 scripts/gen_fonts.py` |
-| `index.html`, `<code>/index.html`, `blog/**`, `<code>/blog/**`, `sitemap.xml` | `python3 scripts/build_site.py --out _site` (run by the deploy) |
+| `index.html`, `<code>/index.html`, `blog/**`, `<code>/blog/**`, `privacy/`, `terms/`, `<code>/privacy/`, `<code>/terms/`, `sitemap.xml` | `python3 scripts/build_site.py --out _site` (run by the deploy) |
 
 Icons in the template are inline Material Symbols SVG paths (`svg.ms`) — there
 is deliberately no icon font. `robots.txt` and `llms.txt` (an LLM-facing

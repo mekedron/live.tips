@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blogg",
+  "blog_index_description": "Pistlar um það að fá þjórfé: QR-kóðar á sviðinu, kortagreiðslur án milliliðar og það sem við lærum af því að byggja live.tips fyrir opnum tjöldum.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips bloggið",
+  "read_more": "Lesa meira",
+  "published_on": "{date}",
+  "updated_on": "Uppfært {date}",
+  "reading_time_tmpl": "{min} mín lestur",
+  "back_to_blog": "Allar færslur",
+  "english_badge": "Á ensku",
+  "empty_state": "Ekkert hér enn. Fyrsta færslan er á leiðinni.",
+  "tags_label": "Efni",
+  "breadcrumb_home": "Forsíða",
+  "breadcrumb_blog": "Blogg"
+}

@@ -3,7 +3,11 @@
      the header/footer chrome. Everything below reuses those custom properties —
      no new colours, so light/dark and any future retheme come along for free. */
 
-  .blog-head { padding: 56px 0 8px; max-width: 720px; }
+  /* Vertical padding only — a `padding` shorthand here would reset the
+     horizontal padding this element inherits from .wrap (blog.css loads after
+     style.css, so the shorthand wins) and the title would sit flush against
+     the screen edge while the post grid below stayed inset. */
+  .blog-head { padding-top: 56px; padding-bottom: 8px; max-width: 720px; }
   .blog-head h1 {
     font-family: Outfit, 'Noto Sans', system-ui, sans-serif;
     font-size: clamp(32px, 5vw, 46px); font-weight: 700;

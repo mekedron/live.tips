@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Notas sobre cómo recibir propinas: códigos QR en el escenario, pagos con tarjeta sin intermediarios y lo que aprendemos construyendo live.tips a la vista de todos.",
+  "title_suffix": " — live.tips",
+  "feed_title": "Blog de live.tips",
+  "read_more": "Leer más",
+  "published_on": "{date}",
+  "updated_on": "Actualizado el {date}",
+  "reading_time_tmpl": "{min} min de lectura",
+  "back_to_blog": "Todas las entradas",
+  "english_badge": "En inglés",
+  "empty_state": "Aquí todavía no hay nada. La primera entrada está en camino.",
+  "tags_label": "Temas",
+  "breadcrumb_home": "Inicio",
+  "breadcrumb_blog": "Blog"
+}

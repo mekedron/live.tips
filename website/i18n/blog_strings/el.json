@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Ιστολόγιο",
+  "blog_index_description": "Σημειώσεις για το φιλοδώρημα: QR κωδικοί στη σκηνή, πληρωμές με κάρτα χωρίς μεσάζοντα, και όσα μαθαίνουμε φτιάχνοντας το live.tips στα φανερά.",
+  "title_suffix": " — live.tips",
+  "feed_title": "Ιστολόγιο live.tips",
+  "read_more": "Διαβάστε περισσότερα",
+  "published_on": "{date}",
+  "updated_on": "Ενημερώθηκε {date}",
+  "reading_time_tmpl": "{min} λεπτά ανάγνωσης",
+  "back_to_blog": "Όλα τα άρθρα",
+  "english_badge": "Στα αγγλικά",
+  "empty_state": "Δεν υπάρχει τίποτα ακόμα. Το πρώτο άρθρο έρχεται.",
+  "tags_label": "Θέματα",
+  "breadcrumb_home": "Αρχική",
+  "breadcrumb_blog": "Ιστολόγιο"
+}

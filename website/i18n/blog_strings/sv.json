@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blogg",
+  "blog_index_description": "Tankar om att få dricks: QR-koder på scenen, kortbetalningar utan mellanhand och vad vi lär oss när vi bygger live.tips öppet.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips blogg",
+  "read_more": "Läs mer",
+  "published_on": "{date}",
+  "updated_on": "Uppdaterad {date}",
+  "reading_time_tmpl": "{min} min läsning",
+  "back_to_blog": "Alla inlägg",
+  "english_badge": "På engelska",
+  "empty_state": "Inget här än. Första inlägget är på väg.",
+  "tags_label": "Ämnen",
+  "breadcrumb_home": "Hem",
+  "breadcrumb_blog": "Blogg"
+}

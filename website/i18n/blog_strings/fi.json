@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blogi",
+  "blog_index_description": "Muistiinpanoja tippien keräämisestä: QR-koodit lavalla, korttimaksut ilman välikättä ja se, mitä opimme rakentaessamme live.tipsiä avoimesti.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips-blogi",
+  "read_more": "Lue lisää",
+  "published_on": "{date}",
+  "updated_on": "Päivitetty {date}",
+  "reading_time_tmpl": "{min} min lukuaika",
+  "back_to_blog": "Kaikki kirjoitukset",
+  "english_badge": "Englanniksi",
+  "empty_state": "Täällä ei ole vielä mitään. Ensimmäinen kirjoitus on tulossa.",
+  "tags_label": "Aiheet",
+  "breadcrumb_home": "Etusivu",
+  "breadcrumb_blog": "Blogi"
+}

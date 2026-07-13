@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Note despre bacșiș: coduri QR pe scenă, plăți cu cardul fără intermediar și ce învățăm construind live.tips la vedere.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips blog",
+  "read_more": "Citește mai mult",
+  "published_on": "{date}",
+  "updated_on": "Actualizat {date}",
+  "reading_time_tmpl": "{min} min de citit",
+  "back_to_blog": "Toate articolele",
+  "english_badge": "În engleză",
+  "empty_state": "Deocamdată nu e nimic aici. Primul articol e pe drum.",
+  "tags_label": "Subiecte",
+  "breadcrumb_home": "Acasă",
+  "breadcrumb_blog": "Blog"
+}

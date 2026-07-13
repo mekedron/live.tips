@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Notes sur l'art du pourboire : QR codes sur scène, paiement par carte sans intermédiaire, et ce que nous apprenons en construisant live.tips à ciel ouvert.",
+  "title_suffix": " — live.tips",
+  "feed_title": "Blog live.tips",
+  "read_more": "Lire la suite",
+  "published_on": "{date}",
+  "updated_on": "Mis à jour le {date}",
+  "reading_time_tmpl": "{min} min de lecture",
+  "back_to_blog": "Tous les articles",
+  "english_badge": "En anglais",
+  "empty_state": "Rien ici pour l'instant. Le premier article arrive.",
+  "tags_label": "Thèmes",
+  "breadcrumb_home": "Accueil",
+  "breadcrumb_blog": "Blog"
+}

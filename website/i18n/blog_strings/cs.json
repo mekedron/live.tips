@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Poznámky o spropitném: QR kódy na pódiu, platby kartou bez prostředníka a co se učíme, když stavíme live.tips na očích všem.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips blog",
+  "read_more": "Číst dál",
+  "published_on": "{date}",
+  "updated_on": "Aktualizováno {date}",
+  "reading_time_tmpl": "{min} min čtení",
+  "back_to_blog": "Všechny články",
+  "english_badge": "Anglicky",
+  "empty_state": "Zatím tu nic není. První článek je na cestě.",
+  "tags_label": "Témata",
+  "breadcrumb_home": "Domů",
+  "breadcrumb_blog": "Blog"
+}

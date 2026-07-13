@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="{{html_lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{doc_title}}{{title_suffix}}</title>
+<meta name="description" content="{{meta_description}}">
+<!-- Self-referential, like every other page here: a translated policy is not a
+     duplicate of the English one, and canonicalizing it away would void the
+     hreflang cluster that ties the twenty versions together. -->
+<link rel="canonical" href="{{canonical_url}}">
+{{hreflang_links}}
+<meta name="robots" content="index, follow">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#FAF6F1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14110E">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="live.tips">
+<meta property="og:url" content="{{og_url}}">
+<meta property="og:title" content="{{doc_title}}">
+<meta property="og:description" content="{{meta_description}}">
+<meta property="og:image" content="{{og_image}}">
+<meta property="og:image:alt" content="{{og_image_alt}}">
+<meta property="og:locale" content="{{og_locale}}">
+{{og_locale_alternates}}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{doc_title}}">
+<meta name="twitter:description" content="{{meta_description}}">
+<meta name="twitter:image" content="{{og_image}}">
+
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+{{font_preloads}}
+<style>
+{{> partials/style.css}}
+{{> partials/blog.css}}
+</style>
+</head>
+<body>
+
+{{> partials/langbar.html}}
+
+{{> partials/header.html}}
+
+<main id="top">
+  <article class="wrap post-wrap">
+    <header class="post-header">
+      <h1>{{doc_title}}</h1>
+      <p class="lede">{{doc_lede}}</p>
+      <div class="post-meta">
+        <time datetime="{{updated_iso}}">{{updated_html}}</time>
+      </div>
+    </header>
+    <div class="post-body">
+{{doc_body}}
+    </div>
+    <div class="post-foot">
+      <a class="post-back" href="{{other_doc_href}}">{{other_doc_label}}</a>
+    </div>
+  </article>
+</main>
+
+{{> partials/footer.html}}
+
+<!-- data-cfasync opts this script out of Cloudflare Rocket Loader: deferring it
+     would flash the wrong theme. Shared verbatim with the landing and the blog. -->
+<script data-cfasync="false">
+(function () {
+  'use strict';
+
+{{> partials/chrome.js}}
+})();
+</script>
+</body>
+</html>

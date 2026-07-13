@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Notizen übers Trinkgeld: QR-Codes auf der Bühne, Kartenzahlung ohne Mittelsmann und was wir lernen, während wir live.tips offen entwickeln.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips Blog",
+  "read_more": "Weiterlesen",
+  "published_on": "{date}",
+  "updated_on": "Aktualisiert {date}",
+  "reading_time_tmpl": "{min} Min. Lesezeit",
+  "back_to_blog": "Alle Beiträge",
+  "english_badge": "Auf Englisch",
+  "empty_state": "Hier ist noch nichts. Der erste Beitrag ist unterwegs.",
+  "tags_label": "Themen",
+  "breadcrumb_home": "Start",
+  "breadcrumb_blog": "Blog"
+}

@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Notatki o zbieraniu napiwków: kody QR na scenie, płatności kartą bez pośrednika i to, czego uczymy się, budując live.tips na widoku.",
+  "title_suffix": " — live.tips",
+  "feed_title": "Blog live.tips",
+  "read_more": "Czytaj dalej",
+  "published_on": "{date}",
+  "updated_on": "Zaktualizowano {date}",
+  "reading_time_tmpl": "{min} min czytania",
+  "back_to_blog": "Wszystkie wpisy",
+  "english_badge": "Po angielsku",
+  "empty_state": "Jeszcze nic tu nie ma. Pierwszy wpis jest w drodze.",
+  "tags_label": "Tematy",
+  "breadcrumb_home": "Strona główna",
+  "breadcrumb_blog": "Blog"
+}

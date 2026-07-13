@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blogg",
+  "blog_index_description": "Notater om å få drikkepenger: QR-koder på scenen, kortbetalinger uten mellommann, og hva vi lærer mens vi bygger live.tips i det åpne.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips blogg",
+  "read_more": "Les mer",
+  "published_on": "{date}",
+  "updated_on": "Oppdatert {date}",
+  "reading_time_tmpl": "{min} min lesing",
+  "back_to_blog": "Alle innlegg",
+  "english_badge": "På engelsk",
+  "empty_state": "Ingenting her ennå. Det første innlegget er på vei.",
+  "tags_label": "Temaer",
+  "breadcrumb_home": "Hjem",
+  "breadcrumb_blog": "Blogg"
+}

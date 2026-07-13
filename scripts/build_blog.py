@@ -40,8 +40,8 @@ import shutil
 
 import markdown
 
-from site_common import (I18N, WEB, esc, font_preloads, js_literal, load_strings,
-                         load_template, render, sitemap_url, write)
+from site_common import (I18N, WEB, esc, font_preloads, js_literal, legal_path,
+                         load_strings, load_template, render, sitemap_url, write)
 
 BLOG = os.path.join(WEB, "blog")
 POSTS = os.path.join(BLOG, "posts")
@@ -509,6 +509,11 @@ def build(out_dir, base, ctx):
             "logo_href": "/" if lang == default else "/%s/" % lang,
             "app_href": "/app/?lang=%s" % lang,
             "blog_href": urls.index(lang),
+            # The footer is shared with the landing and the legal pages, so every
+            # builder has to fill its slots — a missing one is a hard KeyError.
+            "privacy_href": legal_path("privacy", lang, default),
+            "terms_href": legal_path("terms", lang, default),
+            "gh_stars_badge": ctx["gh_stars_badge"],
             "html_lang": lang,
             "lang_switcher_options": "".join(
                 '<option value="%s"%s>%s</option>'

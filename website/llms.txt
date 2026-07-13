@@ -38,6 +38,8 @@ Most live performers earn very little, and tips are often their main income. liv
 - [Run the app](https://live.tips/app/): the tip-jar app itself — runs in any modern browser, no install and no sign-up, with a full demo mode to try before connecting Stripe.
 - [Source code on GitHub](https://github.com/mekedron/live.tips): the complete, MIT-licensed source, including the README and the browser-side Stripe integration.
 - [MIT License](https://github.com/mekedron/live.tips/blob/main/LICENSE): confirms it is free and open source.
+- [Privacy Policy](https://live.tips/privacy/): no accounts, no cookies, no analytics, no tracking. States exactly what the optional relay does hold — an artist's public profile until 90 days of inactivity, and an undelivered tip for at most one hour — and nothing else.
+- [Terms of Use](https://live.tips/terms/): live.tips is not a payment provider and never touches the money; tips are payments for a performance, not charitable donations; Revolut/MobilePay/Monzo tips are shown as *unverified* and are never proof of payment.
 
 ## Optional
 

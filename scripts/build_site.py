@@ -33,9 +33,10 @@ import shutil
 import sys
 
 import build_blog
-from site_common import (STRINGS, WEB, esc, font_preloads, home_path, js_literal,
-                         load_locales, load_strings, load_template, loc_url,
-                         render, sitemap_document, sitemap_url, write)
+import build_legal
+from site_common import (STRINGS, WEB, esc, font_preloads, gh_stars_badge, home_path,
+                         js_literal, legal_path, load_locales, load_strings, load_template,
+                         loc_url, render, sitemap_document, sitemap_url, write)
 
 # Values that legitimately contain inline markup (<br>, <em>, <strong>) and so
 # are injected verbatim; every other string is HTML-escaped.
@@ -58,6 +59,11 @@ def build(out_dir, base):
     # Load every locale's strings up front (English-filled for any gaps) so the
     # banner table can carry each language's own invitation phrase.
     all_strings, warnings = load_strings(STRINGS, codes)
+
+    # Resolved once, here, instead of by a fetch() in every visitor's browser.
+    stars = gh_stars_badge()
+    if not stars:
+        warnings.append("  GitHub star count unavailable — header badge omitted")
 
     # Cross-language banner data (constant across pages): code, endonym, and the
     # "also available in …" phrase written IN that language.
@@ -110,6 +116,9 @@ def build(out_dir, base):
             # language the visitor is reading the landing page in.
             "app_href": "/app/?lang=%s" % code,
             "blog_href": "/blog/" if code == default else "/%s/blog/" % code,
+            "privacy_href": legal_path("privacy", code, default),
+            "terms_href": legal_path("terms", code, default),
+            "gh_stars_badge": stars,
             "canonical_url": canon,
             "og_url": canon,
             "og_locale": loc["og_locale"],
@@ -141,7 +150,7 @@ def build(out_dir, base):
     # Markdown sources (build_blog.py renders those, and copying them here would
     # shadow the rendered tree), the internal README, and the files this build
     # (re)generates.
-    skip = {"i18n", "blog", "README.md", "index.html", "sitemap.xml"}
+    skip = {"i18n", "blog", "legal", "README.md", "index.html", "sitemap.xml"}
     for name in sorted(os.listdir(WEB)):
         if name in skip:
             continue
@@ -156,12 +165,19 @@ def build(out_dir, base):
     # The blog renders into the same tree and returns its own sitemap entries.
     # It reuses this build's locale registry and landing strings — the blog pages
     # wear the same header, footer and banner, whose copy lives in strings/.
-    blog_urls, blog_warnings, blog_stats = build_blog.build(out_dir, base, {
+    shared_ctx = {
         "default": default, "locales": locales, "codes": codes,
         "names": names, "flags": flags, "locales_js": locales_js,
-        "site_strings": all_strings,
-    })
+        "site_strings": all_strings, "gh_stars_badge": stars,
+    }
+    blog_urls, blog_warnings, blog_stats = build_blog.build(out_dir, base, shared_ctx)
     warnings += blog_warnings
+
+    # The legal pages (privacy, terms) render from Markdown into the same chrome,
+    # one page per document per locale — the footer links to them from every page,
+    # so every locale must have one.
+    legal_urls, legal_warnings, legal_pages = build_legal.build(out_dir, base, shared_ctx)
+    warnings += legal_warnings
 
     # Sitemap: root + each /code/ (the /en/ alias and disallowed /app/, /stage/
     # are deliberately absent), every landing entry carrying the full hreflang
@@ -170,13 +186,15 @@ def build(out_dir, base):
     landing_alts = [("x-default", base + "/")]
     landing_alts += [(c, loc_url(base, c, default)) for c in codes]
     urls = [sitemap_url(loc_url(base, c, default), landing_alts) for c in codes]
-    write(os.path.join(out_dir, "sitemap.xml"), sitemap_document(urls + blog_urls))
+    write(os.path.join(out_dir, "sitemap.xml"),
+          sitemap_document(urls + blog_urls + legal_urls))
 
     print("Built %d locales into %s" % (len(codes), out_dir))
     print("  pages: / (root) + " + ", ".join("/%s/" % c for c in codes))
     print("  blog:  %d post(s), %d translation(s), %d page(s), %d feed(s)"
           % (blog_stats["posts"], blog_stats["translations"],
              blog_stats["pages"], blog_stats["feeds"]))
+    print("  legal: %d page(s) — /privacy/ and /terms/ in every locale" % legal_pages)
     if warnings:
         print("Warnings:")
         print("\n".join(warnings))

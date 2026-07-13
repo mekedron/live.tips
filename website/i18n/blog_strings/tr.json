@@ -1,0 +1,17 @@
+{
+  "_comment": "Blog chrome, English source of truth. Separate from strings/<code>.json on purpose: the landing is translated into every locale, the blog starts English-only and is translated post by post, so a missing file here is normal and silent (a half-filled one still warns). {date} and {min} are substituted by scripts/build_blog.py.",
+  "blog_index_title": "Blog",
+  "blog_index_description": "Bahşiş almak üzerine notlar: sahnedeki QR kodları, aracısız kart ödemeleri ve live.tips'i açıkta geliştirirken öğrendiklerimiz.",
+  "title_suffix": " — live.tips",
+  "feed_title": "live.tips blog",
+  "read_more": "Devamını oku",
+  "published_on": "{date}",
+  "updated_on": "{date} tarihinde güncellendi",
+  "reading_time_tmpl": "{min} dk okuma",
+  "back_to_blog": "Tüm yazılar",
+  "english_badge": "İngilizce",
+  "empty_state": "Burada henüz bir şey yok. İlk yazı yolda.",
+  "tags_label": "Konular",
+  "breadcrumb_home": "Ana sayfa",
+  "breadcrumb_blog": "Blog"
+}
