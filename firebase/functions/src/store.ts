@@ -127,7 +127,9 @@ export interface PendingTipDoc {
  * updated by the APP writing Firestore directly (name, platform, model?,
  * createdAtMs, lastSeenAtMs), EXCEPT `revoked`/`revokedAtMs`: the rules pin
  * those client-side (create must say revoked:false, update may never change
- * either), so only the revoke callables can flip them.
+ * either), so only the callables can flip them. Two callables do: the revoke
+ * pair sets the flag, and confirmLinkCode clears it — the artist, on a device
+ * still signed in, re-admitting this one (#36). Nothing else, ever.
  */
 export interface DeviceDoc {
   name: string;
@@ -167,6 +169,14 @@ export interface LinkCodeDoc {
   attempts: number;
   /** Set at redeem: what device A's confirm screen shows. */
   requester?: { name: string; platform: string };
+  /**
+   * Set at redeem: the deviceId B calls itself. The confirm clears `revoked`
+   * on users/{uid}/devices/{requesterDeviceId} — the ONE thing that re-admits
+   * a device the account revoked (#36). Unverified by construction (redeem is
+   * unauthenticated), which is safe: it can only ever name a doc under the
+   * owner's own uid, and only the owner's confirm acts on it.
+   */
+  requesterDeviceId?: string;
   /** sha256 of the redeem nonce; the nonce itself is never at rest. */
   redeemNonceHash?: string;
   /**

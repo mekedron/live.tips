@@ -113,6 +113,9 @@ class _ScanDeviceScreenState extends ConsumerState<ScanDeviceScreen> {
         code: code,
         deviceName: description.name,
         devicePlatform: description.platform,
+        // Name this device, so a confirm re-admits it if the account ever
+        // revoked it (#36) — this ceremony is the only way back in.
+        deviceId: ref.read(deviceRegistryProvider).deviceId,
       );
       if (!mounted) return;
       setState(() => _phase = _Phase.waiting);

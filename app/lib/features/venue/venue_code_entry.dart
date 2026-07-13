@@ -106,6 +106,10 @@ class _VenueCodeEntryState extends ConsumerState<VenueCodeEntry> {
         code: code,
         deviceName: description.name,
         devicePlatform: description.platform,
+        // The tablet names itself too: a venue device the artist revoked at
+        // the end of a night is re-admitted by their confirm, and by nothing
+        // else (#36).
+        deviceId: ref.read(deviceRegistryProvider).deviceId,
       );
       if (!mounted) return;
       setState(() => _phase = _Phase.waiting);

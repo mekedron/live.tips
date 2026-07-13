@@ -7,6 +7,7 @@
 /// an in-memory Firestore stand-in.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { FieldValue } from "firebase-admin/firestore";
 import { sha256Hex } from "../src/auth";
 
 // ---------------------------------------------------------------------------
@@ -65,7 +66,11 @@ function fakeQuery(prefix: string, filters: Filter[] = []) {
 function applyUpdate(path: string, patch: Record<string, unknown>) {
   const doc = docs.get(path);
   if (doc === undefined) throw new Error(`update on missing ${path}`);
-  Object.assign(doc, patch);
+  for (const [field, value] of Object.entries(patch)) {
+    // FieldValue.delete() — the confirm drops revokedAtMs when it re-admits.
+    if (value instanceof FieldValue) delete doc[field];
+    else doc[field] = value;
+  }
 }
 
 const fakeDb = {
@@ -93,6 +98,9 @@ const fakeDb = {
 vi.mock("../src/store", () => ({
   db: () => fakeDb,
   linkCodeRef: (_db: unknown, code: string) => ({ path: `linkCodes/${code}` }),
+  deviceRef: (_db: unknown, uid: string, deviceId: string) => ({
+    path: `users/${uid}/devices/${deviceId}`,
+  }),
   devicesCol: (_db: unknown, uid: string) => fakeQuery(`users/${uid}/devices`),
   securityRef: (_db: unknown, uid: string) => {
     const path = `users/${uid}/private/security`;
@@ -122,6 +130,7 @@ vi.mock("firebase-admin/auth", () => ({
 import {
   collectLinkTokenHandler,
   confirmLinkCodeHandler,
+  redeemLinkCodeHandler,
   revokeAllOtherDevicesHandler,
 } from "../src/devices";
 
@@ -298,6 +307,26 @@ describe("the caller keeps its session", () => {
       expect(createCustomToken).not.toHaveBeenCalled();
     });
 
+  it("mints a token no earlier than the second AFTER the watermark", async () => {
+    // auth_time is seconds; the watermark is milliseconds. A session minted in
+    // the same second as the stamp reads as older than it forever — so the
+    // caller's own re-entry would be locked out of users/** for its whole life.
+    seedDevices();
+    let mintedAt = 0;
+    createCustomToken.mockImplementation(async () => {
+      mintedAt = Date.now();
+      return "caller-token";
+    });
+
+    await revokeAllOtherDevicesHandler(signedIn(VICTIM, { currentDeviceId: "phone-1" }));
+
+    const watermark = docs.get(`users/${VICTIM}/private/security`)![
+      "sessionsValidAfterMs"
+    ] as number;
+    // The auth_time (seconds) of any session redeemed from here on clears it.
+    expect(Math.floor(mintedAt / 1000) * 1000).toBeGreaterThanOrEqual(watermark);
+  });
+
   it("serves a GUEST caller: the token needs no provider to redeem", async () => {
     // The anonymous restriction existed for exactly one reason — an anonymous
     // account had nothing to re-authenticate WITH. A server-minted token needs
@@ -314,5 +343,134 @@ describe("the caller keeps its session", () => {
       .toBeTypeOf("number");
     expect(revokeRefreshTokens).toHaveBeenCalledWith(GUEST);
     expect(result.token).toBe("caller-token");
+  });
+});
+
+// Revocation used to be a one-way door (#36): nothing anywhere wrote
+// revoked:false, so a device the artist revoked — their own laptop, every
+// other device after one tap on the kill switch — was barred from the account
+// for good. The confirm is the way back, and the only one.
+describe("a revoked device can be re-admitted, and only by the artist", () => {
+  const LAPTOP = "device-b";
+
+  /** The QR the artist shows on a device that is still signed in. */
+  function seedPendingLinkCode(uid = VICTIM, code = CODE) {
+    docs.set(`linkCodes/${code}`, {
+      uid,
+      status: "pending",
+      createdAtMs: Date.now(),
+      expiresAt: { toMillis: () => Date.now() + 60_000 },
+      attempts: 0,
+    });
+  }
+
+  /** The laptop scans it, naming itself. */
+  function redeem(deviceId: string | undefined, code = CODE) {
+    return redeemLinkCodeHandler(
+      unauthenticated({
+        code,
+        deviceName: "Casey's laptop",
+        devicePlatform: "macos",
+        ...(deviceId === undefined ? {} : { deviceId }),
+      }),
+    );
+  }
+
+  it("the artist's own laptop comes back after the kill switch", async () => {
+    seedDevices();
+    await revokeAllOtherDevicesHandler(signedIn(VICTIM, { currentDeviceId: "phone-1" }));
+    expect(docs.get(`users/${VICTIM}/devices/${LAPTOP}`)!["revoked"]).toBe(true);
+
+    // The whole ceremony, from the laptop's side and then the artist's.
+    seedPendingLinkCode();
+    await redeem(LAPTOP);
+    expect(docs.get(`linkCodes/${CODE}`)!["requesterDeviceId"]).toBe(LAPTOP);
+
+    await confirmLinkCodeHandler(signedIn(VICTIM, { code: CODE }));
+
+    const laptop = docs.get(`users/${VICTIM}/devices/${LAPTOP}`)!;
+    expect(laptop["revoked"]).toBe(false);
+    expect(laptop).not.toHaveProperty("revokedAtMs");
+    // And the code is still a code: the re-admission rides the ceremony, it
+    // does not replace it. The laptop still has to collect its token.
+    expect(docs.get(`linkCodes/${CODE}`)!["status"]).toBe("confirmed");
+  });
+
+  it("re-admits nobody the artist did not confirm", async () => {
+    // Two revoked devices, one ceremony. The other one stays out.
+    seedDevices();
+    docs.set(`users/${VICTIM}/devices/tablet`, {
+      name: "Old tablet", platform: "android", createdAtMs: Date.now(),
+      lastSeenAtMs: Date.now(), revoked: false,
+    });
+    await revokeAllOtherDevicesHandler(signedIn(VICTIM, { currentDeviceId: "phone-1" }));
+
+    seedPendingLinkCode();
+    await redeem(LAPTOP);
+    await confirmLinkCodeHandler(signedIn(VICTIM, { code: CODE }));
+
+    expect(docs.get(`users/${VICTIM}/devices/${LAPTOP}`)!["revoked"]).toBe(false);
+    expect(docs.get(`users/${VICTIM}/devices/tablet`)!["revoked"]).toBe(true);
+  });
+
+  it("a confirm from a REVOKED session re-admits nothing", async () => {
+    // The thief's session is exactly what requireFreshSession shuts out, and
+    // the re-admission must live behind that door like everything else here.
+    seedDevices();
+    docs.set(`users/${VICTIM}/private/security`, {
+      sessionsValidAfterMs: Date.now() + 60_000,
+    });
+    docs.set(`users/${VICTIM}/devices/${LAPTOP}`, {
+      name: "Casey's laptop", platform: "macos", createdAtMs: Date.now(),
+      lastSeenAtMs: Date.now(), revoked: true, revokedAtMs: Date.now(),
+    });
+    seedPendingLinkCode();
+    await redeem(LAPTOP);
+
+    await expect(
+      confirmLinkCodeHandler(signedIn(VICTIM, { code: CODE })),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+    expect(docs.get(`users/${VICTIM}/devices/${LAPTOP}`)!["revoked"]).toBe(true);
+  });
+
+  it("only ever touches a device of the CONFIRMING account", async () => {
+    // The deviceId rides in on an unauthenticated redeem, so it is a claim,
+    // not a credential. It can only ever name a doc under the uid that owns the
+    // code — and only that uid's confirm acts on it.
+    docs.set(`users/uid_other/devices/${LAPTOP}`, {
+      name: "Someone else's laptop", platform: "macos", createdAtMs: Date.now(),
+      lastSeenAtMs: Date.now(), revoked: true, revokedAtMs: Date.now(),
+    });
+    docs.set(`users/${VICTIM}/devices/${LAPTOP}`, {
+      name: "Casey's laptop", platform: "macos", createdAtMs: Date.now(),
+      lastSeenAtMs: Date.now(), revoked: true, revokedAtMs: Date.now(),
+    });
+    seedPendingLinkCode();
+    await redeem(LAPTOP);
+    await confirmLinkCodeHandler(signedIn(VICTIM, { code: CODE }));
+
+    expect(docs.get(`users/${VICTIM}/devices/${LAPTOP}`)!["revoked"]).toBe(false);
+    expect(docs.get(`users/uid_other/devices/${LAPTOP}`)!["revoked"]).toBe(true);
+  });
+
+  it("a first-time device is confirmed without a device doc being invented",
+    async () => {
+      seedPendingLinkCode();
+      await redeem("brand-new-device");
+
+      await confirmLinkCodeHandler(signedIn(VICTIM, { code: CODE }));
+
+      expect(docs.get(`linkCodes/${CODE}`)!["status"]).toBe("confirmed");
+      expect(docs.has(`users/${VICTIM}/devices/brand-new-device`)).toBe(false);
+    });
+
+  it("a client that names no device still completes the ceremony", async () => {
+    // An app that predates this simply has nothing to re-admit.
+    seedPendingLinkCode();
+    await redeem(undefined);
+    expect(docs.get(`linkCodes/${CODE}`)).not.toHaveProperty("requesterDeviceId");
+
+    await confirmLinkCodeHandler(signedIn(VICTIM, { code: CODE }));
+    expect(docs.get(`linkCodes/${CODE}`)!["status"]).toBe("confirmed");
   });
 });

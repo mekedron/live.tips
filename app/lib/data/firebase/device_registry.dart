@@ -249,7 +249,16 @@ class DeviceRegistry {
     }
   }
 
-  /// Every device on the account, newest-seen first, this device flagged.
+  /// Every device on the account that is still ON the account, newest-seen
+  /// first, this device flagged.
+  ///
+  /// A revoked device's doc STAYS (it is the tombstone that device reads to
+  /// sign itself out, and deleting it would let an offline one re-register as
+  /// trusted) — but its row goes (#35). The list is where the artist reads
+  /// "who can see my tips and my keys", and a headstone for every phone they
+  /// ever sold makes that answer harder to read, not more honest. The one
+  /// exception is THIS device: if it is revoked and the guard has not signed
+  /// it out yet, hiding the row the artist is sitting on would be the lie.
   Stream<List<DeviceInfo>> watchDevices(String uid) {
     final devices = _devices(uid);
     if (devices == null) return Stream.value(const []);
@@ -257,6 +266,7 @@ class DeviceRegistry {
       final list = snap.docs
           .map((d) =>
               DeviceInfo.fromJson(d.id, d.data(), isCurrent: d.id == deviceId))
+          .where((device) => !device.revoked || device.isCurrent)
           .toList()
         ..sort((a, b) {
           // This device pins to the top; the rest by recency.

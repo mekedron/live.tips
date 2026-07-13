@@ -187,15 +187,22 @@ class LinkCodeService {
 
   /// Device B, step 2 — no auth needed. Returns the redeem nonce, which only
   /// this device ever holds (it is never in the QR).
+  ///
+  /// [deviceId] is how B names itself: a device this account once revoked is
+  /// re-admitted by A's confirm, and by nothing else (#36). Without it, a
+  /// revoked device would sign in on the collected token and be signed straight
+  /// back out by its own tombstone.
   Future<String> redeemLinkCode({
     required String code,
     required String deviceName,
     required String devicePlatform,
+    String? deviceId,
   }) async {
     final data = await _call('redeemLinkCode', {
       'code': code,
       'deviceName': deviceName,
       'devicePlatform': devicePlatform,
+      'deviceId': ?deviceId,
     });
     final nonce = data['nonce'] as String?;
     if (nonce == null) {

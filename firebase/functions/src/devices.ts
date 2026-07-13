@@ -28,7 +28,7 @@
 /// why a photographed QR is useless.
 
 import { getAuth } from "firebase-admin/auth";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { ipQuotaKey, sha256Hex, verifySecret } from "./auth";
 import { DIRECT_HOPS, clientIp } from "./client-ip";
@@ -226,6 +226,16 @@ export async function redeemLinkCodeHandler(
   const platform = requesterField(data["devicePlatform"], REQUESTER_PLATFORM_MAX);
   if (name === null) throw new HttpsError("invalid-argument", "deviceName is required");
   if (platform === null) throw new HttpsError("invalid-argument", "devicePlatform is required");
+  // B names ITSELF, so a confirm can re-admit a device this account once
+  // revoked (#36). Unauthenticated and therefore unverified — which is fine:
+  // it is only ever used to clear the revoked flag on a doc under the OWNER's
+  // uid, and only when the owner taps confirm on the requester it is shown.
+  // Optional, so a client that predates this simply has nothing to re-admit.
+  const claimedDeviceId = data["deviceId"];
+  const deviceId =
+    typeof claimedDeviceId === "string" && isValidDeviceId(claimedDeviceId)
+      ? claimedDeviceId
+      : null;
 
   const firestore = db();
   await bumpIpQuota(firestore, request, "link-redeem", LINK_REDEEMS_PER_IP_PER_HOUR);
@@ -246,6 +256,7 @@ export async function redeemLinkCodeHandler(
       status: "claimed" satisfies LinkCodeStatus,
       attempts: state.attempts + 1,
       requester: { name, platform },
+      ...(deviceId !== null ? { requesterDeviceId: deviceId } : {}),
       redeemNonceHash: sha256Hex(nonce),
     });
     return { failed: false as const };
@@ -260,6 +271,16 @@ export async function redeemLinkCodeHandler(
  * Step 3, back on the signed-in device (A): the anti-phishing gate. Only the
  * code's owning uid may confirm, and only a claimed, unexpired code. Until
  * this tap, a scanned/photographed QR is parked — collect returns pending.
+ *
+ * This tap is ALSO the only thing in the system that clears `revoked` (#36).
+ * Nothing else could: the flag is function-owned, the rules refuse a client
+ * write (delete + recreate would launder it), and registerThisDevice takes the
+ * update path on a doc that already exists — so a device the artist revoked
+ * was barred from the account forever, its own laptop included, one tap on
+ * "Sign out everywhere else" away. The re-admission needs a trust anchor, and
+ * the ceremony already carries the strongest one there is: a device the artist
+ * is holding, still signed in, deliberately confirming THIS device — named on
+ * the confirm screen — back in.
  */
 export async function confirmLinkCodeHandler(
   request: CallableRequest,
@@ -281,10 +302,26 @@ export async function confirmLinkCodeHandler(
       applyRejection(tx, ref, state, decision);
       return { failed: "precondition" as const, message: decision.message };
     }
+    // The re-admission, read BEFORE any write (transactions demand it). Only
+    // a doc that exists and is actually revoked is touched — a first-time
+    // device has nothing to clear, and the confirm must not create rows.
+    const requesterDeviceId = snap.get("requesterDeviceId") as string | undefined;
+    let readmit: DocumentReference | null = null;
+    if (typeof requesterDeviceId === "string" && isValidDeviceId(requesterDeviceId)) {
+      const ownRef = deviceRef(firestore, uid, requesterDeviceId);
+      const own = await tx.get(ownRef);
+      if (own.exists && own.get("revoked") === true) readmit = ownRef;
+    }
     // confirmedAtMs is what collectLinkToken measures against the owner's
     // revocation watermark — a code confirmed before a revokeAllOtherDevices
     // call must never mint after it.
     tx.update(ref, { status: "confirmed" satisfies LinkCodeStatus, confirmedAtMs: Date.now() });
+    // The tombstone stops being one: the device comes back, and the guard that
+    // signs it straight back out (device_session_guard.dart) has nothing to
+    // act on when it arrives with the token this ceremony is about to mint.
+    if (readmit !== null) {
+      tx.update(readmit, { revoked: false, revokedAtMs: FieldValue.delete() });
+    }
     return { failed: false as const };
   });
 
@@ -427,7 +464,8 @@ export async function revokeDeviceHandler(
  *     cooperative sign-out signal, plus honest UI state);
  *  4. admin revokeRefreshTokens(uid) — stolen sessions cannot renew, so they
  *     die for good when their current ID token expires (≤1h);
- *  5. a custom token for the CALLER, minted LAST — the one credential in the
+ *  5. a custom token for the CALLER, minted LAST (and never inside the second
+ *     the watermark was stamped in — see below) — the one credential in the
  *     world that postdates this revocation, handed to the one client we
  *     authenticated on the way in.
  *
@@ -497,6 +535,20 @@ export async function revokeAllOtherDevicesHandler(
   if (inBatch > 0) await batch.commit();
 
   await getAuth().revokeRefreshTokens(uid);
+
+  // auth_time has SECOND resolution, and notRevoked() (rules) and
+  // requireFreshSession (here) both compare auth_time * 1000 against a
+  // watermark stamped in MILLISECONDS. A session minted in the same second as
+  // the stamp therefore reads as older than it — and auth_time never moves, so
+  // that session would be locked out of users/** for its whole life. That is
+  // the very session we are about to hand the caller. So: do not mint until
+  // the second the watermark sits in has run out. Whenever the client redeems
+  // the token after that, its auth_time clears the mark. Costs up to a second,
+  // on a deliberate, once-in-a-while action.
+  const nextSecond = Math.floor(now / 1000) * 1000 + 1000;
+  const wait = nextSecond - Date.now();
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+
   // Move 5, and only now that every credential this account had is dead: the
   // caller's way back in. Redeeming it is a plain API call on the client's own
   // origin — no provider page, no redirect, nothing to cancel.

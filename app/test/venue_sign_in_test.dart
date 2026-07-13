@@ -43,8 +43,11 @@ class FakeLinkCodeService extends LinkCodeService {
     required String code,
     required String deviceName,
     required String devicePlatform,
+    String? deviceId,
   }) async {
-    calls.add('redeem:$code');
+    // The tablet names itself, so the artist's confirm can re-admit a device
+    // they once revoked (#36).
+    calls.add('redeem:$code:${deviceId ?? 'unnamed'}');
     return 'nonce_1';
   }
 
@@ -131,7 +134,7 @@ void main() {
     expect(find.text('Type the code instead'), findsOneWidget);
 
     await typeCodeAndGo(tester);
-    expect(env.link.calls, ['redeem:$_artistCode', 'collect:nonce_1']);
+    expect(env.link.calls, ['redeem:$_artistCode:dev_tablet', 'collect:nonce_1']);
 
     // The token signed Ana in; the gate demands the identity check before
     // anything else — WHOSE account is on this tablet, said out loud.
