@@ -9,11 +9,29 @@ The tracker is small, hand-maintained, and read by people who will act on it. An
 not a ticket — it is an argument that something is broken, with enough evidence that the reader
 can check it without you. Write it so a stranger could fix the bug from the issue alone.
 
-## Before you file anything: verify in the code
+## Delegate the verification — the orchestrator only commands
 
-**The reporter's framing is a hypothesis, not a finding.** It is often inverted, and filing it
-verbatim is how a tracker fills with fiction. Every claim in an issue must be something you read
-in the code, not something you were told.
+The main session is the master: it triages, dispatches, merges, deploys and reports. It does **not**
+read the codebase to check a bug report, and it does not grep its way to a root cause. That work
+goes to a subagent (`isolation: "worktree"`), which comes back with a verdict and, when the bug is
+real, the filed issue number. Every finding in this skill was worth an agent's context, not the
+orchestrator's.
+
+A triage agent's brief is always the same three questions:
+
+1. **Is it real in today's `main`?** A report may describe a build that was superseded an hour ago.
+2. **Is it already filed?** Open *and* closed issues — and if the report is an instance of a wider
+   invariant, file the invariant (see below).
+3. **What is actually true?** The reporter's framing is a hypothesis (see below) — the agent must
+   answer with `path:line`, not with sympathy.
+
+Then it files the issue in the house style and reports the number back. The orchestrator launches
+the fix agent from there.
+
+## The reporter's framing is a hypothesis, not a finding
+
+It is often inverted, and filing it verbatim is how a tracker fills with fiction. Every claim in an
+issue must be something someone read in the code, not something they were told.
 
 Three real cases from this project:
 
