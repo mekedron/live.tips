@@ -137,10 +137,17 @@ class _DeviceSessionGuardState extends ConsumerState<DeviceSessionGuard>
     _revoking = true;
     try {
       try {
-        await ref.read(liveSessionProvider.notifier).stop();
-      } catch (_) {
-        // The archive write failed (offline, a dead handle) — the transports
-        // are already down, and the wipe + sign-out below must still happen.
+        // DURABLE: the sign-out below deletes the account's Firebase app, so a
+        // queued archive write would die with it. The stop waits for it to
+        // land instead of hoping.
+        await ref.read(liveSessionProvider.notifier).stop(durable: true);
+      } catch (e) {
+        // The archive write failed (offline, a dead handle, rules that already
+        // deny this device) — the transports are already down, and the wipe +
+        // sign-out below must still happen. The night is not lost with it: the
+        // tips reached `sessions/{id}/tips` as they arrived, and the history
+        // rebuilds the set from them.
+        debugPrint('revocation: session stop failed: $e');
       }
       final bandIds = ref
           .read(accountDataRepositoryProvider)

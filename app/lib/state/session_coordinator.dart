@@ -40,6 +40,28 @@ class SessionSupersededException implements Exception {
   const SessionSupersededException();
 }
 
+/// A [SessionCoordinator.stop] that was asked to COMMIT the archive could not
+/// get it to land (offline, a revoked handle, a network that never answered).
+///
+/// Only a durable stop throws it, and only the two callers that are about to
+/// destroy the write queue ask for one — for them "the write is queued" is not
+/// an answer, because the queue is what they are about to delete. The set is
+/// over regardless: the caller logs this and finishes its teardown, and what
+/// survives of the night is the tips already in `sessions/{id}/tips`, which the
+/// history reads back (see [FirestoreRepository.readSessionHistory]).
+class ArchiveNotCommittedException implements Exception {
+  const ArchiveNotCommittedException(this.sessionId, this.cause);
+
+  final String sessionId;
+
+  /// What the write actually failed with — a timeout, permission-denied on a
+  /// revoked device, a dead handle.
+  final Object cause;
+
+  @override
+  String toString() => 'ArchiveNotCommittedException($sessionId): $cause';
+}
+
 /// The controller-side surface a coordinator drives. Everything lands back
 /// in [LiveSessionController]: tips go through the one ingest path
 /// (attribution, confetti, dedupe by id), health through the one error
@@ -164,7 +186,21 @@ abstract interface class SessionCoordinator {
   /// Ends the session: tears the transports down, archives [session]
   /// (endedAt already set), and clears the crash snapshot. The coordinator
   /// is spent afterwards; [dispose] becomes a no-op.
-  Future<void> stop(LiveSession session);
+  ///
+  /// [durable] is for the two callers that destroy the account's write queue
+  /// the moment this returns — the venue end-of-stint and the revocation
+  /// guard both sign out and DELETE the account's `FirebaseApp` (and a venue
+  /// device runs with persistence off, so it has no on-disk queue to replay
+  /// from at all). They need the archive to have LANDED, not merely to have
+  /// been issued: a durable stop waits for it, and throws
+  /// [ArchiveNotCommittedException] when it cannot get it there. It also does
+  /// NOT clear the crash snapshot then — an uncommitted set is not a finished
+  /// one.
+  ///
+  /// A normal stop leaves it false: the stage must not wait on the network to
+  /// end a set, and on a device with persistence the queued mutation really
+  /// is durable — it replays at the next launch.
+  Future<void> stop(LiveSession session, {bool durable = false});
 
   /// Redials push feeds immediately (the app returned to the foreground).
   void reconnectNow();
@@ -272,8 +308,10 @@ class LocalSessionCoordinator implements SessionCoordinator {
     unawaited(_repo.saveActiveSession(_accountId, session, _source.cursor));
   }
 
+  // [durable] is a no-op here: prefs are the store, the write is awaited, and
+  // there is no queue between this device and it.
   @override
-  Future<void> stop(LiveSession session) async {
+  Future<void> stop(LiveSession session, {bool durable = false}) async {
     _teardown();
     await _repo.appendSessionToHistory(_accountId, session);
     await _repo.clearActiveSession(_accountId);

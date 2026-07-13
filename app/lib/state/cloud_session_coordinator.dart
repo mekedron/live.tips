@@ -22,7 +22,10 @@ import 'session_coordinator.dart';
 ///   the session's identity, the goal, and the leader lease.
 /// * `users/{uid}/bands/{bandId}/sessions/{sessionId}/tips/{tipId}` — the
 ///   live tips, doc id = tip id (Stripe/relay ids are stable), so any number
-///   of writers stay idempotent.
+///   of writers stay idempotent. They are also the night's SAFETY NET: a set
+///   whose finalize never landed is rebuilt from them by the history mirror
+///   ([FirestoreRepository.readSessionHistory]), so the money survives a stop
+///   that could not write.
 /// * `…/sessions/{sessionId}` — written as a skeleton at start and finalized
 ///   with the full [LiveSession.toJson] on stop. The finalized doc IS the
 ///   archive entry the history mirror reads — stop must NOT also append via
@@ -460,7 +463,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
   }
 
   @override
-  Future<void> stop(LiveSession session) async {
+  Future<void> stop(LiveSession session, {bool durable = false}) async {
     _stopping = true;
     _teardown();
     try {
@@ -480,13 +483,59 @@ class CloudSessionCoordinator implements SessionCoordinator {
       debugPrint('cloud session: stop transaction failed: $e');
     }
     // Finalize the archive doc with the full assembled set. This IS the
-    // history entry — no repository append, or the night doubles. Fire-and-
-    // forget: awaiting would hang an offline stop, and Firestore queues
-    // the write durably either way.
-    unawaited(_sessionDoc
-        .set({...session.toJson(), 'updatedAtMs': _nowMs})
-        .catchError(_ignore));
+    // history entry — no repository append, or the night doubles.
+    final archive =
+        _sessionDoc.set({...session.toJson(), 'updatedAtMs': _nowMs});
+    if (!durable) {
+      // The ordinary stop: fire-and-forget, because the stage must not wait
+      // on the network to end a set, and this device HAS a durable queue —
+      // the mutation is on disk and replays at the next launch even if the
+      // app dies here.
+      unawaited(archive.catchError(_ignore));
+      await _repo.clearActiveSession(_bandId);
+      return;
+    }
+    // The caller is about to destroy that queue (a venue teardown, a
+    // revocation: both delete the account's FirebaseApp, and venue devices
+    // run with no on-disk queue in the first place). "Queued" is worth
+    // nothing to them — wait for the write to LAND, exactly as CloudMigrator
+    // does at its own commit point.
+    await _commitArchive(archive);
     await _repo.clearActiveSession(_bandId);
+  }
+
+  /// How long a durable stop waits for the archive before it gives up and
+  /// says so. Generous enough for a bad bar Wi-Fi round trip, short enough
+  /// that a tablet on a dead network still ends its stint — the artist is
+  /// leaving the venue either way, and the wipe must not be held hostage.
+  static const commitTimeout = Duration(seconds: 8);
+
+  /// The commit point. The [DocumentReference.set] future resolves on the
+  /// server's ack, so awaiting it IS the proof the archive landed — and
+  /// draining the queue after it covers the tips of this set, which were
+  /// published fire-and-forget and may still be in flight.
+  ///
+  /// A failure is not swallowed: the crash snapshot stays put (an uncommitted
+  /// set is not a finished one), and the caller — the only one that knows what
+  /// it is about to tear down — decides what to do about it.
+  Future<void> _commitArchive(Future<void> archive) async {
+    try {
+      await archive.timeout(commitTimeout);
+      await _awaitPendingWrites().timeout(commitTimeout);
+    } catch (e) {
+      debugPrint('cloud session: archive commit failed: $e');
+      throw ArchiveNotCommittedException(_sessionId, e);
+    }
+  }
+
+  Future<void> _awaitPendingWrites() async {
+    try {
+      await _db.waitForPendingWrites();
+    } on UnimplementedError {
+      // A platform stub without it has no offline queue to drain.
+    } on NoSuchMethodError {
+      // fake_cloud_firestore: writes commit synchronously, nothing pends.
+    }
   }
 
   @override

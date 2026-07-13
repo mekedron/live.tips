@@ -39,7 +39,7 @@ class FakeCoordinator implements SessionCoordinator {
   void onGoalEdited(LiveSession session) {}
 
   @override
-  Future<void> stop(LiveSession session) async {}
+  Future<void> stop(LiveSession session, {bool durable = false}) async {}
 
   @override
   void reconnectNow() {}

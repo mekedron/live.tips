@@ -85,6 +85,13 @@ class FirestoreRepository implements AccountDataRepository {
   final Map<String, _BandMirror> _bands = {};
   final Map<String, _SecretsMirror> _secrets = {};
   final Map<String, List<LiveSession>> _sessions = {};
+
+  /// The tips of sessions whose archive doc was never finalized, read back
+  /// from `sessions/{id}/tips` — bandId → sessionId → tips. See
+  /// [_ensureSessionTipsListener]: without it a set that ended without a
+  /// clean stop reads as 0 tips, €0, with every one of its tips sitting one
+  /// level below the doc that says so.
+  final Map<String, Map<String, List<Tip>>> _sessionTips = {};
   final Map<String, List<Tip>> _relayTips = {};
   AppSettings? _settings;
 
@@ -115,6 +122,10 @@ class FirestoreRepository implements AccountDataRepository {
       _secretSubs = {};
   final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
       _sessionSubs = {};
+  // Keyed '$bandId/$sessionId' — one per unfinalized session (see
+  // [_ensureSessionTipsListener]); a finalized doc carries its own tips.
+  final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
+      _sessionTipSubs = {};
   final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
       _relayTipSubs = {};
 
@@ -125,12 +136,14 @@ class FirestoreRepository implements AccountDataRepository {
       _settingsSub,
       ..._secretSubs.values,
       ..._sessionSubs.values,
+      ..._sessionTipSubs.values,
       ..._relayTipSubs.values,
     ];
     _bandsSub = null;
     _settingsSub = null;
     _secretSubs.clear();
     _sessionSubs.clear();
+    _sessionTipSubs.clear();
     _relayTipSubs.clear();
     for (final sub in subs) {
       await sub?.cancel();
@@ -297,11 +310,102 @@ class FirestoreRepository implements AccountDataRepository {
     final decoded = <LiveSession>[];
     for (final data in docs) {
       final session = _decodeField(data, LiveSession.fromJson);
-      if (session != null) decoded.add(session);
+      if (session == null) continue;
+      // A FINALIZED doc carries the whole set in its `tips` field — the fast
+      // path, and no subcollection read. A session with no `endedAt` is still
+      // the skeleton it was written as at Go live (`tips: []`): either it is
+      // running right now, or its stop never got to finalize it — a venue
+      // tablet whose app was deleted under the write, a revoked device, a
+      // laptop that closed mid-song. Its money is one level down, in
+      // `sessions/{id}/tips`, where every tip landed as it arrived. Read it
+      // back, or the night reads as 0 tips, €0 while its tips sit in Firestore
+      // under the doc that says so.
+      if (session.endedAt == null) {
+        _ensureSessionTipsListener(bandId, session.id);
+      }
+      _mergeSessionTips(bandId, session);
+      decoded.add(session);
     }
     _sessions[bandId] = decoded;
     if (!fromCache) _sessionsSettled.add(bandId);
     _notify();
+  }
+
+  void _ensureSessionTipsListener(String bandId, String sessionId) {
+    final key = '$bandId/$sessionId';
+    if (_noBand(bandId) || sessionId.isEmpty) return;
+    if (_sessionTipSubs.containsKey(key)) return;
+    _sessionTipSubs[key] = _sessionsCol(bandId)
+        .doc(sessionId)
+        .collection('tips')
+        .orderBy('createdAt')
+        .snapshots()
+        .listen((snap) {
+      // The band's sessions listener going out of the map means the copy is
+      // gone from this device (or the band with it) — its tips are not ours
+      // to mirror any more.
+      if (_forgotten(bandId, _sessionSubs)) return;
+      applySessionTipsSnapshot(
+        bandId,
+        sessionId,
+        [for (final doc in snap.docs) doc.data()],
+      );
+    }, onError: _ignore);
+  }
+
+  /// Split out and test-visible for the same reason as [applyBandsSnapshot].
+  ///
+  /// ADDITIVE, deliberately: a snapshot that carries no tips is not the claim
+  /// that this set took no money. An offline device's first snapshot comes
+  /// from the cache — and a cache proves what exists, never what is absent —
+  /// so emptiness here is silence, and silence must not subtract a night.
+  @visibleForTesting
+  void applySessionTipsSnapshot(
+    String bandId,
+    String sessionId,
+    List<Map<String, dynamic>> docs,
+  ) {
+    final decoded = <Tip>[];
+    for (final data in docs) {
+      final tip = _decodeField(data, Tip.fromJson);
+      if (tip != null) decoded.add(tip);
+    }
+    if (decoded.isEmpty) return;
+    final byBand = _sessionTips.putIfAbsent(bandId, () => {});
+    final existing = byBand[sessionId] ?? const <Tip>[];
+    final ids = {for (final tip in existing) tip.id};
+    byBand[sessionId] = [
+      ...existing,
+      for (final tip in decoded)
+        if (ids.add(tip.id)) tip,
+    ];
+    // Fold straight into the session already mirrored, so the next read sees
+    // the money without waiting for another sessions snapshot to re-decode it.
+    for (final session in _sessions[bandId] ?? const <LiveSession>[]) {
+      if (session.id == sessionId) _mergeSessionTips(bandId, session);
+    }
+    _notify();
+  }
+
+  /// Folds the tips read back from the subcollection into a session decoded
+  /// from its doc. [LiveSession.addTip] dedupes by id, so a finalize that
+  /// lands later — carrying the same tips in the doc — costs nothing.
+  void _mergeSessionTips(String bandId, LiveSession session) {
+    final tips = _sessionTips[bandId]?[session.id];
+    if (tips == null) return;
+    for (final tip in tips) {
+      session.addTip(tip);
+    }
+    session.applyRollovers();
+  }
+
+  /// Drops every per-session tips listener of a band (and its mirrored tips).
+  void _dropSessionTipListeners(String bandId) {
+    for (final key in _sessionTipSubs.keys.toList()) {
+      if (!key.startsWith('$bandId/')) continue;
+      unawaited(_sessionTipSubs.remove(key)?.cancel() ?? Future.value());
+    }
+    _sessionTips.remove(bandId);
   }
 
   void _ensureRelayTipsListener(String bandId) {
@@ -738,9 +842,21 @@ class FirestoreRepository implements AccountDataRepository {
       }
     }
     if (doomed.isNotEmpty) {
+      // A session's tips live in a SUBCOLLECTION, and Firestore does not
+      // delete one with its document: deleting the doc alone leaves the
+      // simulated tips behind — demo money outliving the purge that exists to
+      // remove it, unreachable and undeletable. Enumerate them and take them
+      // with it, the same way [wipeAccountData] does.
+      final tipRefs = <DocumentReference<Map<String, dynamic>>>[];
+      for (final ref in doomed) {
+        tipRefs.addAll(
+            (await ref.collection('tips').get()).docs.map((d) => d.reference));
+      }
       _sessions[accountId]?.removeWhere((s) => doomedIds.contains(s.id));
-      await _commitChunked(
-          _db, [for (final ref in doomed) (batch) => batch.delete(ref)]);
+      _sessionTips[accountId]?.removeWhere((id, _) => doomedIds.contains(id));
+      await _commitChunked(_db, [
+        for (final ref in [...tipRefs, ...doomed]) (batch) => batch.delete(ref),
+      ]);
     }
     // The crash snapshot is device-local; a simulated one goes with the rest.
     final active = _local.readActiveSession(accountId);
@@ -775,10 +891,24 @@ class FirestoreRepository implements AccountDataRepository {
     // complete enumerates authoritatively or throws before deleting
     // anything; the caller keeps the band and reports failure instead of
     // half-deleting it.
-    final refs = <DocumentReference<Map<String, dynamic>>>[
-      ...(await _serverGet(_sessionsCol(accountId)))
+    final sessionDocs = (await _serverGet(_sessionsCol(accountId))).docs;
+    // A session's tips are a SUBCOLLECTION, and Firestore does not delete one
+    // with its document: without this, "delete this profile" leaves every fan
+    // name, message and amount of every set alive under a band that no longer
+    // exists — orphaned, reachable from no screen, deletable by nobody.
+    // (Account deletion escapes it only because the callable behind it uses
+    // recursiveDelete.) Server-sourced like the listing above, and for the
+    // same reason: a cache that "finds no tips" would report the orphaning as
+    // a clean wipe.
+    final tipRefs = <DocumentReference<Map<String, dynamic>>>[];
+    for (final doc in sessionDocs) {
+      tipRefs.addAll((await _serverGet(doc.reference.collection('tips')))
           .docs
-          .map((d) => d.reference),
+          .map((d) => d.reference));
+    }
+    final refs = <DocumentReference<Map<String, dynamic>>>[
+      ...tipRefs,
+      ...sessionDocs.map((d) => d.reference),
       ...(await _serverGet(_relayTipsCol(accountId)))
           .docs
           .map((d) => d.reference),
@@ -788,6 +918,7 @@ class FirestoreRepository implements AccountDataRepository {
     _bands.remove(accountId);
     _secrets.remove(accountId);
     _sessions.remove(accountId);
+    _dropSessionTipListeners(accountId);
     _relayTips.remove(accountId);
     await _commitChunked(
         _db, [for (final ref in refs) (batch) => batch.delete(ref)]);

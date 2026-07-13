@@ -299,7 +299,13 @@ class LiveSessionController extends Notifier<LiveState?> {
   }
 
   /// Ends the session, archives it, and returns it for the summary screen.
-  Future<LiveSession?> stop() async {
+  ///
+  /// [durable] is passed straight to the coordinator: the callers that tear
+  /// the account's Firebase app down right after this (the venue end-of-stint,
+  /// the revocation guard) ask for a committed archive and get an
+  /// [ArchiveNotCommittedException] when it cannot be had. The stage's own
+  /// Stop leaves it false and stays instant — see [SessionCoordinator.stop].
+  Future<LiveSession?> stop({bool durable = false}) async {
     final current = state;
     if (current == null) return null;
     final coordinator = _coordinator;
@@ -307,7 +313,20 @@ class LiveSessionController extends Notifier<LiveState?> {
     _fxSub?.close();
     _fxSub = null;
     final session = current.session..endedAt = DateTime.now();
-    if (coordinator != null) await coordinator.stop(session);
+    Object? failure;
+    StackTrace? failureTrace;
+    if (coordinator != null) {
+      try {
+        await coordinator.stop(session, durable: durable);
+      } catch (e, st) {
+        // The set is over whatever the archive did — the transports are down
+        // and the stage must not be left on a night that ended. Finish the
+        // teardown, then hand the failure to the caller: it is the one that
+        // knows what it is about to destroy.
+        failure = e;
+        failureTrace = st;
+      }
+    }
     state = null;
     ref.read(storedSessionProvider.notifier).refresh();
     // Tips that arrived during the set aren't in the home preview's cached
@@ -316,6 +335,9 @@ class LiveSessionController extends Notifier<LiveState?> {
     // An account flip that landed mid-set held its profile reload back —
     // this is the moment it runs (see AppStateNotifier.onSessionEnded).
     ref.read(appStateProvider.notifier).onSessionEnded();
+    if (failure != null) {
+      Error.throwWithStackTrace(failure, failureTrace ?? StackTrace.current);
+    }
     return session;
   }
 

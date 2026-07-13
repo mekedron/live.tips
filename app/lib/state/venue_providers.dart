@@ -175,10 +175,17 @@ class VenueSessionNotifier extends Notifier<VenueSession?> {
     // session was never started here.
     if (ref.read(accountsDirectoryProvider).activeAccountId == uid) {
       try {
-        await ref.read(liveSessionProvider.notifier).stop();
+        // DURABLE: the sign-out below deletes the account's Firebase app, and
+        // a venue tablet runs with persistence off — an archive write that is
+        // merely queued here dies in RAM with the app instance, and the
+        // artist's night reads as 0 tips, €0 forever. The stop waits for it.
+        await ref.read(liveSessionProvider.notifier).stop(durable: true);
       } catch (e) {
         // The archive write failed (offline, a dead handle) — the transports
-        // are already down, and the wipe below must still happen.
+        // are already down, and the wipe below must still happen: a public
+        // device may not keep an artist's set. What survives of the night is
+        // the tips already in `sessions/{id}/tips`, which the history rebuilds
+        // the set from on the artist's own device.
         debugPrint('venue scrub: session stop failed: $e');
       }
     }
