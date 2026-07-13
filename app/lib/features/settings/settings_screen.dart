@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/external_link.dart';
@@ -211,6 +213,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  /// Backing out of demo play — and the ORDER is the whole of it (#45).
+  ///
+  /// RootGate re-enters demo whenever the install says demo and the in-memory
+  /// flag is off: that is how a demo device comes back after a restart. So the
+  /// kind must be gone BEFORE the flag drops — and gone means landed, not sent.
+  /// This used to fire the clear and not wait for it, which left a frame in
+  /// which the install still said demo and the flag was already false: exactly
+  /// the state RootGate answers by putting the artist back into demo, with the
+  /// kind then cleared underneath it — a state neither branch describes. On the
+  /// web the prefs write finishes in a microtask and usually beats the frame;
+  /// on iOS/Android it is a platform-channel round trip that promises nothing.
+  /// The comment already knew the rule. It just didn't wait.
+  Future<void> _exitDemo() async {
+    await ref.read(deviceKindProvider.notifier).clearDemo();
+    if (!mounted) return;
+    ref.read(appStateProvider.notifier).exitDemo();
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
@@ -381,13 +402,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Icons.logout_rounded,
               title: s.t('settings.main.exit_demo'),
               chevron: true,
-              onTap: () {
-                // Clear the kind FIRST: RootGate re-enters demo whenever the
-                // install says demo but the in-memory flag is off.
-                ref.read(deviceKindProvider.notifier).clearDemo();
-                ref.read(appStateProvider.notifier).exitDemo();
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
+              onTap: () => unawaited(_exitDemo()),
             ),
           ],
         )
