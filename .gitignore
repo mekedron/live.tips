@@ -14,3 +14,6 @@ __pycache__/
 # LinkedIn kit working files (final assets live in marketing/linkedin/)
 .li-post-tmp/
 marketing/linkedin/sources/*.final.html
+
+# Built site output (scripts/build_site.py --out _site)
+_site/
