@@ -4,6 +4,7 @@ import {
   StripeApi,
   StripeApiError,
   formEncode,
+  paymentLinkVisible,
   runKeyProbes,
   stripeErrorFrom,
   validateRestrictedKey,
@@ -120,6 +121,39 @@ describe("runKeyProbes", () => {
     expect(failed).toHaveLength(1);
     expect(failed[0]!.label).toMatch(/Webhook Endpoints/);
     expect(failed[0]!.detail).toMatch(/no access to webhook_endpoints/);
+  });
+});
+
+describe("paymentLinkVisible — the different-account reconnect signal", () => {
+  /** A Stripe that answers GET payment_links/{id} with one fixed response. */
+  function stripeAnswering(status: number, body: unknown): StripeApi {
+    return new StripeApi("rk_test_fake", (async () =>
+      new Response(JSON.stringify(body), { status })) as typeof fetch);
+  }
+
+  it("sees a link that lives on the key's own account", async () => {
+    const api = stripeAnswering(200, { id: "plink_1OurTipJarLink", object: "payment_link", active: true });
+    await expect(paymentLinkVisible(api, "plink_1OurTipJarLink")).resolves.toBe(true);
+  });
+
+  it("reads Stripe's 404 as 'a different account owns this link'", async () => {
+    const api = stripeAnswering(404, {
+      error: { message: "No such payment link: 'plink_1OurTipJarLink'", code: "resource_missing", type: "invalid_request_error" },
+    });
+    await expect(paymentLinkVisible(api, "plink_1OurTipJarLink")).resolves.toBe(false);
+  });
+
+  it("anything else is trouble, not a verdict — it throws", async () => {
+    await expect(
+      paymentLinkVisible(stripeAnswering(401, { error: { message: "Expired API Key" } }), "plink_1"),
+    ).rejects.toThrow(StripeApiError);
+    await expect(
+      paymentLinkVisible(stripeAnswering(500, { error: { message: "server error" } }), "plink_1"),
+    ).rejects.toThrow(StripeApiError);
+    const offline = new StripeApi("rk_test_fake", (async () => {
+      throw new Error("offline");
+    }) as typeof fetch);
+    await expect(paymentLinkVisible(offline, "plink_1")).rejects.toThrow(/Stripe/);
   });
 });
 

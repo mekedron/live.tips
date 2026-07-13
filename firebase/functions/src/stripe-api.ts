@@ -197,6 +197,23 @@ export async function runKeyProbes(api: StripeApi): Promise<PermissionCheck[]> {
   );
 }
 
+/**
+ * True iff the payment link is visible to this key — i.e. it lives on the
+ * account the key authenticates as. Stripe answers 404 for a link on ANY
+ * other account, which is the cheap signal stripeConnect uses to catch a
+ * reconnect that brings a different account's key: a link the key cannot
+ * see can never match that account's checkout events.
+ */
+export async function paymentLinkVisible(api: StripeApi, paymentLinkId: string): Promise<boolean> {
+  try {
+    await api.get(`payment_links/${paymentLinkId}`);
+    return true;
+  } catch (e) {
+    if (e instanceof StripeApiError && e.status === 404) return false;
+    throw e; // auth/permission/network trouble is not a verdict on the link
+  }
+}
+
 /** Where one connection's events land: base + the 128-bit connectionId. */
 export function webhookUrlFor(base: string, connectionId: string): string {
   return `${base.replace(/\/+$/, "")}/${connectionId}`;

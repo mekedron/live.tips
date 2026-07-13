@@ -20,6 +20,7 @@ import {
   StripeApiError,
   StripeNetworkError,
   STRIPE_API_VERSION,
+  paymentLinkVisible,
   runKeyProbes,
   validateRestrictedKey,
   webhookUrlFor,
@@ -172,9 +173,21 @@ export async function stripeConnectHandler(
   // Re-connecting replaces cleanly: remember the old connection so its
   // endpoint and ciphertext can go once the new one is in place.
   const existing = await lookupConnection(uid, bandId);
-  if (existing && paymentLinkId === null) {
-    // Same account, fresh key: keep tracking the jar it already had.
-    paymentLinkId = existing.doc.paymentLinkId;
+  if (existing && paymentLinkId === null && existing.doc.paymentLinkId !== null) {
+    // Same account, fresh key: keep tracking the jar it already had. But a
+    // reconnect can bring a DIFFERENT account's key, and carrying the old
+    // account's link onto it would leave the webhook filtering every one of
+    // the new account's checkout events out (stripe-events.ts) — the fan
+    // paid, the tip evaporates, and nothing anywhere says why. So the link
+    // survives only if the incoming key can see it; on Stripe's 404 the
+    // field stays null and a jar gets created fresh, like a first connect.
+    try {
+      if (await paymentLinkVisible(api, existing.doc.paymentLinkId)) {
+        paymentLinkId = existing.doc.paymentLinkId;
+      }
+    } catch (e) {
+      throw stripeToHttpsError(e);
+    }
   }
 
   // Register the receiver on the ARTIST'S account. The endpoint's signing
