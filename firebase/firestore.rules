@@ -24,6 +24,31 @@ service cloud.firestore {
       }
     }
 
+    // Jars: readable by the owner and linked reader devices; every write is
+    // function-mediated (the callables + tip endpoint hold the invariants —
+    // validation, quotas, hashed secrets — that rules cannot express).
+    match /jars/{jarId} {
+      allow read: if request.auth != null &&
+        (resource.data.ownerUid == request.auth.uid || request.auth.uid in resource.data.readerUids);
+      allow write: if false;
+
+      // Pending tips: the artist's devices read them and delete them once
+      // shown (delivery IS deletion — the relay keeps no tip history). Only
+      // the tip function creates them; nobody edits one in place.
+      match /pendingTips/{tipId} {
+        allow read, delete: if request.auth != null &&
+          (get(/databases/$(database)/documents/jars/$(jarId)).data.ownerUid == request.auth.uid
+           || request.auth.uid in get(/databases/$(database)/documents/jars/$(jarId)).data.readerUids);
+        allow create, update: if false;
+      }
+
+      // Secret hash and rate/dedupe state: server-only, always.
+      match /private/{doc} { allow read, write: if false; }
+    }
+
+    // Quota buckets (salted IP hashes, uid day-buckets): server-only.
+    match /rateLimits/{key} { allow read, write: if false; }
+
     // Everything else is closed until a later phase opens it explicitly.
     match /{document=**} {
       allow read, write: if false;
