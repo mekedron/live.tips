@@ -13,6 +13,8 @@ import '../../state/route_depth.dart';
 /// Moves this device's local profiles into [uid]'s account, reporting each
 /// profile as it lands, and returning the id of the band the profile should
 /// open on (the locally-active migrated one) — or null when nothing moved.
+/// Throws [CloudUploadException] when it cannot: the caller owes the artist a
+/// sentence that is true, which means it has to know what went wrong.
 /// The provider itself is null where there is no cloud to move them to (no
 /// Firebase) — the offer then never comes up at all.
 ///
@@ -24,12 +26,21 @@ typedef CloudUploadRunner = Future<String?> Function(
 });
 
 final cloudUploadRunnerProvider = Provider<CloudUploadRunner?>((ref) {
-  final db = ref.watch(firestoreProvider);
-  if (db == null) return null;
+  final ambient = ref.watch(firestoreProvider);
+  if (ambient == null) return null;
+  final sessions = ref.watch(accountSessionsProvider);
   return (uid, {onProgress}) => CloudMigrator(
         local: ref.read(localStoreProvider),
         secure: ref.read(secureStoreProvider),
-        db: db,
+        // The TARGET account's OWN Firestore, not the ambient one. The ambient
+        // handle is keyed on the ACTIVE profile, and a move can perfectly well
+        // run while the local profile is still active — that is what a move is
+        // — in which case the ambient instance is the default app, whose signed
+        // -in uid is the relay's transport credential and not this account at
+        // all. Every write into users/{uid}/… would then be denied by a rule
+        // that is doing its job. main() resolves the resumed upload the same
+        // way, for the same reason.
+        db: sessions.sessionFor(uid)?.firestore ?? ambient,
       ).uploadLocalBands(uid, onProgress: onProgress);
 });
 
@@ -240,7 +251,7 @@ Future<void> runCloudUpload(
       ),
     ),
   );
-  var failed = false;
+  CloudUploadException? failure;
   String? migratedBandId;
   try {
     migratedBandId = await upload(uid, onProgress: (band, done, total) {
@@ -250,18 +261,30 @@ Future<void> runCloudUpload(
         'total': '$total',
       });
     });
-  } catch (_) {
-    // The pending flag survives — the next boot resumes the upload.
-    failed = true;
+  } on CloudUploadException catch (e) {
+    // Kept, not swallowed. The migrator has already logged it and — when the
+    // failure is permanent — dropped the pending flag, so this is the last
+    // time the artist hears about it until they ask again.
+    failure = e;
+  } catch (e, st) {
+    // A runner that is not the migrator (a stub, a future provider): still a
+    // failure, and still not something to say "it will resume" about.
+    failure = CloudUploadException(e, st, transient: false);
   }
   if (!context.mounted) return;
   Navigator.of(context, rootNavigator: true).pop(); // the progress dialog
+  // Three different things happened; the artist is told which. Only a
+  // transient failure keeps the pending flag, so only it may promise a resume
+  // — a permanent one says what broke and leaves the profiles where they are.
   ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-    content: Text(s.t(failed
-        ? 'account.profile_upload.failed'
-        : 'account.profile_upload.done')),
+    duration: Duration(seconds: failure == null ? 4 : 10),
+    content: Text(switch (failure) {
+      null => s.t('account.profile_upload.done'),
+      final f when f.transient => s.t('account.profile_upload.failed_offline'),
+      final f => s.t('account.profile_upload.failed', {'reason': f.message}),
+    }),
   ));
-  if (!failed && migratedBandId != null) {
+  if (failure == null && migratedBandId != null) {
     await _activateMigrated(context, ref, uid, migratedBandId);
   }
 }

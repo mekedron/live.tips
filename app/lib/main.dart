@@ -196,7 +196,13 @@ Future<void> main() async {
     if (db != null && sessions.isAlive(pendingUpload.uid)) {
       final migrator =
           CloudMigrator(local: localStore, secure: secureStore, db: db);
-      unawaited(migrator.uploadLocalBands(pendingUpload.uid));
+      // The migrator logs the reason and, when it is permanent, drops the flag
+      // so this boot is the LAST one that tries. Nobody is looking at a
+      // resumed upload, so there is nothing here to show — but the failure
+      // must not sail off as an unhandled async error either.
+      unawaited(migrator
+          .uploadLocalBands(pendingUpload.uid)
+          .catchError((Object _) => null));
     }
   }
 

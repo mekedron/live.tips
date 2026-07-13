@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
+import 'package:live_tips/data/cloud_migrator.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/features/account/cloud_upload_offer.dart';
@@ -39,6 +40,7 @@ Future<_Harness> _pump(
   bool alreadyOffered = false,
   bool signIn = true,
   FirebaseFirestore? db,
+  CloudUploadRunner? runner,
 }) async {
   await tester.binding.setSurfaceSize(const Size(600, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -55,15 +57,17 @@ Future<_Harness> _pump(
     initialApiKeyProvider.overrideWithValue(null),
     authServiceProvider.overrideWithValue(FakeAuthService()),
     // With a Firestore wired in, the REAL runner (CloudMigrator over the
-    // fake db) runs; without one, a recording stub keeps the gate-decision
-    // tests independent of the migrator.
+    // fake db) runs; a [runner] scripts the migrator's OUTCOME (the failures
+    // a fake db that accepts everything can never produce); without either, a
+    // recording stub keeps the gate-decision tests independent of the migrator.
     if (db != null)
       firestoreProvider.overrideWithValue(db)
     else
-      cloudUploadRunnerProvider.overrideWithValue((uid, {onProgress}) async {
-        uploads.add(uid);
-        return null;
-      }),
+      cloudUploadRunnerProvider.overrideWithValue(runner ??
+          (uid, {onProgress}) async {
+            uploads.add(uid);
+            return null;
+          }),
   ]);
   addTearDown(container.dispose);
 
@@ -218,6 +222,58 @@ void main() {
         reason: '"I moved MY band here" must not land on an unrelated '
             'profile — that reads as data loss');
     expect(app.accounts.map((a) => a.name), contains('Solo Act'));
+  });
+
+  testWidgets('a move that CANNOT succeed says so, with the reason, and '
+      'promises no resume', (tester) async {
+    // #30: the exception was caught and dropped on the floor, so a permanent
+    // failure (a denied write) wore the same sentence as a flaky network —
+    // "it will resume on the next launch" — and resumed into the same wall
+    // forever. Nobody, the artist and us included, could see what threw.
+    await _pump(tester, runner: (uid, {onProgress}) async {
+      throw CloudUploadException(
+        FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'permission-denied',
+            message: 'Missing or insufficient permissions.'),
+        StackTrace.current,
+        transient: false,
+      );
+    });
+
+    await tester.tap(find.text('Move profiles'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Missing or insufficient permissions'),
+        findsOneWidget,
+        reason: 'the artist is told what actually went wrong');
+    expect(find.textContaining('still on this device'), findsOneWidget);
+    expect(find.textContaining('resume'), findsNothing,
+        reason: 'a permanent failure must not promise a resume it cannot keep');
+  });
+
+  testWidgets('an offline move keeps the promise it makes — and the flag that '
+      'makes it true', (tester) async {
+    final h = await _pump(tester, runner: (uid, {onProgress}) async {
+      throw CloudUploadException(
+        FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'unavailable',
+            message: 'Failed to reach the backend.'),
+        StackTrace.current,
+        transient: true,
+      );
+    });
+
+    await tester.tap(find.text('Move profiles'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('you may be offline'), findsOneWidget);
+    expect(find.textContaining('back'), findsOneWidget);
+    // The profiles stayed, and the offer was answered — the resume, not a
+    // re-ask, is what finishes this one.
+    expect(h.local.readCloudUploadOfferedBands('uid_test'),
+        contains(kTestAccountId));
   });
 
   testWidgets('a sign-in mid-onboarding waits for the flow to finish',

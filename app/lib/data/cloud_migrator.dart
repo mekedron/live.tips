@@ -1,8 +1,68 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../domain/band_account.dart';
 import 'local_store.dart';
 import 'secure_store.dart';
+
+/// A move that could not finish — with the reason KEPT, and with the one fact
+/// the artist actually needs: whether waiting can still make it come true.
+///
+/// The upload used to catch its exception and throw it away, so a failure that
+/// could never succeed ("your writes are denied") and one that certainly would
+/// ("you are offline") were told to the artist in the same reassuring sentence
+/// — "it will resume on the next launch" — and neither we nor they could ever
+/// see what threw. Every failure now carries [cause] (logged), and [transient]
+/// decides both the sentence and whether the pending flag survives to try again.
+class CloudUploadException implements Exception {
+  CloudUploadException(this.cause, this.stackTrace, {required this.transient});
+
+  final Object cause;
+  final StackTrace stackTrace;
+
+  /// True when a later attempt could plausibly win — the network dropped, the
+  /// backend was unreachable. False for everything else: a rejected write, a
+  /// value Firestore refuses, a bug of ours. Those repeat forever, and a
+  /// promise to resume them is a lie told once per launch.
+  final bool transient;
+
+  /// One line, fit to show a human: the SDK's own sentence when it has one.
+  String get message {
+    final e = cause;
+    if (e is FirebaseException) {
+      final text = e.message;
+      return text == null || text.isEmpty ? e.code : text;
+    }
+    return '$e';
+  }
+
+  @override
+  String toString() =>
+      'CloudUploadException(${transient ? 'transient' : 'permanent'}): $cause';
+}
+
+/// Only the reasons a later attempt could actually clear count as transient.
+/// Everything unrecognised is PERMANENT on purpose: an unknown failure that
+/// re-arms itself every launch is precisely the bug this file is fixing, and
+/// the artist is better served by "this could not be moved" plus the reason
+/// than by a resume that never comes.
+bool _isTransient(Object e) {
+  if (e is TimeoutException) return true;
+  if (e is FirebaseException) {
+    return const {
+      'unavailable',
+      'deadline-exceeded',
+      'cancelled',
+      'aborted',
+      'internal',
+      'resource-exhausted',
+      'network-request-failed',
+    }.contains(e.code);
+  }
+  return false;
+}
 
 /// One-shot, crash-safe upload of the LOCAL profile's bands into a
 /// signed-in account — the cloud counterpart of the boot migration in
@@ -61,7 +121,34 @@ class CloudMigrator {
   /// crash-resumed upload lands the artist on the band they migrated: "I
   /// moved MY band here" must never open on some unrelated pre-existing
   /// profile — that reads as data loss.
+  ///
+  /// Throws [CloudUploadException] when it cannot: the reason is logged and
+  /// carried out to the caller (which owes the artist a true sentence), and a
+  /// PERMANENT failure clears the pending flag on its way out — see [_upload].
   Future<String?> uploadLocalBands(
+    String uid, {
+    void Function(String bandName, int done, int total)? onProgress,
+  }) async {
+    try {
+      return await _upload(uid, onProgress: onProgress);
+    } catch (e, st) {
+      final transient = _isTransient(e);
+      debugPrint(
+          'cloud upload failed (${transient ? 'transient' : 'permanent'}): $e');
+      if (!transient) {
+        // Nothing a next boot can do about this one. Leaving the flag set
+        // would re-arm the identical attempt on every launch — the same
+        // failure, the same reassuring lie, forever. The local data is
+        // untouched (the wipe lives past the commit point), so the profiles
+        // are still there, and the Settings row can still try again once
+        // whatever denied the write is fixed.
+        await _local.clearCloudUploadPending();
+      }
+      throw CloudUploadException(e, st, transient: transient);
+    }
+  }
+
+  Future<String?> _upload(
     String uid, {
     void Function(String bandName, int done, int total)? onProgress,
   }) async {

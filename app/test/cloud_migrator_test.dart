@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/cloud_migrator.dart';
@@ -80,6 +81,38 @@ Future<(LocalStore, FakeSecureStore)> _seedTwoBands() async {
   await secure.writeApiKey('acc_a', 'rk_live_1');
   await secure.writeRelaySecret('acc_b', 'jar_secret_1');
   return (local, secure);
+}
+
+/// The gap that let #30 through: [FakeFirebaseFirestore] accepts every write,
+/// so no test had ever seen the migrator FAIL. These two make it fail the two
+/// ways it can — the only two the artist has to be told apart.
+///
+/// A Firestore that rejects the writes of anybody but the owning uid — the
+/// real rules, in miniature. Signed in as somebody else, every write into
+/// users/{uid}/… is denied, permanently, exactly as it would be on the server.
+FakeFirebaseFirestore _rejectingDb() => FakeFirebaseFirestore(
+      authObject: Stream.value(const {'uid': 'somebody_else'}),
+      securityRules: '''
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth.uid == uid;
+    }
+  }
+}
+''',
+    );
+
+/// A Firestore whose writes land locally but never reach the server: the
+/// commit point is where an offline device stops, and it stops with the
+/// SDK's own 'unavailable'.
+class _OfflineDb extends FakeFirebaseFirestore {
+  @override
+  Future<void> waitForPendingWrites() async => throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'unavailable',
+        message: 'Failed to reach the backend.',
+      );
 }
 
 void main() {
@@ -331,5 +364,50 @@ void main() {
             'not pre-sign-in data to move');
     expect(local.readAccountsRegistry()!.accounts.single.id, 'acc_fresh',
         reason: 'the registry is left exactly as the finished run set it');
+  });
+
+  test('a REJECTED write is permanent: it throws with the reason, keeps the '
+      'profiles, and does not promise a resume', () async {
+    // #30: the migrator threw, the caller swallowed it, and the pending flag
+    // stayed set — so every launch re-ran the identical doomed upload and
+    // told the artist the same reassuring lie about it.
+    final (local, secure) = await _seedTwoBands();
+    final migrator =
+        CloudMigrator(local: local, secure: secure, db: _rejectingDb());
+
+    final failure = await migrator
+        .uploadLocalBands(_uid)
+        .then<Object?>((_) => null, onError: (Object e) => e);
+
+    expect(failure, isA<CloudUploadException>());
+    final e = failure! as CloudUploadException;
+    expect(e.transient, isFalse);
+    expect(e.message, isNotEmpty, reason: 'the artist gets to be told WHY');
+    // The flag is gone: a permanent failure re-armed forever is the bug.
+    expect(migrator.hasPendingUpload, isFalse);
+    // And nothing local was destroyed on the way out — the wipe lives past
+    // the commit point, so the profiles are still here to try again with.
+    expect(local.accountHasData('acc_a'), isTrue);
+    expect(local.readRelayJar('acc_b'), isNotNull);
+    expect(local.readAccountsRegistry()!.accounts, hasLength(2));
+  });
+
+  test('an OFFLINE failure is transient: it throws, and the pending flag '
+      'survives so the next boot really does resume', () async {
+    final (local, secure) = await _seedTwoBands();
+    final migrator =
+        CloudMigrator(local: local, secure: secure, db: _OfflineDb());
+
+    final failure = await migrator
+        .uploadLocalBands(_uid)
+        .then<Object?>((_) => null, onError: (Object e) => e);
+
+    expect(failure, isA<CloudUploadException>());
+    expect((failure! as CloudUploadException).transient, isTrue);
+    // The one case where "it will resume" is true — so the flag stays, and
+    // the local bands stay with it.
+    expect(migrator.hasPendingUpload, isTrue);
+    expect(local.readCloudUploadPending()!.bandIds, ['acc_a', 'acc_b']);
+    expect(local.accountHasData('acc_a'), isTrue);
   });
 }
