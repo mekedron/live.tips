@@ -373,7 +373,12 @@ class AuthController extends Notifier<AuthState> {
       // A hard ceiling on the one await that stands between the user and the
       // app: whatever happens to the SDK, the boot spinner ends.
       final user = await service
-          .completeRedirectSignIn()
+          .completeRedirectSignIn(
+            kind: OAuthProviderKind.values
+                .where((k) => k.name == record.provider)
+                .firstOrNull,
+            link: record.link,
+          )
           .timeout(const Duration(seconds: 30));
       await store.clearPendingRedirect();
       if (user == null) {

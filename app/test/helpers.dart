@@ -176,6 +176,18 @@ class FakeAuthService extends AuthService {
   /// Thrown by [completeRedirectSignIn]: a failed/expired redirect.
   Object? redirectError;
 
+  /// The user the SDK is holding even though [redirectResult] came back EMPTY —
+  /// WebKit's habit of losing the sessionStorage marker that says "a redirect
+  /// is in flight" while completing the sign-in anyway. The real service falls
+  /// back to the instance's own user for exactly this; the fake must be able to
+  /// pose the question, or the bug (a completed Google sign-in that produced no
+  /// account at all) goes right back to being invisible here.
+  AuthUser? restoredAfterRedirect;
+
+  /// Providers already on [restoredAfterRedirect] — a LINK may only be called
+  /// successful when the provider actually attached.
+  final linkedProviders = <OAuthProviderKind>{};
+
   /// Thrown by [beginRedirectSignIn]: the redirect could not even start.
   Object? redirectStartError;
 
@@ -193,10 +205,23 @@ class FakeAuthService extends AuthService {
   }
 
   @override
-  Future<AuthUser?> completeRedirectSignIn() async {
+  Future<AuthUser?> completeRedirectSignIn({
+    OAuthProviderKind? kind,
+    bool link = false,
+  }) async {
     final error = redirectError;
     if (error != null) throw error;
-    final result = redirectResult;
+    var result = redirectResult;
+    if (result == null) {
+      // The empty-result-but-signed-in case. A link is only honest when the
+      // provider is really on the account: a guest's currentUser is non-null
+      // whether or not the upgrade landed.
+      final restored = restoredAfterRedirect;
+      if (restored != null &&
+          (!link || (kind != null && linkedProviders.contains(kind)))) {
+        result = restored;
+      }
+    }
     if (result != null) user = result;
     return result;
   }

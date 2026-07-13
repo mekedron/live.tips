@@ -209,10 +209,56 @@ class AuthService {
   /// sign-in AND for a link, which resolve through the same door. Null when no
   /// redirect was pending (a normal boot, or the user backed out of the
   /// provider's page): that is not an error, it is "nothing happened".
-  Future<AuthUser?> completeRedirectSignIn() async {
-    final result = await _required.getRedirectResult();
-    final user = result.user;
+  ///
+  /// EXCEPT that `getRedirectResult` lies by omission. The web SDK files the
+  /// "a redirect is in flight" marker in sessionStorage, and WebKit does not
+  /// always hand that storage back to the page it returns to — so the sign-in
+  /// COMPLETES (the SDK has the user, persisted), while the result comes back
+  /// empty. Believing it verbatim is what made a successful Google sign-in end
+  /// with no account on the phone at all: no error, no spinner, nothing.
+  ///
+  /// So an empty result is not taken as "nothing happened" until the instance
+  /// itself agrees it has nobody. Restoring a persisted user is asynchronous,
+  /// hence the short wait on [authStateChanges] rather than a bare read.
+  ///
+  /// [kind] and [link] exist for the honesty of the link path: upgrading a
+  /// guest leaves `currentUser` non-null WHETHER OR NOT the provider attached,
+  /// so a link may only be called successful when the provider is actually on
+  /// the account. Reporting otherwise would tell someone their guest account
+  /// was upgraded when it was not.
+  Future<AuthUser?> completeRedirectSignIn({
+    OAuthProviderKind? kind,
+    bool link = false,
+  }) async {
+    final auth = _required;
+    final result = await auth.getRedirectResult();
+    var user = result.user;
+
+    if (user == null) {
+      final restored = auth.currentUser ??
+          await auth
+              .authStateChanges()
+              .where((u) => u != null)
+              .first
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      if (restored != null) {
+        if (!link) {
+          user = restored;
+        } else if (kind != null && _hasProvider(restored, kind)) {
+          // The link really did land; only the result went missing.
+          user = restored;
+        }
+      }
+    }
     return user == null ? null : toAuthUser(user);
+  }
+
+  static bool _hasProvider(User user, OAuthProviderKind kind) {
+    final id = switch (kind) {
+      OAuthProviderKind.google => 'google.com',
+      OAuthProviderKind.apple => 'apple.com',
+    };
+    return user.providerData.any((p) => p.providerId == id);
   }
 
   Future<void> updateDisplayName(String name) async {

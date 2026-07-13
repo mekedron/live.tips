@@ -61,6 +61,8 @@ Future<({ProviderContainer container, LocalStore local, FakeAuthService auth})>
     _harness({
   AuthUser? user,
   AuthUser? redirectResult,
+  AuthUser? restoredAfterRedirect,
+  Set<OAuthProviderKind> linkedProviders = const {},
   Object? redirectError,
   Object? redirectStartError,
   PendingRedirect? pending,
@@ -71,8 +73,10 @@ Future<({ProviderContainer container, LocalStore local, FakeAuthService auth})>
   if (pending != null) await local.savePendingRedirect(pending);
   final auth = FakeAuthService(user: user)
     ..redirectResult = redirectResult
+    ..restoredAfterRedirect = restoredAfterRedirect
     ..redirectError = redirectError
     ..redirectStartError = redirectStartError;
+  auth.linkedProviders.addAll(linkedProviders);
   final container = ProviderContainer(overrides: [
     localStoreProvider.overrideWithValue(local),
     secureStoreProvider.overrideWithValue(FakeSecureStore()),
@@ -154,6 +158,82 @@ void main() {
     expect(directory.activeAccountId, 'uid_casey');
     // Consumed exactly once.
     expect(h.local.readPendingRedirect(), isNull);
+  });
+
+  test('the sign-in landed but the redirect result came back EMPTY — the '
+      'account must still appear', () async {
+    // Reported from an iPhone: Google finished, the app came back, and no
+    // cloud account existed. getRedirectResult() lies by omission — WebKit
+    // does not always hand back the sessionStorage marker that says a redirect
+    // was in flight, so the result is empty even though the SDK completed the
+    // sign-in and is holding the user. Reading that as "nothing happened" threw
+    // a successful sign-in on the floor, silently: no error, no spinner, no
+    // account.
+    final h = await _harness(
+      redirectResult: null,
+      restoredAfterRedirect: _google,
+      pending: const PendingRedirect(
+        appName: 'acct_slot_0',
+        provider: 'google',
+        link: false,
+        origin: RedirectOrigin.settings,
+      ),
+    );
+
+    final resume = await h.container
+        .read(authControllerProvider.notifier)
+        .consumePendingRedirect();
+
+    expect(resume?.user?.uid, 'uid_casey',
+        reason: 'the instance has the user; an empty result does not undo that');
+    final state = h.container.read(authControllerProvider);
+    expect(state.user?.uid, 'uid_casey');
+    expect(state.busy, isFalse);
+    expect(state.error, isNull);
+    final directory = h.container.read(accountsDirectoryProvider);
+    expect(directory.contains('uid_casey'), isTrue,
+        reason: 'this is the bug: the account never appeared in Settings');
+    expect(directory.activeAccountId, 'uid_casey');
+    expect(h.local.readPendingRedirect(), isNull);
+  });
+
+  test('an empty result on a LINK is only believed when the provider really '
+      'attached', () async {
+    // The same fallback, but a guest is signed in ALREADY — so currentUser is
+    // non-null whether or not the upgrade landed. Taking it as success would
+    // tell someone their guest account is now a Google account when it is not.
+    final guest = const AuthUser(uid: 'uid_guest', kind: AccountKind.anonymous);
+    final h = await _harness(
+      user: guest,
+      redirectResult: null,
+      restoredAfterRedirect: guest, // still a guest: nothing attached
+      linkedProviders: const {}, // the link did NOT land
+      directory: AccountsDirectory.initial()
+          .withAccount(const AppAccount(
+              id: 'uid_guest', name: 'Guest', kind: AccountKind.anonymous))
+          .withActive('uid_guest'),
+      pending: const PendingRedirect(
+        appName: 'acct_slot_0',
+        provider: 'google',
+        link: true,
+        uid: 'uid_guest',
+        origin: RedirectOrigin.settings,
+      ),
+    );
+
+    final resume = await h.container
+        .read(authControllerProvider.notifier)
+        .consumePendingRedirect();
+
+    expect(resume?.user, isNull,
+        reason: 'an unattached provider is not a successful upgrade');
+    final directory = h.container.read(accountsDirectoryProvider);
+    final cloud = directory.accounts.where((a) => !a.isLocal);
+    expect(cloud.length, 1, reason: 'no second account was conjured');
+    expect(cloud.single.id, 'uid_guest');
+    expect(cloud.single.kind, AccountKind.anonymous,
+        reason: 'still a guest — we must not claim the upgrade happened');
+    expect(h.container.read(authControllerProvider).busy, isFalse);
   });
 
   test('a LINK comes back as the guest upgraded in place — not as a second '
