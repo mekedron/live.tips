@@ -4,9 +4,9 @@ rules_version = '2';
 //
 // Default-deny: no collection is publicly readable. Fans never touch
 // Firestore from the browser (the tip page is server-rendered), so the only
-// client principals are the app's signed-in users (incl. anonymous
-// transport uids). Jar documents and everything function-mediated arrive in
-// the relay phase; until then the users subtree is the whole surface.
+// client principals are the app's signed-in users — including the anonymous
+// uid the relay signs in as transport for a no-account artist, which reads
+// its jar's tips and nothing else.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner(uid) {
