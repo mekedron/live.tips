@@ -57,7 +57,11 @@ class OnboardingDraft {
 
   /// Details (1) + method select (2) + one step per chosen method. The final
   /// QR screen is the celebration, not a numbered step.
-  int get totalSteps => 2 + methods.length;
+  ///
+  /// Nothing chosen yet still counts as one method: you cannot finish
+  /// onboarding without picking one, and a total that says "3" on the way in
+  /// and "2" on the way back reads like the app lost a step.
+  int get totalSteps => 2 + (methods.isEmpty ? 1 : methods.length);
 
   /// 1-based position of a fixed screen in this draft's flow.
   int stepOf(String screenKey) => switch (screenKey) {

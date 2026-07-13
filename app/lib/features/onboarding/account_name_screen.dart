@@ -7,12 +7,21 @@ import '../../state/auth_providers.dart';
 import '../../widgets/lt_ui.dart';
 import 'onboarding_flow.dart';
 
-/// Names the ACCOUNT — not a band. Shown right after a sign-in whose
+/// Names the ACCOUNT — not a profile. Shown right after a sign-in whose
 /// provider handed over no display name (anonymous always, Apple/Google
 /// sometimes). One field, prefilled if the provider knew anything, and
 /// Continue with it empty simply skips naming.
+///
+/// [rename] is the same screen reached from Settings › Cloud account, which
+/// is the "later" the sign-up step promises ("you can name the account later
+/// in Settings"). It saves and pops instead of walking on into profile setup —
+/// without it a guest account read "Guest" forever, and two of them were
+/// indistinguishable.
 class AccountNameScreen extends ConsumerStatefulWidget {
-  const AccountNameScreen({super.key});
+  const AccountNameScreen({super.key, this.rename = false});
+
+  /// Standalone rename (Settings) rather than a step of onboarding.
+  final bool rename;
 
   @override
   ConsumerState<AccountNameScreen> createState() => _AccountNameScreenState();
@@ -24,8 +33,19 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
   @override
   void initState() {
     super.initState();
+    // The name the account already answers to wins: the directory holds the
+    // one chosen in the app, and only a provider name stands in for it. A
+    // rename that opens on an empty field looks like the name is gone.
+    final user = ref.read(authControllerProvider).user;
+    final entry = ref
+        .read(accountsDirectoryProvider)
+        .accounts
+        .where((a) => a.id == user?.uid)
+        .firstOrNull;
     _nameController = TextEditingController(
-      text: ref.read(authControllerProvider).user?.displayName ?? '',
+      text: entry != null && entry.name.isNotEmpty
+          ? entry.name
+          : (user?.displayName ?? ''),
     );
   }
 
@@ -37,13 +57,22 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
 
   Future<void> _continue() async {
     final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final saved = context.s.t('settings.account.renamed_snack');
     final name = _nameController.text.trim();
-    // Empty = skip: the account stays unnamed (the switcher falls back to
-    // the email or provider label) and can be named later in Settings.
+    // Empty = skip: the account stays unnamed (Settings falls back to the
+    // email or provider label) and can be named later.
     if (name.isNotEmpty) {
       await ref.read(authControllerProvider.notifier).setAccountName(name);
     }
     if (!mounted) return;
+    if (widget.rename) {
+      navigator.pop();
+      if (name.isNotEmpty) {
+        messenger.showSnackBar(SnackBar(content: Text(saved)));
+      }
+      return;
+    }
     navigator.push(
       MaterialPageRoute(builder: (_) => firstBandSetupScreen()),
     );
@@ -52,8 +81,13 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
+    final rename = widget.rename;
     return Scaffold(
-      appBar: AppBar(title: Text(context.s.t('onboarding.account_name.title'))),
+      appBar: AppBar(
+        title: Text(context.s.t(rename
+            ? 'settings.account.rename_title'
+            : 'onboarding.account_name.title')),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -61,12 +95,16 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
               Text(
-                context.s.t('onboarding.account_name.heading'),
+                context.s.t(rename
+                    ? 'settings.account.rename_heading'
+                    : 'onboarding.account_name.heading'),
                 style: outfitStyle(22, c.text, weight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
               Text(
-                context.s.t('onboarding.account_name.explain'),
+                context.s.t(rename
+                    ? 'settings.account.rename_explain'
+                    : 'onboarding.account_name.explain_profiles'),
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 14,
@@ -95,6 +133,7 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
                       onSubmitted: (_) => _continue(),
                     ),
                     const SizedBox(height: 5),
+                    if (!rename)
                     Text(
                       context.s.t('onboarding.account_name.skip_hint'),
                       style: TextStyle(
@@ -108,8 +147,11 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
               ),
               const SizedBox(height: 20),
               LtPrimaryButton(
-                label: context.s.t('onboarding.account_name.continue'),
-                trailingIcon: Icons.arrow_forward_rounded,
+                label: context.s.t(rename
+                    ? 'settings.account.rename_save'
+                    : 'onboarding.account_name.continue'),
+                trailingIcon:
+                    rename ? Icons.check_rounded : Icons.arrow_forward_rounded,
                 onPressed: _continue,
               ),
             ],

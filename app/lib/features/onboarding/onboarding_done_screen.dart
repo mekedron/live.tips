@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -39,6 +41,16 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
   }
 
+  /// Retry after a failed relay registration — the artist's entries are all
+  /// still in the draft, so this is a second attempt at the same call.
+  void _retry() {
+    setState(() {
+      _working = true;
+      _relayFailed = false;
+    });
+    unawaited(_prepare());
+  }
+
   Future<void> _prepare() async {
     final app = ref.read(appStateProvider);
     final draft = ref.read(onboardingDraftProvider);
@@ -75,7 +87,9 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
         });
         return;
       } catch (_) {
-        // Fall back to the Stripe link (or nothing) below.
+        // Fall back to the Stripe link (or nothing) below — but the failure
+        // is NEVER swallowed: this screen may not show a green check and
+        // "You're all set" over a tip page that was never created.
         if (!mounted) return;
         setState(() => _relayFailed = true);
       }
@@ -117,19 +131,25 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                         height: 64,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: c.successContainer,
+                          color: _relayFailed
+                              ? kGold.withValues(alpha: 0.18)
+                              : c.successContainer,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.check_rounded,
+                          _relayFailed
+                              ? Icons.warning_amber_rounded
+                              : Icons.check_rounded,
                           size: 34,
-                          color: c.success,
+                          color: _relayFailed ? c.text : c.success,
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      _url == null
+                      _relayFailed
+                          ? context.s.t('onboarding.done.title_relay_failed')
+                          : _url == null
                           ? context.s.t('onboarding.done.title_no_method')
                           : context.s.t('onboarding.done.title_ready'),
                       textAlign: TextAlign.center,
@@ -137,7 +157,10 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      _url == null
+                      _relayFailed
+                          ? context.s
+                              .t('onboarding.done.subtitle_relay_failed')
+                          : _url == null
                           ? context.s.t('onboarding.done.subtitle_no_method')
                           : _connectedPage
                           ? context.s.t('onboarding.done.subtitle_connected')
@@ -150,7 +173,11 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                         color: c.textSecondary,
                       ),
                     ),
-                    if (_relayFailed && _url != null) ...[
+                    // A relay-only band has no fallback QR at all (_url is
+                    // null), and THAT is exactly the case the old
+                    // `_relayFailed && _url != null` guard hid: green check,
+                    // "You're all set", and a band with no way to be tipped.
+                    if (_relayFailed) ...[
                       const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -162,7 +189,12 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                           ),
                         ),
                         child: Text(
-                          context.s.t('onboarding.done.relay_failed'),
+                          [
+                            context.s.t('onboarding.done.relay_failed_body'),
+                            if (_url != null)
+                              context.s
+                                  .t('onboarding.done.relay_failed_stripe_note'),
+                          ].join(' '),
                           style: TextStyle(
                             fontFamily: kFontBody,
                             fontSize: 12.5,
@@ -170,6 +202,12 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                             color: c.text,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      LtPrimaryButton(
+                        label: context.s.t('onboarding.done.retry'),
+                        trailingIcon: Icons.refresh_rounded,
+                        onPressed: _retry,
                       ),
                     ],
                     if (_url != null) ...[
@@ -234,12 +272,20 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                       ),
                     ],
                     const SizedBox(height: 28),
-                    LtPrimaryButton(
-                      label: _url == null
-                          ? context.s.t('onboarding.done.go_home')
-                          : context.s.t('onboarding.done.done'),
-                      onPressed: _finish,
-                    ),
+                    // A failure ends on the quiet exit, never on "Done" —
+                    // the loud action above is the retry.
+                    if (_relayFailed)
+                      OutlinedButton(
+                        onPressed: _finish,
+                        child: Text(context.s.t('onboarding.done.go_home')),
+                      )
+                    else
+                      LtPrimaryButton(
+                        label: _url == null
+                            ? context.s.t('onboarding.done.go_home')
+                            : context.s.t('onboarding.done.done'),
+                        onPressed: _finish,
+                      ),
                   ],
                 ),
         ),

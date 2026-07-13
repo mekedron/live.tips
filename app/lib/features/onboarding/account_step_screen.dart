@@ -27,24 +27,32 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
   @override
   void initState() {
     super.initState();
-    // The caller-side gate (see WelcomeScreen) should make this unreachable,
-    // but if we do land here without cloud accounts there is nothing to
-    // choose — replace ourselves with the local flow's first screen.
+    // Nothing to ask when there is nothing to choose: no cloud accounts on
+    // this platform, or the question is already answered because somebody is
+    // signed in. The signed-in case is the important one — this step used to
+    // keep offering "Continue without an account" to a user who HAD one, and
+    // taking it built the profile inside the cloud account anyway.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final canSignIn = platformSupportsCloudAccounts &&
           ref.read(authControllerProvider.notifier).available;
-      if (!canSignIn) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => firstBandSetupScreen()),
-        );
-      }
+      final signedIn = ref.read(authControllerProvider).user != null;
+      if (!canSignIn || signedIn) _replaceWithSetup();
     });
+  }
+
+  void _replaceWithSetup() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => firstBandSetupScreen()),
+    );
   }
 
   /// Runs one of the controller's sign-in methods. A null result is a
   /// cancellation or a failure — the sheet stays put and any error renders
   /// inline from the controller state.
+  ///
+  /// A success REPLACES this step: the account question is settled, and going
+  /// Back from the details screen must not offer to answer it again.
   Future<void> _signIn(
     Future<AuthUser?> Function(AuthController) attempt,
   ) async {
@@ -53,7 +61,7 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
     if (!mounted || user == null) return;
     // A provider that already knows the user's name skips the naming step.
     final unnamed = (user.displayName ?? '').trim().isEmpty;
-    navigator.push(
+    navigator.pushReplacement(
       MaterialPageRoute(
         builder: (_) =>
             unnamed ? const AccountNameScreen() : firstBandSetupScreen(),
@@ -86,7 +94,7 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                context.s.t('onboarding.account_step.subtitle'),
+                context.s.t('onboarding.account_step.subtitle_profiles'),
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 14,

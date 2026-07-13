@@ -178,7 +178,7 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(s.t('settings.account_details.saved_snack'))),
+          SnackBar(content: Text(s.t('settings.profile_details.saved_snack'))),
         );
         Navigator.of(context).pop();
       }
@@ -206,7 +206,7 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.s.t('settings.account_details.title')),
+        title: Text(context.s.t('settings.profile_details.title')),
       ),
       body: Center(
         child: ConstrainedBox(

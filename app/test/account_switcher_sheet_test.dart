@@ -59,24 +59,30 @@ Future<void> _pumpAndOpen(WidgetTester tester, {AuthService? auth}) async {
 }
 
 void main() {
-  testWidgets('band rows and Add-band survive the account-grouped sheet', (
+  testWidgets('the sheet lists this account\'s profiles and Add a profile', (
     tester,
   ) async {
     await _pumpAndOpen(tester);
 
-    expect(find.text('Your accounts'), findsOneWidget);
+    expect(find.text('Your profiles'), findsOneWidget);
     expect(find.text('Solo Act'), findsOneWidget);
     expect(find.text('The Midnight Foxes'), findsOneWidget);
-    expect(find.text('Add an account'), findsOneWidget);
-    // The active profile header: no directory yet → the local profile.
+    expect(find.text('Add a profile'), findsOneWidget);
+    // The header names the ACCOUNT these profiles live under (no directory
+    // yet → the local one). It is a label, not a switch.
     expect(find.text('On this device'), findsOneWidget);
-    // No Firebase → no sign-in row.
-    expect(find.text('Sign in to another account'), findsNothing);
   });
 
-  testWidgets('with auth available the sign-in row appears', (tester) async {
+  testWidgets('cloud accounts never appear in the profile switcher', (
+    tester,
+  ) async {
+    // Auth available and signed in — and the sheet STILL only talks about
+    // profiles. Account switching is Settings' job now: one sheet that mixed
+    // both is how "switch band" turned into "sign into another account".
     await _pumpAndOpen(tester, auth: FakeAuthService());
 
-    expect(find.text('Sign in to another account'), findsOneWidget);
+    expect(find.text('Your profiles'), findsOneWidget);
+    expect(find.text('Sign in to another account'), findsNothing);
+    expect(find.text('Other accounts'), findsNothing);
   });
 }

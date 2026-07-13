@@ -14,6 +14,7 @@ import 'features/shell/app_shell.dart';
 import 'l10n/app_locale.dart';
 import 'l10n/app_localizations.dart';
 import 'state/providers.dart';
+import 'state/route_depth.dart';
 import 'state/seen_ping.dart';
 
 class LiveTipsApp extends ConsumerWidget {
@@ -51,8 +52,13 @@ class LiveTipsApp extends ConsumerWidget {
         localeCode == null ? device : Locale(localeCode),
       ),
       // Lets the web stage go inert while a sheet/dialog covers it, so modals
-      // stay clickable over the jar's iframe.
-      navigatorObservers: [StageOverlayObserver()],
+      // stay clickable over the jar's iframe. The depth observer tells the
+      // upload offer when the user is actually looking at the root screen —
+      // an offer shown under an onboarding route is an offer nobody sees.
+      navigatorObservers: [
+        StageOverlayObserver(),
+        ref.read(routeDepthObserverProvider),
+      ],
       // The keep-alive pings the relay on launch/resume (≤ once a day) so a
       // connected-mode jar never expires under an active artist. The upload
       // gate offers to move local bands into a freshly signed-in account. The
@@ -70,16 +76,28 @@ class LiveTipsApp extends ConsumerWidget {
   }
 }
 
-/// Routes to the right top-level screen from the ACTIVE band's state alone:
-/// signed out → welcome; Stripe connected but no tip jar yet → setup;
-/// else home (a relay-only band needs no Stripe jar setup).
+/// Routes to the right top-level screen — from the DEVICE's state, not from
+/// whether the active band happens to have a payment method.
+///
+/// Welcome is the first-run pitch and nothing else: nobody signed in, nothing
+/// configured anywhere ([deviceIsSetUpProvider]). Every other "nothing set up
+/// yet" state — a fresh cloud account with no bands, a half-created band, a
+/// band whose method never saved — renders INSIDE the shell, so the switcher,
+/// Settings, the account section and sign-out are always one tap away. A
+/// half-made band used to be a room with no door: welcome had no chrome, the
+/// shell was unreachable, and the user's other bands were invisible.
+///
+/// The Stripe-key-without-a-jar case still gets its own screen: that band is
+/// mid-setup with a key already in the keychain, and JarSetupScreen is what
+/// finishes it.
 class RootGate extends ConsumerWidget {
   const RootGate({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final app = ref.watch(appStateProvider);
-    final screen = !app.connected
+    final setUp = ref.watch(deviceIsSetUpProvider);
+    final screen = !setUp
         ? const WelcomeScreen()
         : (app.hasStripe && app.effectiveTipJar == null)
         ? const JarSetupScreen()

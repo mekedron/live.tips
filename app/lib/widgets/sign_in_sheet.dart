@@ -6,12 +6,16 @@ import '../data/firebase/auth_service.dart';
 import '../l10n/app_localizations.dart';
 import '../state/auth_providers.dart';
 
-/// Small bottom sheet with just the Apple / Google options — the shared
-/// sign-in entry point for the account switcher's "Sign in to another
-/// account" row and the Settings sign-in row. Resolves to the signed-in
-/// user, or null when dismissed; a failed attempt keeps the sheet up with
-/// the error inline. Callers gate on [platformSupportsCloudAccounts] and
-/// the controller's `available`.
+/// The shared sign-in entry point: the account switcher's "Sign in to another
+/// account" row and the Settings sign-in row. It offers the same three doors
+/// as the first-run account step — Apple, Google, and a guest account. The
+/// guest one belongs here too: a local-profile artist who skipped the account
+/// question at first run had no way to answer it later, and "the cloud, but
+/// without an identity" was reachable exactly once in the app's life.
+///
+/// Resolves to the signed-in user, or null when dismissed; a failed attempt
+/// keeps the sheet up with the error inline. Callers gate on
+/// [platformSupportsCloudAccounts] and the controller's `available`.
 Future<AuthUser?> showSignInSheet(BuildContext context) {
   return showModalBottomSheet<AuthUser?>(
     context: context,
@@ -67,6 +71,13 @@ class _SignInSheet extends ConsumerWidget {
               enabled: !auth.busy,
               onTap: () => _attempt(context, controller.signInWithGoogle),
             ),
+            _ProviderRow(
+              leading: Icon(Icons.person_outline_rounded, size: 22, color: c.text),
+              label: context.s.t('onboarding.account_step.guest'),
+              subtitle: context.s.t('onboarding.account_step.guest_subtitle'),
+              enabled: !auth.busy,
+              onTap: () => _attempt(context, controller.signInAnonymously),
+            ),
             if (auth.busy)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
@@ -103,12 +114,14 @@ class _ProviderRow extends StatelessWidget {
   const _ProviderRow({
     required this.leading,
     required this.label,
+    this.subtitle,
     required this.enabled,
     required this.onTap,
   });
 
   final Widget leading;
   final String label;
+  final String? subtitle;
   final bool enabled;
   final VoidCallback onTap;
 
@@ -139,9 +152,24 @@ class _ProviderRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: outfitStyle(15, c.text, weight: FontWeight.w600),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: outfitStyle(15, c.text, weight: FontWeight.w600),
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle!,
+                          style: TextStyle(
+                            fontFamily: kFontBody,
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: c.textSecondary,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Icon(Icons.chevron_right_rounded, size: 22, color: c.textMuted),

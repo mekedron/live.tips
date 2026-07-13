@@ -21,12 +21,22 @@ import '../secure_store.dart';
 ///   implementation: it exists to survive a crash on THIS device, and two
 ///   devices' in-flight snapshots must never overwrite each other.
 abstract interface class AccountDataRepository {
+  /// Whether [listBands] can be believed yet. A cloud mirror starts out
+  /// EMPTY AND SILENT: "no snapshot has landed" and "this account has no
+  /// bands" are different answers, and a caller that reads the first as the
+  /// second fabricates a band on every cold start. The local store is warm
+  /// the moment it exists.
+  bool get isWarm;
+
   // --- The band list itself ---
   //
   // Local profile: the AccountsRegistry in prefs, exactly as always.
   // Cloud profile: the users/{uid}/bands collection (mirrored in memory),
   // with the ACTIVE band id kept device-local — which band you're looking
   // at is a device concern, not synced state.
+  //
+  // Only meaningful while [isWarm]; a cold repository answers with an empty
+  // list because it has nothing to say, not because there is nothing.
   List<BandAccount> listBands();
   String? readActiveBandId();
   Future<void> saveActiveBandId(String bandId);
@@ -102,6 +112,11 @@ class LocalStoreRepository implements AccountDataRepository {
   SecureStore get _secure => _secureCache ??= _resolveSecure();
 
   AccountsRegistry? get _registry => _local.readAccountsRegistry();
+
+  /// Prefs are read synchronously from a warmed cache — this repository has
+  /// never had a cold moment.
+  @override
+  bool get isWarm => true;
 
   @override
   List<BandAccount> listBands() => _registry?.accounts ?? const [];

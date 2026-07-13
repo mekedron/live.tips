@@ -72,6 +72,19 @@ class CloudSessionCoordinator implements SessionCoordinator {
   /// mid-set should find its leadership where it left it.
   static const staleMs = 2 * 60 * 1000;
 
+  /// Is a session with this lease still presumed alive?
+  ///
+  /// THE one definition of liveness, because `active: true` alone is a lie a
+  /// crashed tab leaves behind: only a clean stop clears the flag, so a closed
+  /// laptop keeps the account "live" forever. The lease is what actually
+  /// decays. [_claim] takes a stale-leased session over; every guard that
+  /// refuses an action because "a session is running" MUST agree with it, or a
+  /// dead session locks the account out of adding and removing profiles.
+  static bool leaseAlive(int leaderLeaseUntilMs, {int? nowMs}) {
+    final now = nowMs ?? DateTime.now().millisecondsSinceEpoch;
+    return leaderLeaseUntilMs > now - staleMs;
+  }
+
   final FirebaseFirestore _db;
   final String _uid;
   final String _bandId;
@@ -164,7 +177,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
       final active = data?['active'] == true;
       final docSessionId = data?['sessionId'] as String?;
       final leaseUntil = (data?['leaderLeaseUntilMs'] as num?)?.toInt() ?? 0;
-      final leaseFresh = leaseUntil > now - staleMs;
+      final leaseFresh = leaseAlive(leaseUntil, nowMs: now);
 
       if (active && docSessionId == session.id) {
         // Resuming the account's still-running session. Reclaim leadership
@@ -358,7 +371,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
   void _maybeTakeOver() {
     if (_disposed || _isLeader || _takingOver || !_canLead) return;
     if (_lastLeaseUntilMs <= 0) return; // doc not seen yet
-    if (_lastLeaseUntilMs > _nowMs - staleMs) return; // leader alive enough
+    if (leaseAlive(_lastLeaseUntilMs, nowMs: _nowMs)) return; // leader alive
     _takingOver = true;
     unawaited(() async {
       try {
@@ -372,7 +385,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
           }
           final leaseUntil =
               (data['leaderLeaseUntilMs'] as num?)?.toInt() ?? 0;
-          if (leaseUntil > _nowMs - staleMs) return false; // it came back
+          if (leaseAlive(leaseUntil, nowMs: _nowMs)) return false; // it's back
           tx.update(_liveDoc, {
             'leaderDeviceId': _deviceId,
             'leaderLeaseUntilMs': _nowMs + leaseMs,

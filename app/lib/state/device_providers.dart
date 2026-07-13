@@ -50,11 +50,15 @@ final ownDeviceRevokedProvider = StreamProvider<bool>((ref) {
   return registry.watchOwnRevocation(uid, registry.deviceId);
 });
 
+/// The URL this app was launched with, captured at the very top of main()
+/// (see [DeepLinks.bootUrl]) — null everywhere it wasn't, tests included.
+final bootLinkUrlProvider = Provider<String?>((ref) => null);
+
 /// Link codes arriving from a universal link (`https://tip.live.tips/link#c=…`)
 /// — the cold-start URL and every one handed to a running app. Silent on
 /// platforms without cloud accounts: there is nothing to link there.
 final deepLinkCodesProvider = StreamProvider<String>((ref) {
   // No Firebase, no sign-in to redeem into.
   if (ref.watch(firebaseAuthProvider) == null) return const Stream<String>.empty();
-  return DeepLinks().codes();
+  return DeepLinks(bootUrl: ref.watch(bootLinkUrlProvider)).codes();
 });

@@ -7,7 +7,9 @@ import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/domain/band_settings.dart';
 import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/domain/relay_jar.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/tip_jar.dart';
+import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/onboarding_draft.dart';
 import 'package:live_tips/state/providers.dart';
@@ -244,6 +246,36 @@ void main() {
     expect(secure.values.containsKey('${SecureStore.kApiKeyBase}_acc_a'),
         isFalse);
     expect(local.readAccountsRegistry()?.accounts, hasLength(1));
+  });
+
+  test('removeAccount completes — and takes the band\'s relay history with it',
+      () async {
+    final (local, secure) = await _twoBands();
+    await local.appendRelayHistory('acc_a', [
+      Tip.relayTip(
+        amountMinor: 500,
+        currency: 'eur',
+        method: TipMethod.revolut,
+        name: 'Maya',
+        ts: 1751500000000,
+        serial: 1,
+      ),
+    ]);
+    final container = _container(local, secure, initialApiKey: 'rk_live_a');
+    expect(container.read(relayHistoryProvider), hasLength(1));
+
+    // The removal must RESOLVE, not complete with an error: relayHistory
+    // already watches this notifier, so invalidating it from inside the
+    // removal threw a CircularDependencyError at every awaiting caller.
+    await expectLater(
+      container.read(appStateProvider.notifier).removeAccount('acc_a'),
+      completion(isTrue),
+    );
+
+    expect(container.read(appStateProvider).accountId, 'acc_b');
+    expect(container.read(relayHistoryProvider), isEmpty,
+        reason: 'the archive follows the active band on its own');
+    expect(local.readRelayHistory('acc_a'), isEmpty);
   });
 
   test('removing the last band leaves a fresh empty one', () async {

@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/band_switcher.dart';
+import '../../state/providers.dart';
 import '../../widgets/live_session_banner.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
+import '../home/setup_home_screen.dart';
 import '../poster/poster_screen.dart';
 import '../settings/settings_screen.dart';
 
@@ -125,13 +127,24 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.read(shellTabRequestProvider.notifier).clear();
       }
     });
+    // A profile with no payment method still gets the shell — that is the
+    // whole point (see SetupHomeScreen): the switcher, Settings and sign-out
+    // must stay reachable from every "nothing set up yet" state. History and
+    // the poster have nothing to show for such a profile, so they step aside
+    // until there is a jar to show.
+    final connected = ref.watch(appStateProvider.select((s) => s.connected));
+    final tabs = connected
+        ? ShellTab.navTabs
+        : const [ShellTab.home, ShellTab.settings];
+    final tab = tabs.contains(_tab) ? _tab : ShellTab.home;
     final stack = IndexedStack(
-      index: _tab.index,
+      index: tab.index,
       children: [
         for (final t in ShellTab.values)
-          if (_visited.contains(t))
+          if (_visited.contains(t) && (connected || tabs.contains(t)))
             switch (t) {
-              ShellTab.home => const HomeScreen(),
+              ShellTab.home =>
+                connected ? const HomeScreen() : const SetupHomeScreen(),
               ShellTab.history => const HistoryScreen(),
               ShellTab.poster => const PosterScreen(),
               ShellTab.settings => const SettingsScreen(),
@@ -161,7 +174,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _SideRail(tab: _tab, onSelect: _select),
+                    _SideRail(tab: tab, tabs: tabs, onSelect: _select),
                     Expanded(child: body),
                   ],
                 ),
@@ -174,7 +187,8 @@ class _AppShellState extends ConsumerState<AppShell> {
           isRail: false,
           child: Scaffold(
             body: SafeArea(bottom: false, child: body),
-            bottomNavigationBar: _BottomTabBar(tab: _tab, onSelect: _select),
+            bottomNavigationBar:
+                _BottomTabBar(tab: tab, tabs: tabs, onSelect: _select),
           ),
         );
       },
@@ -183,9 +197,17 @@ class _AppShellState extends ConsumerState<AppShell> {
 }
 
 class _BottomTabBar extends StatelessWidget {
-  const _BottomTabBar({required this.tab, required this.onSelect});
+  const _BottomTabBar({
+    required this.tab,
+    required this.tabs,
+    required this.onSelect,
+  });
 
   final ShellTab tab;
+
+  /// The nav items to show — the full set, or Home + Settings while this
+  /// profile has no payment method yet.
+  final List<ShellTab> tabs;
   final ValueChanged<ShellTab> onSelect;
 
   @override
@@ -202,7 +224,7 @@ class _BottomTabBar extends StatelessWidget {
           height: 68,
           child: Row(
             children: [
-              for (final t in ShellTab.navTabs)
+              for (final t in tabs)
                 Expanded(
                   child: InkWell(
                     onTap: () => onSelect(t),
@@ -248,9 +270,14 @@ class _BottomTabBar extends StatelessWidget {
 }
 
 class _SideRail extends ConsumerWidget {
-  const _SideRail({required this.tab, required this.onSelect});
+  const _SideRail({
+    required this.tab,
+    required this.tabs,
+    required this.onSelect,
+  });
 
   final ShellTab tab;
+  final List<ShellTab> tabs;
   final ValueChanged<ShellTab> onSelect;
 
   @override
@@ -283,7 +310,7 @@ class _SideRail extends ConsumerWidget {
           const SizedBox(height: 16),
           const Align(alignment: Alignment.centerLeft, child: BandChip()),
           const SizedBox(height: 16),
-          for (final t in ShellTab.navTabs)
+          for (final t in tabs)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Material(

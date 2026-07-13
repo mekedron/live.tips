@@ -21,15 +21,20 @@ Future<void> _pumpSettings(WidgetTester tester, {AuthService? auth}) async {
   // relay's transport sign-in is anonymous too, and stays invisible).
   final user = auth?.currentUser;
   if (user != null) {
+    // …and it is the ACTIVE profile — what a real sign-in leaves behind
+    // (AuthController._adopt upserts, then activates). Settings is about the
+    // active profile, not about whichever session happens to be alive.
     await localStore.saveAccountsDirectory(
-      AccountsDirectory.initial().withAccount(
-        AppAccount(
-          id: user.uid,
-          name: user.displayName ?? '',
-          kind: user.kind,
-          email: user.email,
-        ),
-      ),
+      AccountsDirectory.initial()
+          .withAccount(
+            AppAccount(
+              id: user.uid,
+              name: user.displayName ?? '',
+              kind: user.kind,
+              email: user.email,
+            ),
+          )
+          .withActive(user.uid),
     );
   }
   await tester.pumpWidget(

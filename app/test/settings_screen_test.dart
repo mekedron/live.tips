@@ -68,23 +68,23 @@ Future<void> _pumpSettings(
 }
 
 void main() {
-  testWidgets('Account details replaces the old account/key section', (
+  testWidgets('Profile details replaces the old account/key section', (
     tester,
   ) async {
     await _pumpSettings(tester, withStripe: true);
 
     // The new top section (LtSectionLabel upper-cases its header) and its rows.
-    expect(find.text('ACCOUNT DETAILS'), findsOneWidget);
+    expect(find.text('PROFILE DETAILS'), findsOneWidget);
     expect(find.text('Name, currency and thank-you message'), findsOneWidget);
-    expect(find.text('Switch account'), findsOneWidget);
-    expect(find.text('Remove this account from this device'), findsOneWidget);
+    expect(find.text('Switch profile'), findsOneWidget);
+    expect(find.text('Remove this profile from this device'), findsOneWidget);
 
     // The retired payment-methods rows are gone.
     expect(find.text('New tip page link'), findsNothing);
     expect(find.text('Disconnect tip page'), findsNothing);
   });
 
-  testWidgets('band name row opens the Account Details editor', (tester) async {
+  testWidgets('profile name row opens the Profile Details editor', (tester) async {
     await _pumpSettings(tester, withStripe: true);
 
     await tester.tap(find.text('Name, currency and thank-you message'));

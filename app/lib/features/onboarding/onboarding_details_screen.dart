@@ -34,6 +34,10 @@ class _OnboardingDetailsScreenState
   @override
   void initState() {
     super.initState();
+    // A profile that was named but never got a payment method comes back
+    // through here ("Set it up"): it already has a name, and asking for it
+    // again on an empty field reads like the profile was lost.
+    _nameController.text = ref.read(appStateProvider).activeAccount?.name ?? '';
     // Coming back to this step (or re-adding a band) — prefill from the draft.
     final draft = ref.read(onboardingDraftProvider);
     if (draft != null) {

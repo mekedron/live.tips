@@ -16,10 +16,17 @@ import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/sign_in_sheet.dart';
 import '../shell/app_shell.dart';
+import '../onboarding/account_name_screen.dart';
 import 'account_details_screen.dart';
+import 'account_switch_screen.dart';
 import 'relay_method_screen.dart';
 import 'security_screen.dart';
 import 'stripe_key_screen.dart';
+
+/// What the sign-out dialog resolved to. A guest can also leave by KEEPING
+/// the account and giving it a real credential — that is the whole point of
+/// offering the link there.
+enum _SignOutChoice { cancel, signOut, linkApple, linkGoogle }
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -42,23 +49,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _confirmRemoveBand() async {
     final s = context.s;
     final app = ref.read(appStateProvider);
-    if (ref.read(appStateProvider.notifier).accountActionsBlocked) {
+    // A refusal always names itself — and it asks the same guard add/switch
+    // ask, so a session that died with its tab can no longer wedge this shut.
+    final block = ref.read(appStateProvider.notifier).accountActionBlock;
+    if (block != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.t('settings.main.stop_session_remove'))),
+        SnackBar(
+          content: Text(block == AccountActionBlock.switching
+              ? s.t('widgets.band_switcher.switching')
+              : s.t('settings.main.stop_session_remove_profile')),
+        ),
       );
       return;
     }
     final hasOthers = app.accounts.length > 1;
     final name = app.displayName.isEmpty
-        ? s.t('settings.main.this_account_fallback')
+        ? s.t('settings.main.this_profile_fallback')
         : app.displayName;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(s.t('settings.main.remove_title', {'name': name})),
         content: Text(
-          '${app.hasStripe ? s.t('settings.main.remove_body_stripe') : s.t('settings.main.remove_body_relay')}'
-          '${hasOthers ? s.t('settings.main.remove_body_others_suffix') : ''}',
+          '${app.hasStripe ? s.t('settings.main.remove_profile_body_stripe') : s.t('settings.main.remove_profile_body_relay')}'
+          '${hasOthers ? s.t('settings.main.remove_profile_body_others_suffix') : ''}',
         ),
         actions: [
           TextButton(
@@ -88,23 +102,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final s = context.s;
     final user = ref.read(authControllerProvider).user;
     if (user == null) return;
-    // A guest account has no way back in — the dialog says so instead of
-    // the gentle "sign back in anytime".
+    // Signing out of a guest account destroys it: an anonymous user has no
+    // credential to come back with. The dialog says so, and offers the way
+    // out that keeps the data — linking a real provider to this same uid.
     final anonymous = user.kind == AccountKind.anonymous;
-    final confirmed = await showDialog<bool>(
+    final choice = await showDialog<_SignOutChoice>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(s.t('settings.account.sign_out_title')),
         content: Text(
           anonymous
-              ? s.t('settings.account.sign_out_anonymous_warning')
-              : s.t('settings.account.sign_out_body'),
+              ? s.t('settings.account.sign_out_anonymous_body')
+              : s.t('settings.account.sign_out_body_profiles'),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(context).pop(_SignOutChoice.cancel),
             child: Text(s.t('common.cancel')),
           ),
+          if (anonymous) ...[
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(_SignOutChoice.linkApple),
+              child: Text(s.t('settings.account.link_apple')),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(_SignOutChoice.linkGoogle),
+              child: Text(s.t('settings.account.link_google')),
+            ),
+          ],
           FilledButton(
             style: anonymous
                 ? FilledButton.styleFrom(
@@ -112,14 +139,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     foregroundColor: Colors.white,
                   )
                 : null,
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(context).pop(_SignOutChoice.signOut),
             child: Text(s.t('settings.account.sign_out')),
           ),
         ],
       ),
     );
-    if (confirmed == true) {
-      await ref.read(authControllerProvider.notifier).signOut();
+    final auth = ref.read(authControllerProvider.notifier);
+    switch (choice) {
+      case _SignOutChoice.signOut:
+        await auth.signOut();
+      case _SignOutChoice.linkApple:
+        await auth.signInWithApple(link: true);
+      case _SignOutChoice.linkGoogle:
+        await auth.signInWithGoogle(link: true);
+      case _SignOutChoice.cancel:
+      case null:
+        break;
     }
   }
 
@@ -139,20 +175,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final cloudAvailable = !app.demo &&
         platformSupportsCloudAccounts &&
         ref.read(authControllerProvider.notifier).available;
-    // The signed-in row prefers the directory entry (its name is the
-    // app-chosen one); a user the directory hasn't caught up with yet
-    // falls back to what the provider knows.
-    final cloudEntry = auth.user == null
+    // The account this screen is ABOUT is the active profile, not whichever
+    // Firebase session happens to be alive: a switch to the local profile
+    // leaves the guest session running, and reading the session here made
+    // Settings keep showing the account you had just left. Null means the
+    // local profile — the sign-in row.
+    final activeProfile = directory.active;
+    final cloudEntry = activeProfile.isLocal
         ? null
-        : directory.accounts
-                .where((a) => a.id == auth.user!.uid)
-                .firstOrNull ??
-            AppAccount(
-              id: auth.user!.uid,
-              name: auth.user!.displayName ?? '',
-              kind: auth.user!.kind,
-              email: auth.user!.email,
-            );
+        // A user the directory hasn't caught up with yet (mid sign-in) falls
+        // back to what the provider knows.
+        : (auth.user != null && auth.user!.uid == activeProfile.id
+            ? AppAccount(
+                id: auth.user!.uid,
+                name: activeProfile.name.isNotEmpty
+                    ? activeProfile.name
+                    : (auth.user!.displayName ?? ''),
+                kind: auth.user!.kind,
+                email: auth.user!.email ?? activeProfile.email,
+              )
+            : activeProfile);
 
     final sections = <Widget>[
       // --------------------------------------------------- cloud account ---
@@ -164,11 +206,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               LtRow(
                 icon: Icons.cloud_outlined,
                 title: s.t('settings.account.sign_in_row'),
-                subtitle: s.t('settings.account.sign_in_subtitle'),
+                subtitle: s.t('settings.account.sign_in_subtitle_profiles'),
                 chevron: true,
                 onTap: () => showSignInSheet(context),
               )
             else ...[
+              // Tappable: an account you can't name is an account you can't
+              // tell apart from the next guest one. AuthController.setAccountName
+              // existed all along with nothing to call it.
               LtRow(
                 icon: Icons.account_circle_rounded,
                 title: accountDisplayName(context, cloudEntry),
@@ -176,6 +221,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   accountProviderLabel(context, cloudEntry.kind),
                   if (cloudEntry.email != null) cloudEntry.email!,
                 ].join(' · '),
+                chevron: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AccountNameScreen(rename: true),
+                  ),
+                ),
               ),
               LtRow(
                 icon: Icons.shield_outlined,
@@ -196,6 +247,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: _confirmSignOut,
               ),
             ],
+            // Switching the ACCOUNT is a deliberate, separate act — it swaps
+            // every profile at once. It lives here, never in the profile
+            // switcher. Shown as soon as there is anywhere else to go.
+            if (cloudEntry != null || directory.accounts.length > 1)
+              LtRow(
+                icon: Icons.swap_horizontal_circle_outlined,
+                title: s.t('settings.account.switch_row'),
+                subtitle: s.t('settings.account.switch_subtitle'),
+                chevron: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AccountSwitchScreen(),
+                  ),
+                ),
+              ),
           ],
         ),
       // ------------------------------------------------ account details ---
@@ -221,12 +287,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         )
       else
         LtRowGroup(
-          header: s.t('settings.main.account_details_header'),
+          header: s.t('settings.main.profile_details_header'),
           children: [
             LtRow(
               icon: Icons.badge_rounded,
               title: app.displayName.isEmpty
-                  ? s.t('settings.main.your_account_fallback')
+                  ? s.t('settings.main.your_profile_fallback')
                   : app.displayName,
               subtitle: s.t('settings.main.account_details_subtitle'),
               chevron: true,
@@ -236,15 +302,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             LtRow(
               icon: Icons.swap_horiz_rounded,
-              title: s.t('settings.main.switch_account'),
-              subtitle: s.t('settings.main.switch_account_subtitle'),
+              title: s.t('settings.main.switch_profile'),
+              subtitle: s.t('settings.main.switch_profile_subtitle'),
               chevron: true,
               onTap: () => showBandSwitcherSheet(context, ref),
             ),
             LtRow(
               icon: Icons.delete_outline_rounded,
               iconColor: c.danger,
-              title: s.t('settings.main.remove_account_row'),
+              title: s.t('settings.main.remove_profile_row'),
               titleColor: c.danger,
               chevron: true,
               onTap: _confirmRemoveBand,

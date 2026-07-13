@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/platform_support.dart';
 import '../core/theme.dart';
 import '../domain/app_account.dart';
 import '../domain/band_account.dart';
@@ -11,7 +10,6 @@ import '../state/auth_providers.dart';
 import '../state/live_session_controller.dart';
 import '../state/providers.dart';
 import 'lt_ui.dart';
-import 'sign_in_sheet.dart';
 
 /// The switcher/settings label for a profile's auth provider.
 String accountProviderLabel(BuildContext context, AccountKind kind) =>
@@ -77,7 +75,7 @@ class BandNameButton extends ConsumerWidget {
     final app = ref.watch(appStateProvider);
     final style = outfitStyle(fontSize, c.text, weight: weight);
     final name = app.displayName.isEmpty
-        ? context.s.t('widgets.band_switcher.your_account')
+        ? context.s.t('widgets.profile_switcher.your_profile')
         : app.displayName;
     // Demo has no real band to switch unless others already exist — the
     // escape hatch back to a real band must stay reachable.
@@ -125,7 +123,7 @@ class BandChip extends ConsumerWidget {
     final c = context.lt;
     final app = ref.watch(appStateProvider);
     final name = app.displayName.isEmpty
-        ? context.s.t('widgets.band_switcher.new_account')
+        ? context.s.t('widgets.profile_switcher.new_profile')
         : app.displayName;
     return Material(
       color: c.chip,
@@ -162,9 +160,24 @@ class BandChip extends ConsumerWidget {
   }
 }
 
-/// The switcher: every band on this device plus "Add a band". Switching is
-/// blocked (rows greyed, hint shown) while a live session runs — a session
-/// is bound to its band's key and relay socket.
+/// The message behind a refused add/switch/remove. Every refusal has one:
+/// a silent no-op button is a broken button as far as the artist can tell.
+String accountBlockMessage(BuildContext context, AccountActionBlock block) =>
+    switch (block) {
+      AccountActionBlock.switching =>
+        context.s.t('widgets.band_switcher.switching'),
+      AccountActionBlock.localSession ||
+      AccountActionBlock.remoteSession =>
+        context.s.t('widgets.profile_switcher.stop_session_switch'),
+    };
+
+/// The profile switcher: the profiles of the ACTIVE account, plus "Add a
+/// profile". Cloud accounts are deliberately absent — switching accounts is a
+/// different decision, made in Settings › Cloud account. Two concepts, two
+/// surfaces.
+///
+/// Switching is blocked (rows greyed, hint shown) while a live session runs —
+/// a session is bound to its profile's key and relay socket.
 Future<void> showBandSwitcherSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,
@@ -185,13 +198,13 @@ class _BandSwitcherSheet extends ConsumerWidget {
     final notifier = ref.read(appStateProvider.notifier);
     final app = ref.read(appStateProvider);
     final stopSessionMsg = context.s.t(
-      'widgets.band_switcher.stop_session_switch',
+      'widgets.profile_switcher.stop_session_switch',
     );
 
-    // Leaving a half-finished new account behind — one that was named on the
-    // details step but never got a payment method, and holds no data? It has
-    // no home in the app (RootGate parks it on Welcome), and no way to remove
-    // it short of finishing onboarding. Offer to discard it on the way out.
+    // Leaving a half-finished new profile behind — one that was named on the
+    // details step but never got a payment method, and holds no data? It is
+    // reachable (the shell's empty-state home) but worthless. Offer to discard
+    // it on the way out rather than let unfinished profiles pile up.
     final leavingId = app.accountId;
     final abandoning =
         account.id != leavingId &&
@@ -201,8 +214,8 @@ class _BandSwitcherSheet extends ConsumerWidget {
       final discard = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(context.s.t('widgets.band_switcher.discard_title')),
-          content: Text(context.s.t('widgets.band_switcher.discard_body')),
+          title: Text(context.s.t('widgets.profile_switcher.discard_title')),
+          content: Text(context.s.t('widgets.profile_switcher.discard_body')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -236,54 +249,35 @@ class _BandSwitcherSheet extends ConsumerWidget {
     if (context.mounted) Navigator.of(context).pop();
   }
 
+  /// Adds a profile — or says why it can't. The old silent `return` on a
+  /// refusal made "Add a profile" look broken: a dead button, no message, no
+  /// clue that a stale session was holding it shut.
   Future<void> _addBand(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
     final rootNavigator = Navigator.of(context, rootNavigator: true);
-    final account = await ref.read(appStateProvider.notifier).addAccount();
-    if (account == null) return;
+    final notifier = ref.read(appStateProvider.notifier);
+    final block = notifier.accountActionBlock;
+    if (block != null) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(block == AccountActionBlock.switching
+            ? context.s.t('widgets.band_switcher.switching')
+            : context.s.t('widgets.profile_switcher.stop_session_add')),
+      ));
+      return;
+    }
+    final addFailed = context.s.t('widgets.profile_switcher.add_failed');
+    final account = await notifier.addAccount();
+    if (account == null) {
+      messenger.showSnackBar(SnackBar(content: Text(addFailed)));
+      return;
+    }
     if (context.mounted) Navigator.of(context).pop();
-    // The new empty band is active now; the details step starts its
-    // onboarding, and RootGate (welcome, behind this route) is the fallback
-    // if the user backs out.
+    // The new empty profile is active now; the details step starts its
+    // onboarding, and the shell's empty-state home (behind this route) is
+    // where the user lands if they back out — never a dead end.
     rootNavigator.push(
       MaterialPageRoute(builder: (_) => const OnboardingDetailsScreen()),
     );
-  }
-
-  /// Switches to another PROFILE (an accounts-directory entry, not a band).
-  /// The local profile flips instantly; a cloud profile needs a fresh
-  /// session, so its provider's sign-in runs again — on success the auth
-  /// controller adopts the user and makes it active.
-  Future<void> _switchProfile(
-    BuildContext context,
-    WidgetRef ref,
-    AppAccount account,
-  ) async {
-    if (account.isLocal) {
-      await ref
-          .read(accountsDirectoryProvider.notifier)
-          .setActive(kLocalAccountId);
-      if (context.mounted) Navigator.of(context).pop();
-      return;
-    }
-    final controller = ref.read(authControllerProvider.notifier);
-    final user = switch (account.kind) {
-      AccountKind.apple => await controller.signInWithApple(),
-      AccountKind.google => await controller.signInWithGoogle(),
-      // Anonymous rows are disabled — once signed out there is no way back
-      // into a guest account.
-      _ => null,
-    };
-    // Null is a cancel or failure: stay put, the error renders inline.
-    if (user != null && context.mounted) Navigator.of(context).pop();
-  }
-
-  /// "+ Sign in to another account" — the shared Apple/Google sheet; a
-  /// successful sign-in makes the new account active, so the switcher
-  /// underneath has nothing left to say and dismisses too.
-  Future<void> _signInAnother(BuildContext context) async {
-    final navigator = Navigator.of(context);
-    final user = await showSignInSheet(context);
-    if (user != null && context.mounted) navigator.pop();
   }
 
   @override
@@ -292,15 +286,7 @@ class _BandSwitcherSheet extends ConsumerWidget {
     final app = ref.watch(appStateProvider);
     final live = ref.watch(liveSessionProvider);
     final directory = ref.watch(accountsDirectoryProvider);
-    final auth = ref.watch(authControllerProvider);
     final blocked = live != null || app.switching;
-    // Cloud rows only make sense where a sign-in could actually run.
-    final canSignIn = platformSupportsCloudAccounts &&
-        ref.read(authControllerProvider.notifier).available;
-    final others = [
-      for (final account in directory.accounts)
-        if (account.id != directory.activeAccountId) account,
-    ];
 
     return SafeArea(
       child: Padding(
@@ -312,19 +298,20 @@ class _BandSwitcherSheet extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
               child: Text(
-                context.s.t('widgets.band_switcher.title'),
+                context.s.t('widgets.profile_switcher.title'),
                 style: outfitStyle(18, c.text, weight: FontWeight.w700),
               ),
             ),
-            // Which PROFILE these bands live under: the local device
-            // profile or a signed-in cloud account.
+            // Which ACCOUNT these profiles live under. Informational only —
+            // switching accounts is Settings' job, not this sheet's.
             _ActiveProfileHeader(profile: directory.active),
             if (blocked)
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
                 child: Text(
                   live != null
-                      ? context.s.t('widgets.band_switcher.live_running_hint')
+                      ? context.s
+                          .t('widgets.profile_switcher.live_running_hint')
                       : context.s.t('widgets.band_switcher.switching'),
                   style: TextStyle(
                     fontFamily: kFontBody,
@@ -348,48 +335,9 @@ class _BandSwitcherSheet extends ConsumerWidget {
               ),
             ),
             Divider(height: 16, color: c.divider),
-            _AddBandRow(enabled: !blocked, onTap: () => _addBand(context, ref)),
-            // ------------------------------------------ other profiles ---
-            if (others.isNotEmpty || canSignIn) ...[
-              Divider(height: 16, color: c.divider),
-              if (others.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-                  child: LtSectionLabel(
-                    context.s.t('widgets.account_switcher.other_accounts'),
-                  ),
-                ),
-              for (final account in others)
-                _ProfileRow(
-                  account: account,
-                  // A signed-out guest account can never be re-entered; a
-                  // cloud account needs its provider, so it needs [canSignIn].
-                  enabled: !blocked &&
-                      !auth.busy &&
-                      (account.isLocal ||
-                          (canSignIn &&
-                              account.kind != AccountKind.anonymous)),
-                  onTap: () => _switchProfile(context, ref, account),
-                ),
-              if (auth.error != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                  child: Text(
-                    auth.error!,
-                    style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 12.5,
-                      height: 1.45,
-                      color: c.danger,
-                    ),
-                  ),
-                ),
-              if (canSignIn)
-                _SignInAnotherRow(
-                  enabled: !blocked && !auth.busy,
-                  onTap: () => _signInAnother(context),
-                ),
-            ],
+            // Always tappable: a refusal must be able to SAY why (a stale
+            // remote session used to make this a dead, silent button).
+            _AddBandRow(enabled: true, onTap: () => _addBand(context, ref)),
           ],
         ),
       ),
@@ -436,132 +384,6 @@ class _ActiveProfileHeader extends StatelessWidget {
   }
 }
 
-/// A collapsed non-active profile: name/email plus provider label. Cloud
-/// rows re-authenticate on tap; signed-out guest accounts stay disabled
-/// with the reason as their subtitle.
-class _ProfileRow extends StatelessWidget {
-  const _ProfileRow({
-    required this.account,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final AppAccount account;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.lt;
-    final name = accountDisplayName(context, account);
-    final subtitle = account.kind == AccountKind.anonymous
-        ? context.s.t('widgets.account_switcher.anonymous_locked')
-        : (account.email ?? accountProviderLabel(context, account.kind));
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        child: Opacity(
-          opacity: enabled ? 1.0 : 0.45,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                InitialAvatar(
-                  name: account.isLocal ? '' : name,
-                  anonymous: account.isLocal ||
-                      account.kind == AccountKind.anonymous,
-                  size: 38,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: outfitStyle(15, c.text, weight: FontWeight.w600),
-                      ),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12.5,
-                          color: c.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                LtPill(
-                  label: accountProviderLabel(context, account.kind),
-                  soft: false,
-                ),
-                Icon(Icons.chevron_right_rounded, size: 22, color: c.textMuted),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// "+ Sign in to another account" — mirrors [_AddBandRow]'s look.
-class _SignInAnotherRow extends StatelessWidget {
-  const _SignInAnotherRow({required this.enabled, required this.onTap});
-
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.lt;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        child: Opacity(
-          opacity: enabled ? 1.0 : 0.45,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: c.accentSoft,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.person_add_alt_rounded,
-                      size: 20, color: c.accent),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    context.s.t('widgets.account_switcher.sign_in_another'),
-                    style: outfitStyle(15, c.text, weight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _BandRow extends ConsumerWidget {
   const _BandRow({
     required this.account,
@@ -579,7 +401,7 @@ class _BandRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final name = account.name.isEmpty
-        ? context.s.t('widgets.band_switcher.unnamed_account')
+        ? context.s.t('widgets.profile_switcher.unnamed')
         : account.name;
     final subtitle = bandMethodsSummary(context, ref, account.id);
     final dim = enabled ? 1.0 : 0.45;
@@ -676,12 +498,12 @@ class _AddBandRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        context.s.t('widgets.band_switcher.add_account'),
+                        context.s.t('widgets.profile_switcher.add'),
                         style: outfitStyle(15, c.text, weight: FontWeight.w600),
                       ),
                       Text(
                         context.s.t(
-                          'widgets.band_switcher.add_account_subtitle',
+                          'widgets.profile_switcher.add_subtitle',
                         ),
                         style: TextStyle(
                           fontFamily: kFontBody,

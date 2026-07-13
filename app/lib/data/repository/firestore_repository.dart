@@ -78,6 +78,11 @@ class FirestoreRepository implements AccountDataRepository {
   final Map<String, List<Tip>> _relayTips = {};
   AppSettings? _settings;
 
+  /// Flipped by the FIRST bands snapshot, cache or server. Until then the
+  /// empty mirror means "I don't know yet", and every caller that would
+  /// otherwise read it as "this account has no bands" must hold off.
+  bool _warm = false;
+
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _bandsSub;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _settingsSub;
   final Map<String, StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>
@@ -146,6 +151,7 @@ class FirestoreRepository implements AccountDataRepository {
     _bands
       ..clear()
       ..addAll(next);
+    _warm = true;
     _notify();
   }
 
@@ -163,8 +169,13 @@ class FirestoreRepository implements AccountDataRepository {
     _notify();
   }
 
+  // No band is active yet (a cold mirror has none to offer): every read is
+  // asked for the empty id, and Firestore refuses an empty document path.
+  // Answer such reads from the — necessarily empty — mirror instead.
+  static bool _noBand(String bandId) => bandId.isEmpty;
+
   void _ensureSecretsListener(String bandId) {
-    if (_secretSubs.containsKey(bandId)) return;
+    if (_noBand(bandId) || _secretSubs.containsKey(bandId)) return;
     _secretSubs[bandId] = _secretsDoc(bandId).snapshots().listen((snap) {
       final data = snap.data() ?? const <String, dynamic>{};
       final stripeKey = data['stripeKey'];
@@ -191,7 +202,7 @@ class FirestoreRepository implements AccountDataRepository {
   }
 
   void _ensureSessionsListener(String bandId) {
-    if (_sessionSubs.containsKey(bandId)) return;
+    if (_noBand(bandId) || _sessionSubs.containsKey(bandId)) return;
     _sessionSubs[bandId] = _sessionsCol(bandId)
         .orderBy('startedAt')
         .snapshots()
@@ -207,7 +218,7 @@ class FirestoreRepository implements AccountDataRepository {
   }
 
   void _ensureRelayTipsListener(String bandId) {
-    if (_relayTipSubs.containsKey(bandId)) return;
+    if (_noBand(bandId) || _relayTipSubs.containsKey(bandId)) return;
     // Newest first, capped like the local archive so both profiles show the
     // same window of tips.
     _relayTipSubs[bandId] = _relayTipsCol(bandId)
@@ -272,6 +283,9 @@ class FirestoreRepository implements AccountDataRepository {
   }
 
   // --- The band list ---
+
+  @override
+  bool get isWarm => _warm;
 
   @override
   List<BandAccount> listBands() {

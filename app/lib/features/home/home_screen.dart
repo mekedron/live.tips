@@ -94,7 +94,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .firstOrNull ??
           '';
       final band = bandName.isEmpty
-          ? context.s.t('widgets.band_switcher.unnamed_account')
+          ? context.s.t('widgets.profile_switcher.unnamed')
           : bandName;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(context.s.t('home.already_live', {'band': band})),

@@ -19,6 +19,7 @@ import 'firebase_options.dart';
 import 'l10n/app_locale.dart';
 import 'l10n/app_localizations.dart';
 import 'state/auth_providers.dart';
+import 'state/device_providers.dart';
 import 'state/providers.dart';
 
 /// Dev convenience (debug builds only): skip the keychain and use this key.
@@ -28,6 +29,12 @@ import 'state/providers.dart';
 const _devStripeKey = String.fromEnvironment('DEV_STRIPE_KEY');
 
 Future<void> main() async {
+  // FIRST, before anything can touch the URL: on the web, Flutter's URL
+  // strategy normalizes the address bar during startup and the `#c=…`
+  // fragment an add-device QR carries is simply gone afterwards. Read it now
+  // and hand it to the deep-link provider below.
+  final bootUrl = kIsWeb ? Uri.base.toString() : null;
+
   WidgetsFlutterBinding.ensureInitialized();
 
   final localStore = await LocalStore.init();
@@ -151,6 +158,7 @@ Future<void> main() async {
         initialRelaySecretProvider.overrideWithValue(relaySecret),
         firebaseAuthProvider.overrideWithValue(firebaseAuth),
         firestoreProvider.overrideWithValue(firestore),
+        bootLinkUrlProvider.overrideWithValue(bootUrl),
       ],
       child: const LiveTipsApp(),
     ),

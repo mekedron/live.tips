@@ -210,6 +210,20 @@ class AppState {
       );
 }
 
+/// Why an add/switch/remove was refused. A refusal must always be able to say
+/// why: a button that silently does nothing is indistinguishable from a broken
+/// one, and that is exactly how a stale session used to read.
+enum AccountActionBlock {
+  /// A band switch is loading its keychain secrets right now.
+  switching,
+
+  /// A session is running on THIS device.
+  localSession,
+
+  /// The account is live on another device (a fresh leader lease says so).
+  remoteSession,
+}
+
 class AppStateNotifier extends Notifier<AppState> {
   @override
   AppState build() {
@@ -220,30 +234,27 @@ class AppStateNotifier extends Notifier<AppState> {
         accountsDirectoryProvider.select((d) => d.activeAccountId),
         (previous, next) {
       if (previous != null && previous != next) {
-        unawaited(_reloadForProfile());
+        // A microtask, not a straight call: the repository provider is a
+        // DEPENDENT of the directory, and reading it from inside this
+        // notification still hands back the old profile's repository — which
+        // is how a switch used to leave the whole app rendering the account
+        // it had just left, until a reload.
+        unawaited(Future.microtask(_reloadForProfile));
       }
     });
     ref.listen(repoRevisionProvider, (previous, next) => _onRemoteChange());
     final repo = ref.read(accountDataRepositoryProvider);
-    // main() migrates/creates the registry before runApp; the fallback here
-    // covers tests that wire a bare store straight into the ProviderScope.
-    var accounts = repo.listBands();
-    if (accounts.isEmpty) {
-      final account = BandAccount(
-        id: BandAccount.newId(),
-        name: '',
-        createdAtMs: DateTime.now().millisecondsSinceEpoch,
-      );
-      accounts = [account];
-      repo.upsertBandEntry(account); // fire-and-forget
-    }
-    final activeId = repo.readActiveBandId();
-    final accountId =
-        accounts.any((a) => a.id == activeId) ? activeId! : accounts.first.id;
+    // main() migrates/creates the registry before runApp; the seeding here
+    // covers a genuinely fresh cloud account (and tests that wire a bare
+    // store straight into the ProviderScope).
+    var accounts = _bandsOf(repo);
+    if (repo.isWarm && accounts.isEmpty) accounts = [_seedFirstBand(repo)];
+    final accountId = _pickActive(accounts, repo.readActiveBandId());
     // Booting straight into a cloud profile: main() read the keychain for
     // the LOCAL registry's band, not this one — fetch the right secrets as
     // soon as the first frame is out.
-    if (!ref.read(accountsDirectoryProvider).active.isLocal) {
+    if (accountId.isNotEmpty &&
+        !ref.read(accountsDirectoryProvider).active.isLocal) {
       unawaited(_refreshSecrets(accountId));
     }
     return AppState(
@@ -258,6 +269,35 @@ class AppStateNotifier extends Notifier<AppState> {
     );
   }
 
+  /// The profiles [repo] can vouch for right now. A cold cloud mirror is
+  /// SILENT, not empty — every caller sees no profiles and creates none,
+  /// and [_onRemoteChange] adopts the real ones when the snapshot lands.
+  static List<BandAccount> _bandsOf(AccountDataRepository repo) =>
+      repo.isWarm ? repo.listBands() : const [];
+
+  /// The first profile of an account that genuinely has none. Only ever
+  /// called on a WARM repository: conjuring one on a cold mirror's silence
+  /// minted a new empty profile — and synced it — on every cloud boot.
+  static BandAccount _seedFirstBand(AccountDataRepository repo) {
+    final account = BandAccount(
+      id: BandAccount.newId(),
+      name: '',
+      createdAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    unawaited(repo.upsertBandEntry(account));
+    return account;
+  }
+
+  /// The band to open on: the stored one when it is really in the list, else
+  /// the first REAL profile — never an id that names nothing. Empty means
+  /// "no profile yet", which is what a cold mirror honestly has.
+  static String _pickActive(List<BandAccount> accounts, String? storedId) {
+    if (accounts.isEmpty) return '';
+    return accounts.any((a) => a.id == storedId)
+        ? storedId!
+        : accounts.first.id;
+  }
+
   /// Reloads everything for the (already switched) active profile — the
   /// directory listener calls this after a sign-in or a profile switch.
   Future<void> _reloadForProfile() async {
@@ -265,31 +305,35 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(switching: true);
     ref.read(onboardingDraftProvider.notifier).clear();
     final repo = ref.read(accountDataRepositoryProvider);
-    var accounts = repo.listBands();
-    if (accounts.isEmpty) {
-      // Fresh profile — or a cloud mirror that hasn't warmed yet. The band
-      // exists in memory only; its doc materializes on the first real write,
-      // and if synced bands arrive a moment later, _onRemoteChange drops
-      // this placeholder for them.
-      accounts = [
-        BandAccount(
-          id: BandAccount.newId(),
-          name: '',
-          createdAtMs: DateTime.now().millisecondsSinceEpoch,
-        ),
-      ];
-    }
-    final storedActive = repo.readActiveBandId();
-    final accountId = accounts.any((a) => a.id == storedActive)
-        ? storedActive!
-        : accounts.first.id;
+    var accounts = _bandsOf(repo);
+    // A warm profile with no bands is a fresh account: it gets its first,
+    // empty band. A cold one gets nothing until its snapshot speaks.
+    if (repo.isWarm && accounts.isEmpty) accounts = [_seedFirstBand(repo)];
+    var accountId = _pickActive(accounts, repo.readActiveBandId());
     String? apiKey;
     String? relaySecret;
-    try {
-      apiKey = await repo.readApiKey(accountId);
-      relaySecret = await repo.readRelaySecret(accountId);
-    } catch (_) {
-      // Locked keychain — the profile opens signed-out this once.
+    if (accountId.isNotEmpty) {
+      try {
+        apiKey = await repo.readApiKey(accountId);
+        relaySecret = await repo.readRelaySecret(accountId);
+      } catch (_) {
+        // Locked keychain — the profile opens signed-out this once.
+      }
+      // The keychain awaits are wide enough for the first cloud snapshot to
+      // land: commit the band list as it is NOW, never the one read before.
+      final fresh = _bandsOf(repo);
+      if (fresh.isNotEmpty) {
+        accounts = fresh;
+        final landed = _pickActive(accounts, accountId);
+        if (landed != accountId) {
+          // Different band than the secrets above belong to — nobody must
+          // ever see band A's key on band B; _refreshSecrets fetches B's.
+          accountId = landed;
+          apiKey = null;
+          relaySecret = null;
+          unawaited(_refreshSecrets(landed));
+        }
+      }
     }
     state = AppState(
       accountId: accountId,
@@ -311,12 +355,17 @@ class AppStateNotifier extends Notifier<AppState> {
     // Mid-set the session owns the stage; the archives refresh on their own.
     if (ref.read(liveSessionProvider) != null) return;
     final repo = ref.read(accountDataRepositoryProvider);
-    final accounts = repo.listBands();
-    if (accounts.isEmpty) return; // mirror not warm yet
+    if (!repo.isWarm) return; // silence — it says nothing about the bands
+    var accounts = repo.listBands();
+    if (accounts.isEmpty) {
+      // The account has spoken and it really has no profiles — a brand new
+      // cloud account. This is the ONE moment creating one is right.
+      accounts = [_seedFirstBand(repo)];
+    }
     final accountId = state.accountId;
     if (!accounts.any((a) => a.id == accountId)) {
-      // The active band vanished remotely (deleted on another device), or
-      // we sat on a cold-mirror placeholder — land on a real band.
+      // The bands we were waiting for arrived (cold boot), or the active one
+      // was deleted on another device — land on a real band.
       unawaited(_reloadForProfile());
       return;
     }
@@ -499,25 +548,65 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(accounts: renamed.accounts);
   }
 
-  /// Whether bands can be switched/added/removed right now. A running
-  /// session is bound to its band's key, payment link, and relay socket —
-  /// the app must never show band B around band A's live numbers. On a
-  /// cloud profile a session running on ANY device blocks too: the account
-  /// is live somewhere, and reshuffling bands under it invites exactly the
-  /// cross-band leaks the local guard exists to prevent.
-  bool get accountActionsBlocked {
-    if (state.switching || ref.read(liveSessionProvider) != null) return true;
+  /// Why bands can't be switched/added/removed right now, or null when they
+  /// can. A running session is bound to its band's key, payment link, and
+  /// relay socket — the app must never show band B around band A's live
+  /// numbers. On a cloud profile a session running on ANY device blocks too:
+  /// the account is live somewhere, and reshuffling bands under it invites
+  /// exactly the cross-band leaks the local guard exists to prevent.
+  ///
+  /// Every refusal names its reason, and add/switch/remove all ask THIS —
+  /// three guards that disagreed is how a dead session used to lock the
+  /// account out of its own switcher.
+  AccountActionBlock? get accountActionBlock {
+    if (state.switching) return AccountActionBlock.switching;
+    return _sessionBlock;
+  }
+
+  bool get accountActionsBlocked => accountActionBlock != null;
+
+  /// The session half of the guard, without the mid-switch flag — the only
+  /// form usable from inside an action that has already set `switching`.
+  AccountActionBlock? get _sessionBlock {
+    if (ref.read(liveSessionProvider) != null) {
+      return AccountActionBlock.localSession;
+    }
     try {
-      return ref.read(activeSessionProvider).value?.active ?? false;
+      final info = ref.read(activeSessionProvider).value;
+      // `active` never gets cleared by a crashed tab — only the lease decays.
+      // Trusting the flag alone left the account blocked forever; the lease
+      // is what CloudSessionCoordinator itself believes (it takes a stale one
+      // over), so the guard must believe the same thing.
+      if (info != null &&
+          info.active &&
+          CloudSessionCoordinator.leaseAlive(info.leaderLeaseUntilMs)) {
+        return AccountActionBlock.remoteSession;
+      }
     } catch (_) {
       // Unwired in tests / provider errored — the local guards stand alone.
+    }
+    return null;
+  }
+
+  /// One exception to the session guard, and only one: moving TO the band the
+  /// account is already live on. That is what tapping Join on the banner does
+  /// — the session is that band's, so following it can't show band B around
+  /// band A's numbers. Every other move stays refused.
+  bool _switchAllowedTo(String id) {
+    final block = _sessionBlock;
+    if (block == null) return true;
+    if (block != AccountActionBlock.remoteSession) return false;
+    try {
+      return ref.read(activeSessionProvider).value?.bandId == id;
+    } catch (_) {
       return false;
     }
   }
 
   /// Makes [id] the active band. Returns false when refused (unknown id,
-  /// mid-switch, or a live session running). Exits demo mode — switching is
-  /// an explicit "work with this band now".
+  /// mid-switch, or a live session — here or on another device, unless [id]
+  /// IS that session's band). Exits demo mode — switching is an explicit
+  /// "work with this band now".
   Future<bool> switchAccount(String id) async {
     if (state.switching) return false;
     if (id == state.accountId) {
@@ -527,7 +616,7 @@ class AppStateNotifier extends Notifier<AppState> {
       return true;
     }
     if (!_registry.contains(id)) return false;
-    if (ref.read(liveSessionProvider) != null) return false;
+    if (!_switchAllowedTo(id)) return false;
 
     final previousId = state.accountId;
     state = state.copyWith(switching: true);
@@ -549,7 +638,7 @@ class AppStateNotifier extends Notifier<AppState> {
     }
 
     // The guard ran before the awaits — re-check nothing slipped in.
-    if (ref.read(liveSessionProvider) != null) {
+    if (!_switchAllowedTo(id)) {
       state = state.copyWith(switching: false);
       return false;
     }
@@ -676,7 +765,10 @@ class AppStateNotifier extends Notifier<AppState> {
       // the boot-time retry deletes them once the keychain cooperates.
       await ref.read(localStoreProvider).addPendingSecretWipe(id);
     }
-    ref.invalidate(relayHistoryProvider);
+    // Nothing to push at the archives: RelayHistoryNotifier watches the band
+    // id and the cloud revision, so it rebuilds itself. Invalidating it from
+    // here made the removal complete with a CircularDependencyError instead —
+    // it already watches THIS notifier.
     return true;
   }
 
@@ -756,6 +848,35 @@ class AppStateNotifier extends Notifier<AppState> {
 
 final appStateProvider =
     NotifierProvider<AppStateNotifier, AppState>(AppStateNotifier.new);
+
+/// Whether this device has anything set up at all — the ONE question that
+/// decides between the first-run pitch (WelcomeScreen) and the shell.
+///
+/// True as soon as SOME band of the active profile has a payment method, or a
+/// cloud account is signed in, or the device knows a cloud account it could
+/// sign back into. Only a device where none of that holds is genuinely on its
+/// first run; everywhere else the artist has something to come back to, and
+/// must land in the shell where the switcher, Settings and sign-out live —
+/// never on a marketing page with no chrome.
+///
+/// Bands of OTHER profiles aren't consulted: their jars sit in a repository
+/// this profile can't read. The directory entry stands in for them, which is
+/// what "a cloud account exists on this device" means anyway.
+final deviceIsSetUpProvider = Provider<bool>((ref) {
+  final app = ref.watch(appStateProvider);
+  if (app.connected) return true;
+  if (ref.watch(authControllerProvider.select((s) => s.user != null))) {
+    return true;
+  }
+  final directory = ref.watch(accountsDirectoryProvider);
+  if (!directory.active.isLocal) return true;
+  if (directory.accounts.any((a) => !a.isLocal)) return true;
+  // A cloud snapshot can bring bands in after the first frame.
+  ref.watch(repoRevisionProvider);
+  final repo = ref.watch(accountDataRepositoryProvider);
+  return app.accounts.any((a) =>
+      repo.readTipJar(a.id) != null || repo.readRelayJar(a.id) != null);
+});
 
 /// Builds the tip feed for a session — a seam so controller tests can
 /// inject a scripted source instead of the demo/Stripe pollers. The Stripe

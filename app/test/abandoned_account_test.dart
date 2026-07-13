@@ -7,6 +7,7 @@ import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/state/providers.dart';
+import 'package:live_tips/widgets/band_switcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers.dart';
@@ -38,7 +39,7 @@ Future<LocalStore> _store() async {
 }
 
 void main() {
-  testWidgets('switching away from an unfinished account offers to discard it',
+  testWidgets('switching away from an unfinished profile offers to discard it',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(700, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -59,28 +60,32 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The active account is unfinished → RootGate shows Welcome, whose chip
-    // opens the account switcher.
-    await tester.tap(find.text('Half Done'));
+    // The active profile is unfinished → RootGate shows the shell's
+    // empty-state home, whose name button opens the profile switcher.
+    // The profile-name button in the shell's empty-state home opens it.
+    await tester.tap(find.descendant(
+      of: find.byType(BandNameButton),
+      matching: find.byType(InkWell),
+    ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Your accounts'), findsOneWidget);
+    expect(find.text('Your profiles'), findsOneWidget);
     await tester.tap(find.text('The Configured'));
     await tester.pumpAndSettle();
 
     // The discard warning, exactly as asked.
-    expect(find.text('Discard this unfinished account?'), findsOneWidget);
+    expect(find.text('Discard this unfinished profile?'), findsOneWidget);
     await tester.tap(find.text('Discard & switch'));
     await tester.pumpAndSettle();
 
-    // The unfinished account is gone; only the configured one remains active.
+    // The unfinished profile is gone; only the configured one remains active.
     final registry = local.readAccountsRegistry()!;
     expect(registry.accounts, hasLength(1));
     expect(registry.accounts.single.id, 'acc_cfg');
     expect(registry.activeId, 'acc_cfg');
   });
 
-  testWidgets('keeping the unfinished account cancels the switch',
+  testWidgets('keeping the unfinished profile cancels the switch',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(700, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -101,7 +106,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Half Done'));
+    // The profile-name button in the shell's empty-state home opens it.
+    await tester.tap(find.descendant(
+      of: find.byType(BandNameButton),
+      matching: find.byType(InkWell),
+    ));
     await tester.pumpAndSettle();
     await tester.tap(find.text('The Configured'));
     await tester.pumpAndSettle();
@@ -109,7 +118,7 @@ void main() {
     await tester.tap(find.text('Keep editing'));
     await tester.pumpAndSettle();
 
-    // Nothing removed, still on the unfinished account.
+    // Nothing removed, still on the unfinished profile.
     final registry = local.readAccountsRegistry()!;
     expect(registry.accounts, hasLength(2));
     expect(registry.activeId, 'acc_new');

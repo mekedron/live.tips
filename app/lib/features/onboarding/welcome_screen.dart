@@ -6,32 +6,29 @@ import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
-import '../../widgets/band_switcher.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import 'account_step_screen.dart';
 import 'onboarding_flow.dart';
 
+/// The first-run pitch — and ONLY that. RootGate shows it when nobody is
+/// signed in and nothing is configured anywhere on this device; every other
+/// "nothing set up yet" state renders inside the shell instead. That is why
+/// there is no profile switcher here any more: there is nothing to switch to,
+/// and a screen with no chrome must never be somewhere a user can get stuck.
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
-    // A brand-new band mid-add lands here (it has nothing configured yet) —
-    // the chip is the way back to the bands that already work.
-    final hasOtherBands =
-        ref.watch(appStateProvider.select((s) => s.accounts.length)) > 1;
     return Scaffold(
       // The language switcher lives top-right from the very first screen, so a
-      // fresh user can pick their language before anything else. The band chip
-      // (a way back to already-working bands) shows on the left only when a
-      // half-added band parked the user here.
+      // fresh user can pick their language before anything else.
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: false,
         backgroundColor: Colors.transparent,
-        title: hasOtherBands ? const BandChip() : null,
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: 12),

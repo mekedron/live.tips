@@ -74,7 +74,7 @@ class _LiveSessionBannerState extends ConsumerState<LiveSessionBanner> {
             .firstOrNull ??
         '';
     final band = bandName.isEmpty
-        ? context.s.t('widgets.band_switcher.unnamed_account')
+        ? context.s.t('widgets.profile_switcher.unnamed')
         : bandName;
 
     return Material(

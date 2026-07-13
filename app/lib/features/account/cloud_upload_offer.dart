@@ -7,11 +7,42 @@ import '../../data/cloud_migrator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
+import '../../state/route_depth.dart';
+
+/// Moves this device's local profiles into [uid]'s account, reporting each
+/// profile as it lands. Null where there is no cloud to move them to (no
+/// Firebase) — the offer then never comes up at all.
+///
+/// A provider so the gate's decisions (when to ask, when to record the
+/// answer) can be tested without a live Firestore behind them.
+typedef CloudUploadRunner = Future<void> Function(
+  String uid, {
+  void Function(String bandName, int done, int total)? onProgress,
+});
+
+final cloudUploadRunnerProvider = Provider<CloudUploadRunner?>((ref) {
+  final db = ref.watch(firestoreProvider);
+  if (db == null) return null;
+  return (uid, {onProgress}) => CloudMigrator(
+        local: ref.read(localStoreProvider),
+        secure: ref.read(secureStoreProvider),
+        db: db,
+      ).uploadLocalBands(uid, onProgress: onProgress);
+});
 
 /// Invisible wrapper that watches for a sign-in and offers — once per
-/// account — to move this device's local bands (jars, settings, history,
+/// account — to move this device's local profiles (jars, settings, history,
 /// secrets) into it. Sits at the app root because the sign-in sheets pop
 /// themselves before the offer could run from their own contexts.
+///
+/// Two invariants, both learned the hard way:
+///
+/// * The offer waits until the navigator is back on the root screen. A
+///   sign-in mid-onboarding pushes the next step in the same beat, and a
+///   dialog raised then lands UNDER that opaque route — shown, never seen.
+/// * The "offered" flag is written only once the user ANSWERED. Marking it up
+///   front burned the single chance to ask, and the local profiles stayed
+///   stranded on the device with no way to bring them over.
 ///
 /// A crashed upload resumes from main() without asking again; declining is
 /// remembered per uid, so nobody gets nagged on every profile switch.
@@ -28,54 +59,98 @@ class CloudUploadOfferGate extends ConsumerStatefulWidget {
 class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
   bool _running = false;
 
+  /// The account that signed in and hasn't answered yet — held until the user
+  /// is back on the root screen, where the question can actually be seen.
+  String? _pending;
+
   @override
   Widget build(BuildContext context) {
     ref.listen(authControllerProvider.select((s) => s.user?.uid),
         (previous, uid) {
-      if (uid != null && uid != previous) _maybeOffer(uid);
+      if (uid != null && uid != previous) {
+        _pending = uid;
+        _offerWhenVisible();
+      }
+    });
+    ref.listen(routeDepthProvider, (previous, depth) {
+      if (depth == 0) _offerWhenVisible();
     });
     return widget.child;
   }
 
+  void _offerWhenVisible() {
+    if (_pending == null || _running) return;
+    if (ref.read(routeDepthProvider) != 0) return; // something is on top
+    // Next frame, not this instant: the depth reaches zero in the MIDDLE of
+    // the pop that got us there (onboarding ends with popUntil), and a dialog
+    // pushed then is simply popped along with everything else. Let the
+    // navigator finish, then ask.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final uid = _pending;
+      if (uid == null || _running) return;
+      if (ref.read(routeDepthProvider) != 0) return;
+      unawaited(_maybeOffer(uid));
+    });
+  }
+
   Future<void> _maybeOffer(String uid) async {
     if (_running) return;
-    final db = ref.read(firestoreProvider);
-    if (db == null) return;
+    final upload = ref.read(cloudUploadRunnerProvider);
     final local = ref.read(localStoreProvider);
-    if (local.readCloudUploadOffered(uid)) return;
-    // Anything worth moving? A band counts once it was named or holds any
-    // data — pristine placeholder bands travel as noise, not value.
+    if (upload == null || local.readCloudUploadOffered(uid)) {
+      _pending = null;
+      return;
+    }
+    // Anything worth moving? A profile counts once it was named or holds any
+    // data — pristine placeholder profiles travel as noise, not value.
     final registry = local.readAccountsRegistry();
     final hasData = registry != null &&
         registry.accounts.any(
             (a) => a.name.trim().isNotEmpty || local.accountHasData(a.id));
-    if (!hasData) return;
+    if (!hasData) {
+      _pending = null;
+      return;
+    }
     if (!mounted) return;
 
+    // Held across the awaits: another route settling must not stack a second
+    // dialog on top of the offer already asking.
+    _running = true;
     final s = context.s;
-    unawaited(local.markCloudUploadOffered(uid));
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(s.t('account.upload_offer.title')),
-        content: Text(s.t('account.upload_offer.body')),
+        title: Text(s.t('account.profile_upload.title')),
+        content: Text(s.t('account.profile_upload.body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(s.t('account.upload_offer.decline')),
+            child: Text(s.t('account.profile_upload.decline')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(s.t('account.upload_offer.accept')),
+            child: Text(s.t('account.profile_upload.accept')),
           ),
         ],
       ),
     );
-    if (accepted != true || !mounted) return;
+    // Dismissed without an answer (barrier tap, back button): the question
+    // stands, so nothing is recorded and the next chance asks it again.
+    if (accepted == null) {
+      _running = false;
+      return;
+    }
+    _pending = null;
+    await local.markCloudUploadOffered(uid);
     // The signed-in user may have changed while the dialog sat open.
-    if (ref.read(authControllerProvider).user?.uid != uid) return;
+    if (accepted != true ||
+        !mounted ||
+        ref.read(authControllerProvider).user?.uid != uid) {
+      _running = false;
+      return;
+    }
 
-    _running = true;
     final progress = ValueNotifier<String>('');
     if (mounted) {
       // Fire-and-forget: the upload below pops it when done.
@@ -97,7 +172,7 @@ class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
                   child: ValueListenableBuilder<String>(
                     valueListenable: progress,
                     builder: (context, value, child) => Text(value.isEmpty
-                        ? s.t('account.upload_offer.progress')
+                        ? s.t('account.profile_upload.progress')
                         : value),
                   ),
                 ),
@@ -109,14 +184,9 @@ class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
     }
     var failed = false;
     try {
-      final migrator = CloudMigrator(
-        local: local,
-        secure: ref.read(secureStoreProvider),
-        db: db,
-      );
-      await migrator.uploadLocalBands(uid, onProgress: (band, done, total) {
-        progress.value = s.t('account.upload_offer.progress_band', {
-          'band': band,
+      await upload(uid, onProgress: (band, done, total) {
+        progress.value = s.t('account.profile_upload.progress_profile', {
+          'profile': band,
           'done': '$done',
           'total': '$total',
         });
@@ -131,8 +201,8 @@ class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
     Navigator.of(context, rootNavigator: true).pop(); // the progress dialog
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
       content: Text(s.t(failed
-          ? 'account.upload_offer.failed'
-          : 'account.upload_offer.done')),
+          ? 'account.profile_upload.failed'
+          : 'account.profile_upload.done')),
     ));
   }
 }

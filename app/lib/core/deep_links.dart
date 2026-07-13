@@ -56,20 +56,27 @@ String? parseLinkCode(String raw) {
 /// Windows/Linux) yields an empty stream instead of throwing, because a deep
 /// link is a nice-to-have on top of the QR scanner, never a dependency of it.
 class DeepLinks {
-  DeepLinks([AppLinks? links]) : _links = links;
+  DeepLinks({AppLinks? links, this.bootUrl}) : _links = links;
 
   final AppLinks? _links;
 
+  /// The URL the app was OPENED with, captured in main() before anything can
+  /// rewrite it. On the web this is the only chance to see it: Flutter's URL
+  /// strategy normalizes the address bar during startup, so by the time this
+  /// stream is first listened to, `Uri.base` has already lost the `#c=…`
+  /// fragment the code rides in — and every scanned QR silently did nothing.
+  final String? bootUrl;
+
   Stream<String> codes() async* {
+    // The launch URL first, always — it is the one the plugin can't tell us
+    // about on the web, and on native it costs nothing to honour.
+    final boot = bootUrl == null ? null : parseLinkCode(bootUrl!);
+    if (boot != null) yield boot;
+    // On the web there is no plugin channel at all: the boot URL is the whole
+    // of it, and a missing plugin must never swallow it.
+    if (kIsWeb) return;
     final links = _links ?? _tryCreate();
     if (links == null) return;
-    // On the web there is no plugin channel — the boot URL is simply the
-    // page's own, fragment included.
-    if (kIsWeb) {
-      final boot = parseLinkCode(Uri.base.toString());
-      if (boot != null) yield boot;
-      return;
-    }
     try {
       final initial = await links.getInitialLink();
       if (initial != null) {

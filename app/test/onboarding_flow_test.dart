@@ -60,4 +60,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('You\'re all set'), findsOneWidget);
   });
+
+  testWidgets('a named profile with no method yet comes back to a PREFILLED '
+      'details step', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(600, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    // The profile was named on the details step and then abandoned before a
+    // payment method — "Set it up" must not act like the name never existed.
+    final store = await seededStore(bandName: 'The Midnight Foxes');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localStoreProvider.overrideWithValue(store),
+          secureStoreProvider.overrideWithValue(SecureStore()),
+          initialApiKeyProvider.overrideWithValue(null),
+        ],
+        child: const LiveTipsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+
+    final name = tester.widget<TextField>(find.byType(TextField).first);
+    expect(name.controller?.text, 'The Midnight Foxes');
+  });
 }

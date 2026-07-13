@@ -37,6 +37,13 @@ void main() {
         3,
       );
     });
+
+    test('nothing chosen yet still counts as one method → 3', () {
+      // The details step is shown BEFORE any method is picked, and going Back
+      // to it must not renumber the flow "Step 1 of 3" → "Step 1 of 2". You
+      // cannot finish onboarding without a method, so one is the floor.
+      expect(const OnboardingDraft().totalSteps, 3);
+    });
   });
 
   group('stepOf / stepOfMethod', () {
