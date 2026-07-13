@@ -82,10 +82,19 @@ class _NoopRevision extends RepoRevisionNotifier {
 /// serves every fresh listener first. That first stale emission is what shot
 /// down every production "Go live" after an account's first session.
 class StaleCacheFirestore extends Fake implements FirebaseFirestore {
-  StaleCacheFirestore(this.inner, this.stalePath, this.staleData);
+  StaleCacheFirestore(this.inner, this.stalePath, this.staleData,
+      {this.staleFromCache = false});
 
   final FakeFirebaseFirestore inner;
   final String stalePath;
+
+  /// Whether the stale first emission claims to come from the local cache.
+  /// PRODUCTION SAYS FALSE: the doc already has a listener (the Join banner's),
+  /// so the SDK replays that target's current — pre-transaction — data
+  /// server-synced. A fix that keyed on `isFromCache` therefore shipped still
+  /// broken. The cached variant is kept because it is also real (a cold
+  /// listener on a warm cache), and both must be survived.
+  final bool staleFromCache;
 
   /// What the cache "remembers" for [stalePath] — fixed at construction,
   /// mirroring a cache the claim transaction cannot refresh.
@@ -95,7 +104,7 @@ class StaleCacheFirestore extends Fake implements FirebaseFirestore {
   DocumentReference<Map<String, dynamic>> doc(String documentPath) {
     final real = inner.doc(documentPath);
     if (documentPath == stalePath || real.path == stalePath) {
-      return _StaleCacheDocRef(real, staleData);
+      return _StaleCacheDocRef(real, staleData, staleFromCache);
     }
     return real;
   }
@@ -123,17 +132,18 @@ class StaleCacheFirestore extends Fake implements FirebaseFirestore {
 // ignore: subtype_of_sealed_class
 class _StaleCacheDocRef extends Fake
     implements DocumentReference<Map<String, dynamic>> {
-  _StaleCacheDocRef(this.inner, this.staleData);
+  _StaleCacheDocRef(this.inner, this.staleData, this.fromCache);
 
   final DocumentReference<Map<String, dynamic>> inner;
   final Map<String, dynamic> staleData;
+  final bool fromCache;
 
   @override
   Stream<DocumentSnapshot<Map<String, dynamic>>> snapshots({
     bool includeMetadataChanges = false,
     ListenSource source = ListenSource.defaultSource,
   }) async* {
-    yield _CachedSnap(inner, staleData);
+    yield _CachedSnap(inner, staleData, fromCache);
     yield* inner.snapshots(includeMetadataChanges: includeMetadataChanges);
   }
 
@@ -168,10 +178,11 @@ class _StaleCacheDocRef extends Fake
 // ignore: subtype_of_sealed_class
 class _CachedSnap extends Fake
     implements DocumentSnapshot<Map<String, dynamic>> {
-  _CachedSnap(this._ref, this._data);
+  _CachedSnap(this._ref, this._data, this._fromCache);
 
   final DocumentReference<Map<String, dynamic>> _ref;
   final Map<String, dynamic> _data;
+  final bool _fromCache;
 
   @override
   bool get exists => true;
@@ -180,7 +191,7 @@ class _CachedSnap extends Fake
   Map<String, dynamic>? data() => Map<String, dynamic>.of(_data);
 
   @override
-  SnapshotMetadata get metadata => _CacheMeta();
+  SnapshotMetadata get metadata => _CacheMeta(_fromCache);
 
   @override
   DocumentReference<Map<String, dynamic>> get reference => _ref;
@@ -190,8 +201,12 @@ class _CachedSnap extends Fake
 }
 
 class _CacheMeta extends Fake implements SnapshotMetadata {
+  _CacheMeta(this._fromCache);
+
+  final bool _fromCache;
+
   @override
-  bool get isFromCache => true;
+  bool get isFromCache => _fromCache;
 
   @override
   bool get hasPendingWrites => false;
@@ -527,9 +542,10 @@ void main() {
         };
 
     test(
-        'a stale cached snapshot of the PREVIOUS session must not shoot down '
-        'the session this device just claimed', () async {
-      // Last night's stopped session, both on the "server" and in the cache.
+        'a stale PRE-TRANSACTION echo of the previous session must not shoot '
+        'down the session this device just claimed', () async {
+      // Last night's stopped session, echoed back to the fresh listener
+      // SERVER-SYNCED (isFromCache: false) — production's actual shape.
       final stale = lastNightsDoc();
       await liveDoc().set(stale);
       final a = await device('dev_a',
@@ -542,14 +558,15 @@ void main() {
       await a.read(liveSessionProvider.notifier).start(goalMinor: 10000);
       await settle();
 
-      // Without the isFromCache guard the coordinator read the cached
-      // active:false doc as "stopped on another device", nulled the state,
-      // and the very session this device leads came back as a foreign
-      // Join banner.
+      // The coordinator read the echoed active:false doc as "stopped on
+      // another device", nulled the state, and the very session this device
+      // leads came back as a foreign Join banner. Guarding on isFromCache did
+      // NOT fix it — the echo is server-synced, because the doc already has a
+      // listener (the Join banner's) whose current data the SDK replays.
       final state = a.read(liveSessionProvider);
       expect(state, isNotNull,
           reason: 'a device that just won the claim transaction must not be '
-              'told by a stale cached snapshot that its own session is over');
+              'told by a pre-transaction echo that its own session is over');
       final doc = (await liveDoc().get()).data()!;
       expect(doc['active'], isTrue);
       expect(doc['sessionId'], state!.session.id);
@@ -561,8 +578,8 @@ void main() {
     });
 
     test(
-        'a genuine remote stop (server snapshot) still tears the session '
-        'down, stale cache emission or not', () async {
+        'a genuine remote stop still tears the session down, stale echo or '
+        'not', () async {
       final stale = lastNightsDoc();
       await liveDoc().set(stale);
       final a = await device('dev_a',
@@ -573,8 +590,8 @@ void main() {
       await settle();
       expect(a.read(liveSessionProvider), isNotNull);
 
-      // Another device stops the session: this lands as a SERVER snapshot
-      // (isFromCache: false) on the live listener and must still be obeyed.
+      // Another device stops the session: this names OUR sessionId, so it is
+      // news, not an echo, and must still be obeyed.
       await liveDoc().set({
         'active': false,
         'endedAtMs': DateTime.now().millisecondsSinceEpoch,
@@ -582,8 +599,42 @@ void main() {
       await settle();
 
       expect(a.read(liveSessionProvider), isNull,
-          reason: 'the isFromCache guard must not deafen the coordinator to '
+          reason: 'the echo guard must not deafen the coordinator to '
               'real remote stops');
+    });
+
+    test(
+        'a device superseded by a STRICTLY NEWER session tears down even '
+        'before it ever saw its own', () async {
+      final stale = lastNightsDoc();
+      await liveDoc().set(stale);
+      final a = await device('dev_a',
+          dbOverride:
+              StaleCacheFirestore(db, 'users/$_uid/live/current', stale));
+
+      await a.read(liveSessionProvider.notifier).start(goalMinor: 10000);
+      await settle();
+      expect(a.read(liveSessionProvider), isNotNull);
+
+      // Another device took the doc with a session started AFTER ours. That
+      // is not an echo of the past — it is the present, and it is not us.
+      // Waving it through would trade the dead-session bug for a phantom one:
+      // a device happily leading a night that belongs to someone else.
+      await liveDoc().set({
+        'active': true,
+        'bandId': _bandId,
+        'sessionId': 'ses_newer',
+        'startedAtMs': DateTime.now()
+            .add(const Duration(minutes: 1))
+            .millisecondsSinceEpoch,
+        'leaderDeviceId': 'dev_b',
+        'leaderLeaseUntilMs':
+            DateTime.now().add(const Duration(minutes: 2)).millisecondsSinceEpoch,
+      });
+      await settle();
+
+      expect(a.read(liveSessionProvider), isNull,
+          reason: 'a newer session on the doc supersedes ours, seen or not');
     });
   });
 

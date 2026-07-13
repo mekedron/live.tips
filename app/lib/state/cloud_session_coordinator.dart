@@ -98,6 +98,11 @@ class CloudSessionCoordinator implements SessionCoordinator {
 
   String _sessionId = '';
   bool _isLeader = false;
+
+  /// Whether the doc listener has yet seen the session THIS device is running.
+  /// Until it has, a doc naming another session is the pre-transaction doc
+  /// echoing back, not news that our night ended — see [_onLiveDoc].
+  bool _sawOwnSession = false;
   bool _disposed = false;
   bool _stopping = false;
   bool _takingOver = false;
@@ -134,6 +139,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
   }) async {
     _session = session;
     _sessionId = session.id;
+    _sawOwnSession = false;
 
     if (mode == SessionStartMode.join) {
       // A follower by definition — the doc already names a leader.
@@ -343,24 +349,35 @@ class CloudSessionCoordinator implements SessionCoordinator {
     final data = snap.data();
     if (data == null) return;
 
-    if (data['active'] != true || data['sessionId'] != _sessionId) {
-      // INVARIANT: a device that just won the claim transaction must not be
-      // told by a stale CACHED snapshot that its own session is over.
+    final isOurs = data['sessionId'] == _sessionId;
+    if (isOurs && data['active'] == true) _sawOwnSession = true;
+
+    if (data['active'] != true || !isOurs) {
+      // INVARIANT: a device that just won the claim must not be told by a
+      // PRE-TRANSACTION echo that its own session is over.
       //
-      // Firestore transactions never write to the local cache, so the FIRST
-      // emission of the listener attached right after [_claim] is whatever
-      // the cache last saw — on any account past its first session, the
-      // PREVIOUS session's stopped doc (`active: false`). Tearing down on
-      // that killed every fresh session seconds after "Go live" and then
-      // presented the server doc this device leads as a foreign one.
+      // The doc already has a permanent listener on it (activeSessionProvider
+      // feeds the Join banner). When we attach a second one right after the
+      // claim, the SDK hands us that target's current data at once — the doc
+      // as it was BEFORE our transaction, because the write has not come back
+      // down the watch stream yet. It arrives server-synced, so `isFromCache`
+      // does not catch it (an earlier fix believed it would, and shipped a
+      // still-broken Go live: the session died seconds after starting and the
+      // doc this device led came back as a foreign session to "Join").
       //
-      // Ending a session is a server-side fact (a stop is a transaction,
-      // a stale-lease takeover is a transaction), so only a snapshot the
-      // server confirmed may end this one. The genuine case this branch
-      // exists for — another device really stops or supersedes the session
-      // — still arrives as a server snapshot (isFromCache: false) and
-      // tears down below.
-      if (snap.metadata.isFromCache) return;
+      // The honest test is not where the snapshot came from but whether it can
+      // possibly be about us: until this listener has seen its OWN sessionId
+      // once, a doc naming a different session is the old one echoing.
+      //
+      // Except when it is not: a device that superseded a stale lease writes a
+      // session STRICTLY NEWER than ours. That one really does end us, seen or
+      // not — otherwise this guard would trade a dead session for a phantom
+      // one, where we believe we lead a night that belongs to another device.
+      if (!_sawOwnSession && !isOurs) {
+        final docStartedAtMs = (data['startedAtMs'] as num?)?.toInt() ?? 0;
+        final ourStartedAtMs = _session?.startedAt.millisecondsSinceEpoch ?? 0;
+        if (docStartedAtMs <= ourStartedAtMs) return;
+      }
       // Stopped on another device (or replaced after a stale takeover) —
       // this device's copy of the set is over. The stopping device owns the
       // archive; here only the snapshot goes.
