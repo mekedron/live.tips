@@ -63,8 +63,6 @@ void main() {
 
     await tester.tap(find.text('Get started'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('My own device'));
-    await tester.pumpAndSettle();
 
     // The account question is step 1 — with a pill, like every other step.
     expect(find.text('First, an account'), findsOneWidget);

@@ -528,6 +528,7 @@
   "welcome.tagline": "Votre pot à pourboires en direct.",
   "welcome.trust": "Open source · votre clé ne quitte jamais cet appareil",
   "welcome.try_demo": "Essayer la démo",
+  "welcome.venue_link": "Vous configurez un appareil partagé pour la salle ?",
   "widgets.band_switcher.add_account": "Ajouter un compte",
   "widgets.band_switcher.add_account_subtitle": "Un autre compte avec ses propres liens, objectif et historique.",
   "widgets.band_switcher.discard_body": "Vous avez commencé ce compte mais n'avez pas ajouté de moyen de paiement, il n'y a donc rien à conserver. En changer le supprime.",

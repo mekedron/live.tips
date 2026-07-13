@@ -528,6 +528,7 @@
   "welcome.tagline": "Din live-dricksburk.",
   "welcome.trust": "Öppen källkod · din nyckel lämnar aldrig den här enheten",
   "welcome.try_demo": "Testa demot",
+  "welcome.venue_link": "Ställer du in en delad enhet för spelstället?",
   "widgets.band_switcher.add_account": "Lägg till ett konto",
   "widgets.band_switcher.add_account_subtitle": "Ett till konto med egna länkar, mål och historik.",
   "widgets.band_switcher.discard_body": "Du startade det här kontot men lade inte till något betalsätt, så det finns inget att behålla. Att byta bort slänger det.",

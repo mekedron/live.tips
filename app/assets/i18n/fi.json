@@ -528,6 +528,7 @@
   "welcome.tagline": "Oma live-tippipurkkisi.",
   "welcome.trust": "Avoin lähdekoodi · avaimesi ei koskaan poistu tältä laitteelta",
   "welcome.try_demo": "Kokeile demoa",
+  "welcome.venue_link": "Otatko käyttöön keikkapaikan yhteiskäyttölaitetta?",
   "widgets.band_switcher.add_account": "Lisää tili",
   "widgets.band_switcher.add_account_subtitle": "Toinen tili omine linkkeineen, tavoitteineen ja historioineen.",
   "widgets.band_switcher.discard_body": "Aloitit tämän tilin mutta et lisännyt maksutapaa, joten mitään ei ole säilytettävää. Toiseen vaihtaminen poistaa sen.",

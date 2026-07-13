@@ -528,6 +528,7 @@
   "welcome.tagline": "Canlı bahşiş kavanozun.",
   "welcome.trust": "Açık kaynak · anahtarın bu cihazdan asla çıkmaz",
   "welcome.try_demo": "Demoyu dene",
+  "welcome.venue_link": "Mekân için ortak bir cihaz mı kuruyorsun?",
   "widgets.band_switcher.add_account": "Hesap ekle",
   "widgets.band_switcher.add_account_subtitle": "Kendi bağlantıları, hedefi ve geçmişi olan başka bir hesap.",
   "widgets.band_switcher.discard_body": "Bu hesabı başlattın ama bir ödeme yöntemi eklemedin, bu yüzden saklanacak bir şey yok. Başka bir hesaba geçmek onu siler.",

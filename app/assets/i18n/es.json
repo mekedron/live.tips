@@ -528,6 +528,7 @@
   "welcome.tagline": "Tu bote de propinas en directo.",
   "welcome.trust": "Código abierto · tu clave nunca sale de este dispositivo",
   "welcome.try_demo": "Probar la demo",
+  "welcome.venue_link": "¿Estás configurando un dispositivo compartido para el local?",
   "widgets.band_switcher.add_account": "Añadir una cuenta",
   "widgets.band_switcher.add_account_subtitle": "Otra cuenta con sus propios enlaces, meta e historial.",
   "widgets.band_switcher.discard_body": "Empezaste esta cuenta pero no añadiste un método de pago, así que no hay nada que conservar. Cambiar de cuenta la elimina.",

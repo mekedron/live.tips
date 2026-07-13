@@ -528,6 +528,7 @@
   "welcome.tagline": "Ваша жива банка для чайових.",
   "welcome.trust": "Відкритий код · ваш ключ ніколи не залишає цей пристрій",
   "welcome.try_demo": "Спробувати демо",
+  "welcome.venue_link": "Налаштовуєте спільний пристрій для закладу?",
   "widgets.band_switcher.add_account": "Додати акаунт",
   "widgets.band_switcher.add_account_subtitle": "Ще один акаунт з власними посиланнями, ціллю та історією.",
   "widgets.band_switcher.discard_body": "Ви почали цей акаунт, але не додали спосіб оплати, тож зберігати нічого. Перехід на інший видалить його.",

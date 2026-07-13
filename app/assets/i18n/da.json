@@ -528,6 +528,7 @@
   "welcome.tagline": "Din live-drikkepengekrukke.",
   "welcome.trust": "Open source · din nøgle forlader aldrig denne enhed",
   "welcome.try_demo": "Prøv demoen",
+  "welcome.venue_link": "Sætter du en delt enhed op til spillestedet?",
   "widgets.band_switcher.add_account": "Tilføj en konto",
   "widgets.band_switcher.add_account_subtitle": "En anden konto med sine egne links, mål og historik.",
   "widgets.band_switcher.discard_body": "Du startede denne konto, men tilføjede ikke en betalingsmetode, så der er intet at beholde. Skifter du væk, slettes den.",

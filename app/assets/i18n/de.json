@@ -528,6 +528,7 @@
   "welcome.tagline": "Dein Live-Trinkgeldglas.",
   "welcome.trust": "Open Source · dein Schlüssel verlässt nie dieses Gerät",
   "welcome.try_demo": "Demo ausprobieren",
+  "welcome.venue_link": "Richtest du ein geteiltes Gerät für den Veranstaltungsort ein?",
   "widgets.band_switcher.add_account": "Konto hinzufügen",
   "widgets.band_switcher.add_account_subtitle": "Ein weiteres Konto mit eigenen Links, Ziel und Verlauf.",
   "widgets.band_switcher.discard_body": "Du hast dieses Konto begonnen, aber keine Zahlungsmethode hinzugefügt, daher gibt es nichts zu behalten. Beim Wechsel wird es gelöscht.",

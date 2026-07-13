@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/app.dart';
 import 'package:live_tips/data/secure_store.dart';
+import 'package:live_tips/domain/device_kind.dart';
+import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
 
 import 'helpers.dart';
@@ -28,12 +30,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Welcome → device kind → details (no install nudge off the web).
+    // Welcome → details: "Get started" claims the device for the performer
+    // (no device-kind question, no install nudge off the web, and no account
+    // step — auth is unavailable in this test). Unavailable auth also means
+    // no venue link: it hides entirely rather than render disabled.
     expect(find.text('Get started'), findsOneWidget);
+    expect(find.text('Setting up a shared venue device?'), findsNothing);
     await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
-    expect(find.text('What is this device?'), findsOneWidget);
-    await tester.tap(find.text('My own device'));
     await tester.pumpAndSettle();
 
     // Step 1: details. Name is required to advance.
@@ -86,10 +89,36 @@ void main() {
 
     await tester.tap(find.text('Get started'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('My own device'));
-    await tester.pumpAndSettle();
 
     final name = tester.widget<TextField>(find.byType(TextField).first);
     expect(name.controller?.text, 'The Midnight Foxes');
+  });
+
+  testWidgets('the quiet venue link on Welcome claims the device for the '
+      'venue and opens the intro', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(600, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final store = await seededStore();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localStoreProvider.overrideWithValue(store),
+          secureStoreProvider.overrideWithValue(FakeSecureStore()),
+          initialApiKeyProvider.overrideWithValue(null),
+          // Cloud accounts on offer — the venue link only exists then.
+          authServiceProvider.overrideWithValue(FakeAuthService()),
+        ],
+        child: const LiveTipsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The link is there but quiet — no card, no icon, just text.
+    await tester.tap(find.text('Setting up a shared venue device?'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('How a shared device works'), findsOneWidget);
+    expect(store.readDeviceKind(), DeviceKind.venue);
   });
 }

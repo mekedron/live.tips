@@ -1,15 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform_support.dart';
 import '../../core/theme.dart';
 import '../../domain/device_kind.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/auth_providers.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../state/venue_providers.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
-import 'device_kind_screen.dart';
+import '../venue/venue_intro_screen.dart';
+import 'account_step_screen.dart';
+import 'onboarding_flow.dart';
 
 /// The first-run pitch — and ONLY that. RootGate shows it when nobody is
 /// signed in and nothing is configured anywhere on this device; every other
@@ -19,9 +25,55 @@ import 'device_kind_screen.dart';
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
+  /// "Get started" — the performer path. This device is the performer's own
+  /// (the overwhelmingly common case), so the old "What is this device?"
+  /// question is answered here implicitly and onboarding continues with the
+  /// account question (when on offer) or the first band step.
+  Future<void> _getStarted(BuildContext context, WidgetRef ref) async {
+    final navigator = Navigator.of(context);
+    // A fresh run: the step counter starts clean.
+    ref.read(onboardingPreludeProvider.notifier).reset();
+    await ref.read(deviceKindProvider.notifier).choose(DeviceKind.performer);
+    if (!context.mounted) return;
+    final offerSignIn = platformSupportsCloudAccounts &&
+        ref.read(authControllerProvider.notifier).available &&
+        ref.read(authControllerProvider).user == null;
+    navigator.push(
+      MaterialPageRoute(
+        builder: (_) => offerSignIn
+            ? const AccountStepScreen()
+            : firstBandSetupScreen(),
+      ),
+    );
+  }
+
+  /// The quiet venue link — a shared device is a different trust decision,
+  /// but it is rare enough that it no longer deserves a full onboarding step.
+  Future<void> _pickVenue(BuildContext context, WidgetRef ref) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final s = context.s;
+    try {
+      await ref.read(deviceKindProvider.notifier).choose(DeviceKind.venue);
+    } catch (_) {
+      // A shared device without its at-rest cipher must not exist (see
+      // DeviceKindNotifier._applyKind) — the choice simply didn't take.
+      messenger.showSnackBar(
+        SnackBar(content: Text(s.t('venue.boot.choose_failed'))),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    navigator.push(
+      MaterialPageRoute(builder: (_) => const VenueIntroScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
+    final venueAvailable = platformSupportsCloudAccounts &&
+        ref.read(authControllerProvider.notifier).available;
     return Scaffold(
       // The language switcher lives top-right from the very first screen, so a
       // fresh user can pick their language before anything else.
@@ -119,21 +171,8 @@ class WelcomeScreen extends ConsumerWidget {
                           LtPrimaryButton(
                             label: context.s.t('welcome.get_started'),
                             trailingIcon: Icons.arrow_forward_rounded,
-                            // The device-kind question comes first — what
-                            // this install IS shapes every step after it.
-                            // The account question (when on offer) follows
-                            // on the performer path.
-                            onPressed: () {
-                              // A fresh run: the step counter starts clean.
-                              ref
-                                  .read(onboardingPreludeProvider.notifier)
-                                  .reset();
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DeviceKindScreen(),
-                                ),
-                              );
-                            },
+                            onPressed: () =>
+                                unawaited(_getStarted(context, ref)),
                           ),
                           const SizedBox(height: 10),
                           OutlinedButton.icon(
@@ -153,6 +192,25 @@ class WelcomeScreen extends ConsumerWidget {
                             ),
                             label: Text(context.s.t('welcome.try_demo')),
                           ),
+                          // The venue path is deliberately quiet: a link for
+                          // the rare person setting up a shared tablet, not a
+                          // choice everyone has to weigh. Hidden entirely
+                          // when venue mode can't exist on this platform.
+                          if (venueAvailable) ...[
+                            const SizedBox(height: 4),
+                            TextButton(
+                              onPressed: () =>
+                                  unawaited(_pickVenue(context, ref)),
+                              child: Text(
+                                context.s.t('welcome.venue_link'),
+                                style: TextStyle(
+                                  fontFamily: kFontBody,
+                                  fontSize: 13,
+                                  color: c.textMuted,
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,

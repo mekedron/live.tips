@@ -528,6 +528,7 @@
   "welcome.tagline": "Il tuo barattolo delle mance dal vivo.",
   "welcome.trust": "Open source · la tua chiave non lascia mai questo dispositivo",
   "welcome.try_demo": "Prova la demo",
+  "welcome.venue_link": "Stai configurando un dispositivo condiviso per il locale?",
   "widgets.band_switcher.add_account": "Aggiungi un account",
   "widgets.band_switcher.add_account_subtitle": "Un altro account con i suoi link, obiettivo e cronologia.",
   "widgets.band_switcher.discard_body": "Hai iniziato questo account ma non hai aggiunto un metodo di pagamento, quindi non c'è nulla da conservare. Passando a un altro lo elimini.",

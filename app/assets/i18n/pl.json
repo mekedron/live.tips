@@ -528,6 +528,7 @@
   "welcome.tagline": "Twój słoik na napiwki na żywo.",
   "welcome.trust": "Open source · Twój klucz nigdy nie opuszcza tego urządzenia",
   "welcome.try_demo": "Wypróbuj demo",
+  "welcome.venue_link": "Konfigurujesz wspólne urządzenie dla lokalu?",
   "widgets.band_switcher.add_account": "Dodaj konto",
   "widgets.band_switcher.add_account_subtitle": "Kolejne konto z własnymi linkami, celem i historią.",
   "widgets.band_switcher.discard_body": "To konto zostało rozpoczęte, ale bez dodanej metody płatności, więc nie ma czego zachować. Przełączenie na inne usuwa je.",
