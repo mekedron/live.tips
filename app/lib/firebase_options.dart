@@ -66,6 +66,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '623278585949',
     projectId: 'livetips-app',
     storageBucket: 'livetips-app.firebasestorage.app',
+    androidClientId: '623278585949-3p9pa5g2d4tpshm03vt92bjma7min498.apps.googleusercontent.com',
+    iosClientId: '623278585949-1cranfn8aua4u43kn66n9c2n8mlptl45.apps.googleusercontent.com',
     iosBundleId: 'tips.live.liveTips',
   );
 
@@ -75,6 +77,9 @@ class DefaultFirebaseOptions {
     messagingSenderId: '623278585949',
     projectId: 'livetips-app',
     storageBucket: 'livetips-app.firebasestorage.app',
+    androidClientId: '623278585949-3p9pa5g2d4tpshm03vt92bjma7min498.apps.googleusercontent.com',
+    iosClientId: '623278585949-1cranfn8aua4u43kn66n9c2n8mlptl45.apps.googleusercontent.com',
     iosBundleId: 'tips.live.liveTips',
   );
+
 }

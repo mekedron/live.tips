@@ -12,7 +12,20 @@
           "package_name": "tips.live.live_tips"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "623278585949-3p9pa5g2d4tpshm03vt92bjma7min498.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "tips.live.live_tips",
+            "certificate_hash": "6504ec63963d8f79eeb2e2ddc8ea7f47ff30d025"
+          }
+        },
+        {
+          "client_id": "623278585949-tplq3j00c9h2enn80ocu22cjngc371sn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDhLRImKreMz3FAGpiTPnY0qWbHVowb1FM"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "623278585949-tplq3j00c9h2enn80ocu22cjngc371sn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "623278585949-1cranfn8aua4u43kn66n9c2n8mlptl45.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "tips.live.liveTips"
+              }
+            }
+          ]
         }
       }
     }

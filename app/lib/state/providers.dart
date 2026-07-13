@@ -175,24 +175,25 @@ class AppState {
 class AppStateNotifier extends Notifier<AppState> {
   @override
   AppState build() {
-    final local = ref.read(localStoreProvider);
+    final repo = ref.read(accountDataRepositoryProvider);
     // main() migrates/creates the registry before runApp; the fallback here
     // covers tests that wire a bare store straight into the ProviderScope.
-    var registry = local.readAccountsRegistry();
-    if (registry == null) {
+    var accounts = repo.listBands();
+    if (accounts.isEmpty) {
       final account = BandAccount(
         id: BandAccount.newId(),
         name: '',
         createdAtMs: DateTime.now().millisecondsSinceEpoch,
       );
-      registry = AccountsRegistry(accounts: [account], activeId: account.id);
-      local.saveAccountsRegistry(registry); // fire-and-forget
+      accounts = [account];
+      repo.upsertBandEntry(account); // fire-and-forget
     }
-    final accountId = registry.activeId;
-    final repo = ref.read(accountDataRepositoryProvider);
+    final activeId = repo.readActiveBandId();
+    final accountId =
+        accounts.any((a) => a.id == activeId) ? activeId! : accounts.first.id;
     return AppState(
       accountId: accountId,
-      accounts: registry.accounts,
+      accounts: accounts,
       apiKey: ref.read(initialApiKeyProvider),
       tipJar: repo.readTipJar(accountId),
       relayJar: repo.readRelayJar(accountId),
@@ -349,7 +350,10 @@ class AppStateNotifier extends Notifier<AppState> {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     final renamed = _registry.withRenamed(accountId, trimmed);
-    await ref.read(localStoreProvider).saveAccountsRegistry(renamed);
+    final entry =
+        renamed.accounts.where((a) => a.id == accountId).firstOrNull;
+    if (entry == null) return;
+    await ref.read(accountDataRepositoryProvider).upsertBandEntry(entry);
     state = state.copyWith(accounts: renamed.accounts);
   }
 
@@ -379,7 +383,6 @@ class AppStateNotifier extends Notifier<AppState> {
     // hijack the next band's setup flow with this band's method choices.
     ref.read(onboardingDraftProvider.notifier).clear();
 
-    final local = ref.read(localStoreProvider);
     final repo = ref.read(accountDataRepositoryProvider);
     String? apiKey;
     String? relaySecret;
@@ -399,7 +402,7 @@ class AppStateNotifier extends Notifier<AppState> {
       return false;
     }
 
-    await local.saveAccountsRegistry(_registry.withActive(id));
+    await repo.saveActiveBandId(id);
     state = AppState(
       accountId: id,
       accounts: state.accounts,
@@ -425,12 +428,13 @@ class AppStateNotifier extends Notifier<AppState> {
       name: '',
       createdAtMs: DateTime.now().millisecondsSinceEpoch,
     );
-    final registry = _registry.withAccount(account).withActive(account.id);
-    await ref.read(localStoreProvider).saveAccountsRegistry(registry);
+    final repo = ref.read(accountDataRepositoryProvider);
+    await repo.upsertBandEntry(account);
+    await repo.saveActiveBandId(account.id);
     ref.read(onboardingDraftProvider.notifier).clear();
     state = AppState(
       accountId: account.id,
-      accounts: registry.accounts,
+      accounts: [...state.accounts, account],
       settings: state.settings,
     );
     return account;
@@ -445,7 +449,6 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(switching: true);
     ref.read(onboardingDraftProvider.notifier).clear();
 
-    final local = ref.read(localStoreProvider);
     final repo = ref.read(accountDataRepositoryProvider);
 
     // Best effort: retire the band's connected-mode jar on the relay so the
@@ -472,6 +475,7 @@ class AppStateNotifier extends Notifier<AppState> {
     }
 
     var registry = _registry.withoutAccount(id);
+    await repo.removeBandEntry(id);
     if (registry.accounts.isEmpty) {
       final fresh = BandAccount(
         id: BandAccount.newId(),
@@ -480,6 +484,7 @@ class AppStateNotifier extends Notifier<AppState> {
       );
       registry =
           AccountsRegistry(accounts: [fresh], activeId: fresh.id);
+      await repo.upsertBandEntry(fresh);
     }
 
     // Load the successor BEFORE wiping, so the UI lands on coherent state.
@@ -497,7 +502,7 @@ class AppStateNotifier extends Notifier<AppState> {
         relaySecret = await repo.readRelaySecret(successorId);
       } catch (_) {}
     }
-    await local.saveAccountsRegistry(registry.withActive(successorId));
+    await repo.saveActiveBandId(successorId);
     state = AppState(
       accountId: successorId,
       accounts: registry.accounts,
@@ -515,7 +520,7 @@ class AppStateNotifier extends Notifier<AppState> {
     } catch (_) {
       // A locked keychain leaves the secrets behind — tombstone them so
       // the boot-time retry deletes them once the keychain cooperates.
-      await local.addPendingSecretWipe(id);
+      await ref.read(localStoreProvider).addPendingSecretWipe(id);
     }
     ref.invalidate(relayHistoryProvider);
     return true;
@@ -568,7 +573,6 @@ class AppStateNotifier extends Notifier<AppState> {
         .isNotEmpty) {
       return;
     }
-    final local = ref.read(localStoreProvider);
     final repo = ref.read(accountDataRepositoryProvider);
     if (repo.accountHasData(id)) return;
     try {
@@ -587,7 +591,7 @@ class AppStateNotifier extends Notifier<AppState> {
       return;
     }
     final pruned = current.withoutAccount(id);
-    await local.saveAccountsRegistry(pruned);
+    await repo.removeBandEntry(id);
     state = state.copyWith(accounts: pruned.accounts);
   }
 

@@ -1,4 +1,5 @@
 import '../../domain/app_settings.dart';
+import '../../domain/band_account.dart';
 import '../../domain/band_settings.dart';
 import '../../domain/live_session.dart';
 import '../../domain/relay_jar.dart';
@@ -20,6 +21,18 @@ import '../secure_store.dart';
 ///   implementation: it exists to survive a crash on THIS device, and two
 ///   devices' in-flight snapshots must never overwrite each other.
 abstract interface class AccountDataRepository {
+  // --- The band list itself ---
+  //
+  // Local profile: the AccountsRegistry in prefs, exactly as always.
+  // Cloud profile: the users/{uid}/bands collection (mirrored in memory),
+  // with the ACTIVE band id kept device-local — which band you're looking
+  // at is a device concern, not synced state.
+  List<BandAccount> listBands();
+  String? readActiveBandId();
+  Future<void> saveActiveBandId(String bandId);
+  Future<void> upsertBandEntry(BandAccount band);
+  Future<void> removeBandEntry(String bandId);
+
   // --- Stripe tip jar ---
   TipJar? readTipJar(String accountId);
   Future<void> saveTipJar(String accountId, TipJar jar);
@@ -87,6 +100,48 @@ class LocalStoreRepository implements AccountDataRepository {
   final SecureStore Function() _resolveSecure;
   SecureStore? _secureCache;
   SecureStore get _secure => _secureCache ??= _resolveSecure();
+
+  AccountsRegistry? get _registry => _local.readAccountsRegistry();
+
+  @override
+  List<BandAccount> listBands() => _registry?.accounts ?? const [];
+
+  @override
+  String? readActiveBandId() => _registry?.activeId;
+
+  @override
+  Future<void> saveActiveBandId(String bandId) async {
+    final registry = _registry;
+    if (registry == null || !registry.contains(bandId)) return;
+    await _local.saveAccountsRegistry(registry.withActive(bandId));
+  }
+
+  @override
+  Future<void> upsertBandEntry(BandAccount band) async {
+    final registry = _registry;
+    if (registry == null) {
+      await _local.saveAccountsRegistry(
+          AccountsRegistry(accounts: [band], activeId: band.id));
+      return;
+    }
+    final next = registry.contains(band.id)
+        ? AccountsRegistry(
+            accounts: [
+              for (final a in registry.accounts)
+                if (a.id == band.id) band else a,
+            ],
+            activeId: registry.activeId,
+          )
+        : registry.withAccount(band);
+    await _local.saveAccountsRegistry(next);
+  }
+
+  @override
+  Future<void> removeBandEntry(String bandId) async {
+    final registry = _registry;
+    if (registry == null) return;
+    await _local.saveAccountsRegistry(registry.withoutAccount(bandId));
+  }
 
   @override
   TipJar? readTipJar(String accountId) => _local.readTipJar(accountId);
