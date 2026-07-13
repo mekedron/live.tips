@@ -9,8 +9,8 @@
 /// verdicts may be logged, payloads and keys never.
 
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import { requireFreshSession } from "./devices";
-import { dataObject, requireUid } from "./jars";
+import { requireFreshSession, requireNonAnonymousUid } from "./devices";
+import { dataObject } from "./jars";
 import { kmsKeyWrapper } from "./kms";
 import { StripeApi, runKeyProbes } from "./stripe-api";
 import { lookupConnection, stripeToHttpsError } from "./stripe-connect";
@@ -24,7 +24,9 @@ import {
 import { bumpQuota, db } from "./store";
 
 export async function stripeProxyHandler(request: CallableRequest): Promise<Record<string, unknown>> {
-  const uid = requireUid(request);
+  // Cloud accounts only, like connect/disconnect: this surface never serves
+  // the anonymous relay-transport identity.
+  const uid = requireNonAnonymousUid(request);
   const data = dataObject(request);
   const bandId = data["bandId"];
   if (!isValidBandId(bandId)) throw new HttpsError("invalid-argument", "bandId is required");

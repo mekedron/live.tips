@@ -103,8 +103,11 @@ import type {
  * 'failed-precondition': an anonymous account minted onto a second device
  * (or with all sessions revoked) has no credential to ever sign in with
  * again, so these operations would be a data-loss footgun for them.
+ * Exported: the cloud-Stripe custody surface is for signed-in cloud accounts
+ * only — a guest uid that sealed a key there could never come back to
+ * disconnect it.
  */
-function requireNonAnonymousUid(request: CallableRequest): string {
+export function requireNonAnonymousUid(request: CallableRequest): string {
   const uid = requireUid(request);
   const provider = request.auth?.token.firebase?.sign_in_provider;
   if (isAnonymousProvider(provider)) {

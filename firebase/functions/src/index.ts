@@ -102,7 +102,8 @@ export const collectLoginToken = onCall(
 
 // ------------------------------------------- cloud Stripe (key custody path)
 //
-// Signed-in cloud accounts only. The artist's restricted key lives here —
+// Signed-in cloud accounts only — every handler enforces it with
+// requireNonAnonymousUid. The artist's restricted key lives here —
 // envelope-encrypted, KMS-wrapped, never on a device — and Stripe pushes
 // tips to the webhook; the app stops polling entirely. The local no-account
 // mode never touches any of these functions: its key stays in the device

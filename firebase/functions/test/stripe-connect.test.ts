@@ -74,6 +74,9 @@ vi.mock("../src/store", () => ({
 
 vi.mock("../src/devices", () => ({
   requireFreshSession: async () => {},
+  // The real anonymous-rejecting guard is pinned in stripe-guards.test.ts;
+  // for the carry-over scenarios it only has to hand the uid back.
+  requireNonAnonymousUid: (request: { auth: { uid: string } }) => request.auth.uid,
 }));
 
 /** A KeyWrapper whose "KMS" is the identity function — the envelope logic

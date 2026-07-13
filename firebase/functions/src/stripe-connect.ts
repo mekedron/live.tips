@@ -12,8 +12,8 @@ import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { defineString } from "firebase-functions/params";
 import { FieldValue } from "firebase-admin/firestore";
 import { newJarId } from "./auth";
-import { requireFreshSession } from "./devices";
-import { dataObject, requireUid } from "./jars";
+import { requireFreshSession, requireNonAnonymousUid } from "./devices";
+import { dataObject } from "./jars";
 import { kmsKeyWrapper } from "./kms";
 import {
   StripeApi,
@@ -128,7 +128,11 @@ async function tryDeleteEndpoint(api: StripeApi, endpointId: string, context: st
 export async function stripeConnectHandler(
   request: CallableRequest,
 ): Promise<{ ok: true; livemode: boolean; checks: PermissionCheck[] }> {
-  const uid = requireUid(request);
+  // Cloud accounts only, as the header promises — enforced, not assumed. An
+  // anonymous (guest) uid is unrecoverable by design: a key it sealed here,
+  // and the live webhook endpoint with it, would be stranded with no
+  // principal that could ever disconnect them.
+  const uid = requireNonAnonymousUid(request);
   const data = dataObject(request);
   const bandId = requireBandId(data);
 
@@ -263,7 +267,8 @@ export async function stripeConnectHandler(
 // stripeDisconnect
 
 export async function stripeDisconnectHandler(request: CallableRequest): Promise<{ ok: true }> {
-  const uid = requireUid(request);
+  // Same guard as connect: the custody surface is cloud accounts only.
+  const uid = requireNonAnonymousUid(request);
   const data = dataObject(request);
   const bandId = requireBandId(data);
   const deactivateLink = data["deactivateLink"] === true;
