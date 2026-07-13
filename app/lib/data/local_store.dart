@@ -7,16 +7,23 @@ import '../domain/app_account.dart';
 import '../domain/app_settings.dart';
 import '../domain/band_account.dart';
 import '../domain/band_settings.dart';
+import '../domain/device_kind.dart';
 import '../domain/tip.dart';
 import '../domain/fx_rates.dart';
 import '../domain/live_session.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
+import 'local_cipher.dart';
 
 /// Non-secret local persistence. Two kinds of keys live here: device-wide
 /// ones (the accounts registry, device settings) and per-band ones — every
 /// band-owned blob (jars, histories, the active session, band settings) is
 /// stored under `<base>_<accountId>`, so bands never see each other's data.
+///
+/// On a VENUE device every string value goes through [LocalCipher] — see the
+/// honesty note there about what that does and does not protect. Ints, bools
+/// and string lists stay plain: they are timestamps, flags and band-id
+/// tombstones, not profile data.
 class LocalStore {
   LocalStore(this._prefs);
 
@@ -24,6 +31,32 @@ class LocalStore {
 
   static Future<LocalStore> init() async =>
       LocalStore(await SharedPreferences.getInstance());
+
+  /// Set on venue devices before anything reads (boot) or right after the
+  /// wipe that entering venue mode performs — so no venue-written value ever
+  /// exists in plaintext. Null everywhere else.
+  LocalCipher? _cipher;
+
+  // ignore: avoid_setters_without_getters — write-only by design: nothing
+  // downstream may branch on whether encryption is on.
+  set cipher(LocalCipher? cipher) => _cipher = cipher;
+
+  String? _getString(String key) {
+    final raw = _prefs.getString(key);
+    if (raw == null) return null;
+    final cipher = _cipher;
+    if (cipher == null) {
+      // An encrypted leftover read without the key is "nothing stored" —
+      // never garbage handed to a JSON parser.
+      return raw.startsWith(LocalCipher.prefix) ? null : raw;
+    }
+    return cipher.decrypt(raw);
+  }
+
+  Future<bool> _setString(String key, String value) {
+    final cipher = _cipher;
+    return _prefs.setString(key, cipher == null ? value : cipher.encrypt(value));
+  }
 
   // Device-wide keys.
   static const kAccounts = 'accounts_v1';
@@ -68,7 +101,7 @@ class LocalStore {
   // --- Accounts registry ---
 
   AccountsRegistry? readAccountsRegistry() {
-    final raw = _prefs.getString(kAccounts);
+    final raw = _getString(kAccounts);
     if (raw == null) return null;
     try {
       final registry = AccountsRegistry.fromJson(
@@ -80,12 +113,12 @@ class LocalStore {
   }
 
   Future<void> saveAccountsRegistry(AccountsRegistry registry) =>
-      _prefs.setString(kAccounts, jsonEncode(registry.toJson()));
+      _setString(kAccounts, jsonEncode(registry.toJson()));
 
   // --- Accounts directory (device profiles: local + signed-in accounts) ---
 
   AccountsDirectory? readAccountsDirectory() {
-    final raw = _prefs.getString(kAccountsDirectory);
+    final raw = _getString(kAccountsDirectory);
     if (raw == null) return null;
     try {
       return AccountsDirectory.fromJson(
@@ -96,7 +129,7 @@ class LocalStore {
   }
 
   Future<void> saveAccountsDirectory(AccountsDirectory directory) =>
-      _prefs.setString(kAccountsDirectory, jsonEncode(directory.toJson()));
+      _setString(kAccountsDirectory, jsonEncode(directory.toJson()));
 
   /// Whether this band has any local data at all — used by the switcher's
   /// garbage collection of abandoned, never-configured bands. Deliberately
@@ -145,14 +178,14 @@ class LocalStore {
   /// else's". setString updates the in-memory cache synchronously, so the
   /// read-back is immediate; only the disk write is deferred.
   String deviceId() {
-    final existing = _prefs.getString(_kDeviceId);
+    final existing = _getString(_kDeviceId);
     if (existing != null) return existing;
     final random = Random.secure();
     final id = 'dev_${List.generate(
       20,
       (_) => random.nextInt(16).toRadixString(16),
     ).join()}';
-    _prefs.setString(_kDeviceId, id);
+    _setString(_kDeviceId, id);
     return id;
   }
 
@@ -165,10 +198,16 @@ class LocalStore {
   static const kActiveCloudBandBase = 'active_band_v1';
 
   String? readActiveCloudBand(String uid) =>
-      _prefs.getString('${kActiveCloudBandBase}_$uid');
+      _getString('${kActiveCloudBandBase}_$uid');
 
   Future<void> saveActiveCloudBand(String uid, String bandId) =>
-      _prefs.setString('${kActiveCloudBandBase}_$uid', bandId);
+      _setString('${kActiveCloudBandBase}_$uid', bandId);
+
+  /// Ending a venue session forgets even WHICH band the artist was on —
+  /// nothing of theirs stays behind on a public device.
+  Future<void> clearActiveCloudBand(String uid) async {
+    await _prefs.remove('${kActiveCloudBandBase}_$uid');
+  }
 
   // --- Pending local→cloud upload ---
   //
@@ -180,7 +219,7 @@ class LocalStore {
   static const _kCloudUploadPending = 'cloud_upload_pending_v1';
 
   ({String uid, List<String> bandIds})? readCloudUploadPending() {
-    final raw = _prefs.getString(_kCloudUploadPending);
+    final raw = _getString(_kCloudUploadPending);
     if (raw == null) return null;
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
@@ -197,7 +236,7 @@ class LocalStore {
   }
 
   Future<void> saveCloudUploadPending(String uid, List<String> bandIds) =>
-      _prefs.setString(
+      _setString(
           _kCloudUploadPending, jsonEncode({'uid': uid, 'bandIds': bandIds}));
 
   Future<void> clearCloudUploadPending() async {
@@ -215,7 +254,7 @@ class LocalStore {
   // --- Tip jar ---
 
   TipJar? readTipJar(String accountId) {
-    final raw = _prefs.getString(accountKey(kTipJarBase, accountId));
+    final raw = _getString(accountKey(kTipJarBase, accountId));
     if (raw == null) return null;
     try {
       return TipJar.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -224,7 +263,7 @@ class LocalStore {
     }
   }
 
-  Future<void> saveTipJar(String accountId, TipJar jar) => _prefs.setString(
+  Future<void> saveTipJar(String accountId, TipJar jar) => _setString(
       accountKey(kTipJarBase, accountId), jsonEncode(jar.toJson()));
 
   Future<void> clearTipJar(String accountId) async {
@@ -234,7 +273,7 @@ class LocalStore {
   // --- Relay jar (connected mode) ---
 
   RelayJar? readRelayJar(String accountId) {
-    final raw = _prefs.getString(accountKey(kRelayJarBase, accountId));
+    final raw = _getString(accountKey(kRelayJarBase, accountId));
     if (raw == null) return null;
     try {
       return RelayJar.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -244,7 +283,7 @@ class LocalStore {
   }
 
   Future<void> saveRelayJar(String accountId, RelayJar jar) =>
-      _prefs.setString(
+      _setString(
           accountKey(kRelayJarBase, accountId), jsonEncode(jar.toJson()));
 
   Future<void> clearRelayJar(String accountId) async {
@@ -264,10 +303,10 @@ class LocalStore {
   /// until the artist dismisses the "please reprint" notice. Null when there
   /// is nothing to warn about.
   String? readRelayLinkReplaced(String accountId) =>
-      _prefs.getString(accountKey(kRelayLinkReplacedBase, accountId));
+      _getString(accountKey(kRelayLinkReplacedBase, accountId));
 
   Future<void> writeRelayLinkReplaced(String accountId, String oldTipUrl) =>
-      _prefs.setString(
+      _setString(
           accountKey(kRelayLinkReplacedBase, accountId), oldTipUrl);
 
   Future<void> clearRelayLinkReplaced(String accountId) =>
@@ -282,7 +321,7 @@ class LocalStore {
   /// session controller filters demo tips out at the write site), so there
   /// is nothing simulated to purge.
   List<Tip> readRelayHistory(String accountId) {
-    final raw = _prefs.getString(accountKey(kRelayHistoryBase, accountId));
+    final raw = _getString(accountKey(kRelayHistoryBase, accountId));
     if (raw == null) return [];
     try {
       return (jsonDecode(raw) as List)
@@ -311,7 +350,7 @@ class LocalStore {
     final capped = merged.length > relayHistoryCap
         ? merged.sublist(0, relayHistoryCap)
         : merged;
-    await _prefs.setString(
+    await _setString(
       accountKey(kRelayHistoryBase, accountId),
       jsonEncode([for (final d in capped) d.toJson()]),
     );
@@ -320,7 +359,7 @@ class LocalStore {
   // --- Device settings ---
 
   AppSettings readSettings() {
-    final raw = _prefs.getString(_kSettings);
+    final raw = _getString(_kSettings);
     if (raw == null) return const AppSettings();
     try {
       return AppSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -330,7 +369,7 @@ class LocalStore {
   }
 
   Future<void> saveSettings(AppSettings settings) =>
-      _prefs.setString(_kSettings, jsonEncode(settings.toJson()));
+      _setString(_kSettings, jsonEncode(settings.toJson()));
 
   // --- Exchange rates (device-wide) ---
   //
@@ -339,7 +378,7 @@ class LocalStore {
   // a session.
 
   FxRates? readFxRates() {
-    final raw = _prefs.getString(_kFxRates);
+    final raw = _getString(_kFxRates);
     if (raw == null) return null;
     try {
       return FxRates.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -349,12 +388,12 @@ class LocalStore {
   }
 
   Future<void> saveFxRates(FxRates rates) =>
-      _prefs.setString(_kFxRates, jsonEncode(rates.toJson()));
+      _setString(_kFxRates, jsonEncode(rates.toJson()));
 
   // --- Band settings ---
 
   BandSettings readBandSettings(String accountId) {
-    final raw = _prefs.getString(accountKey(kBandSettingsBase, accountId));
+    final raw = _getString(accountKey(kBandSettingsBase, accountId));
     if (raw == null) return const BandSettings();
     try {
       return BandSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -364,13 +403,13 @@ class LocalStore {
   }
 
   Future<void> saveBandSettings(String accountId, BandSettings band) =>
-      _prefs.setString(
+      _setString(
           accountKey(kBandSettingsBase, accountId), jsonEncode(band.toJson()));
 
   // --- Session history ---
 
   List<LiveSession> readSessionHistory(String accountId) {
-    final raw = _prefs.getString(accountKey(kHistoryBase, accountId));
+    final raw = _getString(accountKey(kHistoryBase, accountId));
     if (raw == null) return [];
     try {
       return (jsonDecode(raw) as List)
@@ -384,7 +423,7 @@ class LocalStore {
   Future<void> appendSessionToHistory(
       String accountId, LiveSession session) async {
     final history = readSessionHistory(accountId)..add(session);
-    await _prefs.setString(
+    await _setString(
       accountKey(kHistoryBase, accountId),
       jsonEncode(history.map((s) => s.toJson()).toList()),
     );
@@ -393,7 +432,7 @@ class LocalStore {
   // --- Active session (crash recovery) ---
 
   LiveSession? readActiveSession(String accountId) {
-    final raw = _prefs.getString(accountKey(kActiveSessionBase, accountId));
+    final raw = _getString(accountKey(kActiveSessionBase, accountId));
     if (raw == null) return null;
     try {
       return LiveSession.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -403,16 +442,16 @@ class LocalStore {
   }
 
   String? readActiveCursor(String accountId) =>
-      _prefs.getString(accountKey(kActiveCursorBase, accountId));
+      _getString(accountKey(kActiveCursorBase, accountId));
 
   Future<void> saveActiveSession(
       String accountId, LiveSession session, String? cursor) async {
-    await _prefs.setString(
+    await _setString(
       accountKey(kActiveSessionBase, accountId),
       jsonEncode(session.toJson()),
     );
     if (cursor != null) {
-      await _prefs.setString(accountKey(kActiveCursorBase, accountId), cursor);
+      await _setString(accountKey(kActiveCursorBase, accountId), cursor);
     }
   }
 
@@ -440,7 +479,7 @@ class LocalStore {
     // which keeps the abandoned-band garbage collection from ever firing.
     if (real.length != all.length ||
         _prefs.containsKey(accountKey(kHistoryBase, accountId))) {
-      await _prefs.setString(
+      await _setString(
         accountKey(kHistoryBase, accountId),
         jsonEncode(real.map((s) => s.toJson()).toList()),
       );
@@ -448,6 +487,73 @@ class LocalStore {
     final active = readActiveSession(accountId);
     if (active != null && _isSimulated(active)) {
       await clearActiveSession(accountId);
+    }
+  }
+
+  // --- Device kind (performer / venue / demo) ---
+  //
+  // Raw prefs on purpose, never the cipher helpers: the kind decides WHETHER
+  // the cipher attaches, so it must be readable before one exists — and it is
+  // the one value that means nothing to an attacker anyway.
+
+  static const kDeviceKind = 'device_kind_v1';
+
+  DeviceKind? readDeviceKind() =>
+      deviceKindFromName(_prefs.getString(kDeviceKind));
+
+  Future<void> saveDeviceKind(DeviceKind kind) =>
+      _prefs.setString(kDeviceKind, kind.name);
+
+  Future<void> clearDeviceKind() async {
+    await _prefs.remove(kDeviceKind);
+  }
+
+  // --- Venue session (the shared tablet's current artist) ---
+
+  static const _kVenueSession = 'venue_session_v1';
+
+  VenueSession? readVenueSession() {
+    final raw = _getString(_kVenueSession);
+    if (raw == null) return null;
+    try {
+      return VenueSession.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Persisted the moment the session starts, deadline included, so a
+  /// restart can only ever HONOUR the 12-hour ceiling — never extend it.
+  Future<void> saveVenueSession(VenueSession session) =>
+      _setString(_kVenueSession, jsonEncode(session.toJson()));
+
+  Future<void> clearVenueSession() async {
+    await _prefs.remove(_kVenueSession);
+  }
+
+  // --- Account session slots (uid → FirebaseApp name) ---
+  //
+  // Which per-account FirebaseApp instances to revive at boot. The uid can't
+  // be the app name itself: a sign-in needs an app BEFORE the uid is known,
+  // so apps are named by slot and the mapping is recorded on success.
+
+  static const _kAccountSessionSlots = 'account_session_slots_v1';
+
+  Map<String, String> readAccountSessionSlots() {
+    final raw = _getString(_kAccountSessionSlots);
+    if (raw == null) return const {};
+    try {
+      return Map<String, String>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<void> saveAccountSessionSlots(Map<String, String> slots) async {
+    if (slots.isEmpty) {
+      await _prefs.remove(_kAccountSessionSlots);
+    } else {
+      await _setString(_kAccountSessionSlots, jsonEncode(slots));
     }
   }
 

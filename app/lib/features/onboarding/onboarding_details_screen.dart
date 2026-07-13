@@ -104,8 +104,14 @@ class _OnboardingDetailsScreenState
     final c = context.lt;
     // Methods aren't picked yet at this step — fall back to the minimum
     // flow length (details + methods + one method step), same estimate
-    // the method-select screen uses before anything is checked.
-    final total = ref.watch(onboardingDraftProvider)?.totalSteps ?? 3;
+    // the method-select screen uses before anything is checked. The account
+    // steps that ran before this (the prelude) count too: they were steps
+    // the user walked through, and a counter that forgot them read like the
+    // app lost track.
+    final prelude = ref.watch(onboardingPreludeProvider);
+    final total =
+        prelude + (ref.watch(onboardingDraftProvider)?.totalSteps ?? 3);
+    final step = prelude + 1;
     return Scaffold(
       appBar: AppBar(
         title: Text(context.s.t('onboarding.details.title')),
@@ -114,7 +120,8 @@ class _OnboardingDetailsScreenState
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: LtPill(
-                label: context.s.t('onboarding.details.step_pill', {
+                label: context.s.t('onboarding.details.step_pill_n', {
+                  'step': step,
                   'total': total,
                 }),
               ),
@@ -128,7 +135,7 @@ class _OnboardingDetailsScreenState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
-              LtProgressSegments(total: total, filled: 1),
+              LtProgressSegments(total: total, filled: step),
               const SizedBox(height: 16),
               Text(
                 context.s.t('onboarding.details.heading'),

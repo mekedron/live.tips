@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -10,11 +11,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/platform_support.dart';
 import 'data/cloud_migrator.dart';
+import 'data/firebase/account_sessions.dart';
 import 'data/firebase/auth_domain.dart';
+import 'data/local_cipher.dart';
 import 'data/local_store.dart';
 import 'data/migrations.dart';
 import 'data/secure_store.dart';
 import 'domain/app_account.dart';
+import 'domain/device_kind.dart';
 import 'firebase_options.dart';
 import 'l10n/app_locale.dart';
 import 'l10n/app_localizations.dart';
@@ -40,18 +44,40 @@ Future<void> main() async {
   final localStore = await LocalStore.init();
   final secureStore = SecureStore();
 
+  // The venue cipher attaches BEFORE any typed read: on a venue install
+  // every stored string is an envelope, and reading around the cipher would
+  // hand ciphertext to the JSON parsers. The kind key itself is plaintext by
+  // design (see LocalStore.readDeviceKind).
+  final deviceKind = localStore.readDeviceKind();
+  if (deviceKind == DeviceKind.venue) {
+    try {
+      var cipherKey = await secureStore.readLocalCipherKey();
+      if (cipherKey == null) {
+        cipherKey = LocalCipher.newRootKey();
+        await secureStore.writeLocalCipherKey(cipherKey);
+      }
+      localStore.cipher = LocalCipher(cipherKey);
+    } catch (e) {
+      // Locked keychain: run unencrypted this boot (encrypted values read as
+      // absent). The ceiling and end-of-session wipes still hold.
+      debugPrint('venue cipher unavailable this boot: $e');
+    }
+  }
+
   // Cloud accounts are strictly additive: a failed Firebase boot (or an
-  // unsupported platform) leaves both handles null and the app runs local
-  // mode exactly as it always has.
+  // unsupported platform) leaves the sessions service refusing everything
+  // and the app runs local mode exactly as it always has.
   FirebaseAuth? firebaseAuth;
   FirebaseFirestore? firestore;
+  FirebaseOptions? firebaseOptions;
   if (platformSupportsCloudAccounts) {
     try {
       // The OAuth handler runs on our own domain (auth.live.tips), not on
       // livetips-app.firebaseapp.com — see data/firebase/auth_domain.dart for
       // why the domain is layered on here instead of in the generated options.
-      await Firebase.initializeApp(
-          options: withCustomAuthDomain(DefaultFirebaseOptions.currentPlatform));
+      firebaseOptions =
+          withCustomAuthDomain(DefaultFirebaseOptions.currentPlatform);
+      await Firebase.initializeApp(options: firebaseOptions);
       firebaseAuth = FirebaseAuth.instance;
       applyCustomAuthDomain(firebaseAuth);
       firestore = FirebaseFirestore.instance;
@@ -59,6 +85,25 @@ Future<void> main() async {
       debugPrint('firebase unavailable, running local-only: $e');
     }
   }
+
+  // One FirebaseApp per signed-in account (see AccountSessions). The default
+  // app stays the relay's transport home; restore() revives every persisted
+  // slot so switching accounts after this needs no re-auth.
+  final sessions = firebaseAuth == null
+      ? AccountSessions.unavailable()
+      : AccountSessions(
+          options: firebaseOptions,
+          defaultHandles: SessionHandles(
+            auth: firebaseAuth,
+            firestore: firestore,
+            functionsFor: (region) =>
+                FirebaseFunctions.instanceFor(region: region),
+          ),
+          readSlots: localStore.readAccountSessionSlots,
+          saveSlots: localStore.saveAccountSessionSlots,
+        );
+  sessions.disableFirestorePersistence = deviceKind == DeviceKind.venue;
+  await sessions.restore();
 
   // Warm the active locale's string table before the first frame so the UI
   // opens already translated (the saved language, else the device language,
@@ -89,16 +134,28 @@ Future<void> main() async {
   final registry = await ensureAccountsRegistry(localStore);
   var activeId = registry.activeId;
 
-  // A cloud profile can only be active while its Firebase user is the one
-  // signed in — a signed-out or switched session falls back to the local
-  // profile rather than showing another account's cache.
+  // Installs from before per-account apps have their one session on the
+  // DEFAULT app; adopt it so it keeps working without a re-auth. The
+  // directory is the discriminator: the relay's transport-anonymous uid is
+  // never in it, so it can never be adopted as an account.
   final directory = localStore.readAccountsDirectory();
-  final currentUid = firebaseAuth?.currentUser?.uid;
+  final defaultUid = firebaseAuth?.currentUser?.uid;
+  if (defaultUid != null &&
+      (directory?.contains(defaultUid) ?? false) &&
+      !sessions.isAlive(defaultUid)) {
+    await sessions.adoptDefault(defaultUid);
+  }
+
+  // A cloud profile can only be active while its session is alive on this
+  // device — a signed-out or dead session falls back to the local profile
+  // rather than showing another account's cache.
   if (directory != null && directory.activeAccountId != kLocalAccountId) {
-    if (currentUid == directory.activeAccountId) {
+    if (sessions.isAlive(directory.activeAccountId)) {
       // The keychain secrets below must belong to the CLOUD profile's
       // active band, not the local registry's.
-      activeId = localStore.readActiveCloudBand(currentUid!) ?? activeId;
+      activeId =
+          localStore.readActiveCloudBand(directory.activeAccountId) ??
+              activeId;
     } else {
       await localStore
           .saveAccountsDirectory(directory.withActive(kLocalAccountId));
@@ -108,11 +165,13 @@ Future<void> main() async {
   // A local→cloud upload that crashed mid-flight resumes before the UI
   // needs the bands; for a different (or signed-out) user the migrator
   // clears the stale flag itself on its next run.
-  if (firestore != null && currentUid != null) {
-    final migrator = CloudMigrator(
-        local: localStore, secure: secureStore, db: firestore);
-    if (migrator.hasPendingUpload) {
-      unawaited(migrator.uploadLocalBands(currentUid));
+  final pendingUpload = localStore.readCloudUploadPending();
+  if (pendingUpload != null) {
+    final db = sessions.sessionFor(pendingUpload.uid)?.firestore ?? firestore;
+    if (db != null && sessions.isAlive(pendingUpload.uid)) {
+      final migrator =
+          CloudMigrator(local: localStore, secure: secureStore, db: db);
+      unawaited(migrator.uploadLocalBands(pendingUpload.uid));
     }
   }
 
@@ -156,8 +215,7 @@ Future<void> main() async {
         secureStoreProvider.overrideWithValue(secureStore),
         initialApiKeyProvider.overrideWithValue(apiKey),
         initialRelaySecretProvider.overrideWithValue(relaySecret),
-        firebaseAuthProvider.overrideWithValue(firebaseAuth),
-        firestoreProvider.overrideWithValue(firestore),
+        accountSessionsProvider.overrideWithValue(sessions),
         bootLinkUrlProvider.overrideWithValue(bootUrl),
       ],
       child: const LiveTipsApp(),

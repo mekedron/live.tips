@@ -42,9 +42,12 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final nonStripe = _selected.any(TipMethod.relayMethods.contains);
-    // The pill previews the flow length for the current selection: details +
-    // this step + one per chosen method.
-    final total = 2 + (_selected.isEmpty ? 1 : _selected.length);
+    // The pill previews the flow length for the current selection: any
+    // account steps already walked (the prelude) + details + this step +
+    // one per chosen method.
+    final prelude = ref.watch(onboardingPreludeProvider);
+    final total = prelude + 2 + (_selected.isEmpty ? 1 : _selected.length);
+    final step = prelude + 2;
 
     return Scaffold(
       appBar: AppBar(
@@ -54,7 +57,8 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: LtPill(
-                label: context.s.t('onboarding.method_select.step_pill', {
+                label: context.s.t('onboarding.method_select.step_pill_n', {
+                  'step': step,
                   'total': total,
                 }),
               ),
@@ -68,7 +72,7 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
-              LtProgressSegments(total: total, filled: 2),
+              LtProgressSegments(total: total, filled: step),
               const SizedBox(height: 16),
               Text(
                 context.s.t('onboarding.method_select.heading'),

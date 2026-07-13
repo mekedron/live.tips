@@ -113,8 +113,10 @@ class _OnboardingMethodScreenState
   Widget build(BuildContext context) {
     final c = context.lt;
     final draft = ref.watch(onboardingDraftProvider);
-    final step = draft?.stepOfMethod(widget.method);
-    final total = draft?.totalSteps;
+    final prelude = ref.watch(onboardingPreludeProvider);
+    final step =
+        draft == null ? null : prelude + draft.stepOfMethod(widget.method);
+    final total = draft == null ? null : prelude + draft.totalSteps;
     final linkHint = relayMethodHint(widget.method);
 
     return Scaffold(

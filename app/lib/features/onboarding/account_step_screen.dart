@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../data/firebase/auth_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
+import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
 import 'account_name_screen.dart';
 import 'onboarding_flow.dart';
@@ -37,7 +38,14 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
       final canSignIn = platformSupportsCloudAccounts &&
           ref.read(authControllerProvider.notifier).available;
       final signedIn = ref.read(authControllerProvider).user != null;
-      if (!canSignIn || signedIn) _replaceWithSetup();
+      if (!canSignIn || signedIn) {
+        _replaceWithSetup();
+        return;
+      }
+      // Only a screen the user actually sees counts in the step indicator —
+      // marking before the auto-skip decision would inflate every flow that
+      // never showed this question.
+      ref.read(onboardingPreludeProvider.notifier).markAccountStep();
     });
   }
 
@@ -80,14 +88,37 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final auth = ref.watch(authControllerProvider);
+    // This screen is step 1 of the run; the total previews the shortest
+    // remaining flow (details + methods + one method), growing as later
+    // steps reveal themselves — it never shrinks on the way Back.
+    final prelude = ref.watch(onboardingPreludeProvider);
+    final total = (prelude < 1 ? 1 : prelude) +
+        (ref.watch(onboardingDraftProvider)?.totalSteps ?? 3);
     return Scaffold(
-      appBar: AppBar(title: Text(context.s.t('onboarding.account_step.title'))),
+      appBar: AppBar(
+        title: Text(context.s.t('onboarding.account_step.title')),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: LtPill(
+                label: context.s.t('onboarding.account_step.step_pill', {
+                  'step': 1,
+                  'total': total,
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
+              LtProgressSegments(total: total, filled: 1),
+              const SizedBox(height: 16),
               Text(
                 context.s.t('onboarding.account_step.heading'),
                 style: outfitStyle(22, c.text, weight: FontWeight.w800),

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'dart:async';
+
 import 'core/theme.dart';
 import 'domain/app_settings.dart';
+import 'domain/device_kind.dart';
 import 'features/account/cloud_upload_offer.dart';
 import 'features/account/deep_link_gate.dart';
 import 'features/account/device_session_guard.dart';
@@ -11,11 +14,14 @@ import 'features/live/stage/stage_overlay.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
 import 'features/shell/app_shell.dart';
+import 'features/venue/venue_banner.dart';
+import 'features/venue/venue_gate.dart';
 import 'l10n/app_locale.dart';
 import 'l10n/app_localizations.dart';
 import 'state/providers.dart';
 import 'state/route_depth.dart';
 import 'state/seen_ping.dart';
+import 'state/venue_providers.dart';
 
 class LiveTipsApp extends ConsumerWidget {
   const LiveTipsApp({super.key});
@@ -59,6 +65,11 @@ class LiveTipsApp extends ConsumerWidget {
         StageOverlayObserver(),
         ref.read(routeDepthObserverProvider),
       ],
+      // Above the navigator on purpose: the venue banner must survive every
+      // pushed route — no screen on a public device may cover "whose account
+      // is this" or "End session".
+      builder: (context, child) =>
+          VenueBannerHost(child: child ?? const SizedBox.shrink()),
       // The keep-alive pings the relay on launch/resume (≤ once a day) so a
       // connected-mode jar never expires under an active artist. The upload
       // gate offers to move local bands into a freshly signed-in account. The
@@ -95,7 +106,19 @@ class RootGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The install's kind gates everything: a venue tablet routes through
+    // VenueGate whatever any account is doing, and a demo install re-enters
+    // demo on boot (the demo flag itself is in-memory only).
+    final kind = ref.watch(deviceKindProvider);
+    if (kind == DeviceKind.venue) return const VenueGate();
     final app = ref.watch(appStateProvider);
+    if (kind == DeviceKind.demo && !app.demo) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(
+            Future(() => ref.read(appStateProvider.notifier).enterDemo()));
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final setUp = ref.watch(deviceIsSetUpProvider);
     final screen = !setUp
         ? const WelcomeScreen()

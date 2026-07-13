@@ -48,6 +48,22 @@ class SecureStore {
     await deleteRelaySecret(accountId);
   }
 
+  // --- Venue at-rest encryption key ---
+  //
+  // The root key for the venue device's prefs cipher (see LocalCipher for the
+  // honest account of what it protects). Device-scoped, not per-band: it
+  // guards the prefs FILE, and there is one of those.
+
+  static const kLocalCipherKey = 'venue_local_cipher_key_v1';
+
+  Future<String?> readLocalCipherKey() => _storage.read(key: kLocalCipherKey);
+
+  Future<void> writeLocalCipherKey(String keyBase64) =>
+      _storage.write(key: kLocalCipherKey, value: keyBase64);
+
+  Future<void> deleteLocalCipherKey() =>
+      _storage.delete(key: kLocalCipherKey);
+
   // --- Pre-multi-band slots (unsuffixed) — the boot migration's territory ---
 
   Future<String?> readLegacyApiKey() => _storage.read(key: kApiKeyBase);

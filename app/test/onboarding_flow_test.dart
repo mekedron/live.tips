@@ -28,9 +28,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Welcome → details (no install nudge off the web).
+    // Welcome → device kind → details (no install nudge off the web).
     expect(find.text('Get started'), findsOneWidget);
     await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+    expect(find.text('What is this device?'), findsOneWidget);
+    await tester.tap(find.text('My own device'));
     await tester.pumpAndSettle();
 
     // Step 1: details. Name is required to advance.
@@ -82,6 +85,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('My own device'));
     await tester.pumpAndSettle();
 
     final name = tester.widget<TextField>(find.byType(TextField).first);

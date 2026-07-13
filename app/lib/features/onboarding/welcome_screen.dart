@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/platform_support.dart';
 import '../../core/theme.dart';
+import '../../domain/device_kind.dart';
 import '../../l10n/app_localizations.dart';
-import '../../state/auth_providers.dart';
+import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
+import '../../state/venue_providers.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
-import 'account_step_screen.dart';
-import 'onboarding_flow.dart';
+import 'device_kind_screen.dart';
 
 /// The first-run pitch — and ONLY that. RootGate shows it when nobody is
 /// signed in and nothing is configured anywhere on this device; every other
@@ -119,31 +119,33 @@ class WelcomeScreen extends ConsumerWidget {
                           LtPrimaryButton(
                             label: context.s.t('welcome.get_started'),
                             trailingIcon: Icons.arrow_forward_rounded,
-                            // The account question comes first when this build
-                            // can host cloud accounts, Firebase is up and
-                            // nobody is signed in yet. Otherwise it's today's
-                            // local flow, untouched: the one-time "Add to Home
-                            // Screen" nudge on phone/tablet browsers, straight
-                            // to the details step everywhere else.
+                            // The device-kind question comes first — what
+                            // this install IS shapes every step after it.
+                            // The account question (when on offer) follows
+                            // on the performer path.
                             onPressed: () {
-                              final offerSignIn = platformSupportsCloudAccounts &&
-                                  ref
-                                      .read(authControllerProvider.notifier)
-                                      .available &&
-                                  ref.read(authControllerProvider).user == null;
+                              // A fresh run: the step counter starts clean.
+                              ref
+                                  .read(onboardingPreludeProvider.notifier)
+                                  .reset();
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => offerSignIn
-                                      ? const AccountStepScreen()
-                                      : firstBandSetupScreen(),
+                                  builder: (_) => const DeviceKindScreen(),
                                 ),
                               );
                             },
                           ),
                           const SizedBox(height: 10),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                ref.read(appStateProvider.notifier).enterDemo(),
+                            // Demo from Welcome is the same choice as the
+                            // demo card on the kind step — record it so the
+                            // Settings row can say what this device is.
+                            onPressed: () {
+                              ref
+                                  .read(deviceKindProvider.notifier)
+                                  .choose(DeviceKind.demo);
+                              ref.read(appStateProvider.notifier).enterDemo();
+                            },
                             icon: Icon(
                               Icons.play_circle_outline_rounded,
                               size: 20,

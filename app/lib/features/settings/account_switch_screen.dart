@@ -22,10 +22,10 @@ class AccountSwitchScreen extends ConsumerWidget {
   const AccountSwitchScreen({super.key});
 
   /// Switching the active profile is a DIRECTORY flip — it never ends a
-  /// session. An account whose Firebase session is still the live one
-  /// (typically the one we just switched away from) is re-entered by flipping
-  /// back to it; only an account with no session left needs its provider's
-  /// sign-in run again, and on success the auth controller adopts the user.
+  /// session. Every account whose own FirebaseApp session is alive (see
+  /// AccountSessions) is one tap away, no re-auth; only an account whose
+  /// session is gone needs its provider's sign-in run again, and on success
+  /// the auth controller adopts the user.
   Future<void> _switchTo(
     BuildContext context,
     WidgetRef ref,
@@ -33,7 +33,10 @@ class AccountSwitchScreen extends ConsumerWidget {
   ) async {
     final navigator = Navigator.of(context);
     final liveUid = ref.read(authControllerProvider).user?.uid;
-    if (account.isLocal || account.id == liveUid) {
+    final sessions = ref.read(accountSessionsProvider);
+    if (account.isLocal ||
+        account.id == liveUid ||
+        sessions.isAlive(account.id)) {
       await ref.read(accountsDirectoryProvider.notifier).setActive(account.id);
       if (context.mounted) navigator.pop();
       return;
@@ -98,8 +101,10 @@ class AccountSwitchScreen extends ConsumerWidget {
     final auth = ref.watch(authControllerProvider);
     final canSignIn = platformSupportsCloudAccounts &&
         ref.read(authControllerProvider.notifier).available;
-    // The account whose Firebase session is alive right now — switching
-    // profiles doesn't drop it, so it stays reachable without a re-auth.
+    // Sessions live in their own FirebaseApp instances — every one of them
+    // stays reachable without a re-auth, not just the one in the foreground.
+    final sessions = ref.watch(accountSessionsProvider);
+    ref.watch(accountSessionsChangesProvider);
     final liveUid = auth.user?.uid;
 
     return Scaffold(
@@ -127,16 +132,20 @@ class AccountSwitchScreen extends ConsumerWidget {
                   // A live session is re-entered by a directory flip, whatever
                   // the provider. Without one, Apple/Google sign in again —
                   // and a guest account, having no credential, cannot.
+                  sessionAlive: account.id == liveUid ||
+                      sessions.isAlive(account.id),
                   enabled: !auth.busy &&
                       (account.isLocal ||
                           account.id == liveUid ||
+                          sessions.isAlive(account.id) ||
                           (canSignIn &&
                               account.kind != AccountKind.anonymous)),
                   // The only unreachable account there is: a guest whose
                   // session is gone. Offer to forget it rather than keep a
                   // dead row around forever.
                   onForget: account.kind == AccountKind.anonymous &&
-                          account.id != liveUid
+                          account.id != liveUid &&
+                          !sessions.isAlive(account.id)
                       ? () => _confirmForget(context, ref, account)
                       : null,
                   onTap: () => _switchTo(context, ref, account),
@@ -178,6 +187,7 @@ class _AccountRow extends StatelessWidget {
     required this.active,
     required this.enabled,
     required this.onTap,
+    this.sessionAlive = false,
     this.onForget,
   });
 
@@ -186,7 +196,10 @@ class _AccountRow extends StatelessWidget {
   final bool enabled;
   final VoidCallback onTap;
 
-  /// Set only for an account this device can never enter again.
+  /// Whether this account's own session is alive on the device — one tap
+  /// re-enters it; a dead session means the provider sign-in runs again.
+  final bool sessionAlive;
+
   final VoidCallback? onForget;
 
   @override
@@ -197,7 +210,12 @@ class _AccountRow extends StatelessWidget {
         ? context.s.t('settings.account.switch_current')
         : onForget != null
             ? context.s.t('widgets.account_switcher.anonymous_locked')
-            : (account.email ?? accountProviderLabel(context, account.kind));
+            : account.isLocal
+                ? (account.email ??
+                    accountProviderLabel(context, account.kind))
+                : sessionAlive
+                    ? context.s.t('settings.account.session_alive')
+                    : context.s.t('settings.account.session_gone');
     return Material(
       color: active ? c.accentSoft : Colors.transparent,
       borderRadius: BorderRadius.circular(14),

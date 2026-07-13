@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
@@ -88,11 +89,17 @@ class SetupHomeScreen extends ConsumerWidget {
                       trailingIcon: Icons.arrow_forward_rounded,
                       // The same onboarding the switcher's "Add a profile"
                       // runs: details, then method select, then each method.
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const OnboardingDetailsScreen(),
-                        ),
-                      ),
+                      // A band-only run — no account steps in its counter.
+                      onPressed: () {
+                        ref
+                            .read(onboardingPreludeProvider.notifier)
+                            .reset();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const OnboardingDetailsScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

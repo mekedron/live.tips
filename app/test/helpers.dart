@@ -81,6 +81,24 @@ class FakeSecureStore extends SecureStore {
   }
 
   @override
+  Future<String?> readLocalCipherKey() async {
+    _check();
+    return values[SecureStore.kLocalCipherKey];
+  }
+
+  @override
+  Future<void> writeLocalCipherKey(String keyBase64) async {
+    _check();
+    values[SecureStore.kLocalCipherKey] = keyBase64;
+  }
+
+  @override
+  Future<void> deleteLocalCipherKey() async {
+    _check();
+    values.remove(SecureStore.kLocalCipherKey);
+  }
+
+  @override
   Future<String?> readLegacyApiKey() async {
     _check();
     return values[SecureStore.kApiKeyBase];
@@ -145,6 +163,9 @@ class FakeAuthService extends AuthService {
 
   @override
   Future<AuthUser?> signInWithGoogle({bool link = false}) => _signIn();
+
+  @override
+  Future<AuthUser?> signInWithCustomToken(String token) => _signIn();
 
   @override
   Future<void> updateDisplayName(String name) async {

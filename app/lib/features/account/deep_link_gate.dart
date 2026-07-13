@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/device_kind.dart';
 import '../../state/device_providers.dart';
+import '../../state/venue_providers.dart';
 import '../settings/scan_device_screen.dart';
 
 /// Invisible root widget that turns a universal link
@@ -33,6 +35,11 @@ class _DeepLinkGateState extends ConsumerState<DeepLinkGate> {
   }
 
   void _openRedeem(String code) {
+    // Not on a venue device: its ONE way in is the venue sign-in screen,
+    // with the identity check and the 12-hour clock behind it. A deep link
+    // that signed in around that ceremony would put an account on a public
+    // tablet with no ceiling and no banner.
+    if (ref.read(deviceKindProvider) == DeviceKind.venue) return;
     if (_redeeming) return;
     _redeeming = true;
     Navigator.of(context)

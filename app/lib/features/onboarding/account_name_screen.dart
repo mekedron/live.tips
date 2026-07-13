@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
+import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
 import 'onboarding_flow.dart';
 
@@ -47,6 +48,14 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
           ? entry.name
           : (user?.displayName ?? ''),
     );
+    // As an onboarding step this counts in the indicator; the Settings
+    // rename is the same screen but not a step of anything.
+    if (!widget.rename) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(onboardingPreludeProvider.notifier).markNameStep();
+      });
+    }
   }
 
   @override
@@ -82,11 +91,31 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final rename = widget.rename;
+    // Step 2 of the run (after the account question). The prelude may not
+    // have caught up with this screen on the first frame — count it as if
+    // it had, so the pill never dips below what the previous screen showed.
+    final prelude = ref.watch(onboardingPreludeProvider);
+    final total = (prelude < 2 ? 2 : prelude) +
+        (ref.watch(onboardingDraftProvider)?.totalSteps ?? 3);
     return Scaffold(
       appBar: AppBar(
         title: Text(context.s.t(rename
             ? 'settings.account.rename_title'
             : 'onboarding.account_name.title')),
+        actions: [
+          if (!rename)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: LtPill(
+                  label: context.s.t('onboarding.account_name.step_pill', {
+                    'step': 2,
+                    'total': total,
+                  }),
+                ),
+              ),
+            ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -94,6 +123,10 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
+              if (!rename) ...[
+                LtProgressSegments(total: total, filled: 2),
+                const SizedBox(height: 16),
+              ],
               Text(
                 context.s.t(rename
                     ? 'settings.account.rename_heading'

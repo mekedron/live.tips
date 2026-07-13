@@ -157,10 +157,12 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
     // buried below the fold; wide layouts keep the full card visible.
     final wide = MediaQuery.sizeOf(context).width >= kRailBreakpoint;
     // Step numbering follows the onboarding draft (Stripe is a per-method
-    // step); standalone opens fall back to a sensible count.
+    // step) plus any account steps walked before it; standalone opens fall
+    // back to a sensible count.
     final draft = ref.watch(onboardingDraftProvider);
-    final step = draft?.stepOfMethod(TipMethod.stripe) ?? 3;
-    final total = draft?.totalSteps ?? 3;
+    final prelude = ref.watch(onboardingPreludeProvider);
+    final step = prelude + (draft?.stepOfMethod(TipMethod.stripe) ?? 3);
+    final total = prelude + (draft?.totalSteps ?? 3);
 
     return Scaffold(
       appBar: AppBar(

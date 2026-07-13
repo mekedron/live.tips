@@ -242,6 +242,47 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
               color: c.textSecondary,
             ),
           ),
+          const SizedBox(height: 14),
+          // This tap is the ONLY thing between that device and the whole
+          // account — and the name above is whatever the device claims to
+          // be. Say both plainly, especially for a tablet the artist does
+          // not own; do not soften it.
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: c.warningContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 18, color: c.warning),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        s.t('settings.add_device.claimed_unverified'),
+                        style: outfitStyle(12.5, c.text,
+                            weight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  s.t('settings.add_device.claimed_risk'),
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 12.5,
+                    height: 1.45,
+                    color: c.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 18),
           LtPrimaryButton(
             label: s.t('settings.add_device.confirm'),

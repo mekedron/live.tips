@@ -7,16 +7,19 @@ import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
 import '../../domain/app_account.dart';
 import '../../domain/app_settings.dart';
+import '../../domain/device_kind.dart';
 import '../../domain/tip_method.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
+import '../../state/venue_providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/sign_in_sheet.dart';
 import '../shell/app_shell.dart';
 import '../onboarding/account_name_screen.dart';
+import '../venue/venue_reapproval_screen.dart';
 import 'account_details_screen.dart';
 import 'account_switch_screen.dart';
 import 'relay_method_screen.dart';
@@ -47,6 +50,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       id.length <= 12 ? id : '${id.substring(0, 8)}…';
 
   Future<void> _confirmRemoveBand() async {
+    // On a venue device, destroying a profile is an account-level act — it
+    // needs the same fresh phone approval as switching one.
+    if (!await ensureVenueReapproval(context, ref)) return;
+    if (!mounted) return;
     final s = context.s;
     final app = ref.read(appStateProvider);
     // A refusal always names itself — and it asks the same guard add/switch
@@ -159,6 +166,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  /// Changing what this device is wipes it — the dialog says exactly that,
+  /// because there is no half-way: data written under one trust model must
+  /// not be inherited by another.
+  Future<void> _confirmChangeDeviceKind() async {
+    final s = context.s;
+    final block = ref.read(appStateProvider.notifier).accountActionBlock;
+    if (block != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(block == AccountActionBlock.switching
+              ? s.t('widgets.band_switcher.switching')
+              : s.t('settings.main.stop_session_remove_profile')),
+        ),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.t('settings.device_kind.change_title')),
+        content: Text(s.t('settings.device_kind.change_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(s.t('common.cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(s.t('settings.device_kind.change_confirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(deviceKindProvider.notifier).wipeDevice();
+    if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
@@ -175,6 +224,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final cloudAvailable = !app.demo &&
         platformSupportsCloudAccounts &&
         ref.read(authControllerProvider.notifier).available;
+    // On a public device the ways in and out of accounts live on the venue
+    // banner and the sign-in screen, not here: Settings must not offer a
+    // door that skips the wipe-and-approve ceremony.
+    final venueMode = ref.watch(venueModeActiveProvider);
+    final deviceKind = ref.watch(deviceKindProvider);
     // The account this screen is ABOUT is the active profile, not whichever
     // Firebase session happens to be alive: a switch to the local profile
     // leaves the guest session running, and reading the session here made
@@ -202,15 +256,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         LtRowGroup(
           header: s.t('settings.account.header'),
           children: [
-            if (cloudEntry == null)
-              LtRow(
-                icon: Icons.cloud_outlined,
-                title: s.t('settings.account.sign_in_row'),
-                subtitle: s.t('settings.account.sign_in_subtitle_profiles'),
-                chevron: true,
-                onTap: () => showSignInSheet(context),
-              )
-            else ...[
+            if (cloudEntry == null) ...[
+              if (!venueMode)
+                LtRow(
+                  icon: Icons.cloud_outlined,
+                  title: s.t('settings.account.sign_in_row'),
+                  subtitle: s.t('settings.account.sign_in_subtitle_profiles'),
+                  chevron: true,
+                  onTap: () => showSignInSheet(context),
+                ),
+            ] else ...[
               // Tappable: an account you can't name is an account you can't
               // tell apart from the next guest one. AuthController.setAccountName
               // existed all along with nothing to call it.
@@ -228,29 +283,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
-              LtRow(
-                icon: Icons.shield_outlined,
-                title: s.t('settings.security.row_title'),
-                subtitle: s.t('settings.security.row_subtitle'),
-                chevron: true,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SecurityScreen()),
+              // Not on a venue device: Security can mint add-device codes,
+              // and this tablet could confirm its own — anyone holding it
+              // could join THEIR phone to the artist's account for good.
+              // Devices are managed from the artist's own phone.
+              if (!venueMode)
+                LtRow(
+                  icon: Icons.shield_outlined,
+                  title: s.t('settings.security.row_title'),
+                  subtitle: s.t('settings.security.row_subtitle'),
+                  chevron: true,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SecurityScreen()),
+                  ),
                 ),
-              ),
-              LtRow(
-                icon: Icons.logout_rounded,
-                title: s.t('settings.account.sign_out'),
-                subtitle: cloudEntry.kind == AccountKind.anonymous
-                    ? s.t('settings.account.sign_out_anonymous_warning')
-                    : null,
-                chevron: true,
-                onTap: _confirmSignOut,
-              ),
+              if (!venueMode)
+                LtRow(
+                  icon: Icons.logout_rounded,
+                  title: s.t('settings.account.sign_out'),
+                  subtitle: cloudEntry.kind == AccountKind.anonymous
+                      ? s.t('settings.account.sign_out_anonymous_warning')
+                      : null,
+                  chevron: true,
+                  onTap: _confirmSignOut,
+                ),
             ],
             // Switching the ACCOUNT is a deliberate, separate act — it swaps
             // every profile at once. It lives here, never in the profile
             // switcher. Shown as soon as there is anywhere else to go.
-            if (cloudEntry != null || directory.accounts.length > 1)
+            if (!venueMode &&
+                (cloudEntry != null || directory.accounts.length > 1))
               LtRow(
                 icon: Icons.swap_horizontal_circle_outlined,
                 title: s.t('settings.account.switch_row'),
@@ -279,6 +341,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: s.t('settings.main.exit_demo'),
               chevron: true,
               onTap: () {
+                // Clear the kind FIRST: RootGate re-enters demo whenever the
+                // install says demo but the in-memory flag is off.
+                ref.read(deviceKindProvider.notifier).clearDemo();
                 ref.read(appStateProvider.notifier).exitDemo();
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },
@@ -470,6 +535,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
               ],
             ),
+          ),
+        ],
+      ),
+      // --------------------------------------------------- this device ---
+      LtRowGroup(
+        header: s.t('settings.device_kind.header'),
+        children: [
+          LtRow(
+            icon: switch (deviceKind) {
+              DeviceKind.venue => Icons.storefront_rounded,
+              DeviceKind.demo => Icons.play_circle_outline_rounded,
+              _ => Icons.mic_external_on_rounded,
+            },
+            title: switch (deviceKind) {
+              DeviceKind.venue => s.t('settings.device_kind.current_venue'),
+              DeviceKind.demo => s.t('settings.device_kind.current_demo'),
+              _ => s.t('settings.device_kind.current_performer'),
+            },
+            subtitle: s.t('settings.device_kind.row_subtitle'),
+            chevron: true,
+            onTap: _confirmChangeDeviceKind,
           ),
         ],
       ),

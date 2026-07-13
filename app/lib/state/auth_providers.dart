@@ -5,18 +5,66 @@ import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/firebase/account_sessions.dart';
 import '../data/firebase/auth_service.dart';
 import '../domain/app_account.dart';
 import 'providers.dart';
 
-/// Live Firebase handles, overridden in main() on platforms that have them.
-/// Null everywhere else (Windows/Linux, tests, a failed Firebase boot) —
-/// the app then runs local-only and every cloud surface hides itself.
-final firebaseAuthProvider = Provider<FirebaseAuth?>((ref) => null);
-final firestoreProvider = Provider<FirebaseFirestore?>((ref) => null);
+/// The per-account Firebase stacks, overridden in main() on platforms that
+/// have Firebase. The default refuses everything — tests and the platforms
+/// without Firebase run local-only, exactly as before.
+final accountSessionsProvider =
+    Provider<AccountSessions>((ref) => AccountSessions.unavailable());
+
+/// Ticks on every session add/remove so the handle providers below re-resolve
+/// — a sign-out must not leave anyone holding the dead account's Firestore.
+final accountSessionsChangesProvider = StreamProvider<int>((ref) {
+  var n = 0;
+  return ref.watch(accountSessionsProvider).changes.map((_) => ++n);
+});
+
+/// The ACTIVE profile's Firebase handles. A cloud profile with a live
+/// session resolves to that account's own instances — which is what lets the
+/// whole repository/session/device stack work unchanged across N signed-in
+/// accounts. Everything else (the local profile, a profile whose session
+/// died) falls back to the DEFAULT app: the relay's transport home. Null
+/// only where Firebase isn't at all (Windows/Linux, tests, a failed boot).
+final firebaseAuthProvider = Provider<FirebaseAuth?>((ref) {
+  final sessions = ref.watch(accountSessionsProvider);
+  // No Firebase, no directory consultation: bare test containers (and the
+  // platforms without Firebase) must resolve to null without needing a
+  // LocalStore wired up.
+  if (!sessions.available) return null;
+  ref.watch(accountSessionsChangesProvider);
+  final active =
+      ref.watch(accountsDirectoryProvider.select((d) => d.activeAccountId));
+  if (active != kLocalAccountId) {
+    final session = sessions.sessionFor(active);
+    if (session != null) return session.auth;
+  }
+  return sessions.defaultAuth;
+});
+
+final firestoreProvider = Provider<FirebaseFirestore?>((ref) {
+  final sessions = ref.watch(accountSessionsProvider);
+  if (!sessions.available) return null;
+  ref.watch(accountSessionsChangesProvider);
+  final active =
+      ref.watch(accountsDirectoryProvider.select((d) => d.activeAccountId));
+  if (active != kLocalAccountId) {
+    final db = sessions.sessionFor(active)?.firestore;
+    if (db != null) return db;
+  }
+  return sessions.defaultFirestore;
+});
 
 final authServiceProvider =
     Provider<AuthService>((ref) => AuthService(ref.watch(firebaseAuthProvider)));
+
+/// Builds the [AuthService] a slot sign-in runs on — a seam so tests can
+/// script the provider flows without a Firebase app behind them.
+final slotAuthServiceFactoryProvider =
+    Provider<AuthService Function(FirebaseAuth)>((ref) => AuthService.new);
 
 /// Every profile this device knows (the local one plus signed-in Firebase
 /// accounts) and which is active. Persisted device-wide in prefs.
@@ -98,6 +146,12 @@ class AuthController extends Notifier<AuthState> {
     _sub?.cancel();
     _sub = service.userChanges().listen((user) {
       if (_signingIn) return;
+      // A profile switch swaps the service out from under this listener:
+      // its cancel comes with the REBUILD, but a queued event (the old
+      // stream's replay) can still land first — and writing it would
+      // clobber the new account's state right after the flush. Stale
+      // generation, stale event: drop it.
+      if (ref.read(authServiceProvider) != service) return;
       final account = _asAccount(user);
       state = state.copyWith(user: account, clearUser: account == null);
     });
@@ -125,10 +179,10 @@ class AuthController extends Notifier<AuthState> {
   bool get available => ref.read(authServiceProvider).available;
 
   Future<AuthUser?> signInWithApple({bool link = false}) =>
-      _run((s) => s.signInWithApple(link: link));
+      _run((s) => s.signInWithApple(link: link), link: link);
 
   Future<AuthUser?> signInWithGoogle({bool link = false}) =>
-      _run((s) => s.signInWithGoogle(link: link));
+      _run((s) => s.signInWithGoogle(link: link), link: link);
 
   Future<AuthUser?> signInAnonymously() =>
       _run((s) => s.signInAnonymously());
@@ -138,20 +192,46 @@ class AuthController extends Notifier<AuthState> {
 
   /// The ONLY door into an account: every sign-in the artist actually asked
   /// for comes through here, and only what comes through here is adopted.
+  ///
+  /// A fresh sign-in runs on a NEW slot ([AccountSessions.begin]) so the
+  /// accounts already signed in on this device are never disturbed; only a
+  /// [link] (upgrading the CURRENT anonymous user in place) runs on the
+  /// active account's own instance. Where slots don't exist (no Firebase,
+  /// tests that stub [authServiceProvider]) the active service is the only
+  /// door there is — today's single-session behavior, unchanged.
   Future<AuthUser?> _run(
-      Future<AuthUser?> Function(AuthService) attempt) async {
+    Future<AuthUser?> Function(AuthService) attempt, {
+    bool link = false,
+  }) async {
     if (state.busy) return null;
     state = state.copyWith(busy: true, clearError: true);
     _signingIn = true;
+    final sessions = ref.read(accountSessionsProvider);
+    PendingSession? pending;
     try {
-      final user = await attempt(ref.read(authServiceProvider));
+      final AuthService service;
+      if (!link && sessions.available) {
+        pending = await sessions.begin();
+        service = ref.read(slotAuthServiceFactoryProvider)(pending.auth);
+      } else {
+        service = ref.read(authServiceProvider);
+      }
+      final user = await attempt(service);
+      if (user == null) {
+        // Cancelled in the provider's own UI — the empty slot goes back.
+        if (pending != null) await sessions.abandon(pending);
+        state = state.copyWith(busy: false);
+        return null;
+      }
+      if (pending != null) await sessions.commit(pending, user.uid);
       // Publish the user BEFORE flipping the directory: the repository
       // provider selects on (active profile, signed-in uid), and adopting
       // first would rebuild it against a stale null user.
       state = state.copyWith(user: user, busy: false);
-      if (user != null) await _adopt(user);
+      await _adopt(user);
       return user;
     } catch (e) {
+      if (pending != null) unawaited(sessions.abandon(pending));
       debugPrint('sign-in failed: $e');
       state = state.copyWith(busy: false, error: friendlyAuthError(e));
       return null;
@@ -219,14 +299,23 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  /// Signs out of Firebase and lands on the local profile. The directory
-  /// keeps the entry (collapsed switcher row); Phase 6 adds the keychain
-  /// scrub of that account's cached secrets.
+  /// Signs the ACTIVE account out — of its own instance only; every other
+  /// account signed in on this device keeps its session. Lands on the local
+  /// profile, and the directory keeps the entry (collapsed switcher row).
   Future<void> signOut() async {
     if (state.busy) return;
     state = state.copyWith(busy: true, clearError: true);
+    final sessions = ref.read(accountSessionsProvider);
+    final uid = state.user?.uid ??
+        ref.read(accountsDirectoryProvider).activeAccountId;
     try {
-      await ref.read(authServiceProvider).signOut();
+      if (sessions.isAlive(uid)) {
+        await sessions.remove(uid);
+      } else if (state.user != null) {
+        // No slot to drop (legacy default-app session, or a stubbed service
+        // in tests) — sign out of the instance the service fronts.
+        await ref.read(authServiceProvider).signOut();
+      }
     } catch (e) {
       debugPrint('sign-out failed: $e');
     }

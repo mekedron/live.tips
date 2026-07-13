@@ -5,6 +5,7 @@ import '../core/theme.dart';
 import '../domain/app_account.dart';
 import '../domain/band_account.dart';
 import '../features/onboarding/onboarding_details_screen.dart';
+import '../features/venue/venue_reapproval_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../state/auth_providers.dart';
 import '../state/live_session_controller.dart';
@@ -194,6 +195,10 @@ class _BandSwitcherSheet extends ConsumerWidget {
     WidgetRef ref,
     BandAccount account,
   ) async {
+    // The owner's rule for shared devices: changing which profile a venue
+    // tablet shows needs a fresh approval from the artist's own phone.
+    if (!await ensureVenueReapproval(context, ref)) return;
+    if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(appStateProvider.notifier);
     final app = ref.read(appStateProvider);
@@ -253,6 +258,10 @@ class _BandSwitcherSheet extends ConsumerWidget {
   /// refusal made "Add a profile" look broken: a dead button, no message, no
   /// clue that a stale session was holding it shut.
   Future<void> _addBand(BuildContext context, WidgetRef ref) async {
+    // Creating a profile changes the account's data — on a venue device
+    // that, too, waits for the phone's nod.
+    if (!await ensureVenueReapproval(context, ref)) return;
+    if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     final notifier = ref.read(appStateProvider.notifier);
