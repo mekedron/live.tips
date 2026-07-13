@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/venue_boot.dart';
 import '../domain/device_kind.dart';
 import 'auth_providers.dart';
+import 'live_session_controller.dart';
 import 'onboarding_draft.dart';
 import 'providers.dart';
 
@@ -166,6 +167,21 @@ class VenueSessionNotifier extends Notifier<VenueSession?> {
   Future<void> evictStray(String uid) => _scrub(uid);
 
   Future<void> _scrub(String uid) async {
+    // The live session dies FIRST, while the coordinator still has the
+    // account's repository and key to archive with. Signing out around a
+    // running session left it polling Stripe invisibly behind the next
+    // artist's sign-in screen — the exact local state this broom exists to
+    // clear. Only when the account IS the active profile: a stray uid's
+    // session was never started here.
+    if (ref.read(accountsDirectoryProvider).activeAccountId == uid) {
+      try {
+        await ref.read(liveSessionProvider.notifier).stop();
+      } catch (e) {
+        // The archive write failed (offline, a dead handle) — the transports
+        // are already down, and the wipe below must still happen.
+        debugPrint('venue scrub: session stop failed: $e');
+      }
+    }
     final local = ref.read(localStoreProvider);
     final secure = ref.read(secureStoreProvider);
     // Secrets first, while the cloud repository can still name the bands —

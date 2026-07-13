@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/device_providers.dart';
+import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 
 /// Invisible root widget that keeps this device's entry in the account's
@@ -124,14 +125,23 @@ class _DeviceSessionGuardState extends ConsumerState<DeviceSessionGuard>
     return widget.child;
   }
 
-  /// This device was revoked: drop the account's secrets from THIS device's
-  /// keychain, then sign out. Secrets first — after the sign-out the
-  /// repository flips back to local and the cloud band list is gone, taking
-  /// with it the ids whose keychain entries need clearing.
+  /// This device was revoked: stop the live session, drop the account's
+  /// secrets from THIS device's keychain, then sign out. The session first —
+  /// a revocation that leaves the coordinator polling Stripe with the
+  /// account's in-memory key is not a revocation. Secrets before the
+  /// sign-out — after it the repository flips back to local and the cloud
+  /// band list is gone, taking with it the ids whose keychain entries need
+  /// clearing.
   Future<void> _onRevoked() async {
     if (_revoking) return;
     _revoking = true;
     try {
+      try {
+        await ref.read(liveSessionProvider.notifier).stop();
+      } catch (_) {
+        // The archive write failed (offline, a dead handle) — the transports
+        // are already down, and the wipe + sign-out below must still happen.
+      }
       final bandIds = ref
           .read(accountDataRepositoryProvider)
           .listBands()

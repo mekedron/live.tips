@@ -7,6 +7,7 @@ import '../../domain/app_account.dart';
 import '../../domain/pending_redirect.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
+import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/sign_in_sheet.dart';
@@ -23,15 +24,28 @@ class AccountSwitchScreen extends ConsumerWidget {
   const AccountSwitchScreen({super.key});
 
   /// Switching the active profile is a DIRECTORY flip — it never ends a
-  /// session. Every account whose own FirebaseApp session is alive (see
-  /// AccountSessions) is one tap away, no re-auth; only an account whose
-  /// session is gone needs its provider's sign-in run again, and on success
-  /// the auth controller adopts the user.
+  /// session, so it is REFUSED while one runs, with the same guard and the
+  /// same kind of message as the band switcher. (The old asymmetry — bands
+  /// blocked, accounts didn't — is how a flip landed under a live set and
+  /// left the app rendering the account it had just left.) Every account
+  /// whose own FirebaseApp session is alive (see AccountSessions) is one tap
+  /// away, no re-auth; only an account whose session is gone needs its
+  /// provider's sign-in run again, and on success the auth controller adopts
+  /// the user.
   Future<void> _switchTo(
     BuildContext context,
     WidgetRef ref,
     AppAccount account,
   ) async {
+    final block = ref.read(appStateProvider.notifier).accountActionBlock;
+    if (block != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(block == AccountActionBlock.switching
+            ? context.s.t('widgets.band_switcher.switching')
+            : context.s.t('settings.account.stop_session_switch')),
+      ));
+      return;
+    }
     final navigator = Navigator.of(context);
     final liveUid = ref.read(authControllerProvider).user?.uid;
     final sessions = ref.read(accountSessionsProvider);

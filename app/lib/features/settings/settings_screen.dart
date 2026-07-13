@@ -110,6 +110,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final s = context.s;
     final user = ref.read(authControllerProvider).user;
     if (user == null) return;
+    // A sign-out is an account flip like any other — refused mid-session,
+    // by the same guard add/switch/remove ask. Silently ending an artist's
+    // live set from a Settings tap is not an option.
+    final block = ref.read(appStateProvider.notifier).accountActionBlock;
+    if (block != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(block == AccountActionBlock.switching
+              ? s.t('widgets.band_switcher.switching')
+              : s.t('settings.account.stop_session_sign_out')),
+        ),
+      );
+      return;
+    }
     // Signing out of a guest account destroys it: an anonymous user has no
     // credential to come back with. The dialog says so, and offers the way
     // out that keeps the data — linking a real provider to this same uid.

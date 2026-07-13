@@ -5,13 +5,35 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/firebase/device_registry.dart';
+import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/domain/app_account.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/features/account/device_session_guard.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/device_providers.dart';
+import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
 
 import 'helpers.dart';
+
+/// A silent tip source that remembers being disposed — how the revocation
+/// test observes "the poll timer is dead".
+class _RecordingSource extends TipSource {
+  bool disposed = false;
+
+  @override
+  Future<void> prime(DateTime startedAt,
+      {String? resumeCursor, bool backfill = false}) async {}
+
+  @override
+  Future<List<Tip>> pollNew() async => const [];
+
+  @override
+  String? get cursor => null;
+
+  @override
+  void dispose() => disposed = true;
+}
 
 /// The mutable Firestore handle the harness flips mid-test — riverpod 3 has
 /// no StateProvider, so this is the two-line equivalent.
@@ -43,6 +65,7 @@ void main() {
   Future<ProviderContainer> pumpGuard(
     WidgetTester tester, {
     FirebaseFirestore? initialDb,
+    TipSource? tipSource,
   }) async {
     final local = await seededStore();
     final container = ProviderContainer(overrides: [
@@ -56,6 +79,9 @@ void main() {
           const DeviceDescription(name: 'Test phone', platform: 'ios')),
       dbSwitch.overrideWith(() => _DbSwitch(initialDb)),
       firestoreProvider.overrideWith((ref) => ref.watch(dbSwitch)),
+      if (tipSource != null)
+        tipSourceFactoryProvider.overrideWithValue(
+            ({required demo, required apiKey, required jar}) => tipSource),
     ]);
     addTearDown(container.dispose);
     await tester.pumpWidget(UncontrolledProviderScope(
@@ -63,7 +89,9 @@ void main() {
       child: MaterialApp(
         localizationsDelegates: kTestL10nDelegates,
         locale: const Locale('en'),
-        home: const DeviceSessionGuard(child: SizedBox()),
+        // A Scaffold under the guard: _onRevoked's "signed out" snackbar
+        // needs one registered with the messenger.
+        home: const DeviceSessionGuard(child: Scaffold(body: SizedBox())),
       ),
     ));
     await tester.pumpAndSettle();
@@ -125,6 +153,39 @@ void main() {
         reason: 'touch() must upsert (via re-register) when the doc is gone');
     expect(revived.data()!['revoked'], isFalse);
     expect(revived.data()!['lastSeenAtMs'], greaterThan(0));
+    await unmount(tester);
+  });
+
+  testWidgets(
+      'revocation stops the live session — the coordinator must not keep '
+      'polling with the in-memory key behind the sign-out', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final source = _RecordingSource();
+    final container =
+        await pumpGuard(tester, initialDb: db, tipSource: source);
+
+    container.read(appStateProvider.notifier).enterDemo();
+    await container.read(liveSessionProvider.notifier).start(goalMinor: 1000);
+    await tester.pumpAndSettle();
+    expect(container.read(liveSessionProvider), isNotNull);
+
+    // The owner revokes THIS device (a function-owned flag in production).
+    await db.doc('users/$uid/devices/$deviceId').update({'revoked': true});
+    await tester.pumpAndSettle();
+
+    expect(container.read(liveSessionProvider), isNull,
+        reason: 'revocation that leaves the session running is not '
+            'revocation — this is precisely the local state it exists '
+            'to clear');
+    expect(source.disposed, isTrue,
+        reason: 'the poll timer dies with the coordinator');
+    expect(container.read(authControllerProvider).user, isNull);
+    expect(
+        container
+            .read(localStoreProvider)
+            .readSessionHistory(kTestAccountId),
+        hasLength(1),
+        reason: 'the set is archived on the way out, not dropped');
     await unmount(tester);
   });
 }

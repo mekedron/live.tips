@@ -313,6 +313,9 @@ class LiveSessionController extends Notifier<LiveState?> {
     // Tips that arrived during the set aren't in the home preview's cached
     // Stripe query — refresh it so Recent tips reflects the night just played.
     ref.invalidate(recentTipsProvider);
+    // An account flip that landed mid-set held its profile reload back —
+    // this is the moment it runs (see AppStateNotifier.onSessionEnded).
+    ref.read(appStateProvider.notifier).onSessionEnded();
     return session;
   }
 
@@ -325,6 +328,7 @@ class LiveSessionController extends Notifier<LiveState?> {
     state = null;
     ref.read(storedSessionProvider.notifier).refresh();
     ref.invalidate(recentTipsProvider);
+    ref.read(appStateProvider.notifier).onSessionEnded();
   }
 
   void _teardown() {

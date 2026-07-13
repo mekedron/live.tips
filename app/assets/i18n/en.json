@@ -376,6 +376,8 @@
   "settings.account.sign_out_anonymous_warning": "This is a guest account — signing out permanently loses access to it.",
   "settings.account.sign_out_body_profiles": "Your profiles stay on this device. Sign back in anytime to pick the account up again.",
   "settings.account.sign_out_title": "Sign out?",
+  "settings.account.stop_session_sign_out": "Stop the live session before signing out.",
+  "settings.account.stop_session_switch": "Stop the live session before switching accounts.",
   "settings.account.switch_current": "Signed in",
   "settings.account.switch_intro": "The accounts this device knows. Each one carries its own profiles — switching accounts swaps all of them at once.",
   "settings.account.switch_row": "Switch account",

@@ -225,6 +225,10 @@ enum AccountActionBlock {
 }
 
 class AppStateNotifier extends Notifier<AppState> {
+  /// A profile flip landed while a session was live and its reload was held
+  /// (see [_reloadForProfile]) — the session-end listener in [build] runs it.
+  bool _reloadHeld = false;
+
   @override
   AppState build() {
     // Profile switches (directory) and remote snapshots (cloud revision)
@@ -301,7 +305,14 @@ class AppStateNotifier extends Notifier<AppState> {
   /// Reloads everything for the (already switched) active profile — the
   /// directory listener calls this after a sign-in or a profile switch.
   Future<void> _reloadForProfile() async {
-    if (ref.read(liveSessionProvider) != null) return; // never yank a live set
+    if (ref.read(liveSessionProvider) != null) {
+      // Never yank a live set. But the flip is real and the directory
+      // listener will not fire for it again — hold the reload, and the
+      // session-end listener in build() runs it once the set is over.
+      _reloadHeld = true;
+      return;
+    }
+    _reloadHeld = false;
     state = state.copyWith(switching: true);
     ref.read(onboardingDraftProvider.notifier).clear();
     final repo = ref.read(accountDataRepositoryProvider);
@@ -348,6 +359,21 @@ class AppStateNotifier extends Notifier<AppState> {
     // The history/stored-session notifiers watch the band id and the cloud
     // revision themselves — pushing refreshes at them from here would make
     // them depend on this notifier that already depends on them.
+  }
+
+  /// The session just ended on this device: run the reload a live set held
+  /// back (see [_reloadForProfile]), if any. Called by the session
+  /// controller from stop() and _onRemoteEnded — the same push it already
+  /// gives the stored-session and recent-tips providers, and for the same
+  /// reason: listening to the session from here would be a circular
+  /// dependency (the controller reads this notifier). The directory
+  /// listener fires exactly ONCE per flip, so without this a flip that
+  /// landed mid-session left the skipped reload skipped forever, and the
+  /// app rendered the departed account until a restart.
+  void onSessionEnded() {
+    if (!_reloadHeld) return;
+    // A microtask: the controller's stop() is still mid-flight here.
+    unawaited(Future.microtask(_reloadForProfile));
   }
 
   /// A cloud snapshot moved a mirror: fold the fresh reads into state.
