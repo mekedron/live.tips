@@ -601,9 +601,15 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  /// Signs the ACTIVE account out — of its own instance only; every other
-  /// account signed in on this device keeps its session. Lands on the local
-  /// profile, and the directory keeps the entry (collapsed switcher row).
+  /// Ends the ACTIVE account's Firebase session — its own instance only;
+  /// every other account signed in on this device keeps its session. Lands on
+  /// the local profile.
+  ///
+  /// Half of a sign-out, and the half that has nothing to do with this device's
+  /// copy of the account: [signOutProvider] is the whole act, and every button
+  /// that says "Sign out" goes through THAT. Calling this alone leaves the
+  /// account's profiles cached and its row in the switcher — which is exactly
+  /// the bug (#31), so don't.
   Future<void> signOut() async {
     if (state.busy) return;
     state = state.copyWith(busy: true, clearError: true);
@@ -626,6 +632,79 @@ class AuthController extends Notifier<AuthState> {
         .setActive(kLocalAccountId);
     state = state.copyWith(clearUser: true, busy: false);
   }
+}
+
+/// SIGN OUT, as the word promises: the account's Firebase session ends AND the
+/// account leaves this device — the cached copies of its profiles, their
+/// keychain secrets, the memory of which profile it was on, and its row in the
+/// account switcher. Every button that says "Sign out" calls this one.
+///
+/// The row used to survive, as a collapsed "session ended — sign in again"
+/// entry. That is a fast way back in on a device you own, and on a shared one
+/// it is the previous artist's email address left on screen for the next one to
+/// read (#31). Nothing is lost by dropping it: everything the account owns is
+/// in the cloud, signing back in brings all of it back, and the dialog says so.
+/// A "stay signed in for later" affordance, if it is ever wanted, is a
+/// DIFFERENT button with an honest name — never the one called Sign out.
+///
+/// A session that DIES on its own — an expired slot, a revoked token, a restart
+/// it didn't survive — is a different event and keeps its entry: that is what
+/// the switcher's "session ended — selecting it signs in again" row is for, and
+/// one tap through the provider brings the account back.
+///
+/// A provider rather than a method on [AuthController], for a structural
+/// reason: the teardown must ask the account's OWN repository which profiles
+/// this device cached, and [accountDataRepositoryProvider] watches the auth
+/// controller — reading it from inside the controller is a circular dependency.
+final signOutProvider = Provider<Future<void> Function()>((ref) => () async {
+      final uid = ref.read(authControllerProvider).user?.uid ??
+          ref.read(accountsDirectoryProvider).activeAccountId;
+      if (uid == kLocalAccountId) return;
+      // Named while the account's repository is still standing: the sign-out
+      // below swaps it for the local profile's, and the only list of the
+      // profiles this device cached goes with it.
+      final bandIds = [
+        for (final band in ref.read(accountDataRepositoryProvider).listBands())
+          band.id,
+      ];
+      await ref.read(authControllerProvider.notifier).signOut();
+      await forgetCloudAccountOnDevice(ref, uid, bandIds);
+    });
+
+/// Everything this device holds FOR the cloud account [uid], dropped: the
+/// keychain secrets and device-local blobs of [bandIds] (the profiles it
+/// cached), which profile it was on, and its entry in the account switcher.
+/// Nothing in the cloud is touched — the account, its profiles, their tip pages
+/// and their history are all in Firestore, and the next sign-in brings the lot
+/// back.
+///
+/// Shared by [signOutProvider] and the venue broom (VenueSessionNotifier
+/// `_scrub`) on purpose: "the artist signed out" and "the venue stint ended"
+/// are the same act on this device, and the one place they disagreed is exactly
+/// how sign-out came to leave an email address behind in the switcher while the
+/// venue path scrubbed it. One teardown, so they cannot drift apart again.
+Future<void> forgetCloudAccountOnDevice(
+  Ref ref,
+  String uid,
+  List<String> bandIds,
+) async {
+  if (uid == kLocalAccountId) return; // the local profile is not an account
+  final local = ref.read(localStoreProvider);
+  for (final id in bandIds) {
+    try {
+      await ref.read(secureStoreProvider).wipeAccount(id);
+    } catch (_) {
+      // Locked keychain: tombstone so the boot-time retry finishes the job.
+      await local.addPendingSecretWipe(id);
+    }
+    await local.wipeAccount(id);
+  }
+  await local.clearActiveCloudBand(uid);
+  // The switcher must not keep listing an account the artist deliberately
+  // left. This also moves the active flag off [uid] when it was still there
+  // (see AccountsDirectory.withoutAccount) — the device lands on the local
+  // profile, exactly as sign-out always did.
+  await ref.read(accountsDirectoryProvider.notifier).remove(uid);
 }
 
 /// What a consumed redirect turned out to be: the record that was waiting, and

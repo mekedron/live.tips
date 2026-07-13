@@ -77,7 +77,14 @@ void main() {
     expect(find.text('PROFILE DETAILS'), findsOneWidget);
     expect(find.text('Name, currency and thank-you message'), findsOneWidget);
     expect(find.text('Switch profile'), findsOneWidget);
-    expect(find.text('Remove this profile from this device'), findsOneWidget);
+    // The LOCAL profile has one removal, because it has one meaning: the band
+    // lives here and nowhere else. The row says delete, and says permanent —
+    // it never claims to be a device-local tidy-up (#27).
+    expect(find.text('Delete this profile'), findsOneWidget);
+    expect(find.text('Permanent — this profile is on this device only'),
+        findsOneWidget);
+    expect(find.text('Remove from this device'), findsNothing);
+    expect(find.text('Remove this profile from this device'), findsNothing);
 
     // The retired payment-methods rows are gone.
     expect(find.text('New tip page link'), findsNothing);

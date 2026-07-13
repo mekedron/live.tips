@@ -182,38 +182,23 @@ class VenueSessionNotifier extends Notifier<VenueSession?> {
         debugPrint('venue scrub: session stop failed: $e');
       }
     }
-    final local = ref.read(localStoreProvider);
-    final secure = ref.read(secureStoreProvider);
-    // Secrets first, while the cloud repository can still name the bands —
-    // after the sign-out the band list is gone (same order as the
-    // revocation path in DeviceSessionGuard). Only when the repository IS
-    // the account's: if it has already fallen back to the local profile,
-    // its bands are not ours to wipe.
-    final bandIds =
-        ref.read(accountsDirectoryProvider).activeAccountId == uid
-            ? ref
-                .read(accountDataRepositoryProvider)
-                .listBands()
-                .map((b) => b.id)
-                .toList()
-            : const <String>[];
-    for (final id in bandIds) {
-      try {
-        await secure.wipeAccount(id);
-      } catch (_) {
-        // Locked keychain: tombstone so the boot-time retry finishes the job.
-        await local.addPendingSecretWipe(id);
-      }
-      await local.wipeAccount(id);
-    }
-    await local.clearActiveCloudBand(uid);
+    // The broom IS a sign-out now: cached secrets, device-local band data, the
+    // band pointer, the directory row — [signOutProvider] drops exactly the
+    // list this method used to keep in its own hands (#31), in the order it
+    // always needed (the secrets go while the cloud repository can still name
+    // the bands; the session goes after). Two copies of that list is how the
+    // two paths drifted apart in the first place.
     final sessions = ref.read(accountSessionsProvider);
     if (ref.read(accountsDirectoryProvider).activeAccountId == uid) {
-      await ref.read(authControllerProvider.notifier).signOut();
-    } else if (sessions.isAlive(uid)) {
-      await sessions.remove(uid);
+      await ref.read(signOutProvider)();
     }
-    await ref.read(accountsDirectoryProvider.notifier).remove(uid);
+    // A STRAY uid was never the active profile, so nothing here can name its
+    // bands and no sign-out is owed it — the slot goes, and the broom sweeps
+    // what is left. Both lines are no-ops after a sign-out that ran, and a
+    // public device may not be left holding an account either way (sign-out
+    // stands down while another auth call is in flight).
+    if (sessions.isAlive(uid)) await sessions.remove(uid);
+    await forgetCloudAccountOnDevice(ref, uid, const []);
   }
 }
 

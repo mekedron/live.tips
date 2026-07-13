@@ -217,9 +217,18 @@ class FirestoreRepository implements AccountDataRepository {
   // Answer such reads from the — necessarily empty — mirror instead.
   static bool _noBand(String bandId) => bandId.isEmpty;
 
+  /// Whether this band's per-band listeners have been dropped ([
+  /// forgetAccountOnDevice] takes them out of the maps without waiting for the
+  /// cancellations). A snapshot still arriving from one of them belongs to a
+  /// band this device no longer holds a copy of — and acting on it would put
+  /// back the very keychain entries the removal just took out.
+  bool _forgotten(String bandId, Map<String, Object?> subs) =>
+      !subs.containsKey(bandId);
+
   void _ensureSecretsListener(String bandId) {
     if (_noBand(bandId) || _secretSubs.containsKey(bandId)) return;
     _secretSubs[bandId] = _secretsDoc(bandId).snapshots().listen((snap) {
+      if (_forgotten(bandId, _secretSubs)) return;
       final data = snap.data() ?? const <String, dynamic>{};
       final stripeKey = data['stripeKey'];
       final relaySecret = data['relaySecret'];
@@ -273,13 +282,14 @@ class FirestoreRepository implements AccountDataRepository {
     _sessionSubs[bandId] = _sessionsCol(bandId)
         .orderBy('startedAt')
         .snapshots()
-        .listen(
-            (snap) => applySessionsSnapshot(
-                  bandId,
-                  [for (final doc in snap.docs) doc.data()],
-                  fromCache: snap.metadata.isFromCache,
-                ),
-            onError: _ignore);
+        .listen((snap) {
+      if (_forgotten(bandId, _sessionSubs)) return;
+      applySessionsSnapshot(
+        bandId,
+        [for (final doc in snap.docs) doc.data()],
+        fromCache: snap.metadata.isFromCache,
+      );
+    }, onError: _ignore);
   }
 
   /// Split out and test-visible for the same reason as [applyBandsSnapshot].
@@ -307,13 +317,14 @@ class FirestoreRepository implements AccountDataRepository {
         .orderBy('createdAt', descending: true)
         .limit(LocalStore.relayHistoryCap)
         .snapshots()
-        .listen(
-            (snap) => applyRelayTipsSnapshot(
-                  bandId,
-                  [for (final doc in snap.docs) doc.data()],
-                  fromCache: snap.metadata.isFromCache,
-                ),
-            onError: _ignore);
+        .listen((snap) {
+      if (_forgotten(bandId, _relayTipSubs)) return;
+      applyRelayTipsSnapshot(
+        bandId,
+        [for (final doc in snap.docs) doc.data()],
+        fromCache: snap.metadata.isFromCache,
+      );
+    }, onError: _ignore);
   }
 
   /// Split out and test-visible for the same reason as [applyBandsSnapshot].
@@ -794,8 +805,53 @@ class FirestoreRepository implements AccountDataRepository {
   Future<void> wipeAccountSecrets(String accountId) =>
       // Keychain only — the secrets DOC belongs to [wipeAccountData]. This
       // keeps the local contract: may throw, the caller tombstones and
-      // retries at boot.
+      // retries at boot. It is also what makes the doc survive a
+      // [forgetAccountOnDevice]: the account keeps its key, this device
+      // does not.
       _secure.wipeAccount(accountId);
+
+  @override
+  Future<void> forgetAccountOnDevice(String accountId) async {
+    // Not one Firestore write: every doc of this band belongs to the account,
+    // which is exactly what makes this the offline-safe removal.
+    //
+    // The band's listeners go FIRST. The secrets one write-throughs the cloud
+    // key back into the keychain on its very next snapshot — leave it running
+    // and the keychain wipe the caller is about to do would be undone before
+    // the artist left the screen. Dropping them also means the mirrors below
+    // stay dropped until the BANDS listener re-delivers the band, which is the
+    // honest end of this operation: the copy is gone from this device until it
+    // syncs again.
+    //
+    // Unawaited, deliberately: a removal must not hang on a cancellation, and
+    // the [_forgotten] check every listener body starts with already makes a
+    // dropped listener silent from this line on, cancelled or not.
+    unawaited(_secretSubs.remove(accountId)?.cancel() ?? Future.value());
+    unawaited(_sessionSubs.remove(accountId)?.cancel() ?? Future.value());
+    unawaited(_relayTipSubs.remove(accountId)?.cancel() ?? Future.value());
+    _bands.remove(accountId);
+    _secrets.remove(accountId);
+    _sessions.remove(accountId);
+    _relayTips.remove(accountId);
+    _sessionsSettled.remove(accountId);
+    _relayTipsSettled.remove(accountId);
+    // The mirror now deliberately disagrees with the server, so it has stopped
+    // being an answer: un-settle it, and — if this was the last band we held —
+    // go COLD. A warm-and-empty cloud mirror is read as "a fresh account with
+    // no bands" and gets a band seeded into it (see AppStateNotifier); minting
+    // one into an account whose band we just chose to stop holding would be the
+    // same trap #23 closed, from the other end. Cold is the truth here: this
+    // device is waiting for the server to speak again.
+    _bandsSettled = false;
+    if (_bands.isEmpty) _warm = false;
+    // The device-local blobs (the crash snapshot, the reprint notice) go with
+    // the copy — they were never the account's.
+    await _local.wipeAccount(accountId);
+    // No [_notify]: the caller commits the state this leaves behind (exactly
+    // like [wipeAccountData]). Firing the "a snapshot moved a mirror" cue from
+    // inside a removal would send the notifier reloading a profile whose
+    // removal is still mid-flight.
+  }
 
   // --- Device settings ---
 

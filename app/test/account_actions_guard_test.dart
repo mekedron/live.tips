@@ -58,6 +58,10 @@ void main() {
     expect(notifier.accountActionBlock, AccountActionBlock.remoteSession);
     expect(await notifier.addAccount(), isNull);
     expect(await notifier.removeAccount('acc_test'), isFalse);
+    // The device-local removal touches no cloud data at all, but it still
+    // reshuffles the bands under a set that is running somewhere — same guard,
+    // same refusal.
+    expect(await notifier.removeAccountFromDevice('acc_test'), isFalse);
   });
 
   test('a stale lease does NOT block — the session died with its tab',

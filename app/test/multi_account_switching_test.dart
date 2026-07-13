@@ -128,13 +128,17 @@ void main() {
         reason: 'the account switched away from keeps its session');
 
     // Signing Ana out removes only her slot; Ben remains one tap away.
-    await controller.signOut();
+    await container.read(signOutProvider)();
     expect(sessions.isAlive('uid_ana'), isFalse);
     expect(sessions.isAlive('uid_ben'), isTrue);
     expect(container.read(accountsDirectoryProvider).activeAccountId,
         kLocalAccountId);
-    // The directory keeps Ana's row — "session gone", not "never existed".
+    // And it takes Ana OFF this device: the switcher must not keep offering
+    // the account — and the email address — she deliberately left (#31).
     expect(container.read(accountsDirectoryProvider).contains('uid_ana'),
-        isTrue);
+        isFalse);
+    expect(container.read(accountsDirectoryProvider).contains('uid_ben'),
+        isTrue,
+        reason: 'signing one account out must not touch the others');
   });
 }

@@ -109,7 +109,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await ref.read(authControllerProvider.notifier).signOut();
+    // The same door Settings' Sign out uses — the account leaves this device
+    // (#31), not just its session.
+    await ref.read(signOutProvider)();
     if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }

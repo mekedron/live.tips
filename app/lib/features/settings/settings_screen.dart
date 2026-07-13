@@ -52,70 +52,139 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _shortBoxId(String id) =>
       id.length <= 12 ? id : '${id.substring(0, 8)}…';
 
-  Future<void> _confirmRemoveBand() async {
+  /// What the dialogs call the account a cloud profile belongs to: the email
+  /// if there is one (that is the thing an artist recognizes as "my account"),
+  /// else its name, else the provider.
+  String _accountLabel(AppAccount profile) =>
+      profile.email ?? accountDisplayName(context, profile);
+
+  /// Whichever removal is asked for, it is refused for the same reasons and in
+  /// the same words: mid-switch, or a session live here or on another device.
+  bool _removalBlocked() {
+    final s = context.s;
+    // A refusal always names itself — and it asks the same guard add/switch
+    // ask, so a session that died with its tab can no longer wedge this shut.
+    final block = ref.read(appStateProvider.notifier).accountActionBlock;
+    if (block == null) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(block == AccountActionBlock.switching
+            ? s.t('widgets.band_switcher.switching')
+            : s.t('settings.main.stop_session_remove_profile')),
+      ),
+    );
+    return true;
+  }
+
+  /// DELETES the profile — from the ACCOUNT, on every device, for good. This
+  /// is what the row labelled "Remove this profile from this device" used to
+  /// run while promising the opposite (#27), so the dialog now says the word
+  /// delete, names the account it is deleting from, says "every other device",
+  /// and — since a tap can't be taken back — makes the artist type the word.
+  ///
+  /// On the LOCAL profile the two removals collapse: there is no account for
+  /// the profile to survive in, deleting it is the only thing removal could
+  /// ever mean, and the red button is the whole ceremony, as before.
+  Future<void> _confirmDeleteProfile() async {
     // On a venue device, destroying a profile is an account-level act — it
     // needs the same fresh phone approval as switching one.
     if (!await ensureVenueReapproval(context, ref)) return;
     if (!mounted) return;
     final s = context.s;
     final app = ref.read(appStateProvider);
-    // A refusal always names itself — and it asks the same guard add/switch
-    // ask, so a session that died with its tab can no longer wedge this shut.
-    final block = ref.read(appStateProvider.notifier).accountActionBlock;
-    if (block != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(block == AccountActionBlock.switching
-              ? s.t('widgets.band_switcher.switching')
-              : s.t('settings.main.stop_session_remove_profile')),
-        ),
-      );
-      return;
-    }
+    if (_removalBlocked()) return;
+    final profile = ref.read(accountsDirectoryProvider).active;
+    final cloud = !profile.isLocal;
     final hasOthers = app.accounts.length > 1;
     final name = app.displayName.isEmpty
         ? s.t('settings.main.this_profile_fallback')
         : app.displayName;
     final confirmed = await showDialog<bool>(
       context: context,
+      builder: (context) => _DeleteProfileDialog(
+        title: s.t('settings.main.delete_title', {'name': name}),
+        body: (cloud
+                ? s.t('settings.main.delete_body_cloud',
+                    {'name': name, 'account': _accountLabel(profile)})
+                : s.t('settings.main.delete_body_local')) +
+            (hasOthers ? s.t('settings.main.delete_body_others_suffix') : '') +
+            (cloud ? s.t('settings.main.delete_body_use_remove_suffix') : ''),
+        // Type-to-confirm exactly where the act reaches past this device and
+        // past this artist's other devices. The local profile's delete is
+        // just as permanent, but it destroys only what is in front of you.
+        typeToConfirm: cloud,
+      ),
+    );
+    if (confirmed != true) return;
+    final removed = await ref
+        .read(appStateProvider.notifier)
+        .removeAccount(ref.read(appStateProvider).accountId);
+    if (!mounted) return;
+    if (!removed) {
+      // A cloud band's wipe refuses offline rather than half-deleting.
+      // Nothing was removed — and a silent no-op would read as a dead
+      // button. The snack points at the removal that DOES work offline.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s.t('settings.main.delete_offline_snack'))),
+      );
+      return;
+    }
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  /// Takes the profile off THIS DEVICE and leaves it in the account — the
+  /// operation the app never had (#27), and the natural end of a gig on a
+  /// borrowed tablet. Nothing is deleted, nothing needs the network, and the
+  /// dialog says both. Cloud profiles only: a local band has no account to
+  /// stay in, so its row is [_confirmDeleteProfile] alone.
+  Future<void> _confirmRemoveFromDevice() async {
+    // Same venue rule as every other profile-level act on a shared tablet:
+    // nobody but the artist reshuffles what is on it mid-stint.
+    if (!await ensureVenueReapproval(context, ref)) return;
+    if (!mounted) return;
+    final s = context.s;
+    if (_removalBlocked()) return;
+    final app = ref.read(appStateProvider);
+    final profile = ref.read(accountsDirectoryProvider).active;
+    final name = app.displayName.isEmpty
+        ? s.t('settings.main.this_profile_fallback')
+        : app.displayName;
+    final confirmed = await showDialog<bool>(
+      context: context,
       builder: (context) => AlertDialog(
-        title: Text(s.t('settings.main.remove_title', {'name': name})),
-        content: Text(
-          '${app.hasStripe ? s.t('settings.main.remove_profile_body_stripe') : s.t('settings.main.remove_profile_body_relay')}'
-          '${hasOthers ? s.t('settings.main.remove_profile_body_others_suffix') : ''}',
-        ),
+        title: Text(s.t('settings.main.remove_device_title', {'name': name})),
+        content: Text(s.t('settings.main.remove_device_body',
+            {'name': name, 'account': _accountLabel(profile)})),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(s.t('common.cancel')),
           ),
+          // No red: this destroys nothing. The profile is still in the
+          // account when the artist walks away with it.
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Colors.white,
-            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(s.t('common.remove')),
           ),
         ],
       ),
     );
-    if (confirmed == true) {
-      final removed = await ref
-          .read(appStateProvider.notifier)
-          .removeAccount(ref.read(appStateProvider).accountId);
-      if (!mounted) return;
-      if (!removed) {
-        // A cloud band's wipe refuses offline rather than half-deleting.
-        // Nothing was removed — and a silent no-op would read as a dead
-        // button.
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(s.t('settings.main.remove_offline_snack'))),
-        );
-        return;
-      }
-      Navigator.of(context).popUntil((route) => route.isFirst);
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final removed = await ref
+        .read(appStateProvider.notifier)
+        .removeAccountFromDevice(ref.read(appStateProvider).accountId);
+    if (!mounted) return;
+    if (!removed) {
+      // Nothing offline can refuse this one — only the guards can, and only
+      // by a session starting while the dialog sat open.
+      _removalBlocked();
+      return;
     }
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    messenger.showSnackBar(SnackBar(
+      content: Text(s.t('settings.main.removed_device_snack', {'name': name})),
+    ));
   }
 
   Future<void> _confirmSignOut() async {
@@ -139,6 +208,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Signing out of a guest account destroys it: an anonymous user has no
     // credential to come back with. The dialog says so, and offers the way
     // out that keeps the data — linking a real provider to this same uid.
+    // Every other account is REMOVED from this device and nothing more (#31):
+    // its data is in the cloud, signing back in brings it all back, and the
+    // body says exactly that.
     final anonymous = user.kind == AccountKind.anonymous;
     final choice = await showDialog<_SignOutChoice>(
       context: context,
@@ -147,7 +219,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         content: Text(
           anonymous
               ? s.t('settings.account.sign_out_anonymous_body')
-              : s.t('settings.account.sign_out_body_profiles'),
+              : s.t('settings.account.sign_out_body_device'),
         ),
         actions: [
           TextButton(
@@ -182,7 +254,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final auth = ref.read(authControllerProvider.notifier);
     switch (choice) {
       case _SignOutChoice.signOut:
-        await auth.signOut();
+        // The whole act, not just the session: the account leaves this device
+        // (#31). Never AuthController.signOut alone — that is the half that
+        // used to leave the artist's email in the switcher.
+        await ref.read(signOutProvider)();
       // The guest upgrade. On the web this is linkWithRedirect: the page leaves
       // and the LINK is remembered across the reload (PendingRedirect.link), so
       // the guest's uid — and every band under it — is upgraded in place rather
@@ -492,13 +567,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               chevron: true,
               onTap: () => showBandSwitcherSheet(context, ref),
             ),
+            // Two removals, each named for what it does (#27). The safe one
+            // comes first: it is what the single old row always promised and
+            // never did, and it is the one an artist ending a gig on a
+            // borrowed tablet actually wants. A LOCAL profile has no account
+            // to stay in, so the two collapse and only the delete shows.
+            if (!activeProfile.isLocal)
+              LtRow(
+                icon: Icons.phonelink_erase_rounded,
+                title: s.t('settings.main.remove_device_row'),
+                subtitle: s.t('settings.main.remove_device_subtitle'),
+                chevron: true,
+                onTap: _confirmRemoveFromDevice,
+              ),
             LtRow(
-              icon: Icons.delete_outline_rounded,
+              icon: Icons.delete_forever_rounded,
               iconColor: c.danger,
-              title: s.t('settings.main.remove_profile_row'),
+              title: s.t('settings.main.delete_profile_row'),
               titleColor: c.danger,
+              subtitle: activeProfile.isLocal
+                  ? s.t('settings.main.delete_profile_subtitle_local')
+                  : s.t('settings.main.delete_profile_subtitle_cloud'),
               chevron: true,
-              onTap: _confirmRemoveBand,
+              onTap: _confirmDeleteProfile,
             ),
           ],
         ),
@@ -769,6 +860,82 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The delete confirmation. With [typeToConfirm] the artist has to type the
+/// word before the button lights up — the ceremony a cloud profile's delete
+/// deserves, because it reaches every device they own and there is nothing
+/// anywhere to restore it from. Without it (the local profile) the red button
+/// stands alone, as it always has.
+class _DeleteProfileDialog extends StatefulWidget {
+  const _DeleteProfileDialog({
+    required this.title,
+    required this.body,
+    required this.typeToConfirm,
+  });
+
+  final String title;
+  final String body;
+  final bool typeToConfirm;
+
+  @override
+  State<_DeleteProfileDialog> createState() => _DeleteProfileDialogState();
+}
+
+class _DeleteProfileDialogState extends State<_DeleteProfileDialog> {
+  final _typed = TextEditingController();
+
+  @override
+  void dispose() {
+    _typed.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final word = s.t('settings.main.delete_confirm_word');
+    final armed = !widget.typeToConfirm ||
+        _typed.text.trim().toUpperCase() == word.toUpperCase();
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(widget.body),
+          if (widget.typeToConfirm) ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _typed,
+              autocorrect: false,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText:
+                    s.t('settings.main.delete_confirm_hint', {'word': word}),
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(s.t('common.cancel')),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: armed ? () => Navigator.of(context).pop(true) : null,
+          child: Text(s.t('common.delete')),
+        ),
+      ],
     );
   }
 }
