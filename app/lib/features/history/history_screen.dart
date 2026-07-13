@@ -172,6 +172,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     });
     final isRail = AppShellScope.of(context)?.isRail ?? false;
     final app = ref.watch(appStateProvider);
+    // Cloud mirrors fill in asynchronously — re-read when a snapshot lands.
+    ref.watch(repoRevisionProvider);
     final sessions = ref
         .watch(accountDataRepositoryProvider)
         .readSessionHistory(app.accountId)

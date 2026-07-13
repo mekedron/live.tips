@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'package:firebase_core/firebase_core.dart';
@@ -7,9 +9,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/platform_support.dart';
+import 'data/cloud_migrator.dart';
 import 'data/local_store.dart';
 import 'data/migrations.dart';
 import 'data/secure_store.dart';
+import 'domain/app_account.dart';
 import 'firebase_options.dart';
 import 'l10n/app_locale.dart';
 import 'l10n/app_localizations.dart';
@@ -71,7 +75,34 @@ Future<void> main() async {
   // Prefs-side migration/creation of the accounts registry. Never touches
   // the keychain, so it can't block or fail transiently.
   final registry = await ensureAccountsRegistry(localStore);
-  final activeId = registry.activeId;
+  var activeId = registry.activeId;
+
+  // A cloud profile can only be active while its Firebase user is the one
+  // signed in — a signed-out or switched session falls back to the local
+  // profile rather than showing another account's cache.
+  final directory = localStore.readAccountsDirectory();
+  final currentUid = firebaseAuth?.currentUser?.uid;
+  if (directory != null && directory.activeAccountId != kLocalAccountId) {
+    if (currentUid == directory.activeAccountId) {
+      // The keychain secrets below must belong to the CLOUD profile's
+      // active band, not the local registry's.
+      activeId = localStore.readActiveCloudBand(currentUid!) ?? activeId;
+    } else {
+      await localStore
+          .saveAccountsDirectory(directory.withActive(kLocalAccountId));
+    }
+  }
+
+  // A local→cloud upload that crashed mid-flight resumes before the UI
+  // needs the bands; for a different (or signed-out) user the migrator
+  // clears the stale flag itself on its next run.
+  if (firestore != null && currentUid != null) {
+    final migrator = CloudMigrator(
+        local: localStore, secure: secureStore, db: firestore);
+    if (migrator.hasPendingUpload) {
+      unawaited(migrator.uploadLocalBands(currentUid));
+    }
+  }
 
   String? apiKey;
   String? relaySecret;

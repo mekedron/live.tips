@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme.dart';
 import 'domain/app_settings.dart';
+import 'features/account/cloud_upload_offer.dart';
 import 'features/live/stage/stage_overlay.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
@@ -51,8 +52,10 @@ class LiveTipsApp extends ConsumerWidget {
       // stay clickable over the jar's iframe.
       navigatorObservers: [StageOverlayObserver()],
       // The keep-alive pings the relay on launch/resume (≤ once a day) so a
-      // connected-mode jar never expires under an active artist.
-      home: const RelayKeepalive(child: RootGate()),
+      // connected-mode jar never expires under an active artist. The upload
+      // gate offers to move local bands into a freshly signed-in account.
+      home: const RelayKeepalive(
+          child: CloudUploadOfferGate(child: RootGate())),
     );
   }
 }

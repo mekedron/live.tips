@@ -256,6 +256,8 @@ class _DesktopHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final url = app.activeQrUrl;
+    // Cloud mirrors fill in asynchronously — re-read when a snapshot lands.
+    ref.watch(repoRevisionProvider);
     final sessions = ref
         .read(accountDataRepositoryProvider)
         .readSessionHistory(app.accountId);

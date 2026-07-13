@@ -9,7 +9,10 @@ import '../data/relay/relay_client.dart';
 import '../data/relay/relay_config.dart';
 import '../data/relay/relay_tip_channel.dart';
 import '../data/repository/account_data_repository.dart';
+import '../data/repository/firestore_repository.dart';
 import '../data/secure_store.dart';
+import '../domain/app_account.dart';
+import 'auth_providers.dart';
 import '../data/stripe/stripe_client.dart';
 import '../data/stripe/stripe_requests.dart';
 import '../domain/app_settings.dart';
@@ -28,17 +31,48 @@ final localStoreProvider =
 final secureStoreProvider =
     Provider<SecureStore>((ref) => throw UnimplementedError());
 
-/// The active profile's data home. Today always the local stores; once
-/// cloud accounts land this resolves per active account (local profile →
-/// [LocalStoreRepository], signed-in → Firestore-backed). Device-wide
-/// plumbing that is local by design — the accounts registry, fx cache,
-/// pending secret wipes, boot migrations — stays on [localStoreProvider].
-final accountDataRepositoryProvider = Provider<AccountDataRepository>(
-  (ref) => LocalStoreRepository(
-    ref.watch(localStoreProvider),
-    () => ref.read(secureStoreProvider),
-  ),
-);
+/// Bumped by the cloud repository on every remote snapshot that changed a
+/// mirror — everything serving sync reads from those mirrors re-reads when
+/// this moves. The local repository never bumps it.
+class RepoRevisionNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state = state + 1;
+}
+
+final repoRevisionProvider =
+    NotifierProvider<RepoRevisionNotifier, int>(RepoRevisionNotifier.new);
+
+/// The active profile's data home: the local profile reads the prefs +
+/// keychain stores; a signed-in profile reads its Firestore subtree —
+/// but only while the signed-in Firebase user IS that profile (a signed-out
+/// or mismatched session falls back to local rather than showing someone
+/// else's cache). Device-wide plumbing that is local by design — the fx
+/// cache, pending secret wipes, boot migrations — stays on
+/// [localStoreProvider].
+final accountDataRepositoryProvider = Provider<AccountDataRepository>((ref) {
+  final local = ref.watch(localStoreProvider);
+  final activeProfile = ref
+      .watch(accountsDirectoryProvider.select((d) => d.activeAccountId));
+  final db = ref.watch(firestoreProvider);
+  final signedInUid =
+      ref.watch(authControllerProvider.select((s) => s.user?.uid));
+  if (activeProfile != kLocalAccountId &&
+      db != null &&
+      signedInUid == activeProfile) {
+    final repo = FirestoreRepository(
+      uid: activeProfile,
+      db: db,
+      local: local,
+      resolveSecure: () => ref.read(secureStoreProvider),
+      onChanged: () => ref.read(repoRevisionProvider.notifier).bump(),
+    );
+    ref.onDispose(repo.dispose);
+    return repo;
+  }
+  return LocalStoreRepository(local, () => ref.read(secureStoreProvider));
+});
 
 /// Active band's API key, read from secure storage before the first frame.
 final initialApiKeyProvider = Provider<String?>((ref) => null);
@@ -175,6 +209,17 @@ class AppState {
 class AppStateNotifier extends Notifier<AppState> {
   @override
   AppState build() {
+    // Profile switches (directory) and remote snapshots (cloud revision)
+    // arrive as listens, not watches: a watch would rebuild the notifier
+    // and wipe in-flight switching state.
+    ref.listen(
+        accountsDirectoryProvider.select((d) => d.activeAccountId),
+        (previous, next) {
+      if (previous != null && previous != next) {
+        unawaited(_reloadForProfile());
+      }
+    });
+    ref.listen(repoRevisionProvider, (previous, next) => _onRemoteChange());
     final repo = ref.read(accountDataRepositoryProvider);
     // main() migrates/creates the registry before runApp; the fallback here
     // covers tests that wire a bare store straight into the ProviderScope.
@@ -191,6 +236,12 @@ class AppStateNotifier extends Notifier<AppState> {
     final activeId = repo.readActiveBandId();
     final accountId =
         accounts.any((a) => a.id == activeId) ? activeId! : accounts.first.id;
+    // Booting straight into a cloud profile: main() read the keychain for
+    // the LOCAL registry's band, not this one — fetch the right secrets as
+    // soon as the first frame is out.
+    if (!ref.read(accountsDirectoryProvider).active.isLocal) {
+      unawaited(_refreshSecrets(accountId));
+    }
     return AppState(
       accountId: accountId,
       accounts: accounts,
@@ -201,6 +252,97 @@ class AppStateNotifier extends Notifier<AppState> {
       settings: repo.readSettings(),
       band: repo.readBandSettings(accountId),
     );
+  }
+
+  /// Reloads everything for the (already switched) active profile — the
+  /// directory listener calls this after a sign-in or a profile switch.
+  Future<void> _reloadForProfile() async {
+    if (ref.read(liveSessionProvider) != null) return; // never yank a live set
+    state = state.copyWith(switching: true);
+    ref.read(onboardingDraftProvider.notifier).clear();
+    final repo = ref.read(accountDataRepositoryProvider);
+    var accounts = repo.listBands();
+    if (accounts.isEmpty) {
+      // Fresh profile — or a cloud mirror that hasn't warmed yet. The band
+      // exists in memory only; its doc materializes on the first real write,
+      // and if synced bands arrive a moment later, _onRemoteChange drops
+      // this placeholder for them.
+      accounts = [
+        BandAccount(
+          id: BandAccount.newId(),
+          name: '',
+          createdAtMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      ];
+    }
+    final storedActive = repo.readActiveBandId();
+    final accountId = accounts.any((a) => a.id == storedActive)
+        ? storedActive!
+        : accounts.first.id;
+    String? apiKey;
+    String? relaySecret;
+    try {
+      apiKey = await repo.readApiKey(accountId);
+      relaySecret = await repo.readRelaySecret(accountId);
+    } catch (_) {
+      // Locked keychain — the profile opens signed-out this once.
+    }
+    state = AppState(
+      accountId: accountId,
+      accounts: accounts,
+      apiKey: apiKey,
+      tipJar: repo.readTipJar(accountId),
+      relayJar: repo.readRelayJar(accountId),
+      relaySecret: relaySecret,
+      settings: repo.readSettings(),
+      band: repo.readBandSettings(accountId),
+    );
+    ref.read(relayHistoryProvider.notifier).refresh();
+    ref.read(storedSessionProvider.notifier).refresh();
+  }
+
+  /// A cloud snapshot moved a mirror: fold the fresh reads into state.
+  void _onRemoteChange() {
+    if (ref.read(liveSessionProvider) != null) {
+      // Mid-set the session owns the stage; only the archives refresh.
+      ref.read(relayHistoryProvider.notifier).refresh();
+      return;
+    }
+    final repo = ref.read(accountDataRepositoryProvider);
+    final accounts = repo.listBands();
+    if (accounts.isEmpty) return; // mirror not warm yet
+    final accountId = state.accountId;
+    if (!accounts.any((a) => a.id == accountId)) {
+      // The active band vanished remotely (deleted on another device), or
+      // we sat on a cold-mirror placeholder — land on a real band.
+      unawaited(_reloadForProfile());
+      return;
+    }
+    state = state.copyWith(
+      accounts: accounts,
+      tipJar: repo.readTipJar(accountId),
+      relayJar: repo.readRelayJar(accountId),
+      band: repo.readBandSettings(accountId),
+      settings: repo.readSettings(),
+    );
+    ref.read(relayHistoryProvider.notifier).refresh();
+    ref.read(storedSessionProvider.notifier).refresh();
+    // A key synced from another device shows up without a re-entry.
+    unawaited(_refreshSecrets(accountId));
+  }
+
+  Future<void> _refreshSecrets(String accountId) async {
+    final repo = ref.read(accountDataRepositoryProvider);
+    try {
+      final apiKey = await repo.readApiKey(accountId);
+      final relaySecret = await repo.readRelaySecret(accountId);
+      if (state.accountId != accountId) return;
+      if (apiKey != state.apiKey || relaySecret != state.relaySecret) {
+        state = state.copyWith(apiKey: apiKey, relaySecret: relaySecret);
+      }
+    } catch (_) {
+      // Locked keychain — the next remote change retries.
+    }
   }
 
   AccountsRegistry get _registry =>
@@ -474,6 +616,10 @@ class AppStateNotifier extends Notifier<AppState> {
       }
     }
 
+    // Subtree first, band entry second: the cloud repository enumerates a
+    // band's session/tip/secret docs by its collections, and deleting the
+    // band doc first would leave the wipe nothing to hang the query on.
+    await repo.wipeAccountData(id);
     var registry = _registry.withoutAccount(id);
     await repo.removeBandEntry(id);
     if (registry.accounts.isEmpty) {
@@ -514,7 +660,6 @@ class AppStateNotifier extends Notifier<AppState> {
       band: repo.readBandSettings(successorId),
     );
 
-    await repo.wipeAccountData(id);
     try {
       await repo.wipeAccountSecrets(id);
     } catch (_) {

@@ -135,6 +135,62 @@ class LocalStore {
     }
   }
 
+  // --- Cloud profile: device-local prefs ---
+  //
+  // A signed-in account's band LIST lives in Firestore, but which band this
+  // device is looking at does not: two devices on the same account can be on
+  // different bands, and syncing the choice would make them fight.
+
+  static const kActiveCloudBandBase = 'active_band_v1';
+
+  String? readActiveCloudBand(String uid) =>
+      _prefs.getString('${kActiveCloudBandBase}_$uid');
+
+  Future<void> saveActiveCloudBand(String uid, String bandId) =>
+      _prefs.setString('${kActiveCloudBandBase}_$uid', bandId);
+
+  // --- Pending local→cloud upload ---
+  //
+  // Set BEFORE the first byte of a local-bands upload leaves the device, so
+  // a crash mid-upload is visible at the next boot and the upload resumes
+  // instead of stranding half the bands in the cloud. Cleared only after
+  // the upload committed AND the local copies were wiped.
+
+  static const _kCloudUploadPending = 'cloud_upload_pending_v1';
+
+  ({String uid, List<String> bandIds})? readCloudUploadPending() {
+    final raw = _prefs.getString(_kCloudUploadPending);
+    if (raw == null) return null;
+    try {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      return (
+        uid: json['uid'] as String,
+        bandIds: [
+          for (final id in json['bandIds'] as List? ?? const [])
+            if (id is String) id,
+        ],
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveCloudUploadPending(String uid, List<String> bandIds) =>
+      _prefs.setString(
+          _kCloudUploadPending, jsonEncode({'uid': uid, 'bandIds': bandIds}));
+
+  Future<void> clearCloudUploadPending() async {
+    await _prefs.remove(_kCloudUploadPending);
+  }
+
+  /// Whether [uid] was already offered the local→cloud band upload —
+  /// declining is an answer, and re-asking on every sign-in is nagging.
+  bool readCloudUploadOffered(String uid) =>
+      _prefs.getBool('cloud_upload_offered_v1_$uid') ?? false;
+
+  Future<void> markCloudUploadOffered(String uid) =>
+      _prefs.setBool('cloud_upload_offered_v1_$uid', true);
+
   // --- Tip jar ---
 
   TipJar? readTipJar(String accountId) {

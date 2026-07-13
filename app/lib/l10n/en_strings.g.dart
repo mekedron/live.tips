@@ -8,6 +8,14 @@
 library;
 
 const Map<String, String> kEnStrings = {
+  "account.upload_offer.accept": "Move bands",
+  "account.upload_offer.body": "The bands on this device — payment methods, settings, and tip history — can move into your account and sync to every device you sign in on. This device's local copies are replaced by the synced ones.",
+  "account.upload_offer.decline": "Not now",
+  "account.upload_offer.done": "Your bands now live in your account.",
+  "account.upload_offer.failed": "Couldn't finish the move — it will resume on the next launch.",
+  "account.upload_offer.progress": "Moving your bands…",
+  "account.upload_offer.progress_band": "Moving {band} ({done}/{total})…",
+  "account.upload_offer.title": "Move your bands to this account?",
   "common.cancel": "Cancel",
   "common.open": "Open",
   "common.remove": "Remove",

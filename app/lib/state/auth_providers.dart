@@ -116,8 +116,11 @@ class AuthController extends Notifier<AuthState> {
     state = state.copyWith(busy: true, clearError: true);
     try {
       final user = await attempt(ref.read(authServiceProvider));
-      if (user != null) await _adopt(user);
+      // Publish the user BEFORE flipping the directory: the repository
+      // provider selects on (active profile, signed-in uid), and adopting
+      // first would rebuild it against a stale null user.
       state = state.copyWith(user: user, busy: false);
+      if (user != null) await _adopt(user);
       return user;
     } catch (e) {
       debugPrint('sign-in failed: $e');
