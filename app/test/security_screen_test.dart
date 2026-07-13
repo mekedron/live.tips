@@ -20,13 +20,58 @@ class RecordingLinkCodeService extends LinkCodeService {
   final revoked = <String>[];
   String? revokedAllFor;
 
+  /// What the server hands back after the revoke: the caller's own way back in
+  /// (#34). Null models a server that mints none — the revoke still happened.
+  String? mintedToken = 'token-for-uid_1';
+
   @override
   Future<void> revokeDevice(String deviceId) async => revoked.add(deviceId);
 
   @override
-  Future<int> revokeAllOtherDevices(String currentDeviceId) async {
+  Future<RevokedSessions> revokeAllOtherDevices(String currentDeviceId) async {
     revokedAllFor = currentDeviceId;
-    return 2;
+    return RevokedSessions(revokedCount: 2, token: mintedToken);
+  }
+}
+
+/// A [FakeAuthService] that counts the thing the kill switch must NEVER do:
+/// send the artist back through an interactive provider sign-in, at the one
+/// moment their credentials have just been invalidated. The fakes used to make
+/// that round-trip succeed unconditionally — which is precisely why the app
+/// tests could not see #34.
+class WatchingAuthService extends FakeAuthService {
+  WatchingAuthService({super.user, super.nextUser, this.tokenFails = false});
+
+  /// The re-entry cannot be completed (offline, a token the client could not
+  /// redeem) — a session is NOT a thing to throw away over that.
+  final bool tokenFails;
+
+  int providerSignIns = 0;
+  int signOuts = 0;
+  final tokens = <String>[];
+
+  @override
+  Future<AuthUser?> signInWithApple({bool link = false}) {
+    providerSignIns++;
+    return super.signInWithApple(link: link);
+  }
+
+  @override
+  Future<AuthUser?> signInWithGoogle({bool link = false}) {
+    providerSignIns++;
+    return super.signInWithGoogle(link: link);
+  }
+
+  @override
+  Future<AuthUser?> signInWithCustomToken(String token) async {
+    tokens.add(token);
+    return tokenFails ? null : user = nextUser;
+  }
+
+  @override
+  Future<void> signOut() async {
+    signOuts++;
+    return super.signOut();
   }
 }
 
@@ -49,11 +94,12 @@ DeviceInfo _device({
           : lastSeenAtMs,
     );
 
-Future<RecordingLinkCodeService> _pump(
+Future<(RecordingLinkCodeService, WatchingAuthService)> _pump(
   WidgetTester tester, {
   required List<DeviceInfo> devices,
   AccountKind kind = AccountKind.google,
   String? ownDeviceId,
+  bool tokenFails = false,
 }) async {
   await tester.binding.setSurfaceSize(const Size(600, 1200));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -67,17 +113,21 @@ Future<RecordingLinkCodeService> _pump(
     ),
   );
   final service = RecordingLinkCodeService();
+  // The re-entry resolves to the SAME account it revoked for: same uid, same
+  // kind, a session that is simply new.
+  final casey = AuthUser(uid: 'uid_1', kind: kind, displayName: 'Casey');
+  final auth = WatchingAuthService(
+    user: casey,
+    nextUser: casey,
+    tokenFails: tokenFails,
+  );
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         localStoreProvider.overrideWithValue(localStore),
         secureStoreProvider.overrideWithValue(FakeSecureStore()),
         initialApiKeyProvider.overrideWithValue(null),
-        authServiceProvider.overrideWithValue(
-          FakeAuthService(
-            user: AuthUser(uid: 'uid_1', kind: kind, displayName: 'Casey'),
-          ),
-        ),
+        authServiceProvider.overrideWithValue(auth),
         linkCodeServiceProvider.overrideWithValue(service),
         devicesProvider.overrideWith((ref) => Stream.value(devices)),
         if (ownDeviceId != null)
@@ -93,7 +143,7 @@ Future<RecordingLinkCodeService> _pump(
     ),
   );
   await tester.pumpAndSettle();
-  return service;
+  return (service, auth);
 }
 
 void main() {
@@ -122,7 +172,7 @@ void main() {
   });
 
   testWidgets('revoking asks first, then calls revokeDevice', (tester) async {
-    final service = await _pump(tester, devices: [
+    final (service, _) = await _pump(tester, devices: [
       _device(id: 'dev_a', name: "Casey's iPhone", isCurrent: true),
       _device(id: 'dev_b', name: 'Old Pixel', platform: 'android'),
     ]);
@@ -143,7 +193,7 @@ void main() {
   });
 
   testWidgets('cancelling the confirm dialog revokes nothing', (tester) async {
-    final service = await _pump(tester, devices: [
+    final (service, _) = await _pump(tester, devices: [
       _device(id: 'dev_b', name: 'Old Pixel', platform: 'android'),
     ]);
 
@@ -180,7 +230,7 @@ void main() {
     // id this device calls itself. Tapping its Revoke must NOT run
     // revokeDevice (which wipes this device's own keys); it is a sign-out,
     // and must say so.
-    final service = await _pump(
+    final (service, _) = await _pump(
       tester,
       ownDeviceId: 'dev_self',
       devices: [
@@ -204,48 +254,91 @@ void main() {
   });
 
   testWidgets(
-      'a guest account cannot sign out everywhere else — and is given the '
-      'door it was told to walk through', (tester) async {
-    await _pump(
-      tester,
-      kind: AccountKind.anonymous,
-      devices: [_device(id: 'dev_a', name: 'Guest phone', isCurrent: true)],
-    );
-
-    expect(
-      find.textContaining('Link Apple or Google first'),
-      findsOneWidget,
-    );
-    final button = tester.widget<OutlinedButton>(
-      find.ancestor(
-        of: find.text('Sign out everywhere else'),
-        matching: find.byType(OutlinedButton),
-      ),
-    );
-    expect(button.onPressed, isNull);
-
-    // #32: the instruction used to be a dead end — the app named the one
-    // control that would make the account safe and offered no way to reach it.
-    await tester.tap(find.text('Link Apple or Google'));
-    await tester.pumpAndSettle();
-    expect(find.text('Sign-in methods'), findsOneWidget);
-    expect(find.widgetWithText(TextButton, 'Link'), findsNWidgets(2));
-  });
-
-  testWidgets('once a provider is linked, the kill switch is armed', (
-    tester,
-  ) async {
-    // The other half of #32: linking is not decoration. The moment the guest
-    // account has a way back in, "Sign out everywhere else" — which would
-    // otherwise have locked them out of their own account — becomes usable.
-    final service = await _pump(
+      'the kill switch keeps the artist signed in — and never sends them '
+      'back through a provider (#34)', (tester) async {
+    // The bug: it revoked THIS device's session too and then re-ran an
+    // interactive Apple/Google sign-in to restore it. A redirect that never
+    // came back, a cancelled sheet — and the app signed the artist out of the
+    // account they were protecting. The server now hands the caller a token
+    // minted after the revoke, and that is the entire re-entry.
+    final (service, auth) = await _pump(
       tester,
       kind: AccountKind.google,
       ownDeviceId: 'dev_a',
+      devices: [
+        _device(id: 'dev_a', name: "Casey's iPhone", isCurrent: true),
+        _device(id: 'dev_b', name: 'Old Pixel', platform: 'android'),
+      ],
+    );
+
+    await tester.tap(find.text('Sign out everywhere else'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign out others'));
+    await tester.pumpAndSettle();
+
+    expect(service.revokedAllFor, 'dev_a');
+    // The session is re-seated with the server's token, and NOTHING asked a
+    // provider for anything.
+    expect(auth.tokens, ['token-for-uid_1']);
+    expect(auth.providerSignIns, 0,
+        reason: 'no sheet, no redirect — nothing for the artist to cancel');
+    expect(auth.signOuts, 0);
+    expect(auth.user?.uid, 'uid_1');
+    expect(find.text('Signed out 2 other device(s).'), findsOneWidget);
+    expect(find.text("Casey's iPhone"), findsOneWidget,
+        reason: 'still on the security screen, still signed in');
+  });
+
+  testWidgets(
+      'a re-entry that fails does NOT sign the artist out of a session that '
+      'is still valid', (tester) async {
+    // The old code called auth.signOut() here. The session in hand is valid
+    // until its ID token expires, the minted token stays good for an hour, and
+    // a guest has no provider to come back with: signing out is the one thing
+    // that turns a hiccup into a lockout.
+    final (_, auth) = await _pump(
+      tester,
+      kind: AccountKind.google,
+      ownDeviceId: 'dev_a',
+      tokenFails: true,
       devices: [_device(id: 'dev_a', name: "Casey's iPhone", isCurrent: true)],
     );
 
+    await tester.tap(find.text('Sign out everywhere else'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign out others'));
+    await tester.pumpAndSettle();
+
+    expect(auth.signOuts, 0);
+    expect(auth.user?.uid, 'uid_1');
+    expect(auth.providerSignIns, 0);
+    expect(find.textContaining('you are still signed in here'), findsOneWidget);
+    expect(find.text("Casey's iPhone"), findsOneWidget);
+    // And the token is still good, so the artist gets another go at it.
+    expect(find.text('Try again'), findsOneWidget);
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(auth.tokens, ['token-for-uid_1', 'token-for-uid_1']);
+  });
+
+  testWidgets(
+      'a guest account can sign out everywhere else — and keeps the door #32 '
+      'built', (tester) async {
+    // The restriction existed for one reason: a guest had no provider to
+    // re-authenticate with. The server's token needs none (#34), so the switch
+    // is armed — and linking, still worth offering, is no longer a hostage.
+    final (service, auth) = await _pump(
+      tester,
+      kind: AccountKind.anonymous,
+      ownDeviceId: 'dev_a',
+      devices: [
+        _device(id: 'dev_a', name: 'Guest phone', isCurrent: true),
+        _device(id: 'dev_b', name: 'Old Pixel', platform: 'android'),
+      ],
+    );
+
     expect(find.textContaining('Link Apple or Google first'), findsNothing);
+    expect(find.textContaining('works on a guest account too'), findsOneWidget);
     final button = tester.widget<OutlinedButton>(
       find.ancestor(
         of: find.text('Sign out everywhere else'),
@@ -260,6 +353,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(service.revokedAllFor, 'dev_a');
+    expect(auth.tokens, ['token-for-uid_1']);
+    expect(auth.providerSignIns, 0);
+    expect(auth.user?.uid, 'uid_1');
+    expect(find.text('Signed out 2 other device(s).'), findsOneWidget);
+
+    // #32's door is still there: linking is how a guest gets back in on a NEW
+    // device, it just is not a prerequisite for the kill switch any more.
+    await tester.tap(find.text('Link Apple or Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign-in methods'), findsOneWidget);
   });
 
   testWidgets('an empty account still renders its (empty) list', (

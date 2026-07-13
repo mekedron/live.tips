@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,7 +8,6 @@ import '../../data/firebase/auth_service.dart';
 import '../../data/firebase/device_registry.dart';
 import '../../data/firebase/link_codes.dart';
 import '../../domain/app_account.dart';
-import '../../domain/pending_redirect.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/device_providers.dart';
@@ -117,10 +118,16 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
   }
 
   /// The real kill switch. It takes THIS device's refresh token down with the
-  /// rest (that's what makes it real), so the moment it returns we sign back
-  /// in with the same provider — otherwise the artist would have locked
-  /// themselves out by tidying up.
-  Future<void> _signOutOthers(AccountKind kind) async {
+  /// rest (that's what makes it real), so the server hands us a custom token
+  /// minted after the revoke and we sign straight back in with THAT (#34).
+  ///
+  /// It used to re-run the INTERACTIVE Apple/Google sign-in here — a provider
+  /// round-trip demanded at the exact moment the account's credentials had
+  /// just been invalidated, and a sign-out when it did not come back. The
+  /// artist could lock themselves out of the account they were protecting.
+  /// Nothing to cancel now, nothing to redirect, and no provider at all —
+  /// which is also why a guest account may take this door.
+  Future<void> _signOutOthers() async {
     final s = context.s;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -147,9 +154,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
 
     setState(() => _busy = true);
     final deviceId = ref.read(deviceRegistryProvider).deviceId;
-    int count;
+    RevokedSessions revoked;
     try {
-      count = await ref
+      revoked = await ref
           .read(linkCodeServiceProvider)
           .revokeAllOtherDevices(deviceId);
     } on LinkCodeError {
@@ -160,49 +167,50 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       ));
       return;
     }
+    await _reenter(revoked);
+  }
 
-    // Our own refresh token is gone. Re-run the same provider sign-in: same
-    // uid, fresh auth_time (which the rules' watermark now demands).
-    final auth = ref.read(authControllerProvider.notifier);
-    // On the WEB that re-auth is a redirect: it returns null because the page
-    // is leaving for the provider, NOT because it failed. Treating that null as
-    // a failure would sign the artist out on their way to the sign-in page —
-    // and the redirect would come back to a signed-out app.
-    final redirecting = ref.read(webRedirectSignInProvider) &&
-        (kind == AccountKind.apple || kind == AccountKind.google);
+  /// Redeems the token the kill switch handed back: the same uid, on this
+  /// account's own session, with an auth_time of now — which is precisely what
+  /// the freshly-stamped watermark demands. A plain API call on our own origin.
+  Future<void> _reenter(RevokedSessions revoked) async {
+    final s = context.s;
+    final token = revoked.token;
     AuthUser? refreshed;
-    try {
-      refreshed = switch (kind) {
-        AccountKind.apple =>
-          await auth.signInWithApple(origin: RedirectOrigin.settings),
-        AccountKind.google =>
-          await auth.signInWithGoogle(origin: RedirectOrigin.settings),
-        _ => null,
-      };
-    } catch (_) {
-      refreshed = null;
+    if (token != null) {
+      try {
+        refreshed = await ref
+            .read(authControllerProvider.notifier)
+            .signInWithCustomToken(token, inPlace: true);
+      } catch (_) {
+        refreshed = null;
+      }
     }
-    // The page is on its way to the provider — unless the redirect could not
-    // even start, which the controller reports as an error and which IS a
-    // failure to re-authenticate.
-    if (redirecting && ref.read(authControllerProvider).error == null) return;
     if (!mounted) return;
+    setState(() => _busy = false);
     if (refreshed == null) {
-      // We cut our own session and could not restore it — land on the local
-      // profile and say so plainly, rather than leaving a zombie UI signed
-      // into an account it can no longer read.
-      await auth.signOut();
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      // We could NOT re-seat the session — and we do not sign the artist out of
+      // the one they are still holding. That is what this screen used to do,
+      // and it is the whole bug: the session in hand is valid until its ID
+      // token expires, the token stays good for an hour, and a guest has no
+      // provider to come back with. So: say it, and offer another go.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(s.t('settings.security.reauth_failed')),
+        action: token == null
+            ? null
+            : SnackBarAction(
+                label: s.t('settings.security.reauth_retry'),
+                onPressed: () {
+                  setState(() => _busy = true);
+                  unawaited(_reenter(revoked));
+                },
+              ),
       ));
       return;
     }
-    setState(() => _busy = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(s.t('settings.security.sign_out_others_done', {
-        'count': '$count',
+        'count': '${revoked.revokedCount}',
       })),
     ));
   }
@@ -324,9 +332,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                               s.t('settings.security.sign_out_others_header')),
                           const SizedBox(height: 8),
                           Text(
-                            anonymous
-                                ? s.t('settings.security.sign_out_others_anonymous')
-                                : s.t('settings.security.sign_out_others_subtitle'),
+                            s.t('settings.security.sign_out_others_subtitle'),
                             style: TextStyle(
                               fontFamily: kFontBody,
                               fontSize: 12.5,
@@ -334,10 +340,25 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                               color: c.textSecondary,
                             ),
                           ),
-                          // The instruction, made into a door (#32): telling a
-                          // guest to "link Apple or Google first" and leaving
-                          // them to hunt for a control that did not exist is
-                          // how this screen used to end.
+                          // A guest keeps the door #32 built — linking is worth
+                          // offering, and is still the only way back in on a
+                          // NEW device. It is no longer a prerequisite for the
+                          // kill switch: the token that keeps this device
+                          // signed in comes from the server, and needs no
+                          // provider (#34).
+                          if (anonymous)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                s.t('settings.security.sign_out_others_guest'),
+                                style: TextStyle(
+                                  fontFamily: kFontBody,
+                                  fontSize: 12.5,
+                                  height: 1.45,
+                                  color: c.textSecondary,
+                                ),
+                              ),
+                            ),
                           if (anonymous)
                             Align(
                               alignment: Alignment.centerLeft,
@@ -359,9 +380,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                             label: s.t('settings.security.sign_out_others'),
                             icon: Icons.gpp_bad_rounded,
                             busy: _busy,
-                            onPressed: anonymous || _busy
-                                ? null
-                                : () => _signOutOthers(user.kind),
+                            onPressed: _busy ? null : _signOutOthers,
                           ),
                         ],
                       ),

@@ -20,8 +20,8 @@ enum LinkCodeErrorKind {
   /// Not signed in, or a session revoked by the watermark.
   unauthenticated,
 
-  /// Anonymous account (createLinkCode / revokeAllOtherDevices), a code that
-  /// expired, was already redeemed, or isn't confirmable any more.
+  /// Anonymous account (createLinkCode), a code that expired, was already
+  /// redeemed, or isn't confirmable any more.
   failedPrecondition,
 
   /// Unknown/malformed code, or a device id with no doc.
@@ -66,6 +66,22 @@ class LinkCode {
   /// sent to a server, so the code stays out of hosting/CDN access logs even
   /// when the link is opened in a browser instead of the app.
   String get url => 'https://tip.live.tips/link#c=$code';
+}
+
+/// What the kill switch gives back: how many devices it flagged, and this
+/// device's own way back in.
+class RevokedSessions {
+  const RevokedSessions({required this.revokedCount, this.token});
+
+  final int revokedCount;
+
+  /// A custom token for the caller's own uid, minted by the server AFTER it
+  /// revoked every refresh token this account had — including ours. Redeeming
+  /// it is what keeps THIS device signed in (see SecurityScreen).
+  ///
+  /// Null only from a server that predates #34. The revoke still happened, so
+  /// a null is a failure to re-enter, never a failure to revoke.
+  final String? token;
 }
 
 /// Where a code is in its lifecycle, as device A's listener sees it.
@@ -248,12 +264,17 @@ class LinkCodeService {
   Future<void> revokeDevice(String deviceId) =>
       _call('revokeDevice', {'deviceId': deviceId});
 
-  /// The real kill switch. Also revokes the CALLER's refresh tokens: whoever
-  /// calls this must silently re-authenticate immediately after, or lose its
-  /// own access. Returns how many devices were flagged.
-  Future<int> revokeAllOtherDevices(String currentDeviceId) async {
+  /// The real kill switch. It revokes the CALLER's refresh token too — that is
+  /// what makes it real — and hands back a custom token minted after the
+  /// revoke, which the caller redeems to stay signed in. Guests included: the
+  /// token needs no provider (#34).
+  Future<RevokedSessions> revokeAllOtherDevices(String currentDeviceId) async {
     final data = await _call(
         'revokeAllOtherDevices', {'currentDeviceId': currentDeviceId});
-    return (data['revokedCount'] as num?)?.toInt() ?? 0;
+    final token = data['token'] as String?;
+    return RevokedSessions(
+      revokedCount: (data['revokedCount'] as num?)?.toInt() ?? 0,
+      token: token == null || token.isEmpty ? null : token,
+    );
   }
 }

@@ -323,8 +323,11 @@ Revocation comes in two strengths, and it is worth being clear which is which:
   the caller's token `auth_time` against that watermark, so an ID token minted
   before the revocation loses the whole subtree **immediately**, rather than
   after the ≤1 h of cryptographic validity it has left. Accounts that never
-  revoked have no security doc and short-circuit on `exists()`; the calling
-  device re-authenticates silently afterwards.
+  revoked have no security doc and short-circuit on `exists()`. The caller's own
+  session dies with the rest — so the callable mints it a custom token *after*
+  the revoke and returns it, and the calling device signs straight back in with
+  that. No provider round-trip at the one moment the account's credentials are
+  down, which is also why a **guest account** may pull this switch.
 
 Adding a device is a QR handshake, and the load-bearing part is that the
 already-signed-in device must **confirm** it. The signed-in device displays

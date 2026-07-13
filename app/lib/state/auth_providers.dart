@@ -268,7 +268,7 @@ class AuthController extends Notifier<AuthState> {
   }) =>
       ref.read(webRedirectSignInProvider)
           ? _startRedirect(OAuthProviderKind.apple, link: link, origin: origin)
-          : _run((s) => s.signInWithApple(link: link), link: link);
+          : _run((s) => s.signInWithApple(link: link), inPlace: link);
 
   Future<AuthUser?> signInWithGoogle({
     bool link = false,
@@ -276,28 +276,36 @@ class AuthController extends Notifier<AuthState> {
   }) =>
       ref.read(webRedirectSignInProvider)
           ? _startRedirect(OAuthProviderKind.google, link: link, origin: origin)
-          : _run((s) => s.signInWithGoogle(link: link), link: link);
+          : _run((s) => s.signInWithGoogle(link: link), inPlace: link);
 
   /// A guest account needs no provider page, so it never redirects — the same
   /// in-page sign-in on every platform.
   Future<AuthUser?> signInAnonymously() =>
       _run((s) => s.signInAnonymously());
 
-  Future<AuthUser?> signInWithCustomToken(String token) =>
-      _run((s) => s.signInWithCustomToken(token));
+  /// Redeems a custom token. A new device's token (the QR handshake, the venue
+  /// tablet) signs a NEW account in and gets its own slot; [inPlace] is for the
+  /// token the server mints for a session we ALREADY hold — the kill switch's
+  /// way back in (#34), which is the same uid on the same account and must
+  /// re-seat that account's own instance rather than open a second one beside
+  /// it.
+  Future<AuthUser?> signInWithCustomToken(String token,
+          {bool inPlace = false}) =>
+      _run((s) => s.signInWithCustomToken(token), inPlace: inPlace);
 
   /// The ONLY door into an account: every sign-in the artist actually asked
   /// for comes through here, and only what comes through here is adopted.
   ///
   /// A fresh sign-in runs on a NEW slot ([AccountSessions.begin]) so the
-  /// accounts already signed in on this device are never disturbed; only a
-  /// [link] (upgrading the CURRENT anonymous user in place) runs on the
-  /// active account's own instance. Where slots don't exist (no Firebase,
-  /// tests that stub [authServiceProvider]) the active service is the only
-  /// door there is — today's single-session behavior, unchanged.
+  /// accounts already signed in on this device are never disturbed. [inPlace]
+  /// runs on the ACTIVE account's own instance instead — a link (upgrading the
+  /// current anonymous user), or a re-seat of the session that account is
+  /// already signed in with. Where slots don't exist (no Firebase, tests that
+  /// stub [authServiceProvider]) the active service is the only door there is
+  /// — today's single-session behavior, unchanged.
   Future<AuthUser?> _run(
     Future<AuthUser?> Function(AuthService) attempt, {
-    bool link = false,
+    bool inPlace = false,
   }) async {
     if (state.busy) return null;
     state = state.copyWith(busy: true, clearError: true);
@@ -306,7 +314,7 @@ class AuthController extends Notifier<AuthState> {
     PendingSession? pending;
     try {
       final AuthService service;
-      if (!link && sessions.available) {
+      if (!inPlace && sessions.available) {
         pending = await sessions.begin();
         service = ref.read(slotAuthServiceFactoryProvider)(pending.auth);
       } else {

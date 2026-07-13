@@ -11,9 +11,11 @@
 ///    confirmed link code would otherwise mint a fresh POST-watermark token
 ///    through the unauthenticated collect handler), AND revokes refresh
 ///    tokens server-side, so stolen sessions die within the ID-token hour and
-///    cannot renew. The caller's own token predates the watermark too — the
-///    calling client must silently re-authenticate right after (its refresh
-///    credential is gone, its provider session is not).
+///    cannot renew. The caller's own session dies with the rest — so the
+///    handler mints it a fresh custom token AFTER the revoke and hands it
+///    back, and the client signs straight back in with it. That is the whole
+///    re-entry: no provider round-trip at the one moment the account's
+///    credentials are down (#34).
 ///
 /// ONE QR flow lives here — ADD A DEVICE (linkCodes, linkcodes.ts): the
 /// SIGNED-IN device shows the QR, the NEW device scans it, the signed-in
@@ -413,7 +415,7 @@ export async function revokeDeviceHandler(
 }
 
 /**
- * The real kill switch, in four moves:
+ * The real kill switch, in five moves:
  *  1. sessionsValidAfterMs = now — rules instantly shut every pre-now ID
  *     token out of users/** (and this surface, via requireFreshSession);
  *  2. every live QR grant dies: the link codes this uid owns flip to
@@ -424,15 +426,31 @@ export async function revokeDeviceHandler(
  *  3. every device doc except currentDeviceId gets revoked:true (the
  *     cooperative sign-out signal, plus honest UI state);
  *  4. admin revokeRefreshTokens(uid) — stolen sessions cannot renew, so they
- *     die for good when their current ID token expires (≤1h).
- * The CALLER is caught by 1 and 4 as well: their client must silently
- * re-authenticate immediately afterwards (fresh auth_time, fresh refresh
- * token). Non-anonymous only — an anonymous account cannot re-authenticate.
+ *     die for good when their current ID token expires (≤1h);
+ *  5. a custom token for the CALLER, minted LAST — the one credential in the
+ *     world that postdates this revocation, handed to the one client we
+ *     authenticated on the way in.
+ *
+ * The caller is caught by 1 and 4 like everyone else — that is what makes the
+ * switch real — so move 5 is how it comes back: signInWithCustomToken, same
+ * uid, auth_time of NOW, which is exactly what the watermark stamped in move 1
+ * demands. The order is the point. Nothing is minted before the revoke, so
+ * nothing survives it; and a handler that throws anywhere above returns no
+ * token at all (#34). The client used to re-run an INTERACTIVE Apple/Google
+ * sign-in here, at the one moment the account's credentials were down — and
+ * signed the artist out when that round-trip did not come back.
+ *
+ * ANY signed-in account may call it, guests included: a server-minted token
+ * needs no provider to redeem, which was the only reason anonymous callers
+ * were ever turned away. requireFreshSession still guards the door, and the
+ * token is only ever for request.auth.uid — the caller can revoke nobody's
+ * sessions but its own, and gains nothing it could not already mint through
+ * mintSessionToken (session-token.ts).
  */
 export async function revokeAllOtherDevicesHandler(
   request: CallableRequest,
-): Promise<{ ok: true; revokedCount: number }> {
-  const uid = requireNonAnonymousUid(request);
+): Promise<{ ok: true; revokedCount: number; token: string }> {
+  const uid = requireUid(request);
   const data = dataObject(request);
   const currentDeviceId = requireDeviceId(data["currentDeviceId"]);
   const firestore = db();
@@ -479,5 +497,9 @@ export async function revokeAllOtherDevicesHandler(
   if (inBatch > 0) await batch.commit();
 
   await getAuth().revokeRefreshTokens(uid);
-  return { ok: true, revokedCount };
+  // Move 5, and only now that every credential this account had is dead: the
+  // caller's way back in. Redeeming it is a plain API call on the client's own
+  // origin — no provider page, no redirect, nothing to cancel.
+  const token = await getAuth().createCustomToken(uid);
+  return { ok: true, revokedCount, token };
 }
