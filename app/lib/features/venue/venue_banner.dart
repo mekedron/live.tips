@@ -7,7 +7,7 @@ import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/venue_providers.dart';
-import '../../widgets/band_switcher.dart';
+import '../../widgets/profile_switcher.dart';
 
 /// The always-on venue banner: "Public device · signed in as X · End session".
 ///

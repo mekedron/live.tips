@@ -12,7 +12,6 @@ import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/features/home/setup_home_screen.dart';
 import 'package:live_tips/features/onboarding/profile_pick_screen.dart';
 import 'package:live_tips/features/onboarding/welcome_screen.dart';
-import 'package:live_tips/features/settings/account_switch_screen.dart';
 import 'package:live_tips/features/shell/app_shell.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
@@ -199,9 +198,8 @@ void main() {
 
     // An empty profile set is an empty profile set, whoever owns it: the way
     // out is to make a profile, not to be handed the list of accounts (which
-    // is the screen the artist would have come FROM).
+    // is the surface the artist would have come FROM).
     expect(find.byType(ProfilePickScreen), findsOneWidget);
-    expect(find.byType(AccountSwitchScreen), findsNothing);
     expect(find.text('No profile on this device yet'), findsOneWidget);
     expect(find.text('Create a new profile'), findsOneWidget);
     expect(find.text('Switch account'), findsOneWidget,
@@ -215,8 +213,8 @@ void main() {
   });
 
   testWidgets(
-      'the empty "On this device" profile is not a dead end: picking it from '
-      'the switcher lands on the create step, never back on the switcher (#38)',
+      'the empty "On this device" mode is not a dead end: picking it from the '
+      'switcher lands on the create step, never back on the switcher (#38)',
       (tester) async {
     // The state the artist is really in after the upload flow moved their
     // local profiles into an account (#25/#30), or after deleting the last
@@ -250,22 +248,25 @@ void main() {
     );
     expect(find.byType(AppShell), findsOneWidget);
 
-    // Settings is a TAB of the shell, so the switcher is pushed straight on top
-    // of the root — which is what made the pop land on the screen it came from.
+    // Settings is a TAB of the shell, so the switcher opens straight over the
+    // root — which is what made the old pushed screen's pop land on the screen
+    // it came from. A sheet has no route identity to collide with.
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Switch account'));
+    await tester.tap(find.text('Switch profile'));
     await tester.pumpAndSettle();
-    expect(find.byType(AccountSwitchScreen), findsOneWidget);
+    expect(find.text('On this device'), findsOneWidget);
 
+    // With no profiles under it, the mode's own label is the door in.
     await tester.tap(find.text('On this device'));
     await tester.pumpAndSettle();
 
-    // Forward, not back: the local profile has no bands, and the create step is
-    // the door it never had. The switcher is gone — the artist is not standing
-    // on the row they just tapped.
+    // Forward, not back: the local mode has no profiles, and the create step is
+    // the door it never had. The sheet is gone — the artist is not standing on
+    // the row they just tapped.
     expect(find.byType(ProfilePickScreen), findsOneWidget);
-    expect(find.byType(AccountSwitchScreen), findsNothing);
+    expect(find.text('Sign in to another account'), findsNothing,
+        reason: 'the sheet closed over what the tap landed on');
     expect(find.text('No profile on this device yet'), findsOneWidget);
     expect(find.text('Create a new profile'), findsOneWidget);
     final container = ProviderScope.containerOf(

@@ -8,31 +8,24 @@ import '../../core/theme.dart';
 import '../../domain/app_account.dart';
 import '../../domain/app_settings.dart';
 import '../../domain/device_kind.dart';
-import '../../domain/pending_redirect.dart';
 import '../../domain/tip_method.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../state/venue_providers.dart';
-import '../../widgets/band_switcher.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
+import '../../widgets/profile_switcher.dart';
 import '../../widgets/sign_in_sheet.dart';
 import '../account/cloud_upload_offer.dart';
 import '../shell/app_shell.dart';
 import '../onboarding/account_name_screen.dart';
 import '../venue/venue_reapproval_screen.dart';
 import 'account_details_screen.dart';
-import 'account_switch_screen.dart';
 import 'relay_method_screen.dart';
 import 'security_screen.dart';
 import 'sign_in_methods_screen.dart';
 import 'stripe_key_screen.dart';
-
-/// What the sign-out dialog resolved to. A guest can also leave by KEEPING
-/// the account and giving it a real credential — that is the whole point of
-/// offering the link there.
-enum _SignOutChoice { cancel, signOut, linkApple, linkGoogle }
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -58,25 +51,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _accountLabel(AppAccount profile) =>
       profile.email ?? accountDisplayName(context, profile);
 
-  /// The removal is refused for the same reasons, and in the same words, as
-  /// every other account-level act: mid-switch, or a session live here or on
-  /// another device.
-  bool _removalBlocked() {
-    final s = context.s;
-    // A refusal always names itself — and it asks the same guard add/switch
-    // ask, so a session that died with its tab can no longer wedge this shut.
-    final block = ref.read(appStateProvider.notifier).accountActionBlock;
-    if (block == null) return false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(block == AccountActionBlock.switching
-            ? s.t('widgets.band_switcher.switching')
-            : s.t('settings.main.stop_session_remove_profile')),
-      ),
-    );
-    return true;
-  }
-
   /// DELETES the profile — from the ACCOUNT, on every device, for good. This
   /// is what the row labelled "Remove this profile from this device" used to
   /// run while promising the opposite (#27), so the dialog says the word
@@ -95,7 +69,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     final s = context.s;
     final app = ref.read(appStateProvider);
-    if (_removalBlocked()) return;
+    // A refusal always names itself — and it asks the same guard switch/add/
+    // sign-out ask, so a session that died with its tab can no longer wedge
+    // this shut.
+    if (!accountActionAllowed(context, ref,
+        sessionKey: 'settings.main.stop_session_remove_profile')) {
+      return;
+    }
     final profile = ref.read(accountsDirectoryProvider).active;
     final cloud = !profile.isLocal;
     final hasOthers = app.accounts.length > 1;
@@ -134,92 +114,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
-  Future<void> _confirmSignOut() async {
-    final s = context.s;
-    final user = ref.read(authControllerProvider).user;
-    if (user == null) return;
-    // A sign-out is an account flip like any other — refused mid-session,
-    // by the same guard add/switch/remove ask. Silently ending an artist's
-    // live set from a Settings tap is not an option.
-    final block = ref.read(appStateProvider.notifier).accountActionBlock;
-    if (block != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(block == AccountActionBlock.switching
-              ? s.t('widgets.band_switcher.switching')
-              : s.t('settings.account.stop_session_sign_out')),
-        ),
-      );
-      return;
-    }
-    // Signing out of a guest account destroys it: an anonymous user has no
-    // credential to come back with. The dialog says so, and offers the way
-    // out that keeps the data — linking a real provider to this same uid.
-    // Every other account is REMOVED from this device and nothing more (#31):
-    // its data is in the cloud, signing back in brings it all back, and the
-    // body says exactly that.
-    final anonymous = user.kind == AccountKind.anonymous;
-    final choice = await showDialog<_SignOutChoice>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(s.t('settings.account.sign_out_title')),
-        content: Text(
-          anonymous
-              ? s.t('settings.account.sign_out_anonymous_body')
-              : s.t('settings.account.sign_out_body_device'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(_SignOutChoice.cancel),
-            child: Text(s.t('common.cancel')),
-          ),
-          if (anonymous) ...[
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_SignOutChoice.linkApple),
-              child: Text(s.t('settings.account.link_apple')),
-            ),
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_SignOutChoice.linkGoogle),
-              child: Text(s.t('settings.account.link_google')),
-            ),
-          ],
-          FilledButton(
-            style: anonymous
-                ? FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                    foregroundColor: Colors.white,
-                  )
-                : null,
-            onPressed: () => Navigator.of(context).pop(_SignOutChoice.signOut),
-            child: Text(s.t('settings.account.sign_out')),
-          ),
-        ],
-      ),
-    );
-    final auth = ref.read(authControllerProvider.notifier);
-    switch (choice) {
-      case _SignOutChoice.signOut:
-        // The whole act, not just the session: the account leaves this device
-        // (#31). Never AuthController.signOut alone — that is the half that
-        // used to leave the artist's email in the switcher.
-        await ref.read(signOutProvider)();
-      // The guest upgrade. On the web this is linkWithRedirect: the page leaves
-      // and the LINK is remembered across the reload (PendingRedirect.link), so
-      // the guest's uid — and every band under it — is upgraded in place rather
-      // than a second, empty account being signed in beside it.
-      case _SignOutChoice.linkApple:
-        await auth.signInWithApple(link: true, origin: RedirectOrigin.settings);
-      case _SignOutChoice.linkGoogle:
-        await auth.signInWithGoogle(
-            link: true, origin: RedirectOrigin.settings);
-      case _SignOutChoice.cancel:
-      case null:
-        break;
-    }
-  }
-
   /// The permanent home of the local→cloud move. The offer that pops after
   /// a sign-in is a convenience with a memory — it only asks about profiles
   /// it hasn't asked about — so without this row, an account that once said
@@ -229,17 +123,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _confirmMoveLocalProfiles() async {
     final s = context.s;
     // The move ends by switching to the migrated profile — the same guard
-    // add/switch/remove ask, for the same reason: no reshuffling under a
+    // switch/add/sign-out ask, for the same reason: no reshuffling under a
     // live set.
-    final block = ref.read(appStateProvider.notifier).accountActionBlock;
-    if (block != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(block == AccountActionBlock.switching
-              ? s.t('widgets.band_switcher.switching')
-              : s.t('settings.account.stop_session_move')),
-        ),
-      );
+    if (!accountActionAllowed(context, ref,
+        sessionKey: 'settings.account.stop_session_move')) {
       return;
     }
     final uid = ref.read(accountsDirectoryProvider).activeAccountId;
@@ -272,15 +159,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// not be inherited by another.
   Future<void> _confirmChangeDeviceKind() async {
     final s = context.s;
-    final block = ref.read(appStateProvider.notifier).accountActionBlock;
-    if (block != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(block == AccountActionBlock.switching
-              ? s.t('widgets.band_switcher.switching')
-              : s.t('settings.main.stop_session_remove_profile')),
-        ),
-      );
+    if (!accountActionAllowed(context, ref,
+        sessionKey: 'settings.main.stop_session_remove_profile')) {
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -447,25 +327,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ? s.t('settings.account.sign_out_anonymous_warning')
                       : null,
                   chevron: true,
-                  onTap: _confirmSignOut,
+                  onTap: () => confirmSignOut(context, ref),
                 ),
             ],
-            // Switching the ACCOUNT is a deliberate, separate act — it swaps
-            // every profile at once. It lives here, never in the profile
-            // switcher. Shown as soon as there is anywhere else to go.
-            if (!venueMode &&
-                (cloudEntry != null || directory.accounts.length > 1))
-              LtRow(
-                icon: Icons.swap_horizontal_circle_outlined,
-                title: s.t('settings.account.switch_row'),
-                subtitle: s.t('settings.account.switch_subtitle'),
-                chevron: true,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const AccountSwitchScreen(),
-                  ),
-                ),
-              ),
+            // "Switch account" used to sit here, a second door to a second
+            // switcher — one that knew about accounts and nothing about the
+            // profiles inside them. There is one switcher now (#29), it is in
+            // the profile group below where the artist looks for it, and it
+            // lists both. The row is gone rather than aliased: two rows opening
+            // the same sheet is the same split, redrawn.
           ],
         ),
       // ------------------------------------------------ account details ---
@@ -507,12 +377,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 MaterialPageRoute(builder: (_) => const AccountDetailsScreen()),
               ),
             ),
+            // THE switcher — profiles and the accounts they live under, one
+            // list, one set of rules (#29).
             LtRow(
               icon: Icons.swap_horiz_rounded,
               title: s.t('settings.main.switch_profile'),
               subtitle: s.t('settings.main.switch_profile_subtitle'),
               chevron: true,
-              onTap: () => showBandSwitcherSheet(context, ref),
+              onTap: () => showSwitcherSheet(context, ref),
             ),
             // ONE removal, and it is account-wide (#37). "Remove from this
             // device" sat here for a few hours and had to go with the model it

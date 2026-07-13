@@ -1,3 +1,4 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,12 +9,12 @@ import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/domain/tip.dart';
-import 'package:live_tips/features/settings/account_switch_screen.dart';
 import 'package:live_tips/features/settings/settings_screen.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
 import 'package:live_tips/state/venue_providers.dart';
+import 'package:live_tips/widgets/profile_switcher.dart';
 
 import 'helpers.dart';
 
@@ -26,7 +27,8 @@ import 'helpers.dart';
 /// which kept polling Stripe with the wiped account's in-memory key. And
 /// the doors that let an interactive flip land mid-session at all — the
 /// account switcher and Settings sign-out — now refuse, like the band
-/// switcher always has.
+/// switcher always has. There is ONE switcher since #29, and one refusal:
+/// switching profiles and switching accounts say the same sentence.
 
 /// A tip source that remembers being disposed — "the poll timer is dead"
 /// made observable.
@@ -159,20 +161,30 @@ void main() {
     expect(secure.values, isEmpty);
   });
 
-  testWidgets('the account switcher refuses mid-session, and says why',
+  testWidgets('the switcher refuses an account flip mid-session, and says why',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(600, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final store = await seededStore();
+    // A profile on the device itself, beside the signed-in account and its own
+    // (cloud) profiles — the account flip under test is the tap on it.
+    final store = await seededStore(bandName: 'Home Sessions');
     await store.saveAccountsDirectory(AccountsDirectory.initial()
         .withAccount(const AppAccount(
             id: 'uid_1', name: 'Casey', kind: AccountKind.google))
         .withActive('uid_1'));
+    final db = FakeFirebaseFirestore();
+    await db
+        .collection('users')
+        .doc('uid_1')
+        .collection('bands')
+        .doc('acc_cloud')
+        .set({'name': 'Duo Sundays', 'createdAtMs': 1});
     final container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
       secureStoreProvider.overrideWithValue(FakeSecureStore(
           {'${SecureStore.kApiKeyBase}_$kTestAccountId': 'rk_live_x'})),
       initialApiKeyProvider.overrideWithValue('rk_live_x'),
+      firestoreProvider.overrideWithValue(db),
       authServiceProvider.overrideWithValue(FakeAuthService(user: _casey)),
       tipSourceFactoryProvider.overrideWithValue(
           ({required demo, required apiKey, required jar}) =>
@@ -188,18 +200,31 @@ void main() {
         localizationsDelegates: kTestL10nDelegates,
         locale: const Locale('en'),
         theme: buildLightTheme(),
-        home: const AccountSwitchScreen(),
+        home: Scaffold(
+          body: Center(
+            child: Consumer(
+              builder: (context, ref, _) => TextButton(
+                onPressed: () => showSwitcherSheet(context, ref),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
       ),
     ));
     await tester.pumpAndSettle();
-
-    // The local "no account" profile is one tap away — the tap that used to
-    // flip the directory under the running set. (The BAND switcher always
-    // refused this; the account switcher did not.)
-    await tester.tap(find.text('On this device'));
+    await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Stop the live session before switching accounts.'),
+    // A profile of the device itself is one tap away — the tap that used to
+    // flip the directory under the running set. (The BAND switcher always
+    // refused this; the ACCOUNT switcher did not. One switcher, one guard, one
+    // sentence — whichever of the two things moved.)
+    expect(find.text('On this device'), findsOneWidget);
+    await tester.tap(find.text('Home Sessions'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Stop the live session before switching.'),
         findsOneWidget);
     expect(container.read(accountsDirectoryProvider).activeAccountId,
         'uid_1',

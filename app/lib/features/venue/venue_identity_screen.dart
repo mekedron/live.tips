@@ -8,7 +8,7 @@ import '../../domain/app_account.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/venue_providers.dart';
-import '../../widgets/band_switcher.dart';
+import '../../widgets/profile_switcher.dart';
 import '../../widgets/lt_ui.dart';
 
 /// The moment after a venue sign-in: WHOSE account just landed on this

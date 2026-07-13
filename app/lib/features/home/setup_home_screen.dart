@@ -5,7 +5,7 @@ import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
-import '../../widgets/band_switcher.dart';
+import '../../widgets/profile_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../onboarding/onboarding_details_screen.dart';
 import '../shell/app_shell.dart';

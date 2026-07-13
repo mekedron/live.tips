@@ -13,7 +13,7 @@ import '../../domain/relay_jar.dart';
 import '../../domain/tip_jar.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
-import '../../widgets/band_switcher.dart';
+import '../../widgets/profile_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
 import '../settings/stage_preview_screen.dart';

@@ -5,17 +5,18 @@ import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/features/onboarding/account_name_screen.dart';
-import 'package:live_tips/features/settings/account_switch_screen.dart';
 import 'package:live_tips/features/settings/settings_screen.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
 
 import 'helpers.dart';
 
-/// Account switching lives in Settings now — its own deliberate act, apart
-/// from picking tonight's profile. And the account can finally be NAMED: the
-/// sign-up step always promised "you can name the account later in Settings",
-/// and until now there was no such thing.
+/// Settings has ONE door to the switcher now (#29): "Switch profile" opens the
+/// one surface, and it lists the accounts too. The "Switch account" row — the
+/// second door, to the second switcher — is gone; two rows opening the same
+/// sheet would be the same split, redrawn. And the account can be NAMED here:
+/// the sign-up step always promised "you can name the account later in
+/// Settings", and until then there was no such thing.
 
 /// [user] is signed in and active. [known] is an account the DIRECTORY knows
 /// while nothing is signed in — a session that died on its own, which is a
@@ -71,20 +72,22 @@ const _casey = AuthUser(
 );
 
 void main() {
-  testWidgets('the cloud section offers Switch account', (tester) async {
+  testWidgets('one switcher, one row: Switch profile opens the accounts too',
+      (tester) async {
     await _pumpSettings(tester, user: _casey);
 
-    expect(find.text('Switch account'), findsOneWidget);
-    // And the profile group keeps its own, differently-named switch.
     expect(find.text('Switch profile'), findsOneWidget);
+    expect(find.text('Switch account'), findsNothing,
+        reason: 'the second door to the second switcher is gone (#29)');
 
-    await tester.tap(find.text('Switch account'));
+    await tester.tap(find.text('Switch profile'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AccountSwitchScreen), findsOneWidget);
-    // The known accounts, the local "no account" profile included, plus the
-    // door to a new sign-in — everything the profile switcher no longer shows.
+    // The one surface: the device's own profiles, the accounts this device
+    // knows, and the door to a new sign-in — all of it in the sheet the header
+    // tap opens too.
     expect(find.text('On this device'), findsOneWidget);
+    expect(find.text('Casey'), findsWidgets);
     expect(find.text('Sign in to another account'), findsOneWidget);
   });
 
@@ -119,13 +122,17 @@ void main() {
     expect(find.text('Use without sign-in'), findsOneWidget);
   });
 
-  testWidgets('signed out with only the local account: no switch row',
+  testWidgets('signed out: the sign-in row, and the switcher still opens',
       (tester) async {
     await _pumpSettings(tester, user: null);
 
     expect(find.text('Sign in / Create account'), findsOneWidget);
-    // Nowhere to switch to — the row would be a door to an empty room.
-    expect(find.text('Switch account'), findsNothing);
+    // The switcher is never a door to an empty room: with no account at all it
+    // still holds this device's profiles, and the way into an account.
+    await tester.tap(find.text('Switch profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('On this device'), findsOneWidget);
+    expect(find.text('Sign in to another account'), findsOneWidget);
   });
 
   testWidgets('an account whose SESSION died keeps its row — and one tap '
@@ -137,7 +144,7 @@ void main() {
     final auth = FakeAuthService(nextUser: _casey);
     await _pumpSettings(tester, user: null, known: _casey, auth: auth);
 
-    await tester.tap(find.text('Switch account'));
+    await tester.tap(find.text('Switch profile'));
     await tester.pumpAndSettle();
 
     expect(find.text('Casey'), findsOneWidget);

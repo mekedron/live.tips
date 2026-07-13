@@ -7,8 +7,7 @@ import '../../domain/app_account.dart';
 import '../../domain/pending_redirect.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
-import '../../state/providers.dart';
-import '../../widgets/band_switcher.dart';
+import '../../widgets/profile_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../account/delete_account.dart';
 
@@ -144,13 +143,10 @@ class _SignInMethodsScreenState extends ConsumerState<SignInMethodsScreen> {
   Future<void> _confirmDelete() async {
     final s = context.s;
     // An account flip like any other: refused mid-session, by the same guard
-    // sign-out/switch/remove ask. Ending an artist's live set — permanently —
+    // switch/add/sign-out ask. Ending an artist's live set — permanently —
     // from a Settings tap is not an option.
-    final block = ref.read(appStateProvider.notifier).accountActionBlock;
-    if (block != null) {
-      _snack(block == AccountActionBlock.switching
-          ? s.t('widgets.band_switcher.switching')
-          : s.t('settings.sign_in_methods.stop_session_delete'));
+    if (!accountActionAllowed(context, ref,
+        sessionKey: 'settings.sign_in_methods.stop_session_delete')) {
       return;
     }
     final word = s.t('settings.sign_in_methods.delete_word');

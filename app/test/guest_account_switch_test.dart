@@ -1,14 +1,13 @@
-import 'dart:async';
-
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/domain/app_account.dart';
-import 'package:live_tips/features/settings/account_switch_screen.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
+import 'package:live_tips/widgets/profile_switcher.dart';
 
 import 'helpers.dart';
 
@@ -32,8 +31,8 @@ const _lockedSubtitle =
 
 final _navigator = GlobalKey<NavigatorState>();
 
-/// The switcher as it is really reached: pushed on top of Settings, so
-/// switching away pops back to the screen underneath.
+/// The switcher as it is really reached: a sheet over whatever the artist was
+/// looking at, which closes over what they picked.
 Future<ProviderContainer> _pumpSwitcher(
   WidgetTester tester, {
   required AuthUser? session,
@@ -41,14 +40,25 @@ Future<ProviderContainer> _pumpSwitcher(
 }) async {
   await tester.binding.setSurfaceSize(const Size(600, 1200));
   addTearDown(() => tester.binding.setSurfaceSize(null));
-  final local = await seededStore();
+  final local = await seededStore(bandName: 'Home Sessions');
   await local.saveAccountsDirectory(AccountsDirectory.initial()
       .withAccount(_guestEntry)
       .withActive(activeId));
+  // The guest account's own profiles live in ITS subtree — the device's local
+  // ones are a different list, and the switcher shows both without confusing
+  // them.
+  final db = FakeFirebaseFirestore();
+  await db
+      .collection('users')
+      .doc('uid_guest')
+      .collection('bands')
+      .doc('acc_guest')
+      .set({'name': 'Guest Set', 'createdAtMs': 1});
   final container = ProviderContainer(overrides: [
     localStoreProvider.overrideWithValue(local),
     secureStoreProvider.overrideWithValue(FakeSecureStore()),
     initialApiKeyProvider.overrideWithValue(null),
+    firestoreProvider.overrideWithValue(db),
     authServiceProvider.overrideWithValue(FakeAuthService(user: session)),
   ]);
   addTearDown(container.dispose);
@@ -60,7 +70,16 @@ Future<ProviderContainer> _pumpSwitcher(
         localizationsDelegates: kTestL10nDelegates,
         locale: const Locale('en'),
         theme: buildLightTheme(),
-        home: const Scaffold(),
+        home: Scaffold(
+          body: Center(
+            child: Consumer(
+              builder: (context, ref, _) => TextButton(
+                onPressed: () => showSwitcherSheet(context, ref),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
       ),
     ),
   );
@@ -69,9 +88,7 @@ Future<ProviderContainer> _pumpSwitcher(
 }
 
 Future<void> _openSwitcher(WidgetTester tester) async {
-  unawaited(_navigator.currentState!.push(
-    MaterialPageRoute<void>(builder: (_) => const AccountSwitchScreen()),
-  ));
+  await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
 }
 
@@ -81,8 +98,10 @@ void main() {
     final container =
         await _pumpSwitcher(tester, session: _guest, activeId: 'uid_guest');
 
-    // Leave for the device-local profile.
-    await tester.tap(find.text('On this device'));
+    // Leave for a profile of the device itself — under the "On this device"
+    // mode, one tap, no "switch account" step in between.
+    expect(find.text('On this device'), findsOneWidget);
+    await tester.tap(find.text('Home Sessions'));
     await tester.pumpAndSettle();
     expect(container.read(accountsDirectoryProvider).activeAccountId,
         kLocalAccountId);

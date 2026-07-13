@@ -14,7 +14,7 @@ import '../onboarding/relay_setup_screen.dart'
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../state/session_coordinator.dart';
-import '../../widgets/band_switcher.dart';
+import '../../widgets/profile_switcher.dart';
 import '../../widgets/tip_tile.dart';
 import '../../widgets/goal_editor.dart';
 import '../../widgets/lt_ui.dart';

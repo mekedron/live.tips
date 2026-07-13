@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
-import '../../widgets/band_switcher.dart';
+import '../../widgets/profile_switcher.dart';
 import '../../state/providers.dart';
 import '../../widgets/live_session_banner.dart';
 import '../history/history_screen.dart';

@@ -7,7 +7,7 @@ import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/state/providers.dart';
-import 'package:live_tips/widgets/band_switcher.dart';
+import 'package:live_tips/widgets/profile_switcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers.dart';
