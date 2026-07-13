@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+  <title>live.tips blog</title>
+  <subtitle>Notes on getting tipped: QR codes on stage, card payments without a middleman, and what we learn building live.tips in the open.</subtitle>
+  <link rel="self" href="https://live.tips/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/blog/"/>
+  <id>https://live.tips/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="en">
+    <title>Tips are not donations — and Stripe treats them as two different businesses</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/blog/tips-are-not-donations/"/>
+    <id>https://live.tips/blog/tips-are-not-donations/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>A busker asking for a &quot;donation button&quot; is describing a business that Stripe prohibits in most of Europe. A tip pays for a service you already performed; a donation is charitable fundraising. The difference decides which category your account lands in — and one API parameter can pick the wrong one for you.</summary>
+  </entry>
+  <entry xml:lang="en">
+    <title>How buskers take card payments now that nobody carries cash</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/blog/how-buskers-take-card-payments/"/>
+    <id>https://live.tips/blog/how-buskers-take-card-payments/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Card readers, phone tap-to-pay, payment-app QR codes, tip-jar platforms. What each one really costs, what it does to a €2 tip, and how to pick — from people who build one of them and will still tell you to buy a SumUp if that is your answer.</summary>
+  </entry>
+  <entry xml:lang="en">
+    <title>Contactless tipping for street performers, honestly</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/blog/contactless-tipping-for-street-performers/"/>
+    <id>https://live.tips/blog/contactless-tipping-for-street-performers/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap-to-pay on a phone, a card reader, an NFC sticker, a QR code — four different things that get called &quot;contactless&quot;. What each one actually costs in 2026, what an NFC tag really does (it is not what you think), and when a tap beats a scan.</summary>
+  </entry>
+  <entry xml:lang="en">
+    <title>Build a tip jar on your own Stripe account</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/blog/build-a-tip-jar-on-your-own-stripe/"/>
+    <id>https://live.tips/blog/build-a-tip-jar-on-your-own-stripe/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Three API calls give you a hosted, pay-what-you-want tip page with Apple Pay and Google Pay, and no server anywhere. Here is the whole build — the restricted key, the scopes, reading tips back without a webhook, and the fee maths nobody prints.</summary>
+  </entry>
+  <entry xml:lang="en">
+    <title>Online tip jars for buskers: Ko-fi, Buy Me a Coffee and TipTopJar compared</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/blog/tip-jars-compared-for-live-performers/"/>
+    <id>https://live.tips/blog/tip-jars-compared-for-live-performers/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Three decent products for creators on the internet. A busker is not a creator on the internet. Your audience is standing in front of you and you have eight seconds — why 0% is not the same as nothing, and why a €5 tip should arrive as €5.</summary>
+  </entry>
+  <entry xml:lang="en">
+    <title>One QR code, every payment method</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/blog/one-qr-code-every-payment-method/"/>
+    <id>https://live.tips/blog/one-qr-code-every-payment-method/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>Most tip tools give you one code per payment provider. Tape three to a mic stand and watch people give up. Here is why live.tips keeps it to one.</summary>
+  </entry>
+  <entry xml:lang="en">
+    <title>How live.tips handles money (it doesn&#x27;t)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/blog/how-live-tips-handles-money/"/>
+    <id>https://live.tips/blog/how-live-tips-handles-money/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>There is no live.tips balance, no payout schedule, and no cut. Here is the architecture that makes those three claims boring instead of brave.</summary>
+  </entry>
+</feed>

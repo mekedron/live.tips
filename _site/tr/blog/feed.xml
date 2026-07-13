@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="tr">
+  <title>live.tips blog</title>
+  <subtitle>Bahşiş almak üzerine notlar: sahnedeki QR kodları, aracısız kart ödemeleri ve live.tips&#x27;i açıkta geliştirirken öğrendiklerimiz.</subtitle>
+  <link rel="self" href="https://live.tips/tr/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/tr/blog/"/>
+  <id>https://live.tips/tr/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="tr">
+    <title>Bahşiş bağış değildir — ve Stripe bunları iki ayrı iş kolu sayar</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/tr/blog/bahsis-bagis-degildir/"/>
+    <id>https://live.tips/tr/blog/bahsis-bagis-degildir/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>«Bağış butonu» isteyen bir sokak müzisyeni, aslında Stripe&#x27;ın Avrupa&#x27;nın büyük bölümünde yasakladığı bir iş kolunu tarif ediyordur. Bahşiş, zaten yaptığın bir hizmetin karşılığıdır; bağış ise hayır amaçlı para toplamaktır. Bu fark, hesabının hangi kategoriye düşeceğine karar verir — ve tek bir API parametresi bu seçimi senin yerine yapabilir.</summary>
+  </entry>
+  <entry xml:lang="tr">
+    <title>Kimse nakit taşımazken sokak müzisyenleri kartla ödeme nasıl alır</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/tr/blog/sokak-muzisyenleri-icin-kartli-odeme/"/>
+    <id>https://live.tips/tr/blog/sokak-muzisyenleri-icin-kartli-odeme/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Kart okuyucular, telefonla temassız ödeme, ödeme uygulamalarının QR kodları, bahşiş platformları. Her seçeneğin gerçek maliyeti, 2 avroluk bir bahşişe ne yaptığı ve nasıl seçileceği — bu araçlardan birini kendisi yapan ve yine de cevabın oysa &quot;SumUp al&quot; diyecek olan insanlardan.</summary>
+  </entry>
+  <entry xml:lang="tr">
+    <title>Sokak müzisyenleri için temassız bahşiş, dürüstçe</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/tr/blog/sokak-muzisyenleri-icin-temassiz-bahsis/"/>
+    <id>https://live.tips/tr/blog/sokak-muzisyenleri-icin-temassiz-bahsis/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Telefonda Tap to Pay, bir kart okuyucu, bir NFC etiketi, bir QR kod — hepsine «temassız» denen dört ayrı şey. 2026&#x27;da her birinin gerçekte neye mal olduğu, bir NFC etiketinin aslında ne yaptığı (sandığın şey değil) ve dokunmanın taramayı ne zaman geçtiği.</summary>
+  </entry>
+  <entry xml:lang="tr">
+    <title>Kendi Stripe hesabınızda bahşiş kavanozu kurun</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/tr/blog/kendi-stripe-hesabinizda-bahsis-kavanozu-kurun/"/>
+    <id>https://live.tips/tr/blog/kendi-stripe-hesabinizda-bahsis-kavanozu-kurun/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Üç API çağrısı size Apple Pay ve Google Pay destekli, barındırılan bir „ne kadar istersen o kadar öde&quot; sayfası verir — hiç sunucu yok. İşte kurulumun tamamı: kısıtlı anahtar, izinler, bahşişleri webhook olmadan nasıl okuyacağınız ve kimsenin basmadığı komisyon hesabı.</summary>
+  </entry>
+  <entry xml:lang="tr">
+    <title>Sokak müzisyenleri için online bahşiş kavanozu: Ko-fi, Buy Me a Coffee ve TipTopJar karşılaştırması</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/tr/blog/bahsis-kavanozlari-karsilastirmasi/"/>
+    <id>https://live.tips/tr/blog/bahsis-kavanozlari-karsilastirmasi/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>İnternette içerik üreticileri için üç düzgün ürün. Sokak müzisyeni internette bir içerik üreticisi değildir. Seyircin tam önünde duruyor ve sekiz saniyen var — neden 0% hiçbir şeyle aynı değil ve neden €5&#x27;lik bir bahşiş €5 olarak ulaşmalı.</summary>
+  </entry>
+  <entry xml:lang="tr">
+    <title>Tek QR kod, her ödeme yöntemi</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/tr/blog/tek-qr-kod-her-odeme-yontemi/"/>
+    <id>https://live.tips/tr/blog/tek-qr-kod-her-odeme-yontemi/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>Çoğu bahşiş aracı sana her ödeme sağlayıcısı için bir kod verir. Üç tanesini mikrofon sehpasına yapıştır ve insanların pes edişini izle. İşte live.tips neden tek kodda kalıyor.</summary>
+  </entry>
+  <entry xml:lang="tr">
+    <title>live.tips parayı nasıl yönetir (yönetmez)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/tr/blog/live-tips-parayi-nasil-yonetir/"/>
+    <id>https://live.tips/tr/blog/live-tips-parayi-nasil-yonetir/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>live.tips bakiyesi yok, ödeme takvimi yok, kesinti yok. İşte bu üç iddiayı cesur değil sıkıcı kılan mimari.</summary>
+  </entry>
+</feed>

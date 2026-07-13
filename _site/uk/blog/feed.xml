@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="uk">
+  <title>Блог live.tips</title>
+  <subtitle>Нотатки про те, як отримувати чайові: QR-коди на сцені, оплата карткою без посередників і те, чого ми вчимося, будуючи live.tips відкрито.</subtitle>
+  <link rel="self" href="https://live.tips/uk/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/uk/blog/"/>
+  <id>https://live.tips/uk/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="uk">
+    <title>Чайові — це не пожертва, і Stripe вважає їх двома різними бізнесами</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/uk/blog/chaiovi-tse-ne-pozhertva/"/>
+    <id>https://live.tips/uk/blog/chaiovi-tse-ne-pozhertva/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Вуличний музикант, який просить «кнопку для пожертв», описує бізнес, який Stripe забороняє майже по всій Європі. Чайові платять за послугу, яку ти вже надав; пожертва — це благодійний збір коштів. Ця різниця вирішує, у яку категорію потрапить твій акаунт, — і один параметр API може обрати за тебе не ту.</summary>
+  </entry>
+  <entry xml:lang="uk">
+    <title>Як вуличні музиканти приймають оплату карткою тепер, коли ніхто не носить готівки</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/uk/blog/oplata-kartkoyu-dlia-vulychnykh-muzykantiv/"/>
+    <id>https://live.tips/uk/blog/oplata-kartkoyu-dlia-vulychnykh-muzykantiv/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Термінали, оплата дотиком телефона, QR-коди платіжних застосунків, платформи для чайових. Скільки насправді коштує кожен варіант, що він робить із чайовими у 2 €, і як обрати — від людей, які самі будують один із цих інструментів і все одно скажуть купити SumUp, якщо відповідь саме така.</summary>
+  </entry>
+  <entry xml:lang="uk">
+    <title>Безконтактні чайові вуличним музикантам — чесний підрахунок</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/uk/blog/bezkontaktni-chaiovi-vulychnym-muzykantam/"/>
+    <id>https://live.tips/uk/blog/bezkontaktni-chaiovi-vulychnym-muzykantam/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap to Pay на телефоні, картковий термінал, NFC-наліпка, QR-код — чотири різні речі, які всі називають «безконтактними». Скільки кожна з них справді коштує у 2026, що насправді робить NFC-мітка (не те, що ти думаєш) і коли дотик виграє в сканування.</summary>
+  </entry>
+  <entry xml:lang="uk">
+    <title>Зробіть банку для чайових на власному акаунті Stripe</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/uk/blog/zrobit-banku-dlya-chaiovykh-na-vlasnomu-akaunti-stripe/"/>
+    <id>https://live.tips/uk/blog/zrobit-banku-dlya-chaiovykh-na-vlasnomu-akaunti-stripe/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Три виклики API дають хостовану сторінку «плати скільки хочеш» з Apple Pay і Google Pay — і жодного сервера. Ось уся збірка: обмежений ключ, дозволи, як читати чайові без вебхука, і чесна арифметика комісій, яку ніхто не друкує.</summary>
+  </entry>
+  <entry xml:lang="uk">
+    <title>Чайові онлайн для вуличного музиканта: Ko-fi, Buy Me a Coffee і TipTopJar у порівнянні</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/uk/blog/porivniannia-servisiv-dlia-chaiovykh/"/>
+    <id>https://live.tips/uk/blog/porivniannia-servisiv-dlia-chaiovykh/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Три пристойні продукти для авторів в інтернеті. Вуличний музикант — не автор в інтернеті. Твоя аудиторія стоїть просто перед тобою, і в тебе є вісім секунд — чому 0% — це не те саме, що нічого, і чому чайові в €5 мають дійти як €5.</summary>
+  </entry>
+  <entry xml:lang="uk">
+    <title>Один QR-код на всі способи оплати</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/uk/blog/odyn-qr-kod-na-vsi-sposoby-oplaty/"/>
+    <id>https://live.tips/uk/blog/odyn-qr-kod-na-vsi-sposoby-oplaty/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>Більшість інструментів для чайових дають тобі по одному коду на кожного платіжного провайдера. Приклей три до мікрофонної стійки й дивись, як люди здаються. Ось чому live.tips обмежується одним.</summary>
+  </entry>
+  <entry xml:lang="uk">
+    <title>Як live.tips поводиться з грошима (ніяк)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/uk/blog/yak-live-tips-povodytsia-z-groshyma/"/>
+    <id>https://live.tips/uk/blog/yak-live-tips-povodytsia-z-groshyma/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Немає жодного балансу live.tips, жодного графіка виплат і жодної комісії. Ось архітектура, яка робить ці три твердження нудними, а не сміливими.</summary>
+  </entry>
+</feed>

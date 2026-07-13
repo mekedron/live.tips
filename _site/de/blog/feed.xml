@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="de">
+  <title>live.tips Blog</title>
+  <subtitle>Notizen übers Trinkgeld: QR-Codes auf der Bühne, Kartenzahlung ohne Mittelsmann und was wir lernen, während wir live.tips offen entwickeln.</subtitle>
+  <link rel="self" href="https://live.tips/de/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/de/blog/"/>
+  <id>https://live.tips/de/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="de">
+    <title>Trinkgeld ist keine Spende — und Stripe behandelt beides als zwei verschiedene Geschäfte</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/de/blog/trinkgeld-ist-keine-spende/"/>
+    <id>https://live.tips/de/blog/trinkgeld-ist-keine-spende/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Ein Straßenmusiker, der nach einem „Spenden-Button&quot; sucht, beschreibt ein Geschäft, das Stripe in weiten Teilen Europas verbietet. Ein Trinkgeld bezahlt eine Leistung, die du bereits erbracht hast; eine Spende ist Spendensammlung für einen gemeinnützigen Zweck. Der Unterschied entscheidet, in welche Kategorie dein Konto fällt — und ein einziger API-Parameter kann die falsche für dich auswählen.</summary>
+  </entry>
+  <entry xml:lang="de">
+    <title>Wie Straßenmusiker Kartenzahlungen annehmen, jetzt wo niemand mehr Bargeld dabeihat</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/de/blog/kartenzahlung-fuer-strassenmusiker/"/>
+    <id>https://live.tips/de/blog/kartenzahlung-fuer-strassenmusiker/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Kartenlesegeräte, Tap to Pay auf dem Handy, QR-Codes für Bezahl-Apps, Trinkgeld-Plattformen. Was jede Option wirklich kostet, was sie mit einem Trinkgeld von €2 anstellt, und wie du wählst — von Leuten, die eines dieser Werkzeuge bauen und dir trotzdem sagen, du sollst dir ein SumUp kaufen, wenn das deine Antwort ist.</summary>
+  </entry>
+  <entry xml:lang="de">
+    <title>Kontaktloses Trinkgeld für Straßenmusiker — ehrlich gerechnet</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/de/blog/kontaktloses-trinkgeld-fuer-strassenmusiker/"/>
+    <id>https://live.tips/de/blog/kontaktloses-trinkgeld-fuer-strassenmusiker/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap to Pay auf dem Handy, ein Kartenlesegerät, ein NFC-Sticker, ein QR-Code — vier verschiedene Dinge, die alle „kontaktlos&quot; heißen. Was jedes davon 2026 wirklich kostet, was ein NFC-Tag tatsächlich tut (nicht das, was du denkst), und wann Tippen den Scan schlägt.</summary>
+  </entry>
+  <entry xml:lang="de">
+    <title>Bau dir eine Trinkgeldkasse auf deinem eigenen Stripe-Konto</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/de/blog/trinkgeldkasse-auf-deinem-eigenen-stripe-konto/"/>
+    <id>https://live.tips/de/blog/trinkgeldkasse-auf-deinem-eigenen-stripe-konto/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Drei API-Aufrufe geben dir eine gehostete Pay-what-you-want-Seite mit Apple Pay und Google Pay — ganz ohne Server. Hier ist der komplette Bau: der Restricted Key, die Berechtigungen, wie du Trinkgelder ohne Webhook zurücklieferst, und die Gebührenrechnung, die niemand abdruckt.</summary>
+  </entry>
+  <entry xml:lang="de">
+    <title>Online-Trinkgeldkasse für Straßenmusiker: Ko-fi, Buy Me a Coffee und TipTopJar im Vergleich</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/de/blog/trinkgeld-tools-im-vergleich/"/>
+    <id>https://live.tips/de/blog/trinkgeld-tools-im-vergleich/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Drei ordentliche Produkte für Creator im Internet. Ein Straßenmusiker ist kein Creator im Internet. Dein Publikum steht vor dir, und du hast acht Sekunden — warum 0% nicht dasselbe ist wie nichts, und warum ein Trinkgeld von €5 als €5 ankommen sollte.</summary>
+  </entry>
+  <entry xml:lang="de">
+    <title>Ein QR-Code für jede Zahlungsart</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/de/blog/ein-qr-code-fuer-jede-zahlungsart/"/>
+    <id>https://live.tips/de/blog/ein-qr-code-fuer-jede-zahlungsart/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>Die meisten Trinkgeld-Tools geben dir einen Code pro Anbieter. Kleb drei ans Mikrofonstativ und sieh zu, wie die Leute aufgeben. Darum bleibt es bei live.tips bei einem.</summary>
+  </entry>
+  <entry xml:lang="de">
+    <title>Wie live.tips mit Geld umgeht (gar nicht)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/de/blog/wie-live-tips-mit-geld-umgeht/"/>
+    <id>https://live.tips/de/blog/wie-live-tips-mit-geld-umgeht/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Es gibt kein live.tips-Guthaben, keinen Auszahlungsplan und keinen Anteil. Hier ist die Architektur, die diese drei Aussagen langweilig statt mutig macht.</summary>
+  </entry>
+</feed>

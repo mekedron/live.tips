@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="pl">
+  <title>Blog live.tips</title>
+  <subtitle>Notatki o zbieraniu napiwków: kody QR na scenie, płatności kartą bez pośrednika i to, czego uczymy się, budując live.tips na widoku.</subtitle>
+  <link rel="self" href="https://live.tips/pl/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/pl/blog/"/>
+  <id>https://live.tips/pl/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="pl">
+    <title>Napiwek to nie darowizna — a Stripe traktuje je jak dwa różne biznesy</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/pl/blog/napiwek-to-nie-darowizna/"/>
+    <id>https://live.tips/pl/blog/napiwek-to-nie-darowizna/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Uliczny muzyk, który prosi o „przycisk darowizny&quot;, opisuje działalność, której Stripe w większości Europy zakazuje. Napiwek płaci za usługę już wykonaną; darowizna to zbiórka na cele charytatywne. Ta różnica decyduje, do jakiej kategorii trafi twoje konto — a jeden parametr API potrafi wybrać za ciebie tę złą.</summary>
+  </entry>
+  <entry xml:lang="pl">
+    <title>Jak muzycy uliczni przyjmują płatności kartą, skoro nikt nie nosi już gotówki</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/pl/blog/platnosci-karta-dla-muzykow-ulicznych/"/>
+    <id>https://live.tips/pl/blog/platnosci-karta-dla-muzykow-ulicznych/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Terminale, płatności zbliżeniowe telefonem, kody QR aplikacji płatniczych, platformy napiwkowe. Ile naprawdę kosztuje każda opcja, co robi z napiwkiem 10 zł i jak wybrać — od ludzi, którzy sami budują jedno z tych narzędzi i mimo to powiedzą ci, żebyś kupił SumUpa, jeśli to jest twoja odpowiedź.</summary>
+  </entry>
+  <entry xml:lang="pl">
+    <title>Napiwki zbliżeniowe dla ulicznych muzyków — szczerze policzone</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/pl/blog/platnosci-zblizeniowe-dla-muzykow-ulicznych/"/>
+    <id>https://live.tips/pl/blog/platnosci-zblizeniowe-dla-muzykow-ulicznych/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap to Pay na telefonie, terminal kartowy, naklejka NFC, kod QR — cztery różne rzeczy, które wszystkie nazywa się „zbliżeniowymi&quot;. Ile każda z nich naprawdę kosztuje w 2026, co tak naprawdę robi tag NFC (nie to, co myślisz) i kiedy przyłożenie wygrywa ze skanem.</summary>
+  </entry>
+  <entry xml:lang="pl">
+    <title>Zbuduj słoik na napiwki na własnym koncie Stripe</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/pl/blog/zbuduj-sloik-na-napiwki-na-wlasnym-koncie-stripe/"/>
+    <id>https://live.tips/pl/blog/zbuduj-sloik-na-napiwki-na-wlasnym-koncie-stripe/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Trzy wywołania API dają ci hostowaną stronę „zapłać, ile chcesz” z Apple Pay i Google Pay — bez żadnego serwera. Oto cała budowa: klucz z ograniczeniami, uprawnienia, jak odczytywać napiwki bez webhooka i rachunek prowizji, którego nikt nie drukuje.</summary>
+  </entry>
+  <entry xml:lang="pl">
+    <title>Napiwki online dla ulicznego muzyka: Ko-fi, Buy Me a Coffee i TipTopJar w porównaniu</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/pl/blog/porownanie-narzedzi-do-napiwkow/"/>
+    <id>https://live.tips/pl/blog/porownanie-narzedzi-do-napiwkow/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Trzy porządne produkty dla twórców w internecie. Uliczny muzyk nie jest twórcą w internecie. Publiczność stoi tuż przed tobą, a ty masz osiem sekund — dlaczego 0% to nie to samo co nic i dlaczego napiwek €5 powinien dotrzeć jako €5.</summary>
+  </entry>
+  <entry xml:lang="pl">
+    <title>Jeden kod QR, każda metoda płatności</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/pl/blog/jeden-kod-qr-kazda-metoda-platnosci/"/>
+    <id>https://live.tips/pl/blog/jeden-kod-qr-kazda-metoda-platnosci/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>Większość narzędzi do napiwków daje ci jeden kod na każdego dostawcę płatności. Przyklej trzy do statywu mikrofonowego i patrz, jak ludzie się poddają. Oto dlaczego live.tips zostaje przy jednym.</summary>
+  </entry>
+  <entry xml:lang="pl">
+    <title>Jak live.tips obchodzi się z pieniędzmi (nijak)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/pl/blog/jak-live-tips-obchodzi-sie-z-pieniedzmi/"/>
+    <id>https://live.tips/pl/blog/jak-live-tips-obchodzi-sie-z-pieniedzmi/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Nie ma salda live.tips, nie ma harmonogramu wypłat, nie ma prowizji. Oto architektura, dzięki której te trzy stwierdzenia są nudne, a nie odważne.</summary>
+  </entry>
+</feed>

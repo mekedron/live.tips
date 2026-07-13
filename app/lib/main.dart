@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/platform_support.dart';
 import 'data/cloud_migrator.dart';
+import 'data/firebase/auth_domain.dart';
 import 'data/local_store.dart';
 import 'data/migrations.dart';
 import 'data/secure_store.dart';
@@ -39,9 +40,13 @@ Future<void> main() async {
   FirebaseFirestore? firestore;
   if (platformSupportsCloudAccounts) {
     try {
+      // The OAuth handler runs on our own domain (auth.live.tips), not on
+      // livetips-app.firebaseapp.com — see data/firebase/auth_domain.dart for
+      // why the domain is layered on here instead of in the generated options.
       await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform);
+          options: withCustomAuthDomain(DefaultFirebaseOptions.currentPlatform));
       firebaseAuth = FirebaseAuth.instance;
+      applyCustomAuthDomain(firebaseAuth);
       firestore = FirebaseFirestore.instance;
     } catch (e) {
       debugPrint('firebase unavailable, running local-only: $e');

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="nl">
+  <title>live.tips blog</title>
+  <subtitle>Aantekeningen over fooien ophalen: QR-codes op het podium, kaartbetalingen zonder tussenpersoon, en wat we leren terwijl we live.tips in de openbaarheid bouwen.</subtitle>
+  <link rel="self" href="https://live.tips/nl/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/nl/blog/"/>
+  <id>https://live.tips/nl/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="nl">
+    <title>Fooien zijn geen donaties — en Stripe behandelt ze als twee verschillende bedrijven</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/nl/blog/fooien-zijn-geen-donaties/"/>
+    <id>https://live.tips/nl/blog/fooien-zijn-geen-donaties/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Een straatmuzikant die om een &#x27;donatieknop&#x27; vraagt, beschrijft een bedrijf dat Stripe in vrijwel heel Europa verbiedt. Een fooi betaalt voor een dienst die je al geleverd hebt; een donatie is fondsenwerving voor een goed doel. Het verschil bepaalt in welke categorie je account belandt — en één API-parameter kan de verkeerde voor je kiezen.</summary>
+  </entry>
+  <entry xml:lang="nl">
+    <title>Hoe straatmuzikanten kaartbetalingen aannemen nu niemand nog contant geld op zak heeft</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/nl/blog/kaartbetalingen-voor-straatmuzikanten/"/>
+    <id>https://live.tips/nl/blog/kaartbetalingen-voor-straatmuzikanten/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Pinapparaten, tap-to-pay op je telefoon, QR-codes van betaalapps, fooienplatforms. Wat elke optie echt kost, wat ze doet met een fooi van € 2, en hoe je kiest — van mensen die zelf zo&#x27;n tool bouwen en je alsnog vertellen dat je een SumUp moet kopen als dat het antwoord is.</summary>
+  </entry>
+  <entry xml:lang="nl">
+    <title>Contactloos fooien geven aan straatmuzikanten, eerlijk gerekend</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/nl/blog/contactloos-fooien-geven-aan-straatmuzikanten/"/>
+    <id>https://live.tips/nl/blog/contactloos-fooien-geven-aan-straatmuzikanten/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap to Pay op een telefoon, een kaartlezer, een NFC-sticker, een QR-code — vier verschillende dingen die allemaal &#x27;contactloos&#x27; heten. Wat elk daarvan in 2026 echt kost, wat een NFC-tag werkelijk doet (niet wat je denkt), en wanneer een tap een scan verslaat.</summary>
+  </entry>
+  <entry xml:lang="nl">
+    <title>Bouw een fooienpot op je eigen Stripe-account</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/nl/blog/bouw-een-fooienpot-op-je-eigen-stripe-account/"/>
+    <id>https://live.tips/nl/blog/bouw-een-fooienpot-op-je-eigen-stripe-account/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Drie API-calls geven je een gehoste pay-what-you-want-pagina met Apple Pay en Google Pay, zonder enige server. Hier is de volledige bouw: de restricted key, de scopes, hoe je fooien binnenleest zonder webhook, en de kostenberekening die niemand afdrukt.</summary>
+  </entry>
+  <entry xml:lang="nl">
+    <title>Online fooienpot voor straatmuzikanten: Ko-fi, Buy Me a Coffee en TipTopJar vergeleken</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/nl/blog/fooienpotten-vergeleken/"/>
+    <id>https://live.tips/nl/blog/fooienpotten-vergeleken/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Drie prima producten voor makers op internet. Een straatmuzikant is geen maker op internet. Je publiek staat vóór je en je hebt acht seconden — waarom 0% niet hetzelfde is als niks, en waarom een fooi van €5 als €5 moet aankomen.</summary>
+  </entry>
+  <entry xml:lang="nl">
+    <title>Één QR-code, elke betaalmethode</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/nl/blog/een-qr-code-elke-betaalmethode/"/>
+    <id>https://live.tips/nl/blog/een-qr-code-elke-betaalmethode/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>De meeste fooientools geven je één code per betaalprovider. Plak er drie op een microfoonstandaard en zie hoe mensen afhaken. Dit is waarom live.tips het bij één houdt.</summary>
+  </entry>
+  <entry xml:lang="nl">
+    <title>Hoe live.tips met geld omgaat (dat doet het niet)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/nl/blog/hoe-live-tips-met-geld-omgaat/"/>
+    <id>https://live.tips/nl/blog/hoe-live-tips-met-geld-omgaat/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Er is geen live.tips-saldo, geen uitbetalingsschema en geen commissie. Dit is de architectuur die die drie beweringen saai maakt in plaats van dapper.</summary>
+  </entry>
+</feed>

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+# The Flutter web app and the headless 3D stage renderer are application
+# surfaces, not indexable content — keep them out of search results.
+Disallow: /app/
+Disallow: /stage/
+
+Sitemap: https://live.tips/sitemap.xml

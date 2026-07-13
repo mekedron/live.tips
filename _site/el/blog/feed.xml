@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="el">
+  <title>Ιστολόγιο live.tips</title>
+  <subtitle>Σημειώσεις για το φιλοδώρημα: QR κωδικοί στη σκηνή, πληρωμές με κάρτα χωρίς μεσάζοντα, και όσα μαθαίνουμε φτιάχνοντας το live.tips στα φανερά.</subtitle>
+  <link rel="self" href="https://live.tips/el/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/el/blog/"/>
+  <id>https://live.tips/el/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="el">
+    <title>Το φιλοδώρημα δεν είναι δωρεά — και το Stripe τα αντιμετωπίζει ως δύο διαφορετικές επιχειρήσεις</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/el/blog/to-filodorima-den-einai-dorea/"/>
+    <id>https://live.tips/el/blog/to-filodorima-den-einai-dorea/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Ένας μουσικός του δρόμου που ζητά «κουμπί δωρεάς» περιγράφει μια επιχείρηση που το Stripe απαγορεύει στο μεγαλύτερο μέρος της Ευρώπης. Το φιλοδώρημα πληρώνει μια υπηρεσία που ήδη πρόσφερες· η δωρεά είναι έρανος για φιλανθρωπικό σκοπό. Η διαφορά κρίνει σε ποια κατηγορία θα προσγειωθεί ο λογαριασμός σου — κι ένα μόνο API parameter μπορεί να διαλέξει λάθος για λογαριασμό σου.</summary>
+  </entry>
+  <entry xml:lang="el">
+    <title>Πώς δέχονται πληρωμές με κάρτα οι πλανόδιοι μουσικοί τώρα που κανείς δεν έχει μετρητά</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/el/blog/pliromes-me-karta-gia-planodious-mousikous/"/>
+    <id>https://live.tips/el/blog/pliromes-me-karta-gia-planodious-mousikous/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Τερματικά κάρτας, ανέπαφη πληρωμή με το κινητό, QR codes εφαρμογών πληρωμών, πλατφόρμες φιλοδωρήματος. Τι κοστίζει πραγματικά η κάθε επιλογή, τι κάνει σε ένα φιλοδώρημα των 2 €, και πώς διαλέγεις — από ανθρώπους που φτιάχνουν ένα από αυτά τα εργαλεία και παρ&#x27; όλα αυτά θα σου πουν να πάρεις SumUp αν αυτή είναι η απάντηση.</summary>
+  </entry>
+  <entry xml:lang="el">
+    <title>Ανέπαφα φιλοδωρήματα για πλανόδιους μουσικούς, με ειλικρίνεια</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/el/blog/anepafa-filodorimata-gia-planodious-mousikous/"/>
+    <id>https://live.tips/el/blog/anepafa-filodorimata-gia-planodious-mousikous/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap to Pay στο κινητό, ένα τερματικό κάρτας, ένα αυτοκόλλητο NFC, ένας κωδικός QR — τέσσερα διαφορετικά πράγματα που όλα τα λένε «ανέπαφα». Τι κοστίζει πραγματικά το καθένα το 2026, τι κάνει στ&#x27; αλήθεια ένα NFC tag (δεν είναι αυτό που νομίζεις) και πότε το άγγιγμα νικάει το σκανάρισμα.</summary>
+  </entry>
+  <entry xml:lang="el">
+    <title>Φτιάξτε ένα κουτί φιλοδωρημάτων στον δικό σας λογαριασμό Stripe</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/el/blog/ftiaxte-ena-kouti-filodorimaton-ston-diko-sas-logariasmo-stripe/"/>
+    <id>https://live.tips/el/blog/ftiaxte-ena-kouti-filodorimaton-ston-diko-sas-logariasmo-stripe/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Τρεις κλήσεις API σάς δίνουν μια φιλοξενούμενη σελίδα «πλήρωσε όσο θέλεις» με Apple Pay και Google Pay — χωρίς κανέναν διακομιστή. Ιδού ολόκληρο το χτίσιμο: το περιορισμένο κλειδί, τα δικαιώματα, πώς διαβάζετε τα φιλοδωρήματα χωρίς webhook, και τα μαθηματικά των προμηθειών που δεν τυπώνει κανείς.</summary>
+  </entry>
+  <entry xml:lang="el">
+    <title>Φιλοδώρημα online για μουσικούς του δρόμου: Ko-fi, Buy Me a Coffee και TipTopJar σε σύγκριση</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/el/blog/sygkrisi-ergaleion-filodorimatos/"/>
+    <id>https://live.tips/el/blog/sygkrisi-ergaleion-filodorimatos/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Τρία αξιοπρεπή προϊόντα για δημιουργούς στο διαδίκτυο. Ένας μουσικός του δρόμου δεν είναι δημιουργός στο διαδίκτυο. Το κοινό σου στέκεται μπροστά σου κι έχεις οκτώ δευτερόλεπτα — γιατί το 0% δεν είναι το ίδιο με το τίποτα, και γιατί ένα φιλοδώρημα των €5 πρέπει να φτάνει ως €5.</summary>
+  </entry>
+  <entry xml:lang="el">
+    <title>Ένας κωδικός QR για κάθε τρόπο πληρωμής</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/el/blog/enas-kodikos-qr-gia-kathe-tropo-pliromis/"/>
+    <id>https://live.tips/el/blog/enas-kodikos-qr-gia-kathe-tropo-pliromis/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>Τα περισσότερα εργαλεία φιλοδωρημάτων σού δίνουν έναν κωδικό ανά πάροχο πληρωμών. Κόλλησε τρεις στη βάση του μικροφώνου και δες τον κόσμο να τα παρατάει. Να γιατί το live.tips μένει στον έναν.</summary>
+  </entry>
+  <entry xml:lang="el">
+    <title>Πώς το live.tips διαχειρίζεται τα χρήματα (δεν τα διαχειρίζεται)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/el/blog/pos-to-live-tips-diacheirizetai-ta-chrimata/"/>
+    <id>https://live.tips/el/blog/pos-to-live-tips-diacheirizetai-ta-chrimata/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Δεν υπάρχει υπόλοιπο live.tips, ούτε πρόγραμμα πληρωμών, ούτε προμήθεια. Να η αρχιτεκτονική που κάνει αυτούς τους τρεις ισχυρισμούς βαρετούς αντί για γενναίους.</summary>
+  </entry>
+</feed>

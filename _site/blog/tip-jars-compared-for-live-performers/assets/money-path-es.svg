@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 300" width="780" height="300" role="img" aria-labelledby="mp-title" font-family="Outfit, ui-sans-serif, system-ui, sans-serif">
+  <title id="mp-title">Two ways a tip reaches a performer: through a platform, a held balance and a payout queue, or straight from the fan to the artist.</title>
+  <rect width="780" height="300" rx="14" fill="#FAF6F1"/>
+  <text x="36" y="46" font-size="15" fill="#70685D" text-anchor="start" font-weight="600" letter-spacing="1.4">PLATAFORMA CREADOR</text>
+  <rect x="36" y="66" width="120" height="60" rx="12" fill="#FFFFFF" stroke="#E4DAD0"/>
+  <rect x="200" y="66" width="156" height="60" rx="12" fill="#FFFFFF" stroke="#E4DAD0"/>
+  <rect x="400" y="66" width="178" height="60" rx="12" fill="#FFFFFF" stroke="#E4DAD0"/>
+  <rect x="624" y="66" width="120" height="60" rx="12" fill="#FFFFFF" stroke="#E4DAD0"/>
+  <text x="96" y="102" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Tu fan</text>
+  <text x="278" y="94" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Plataforma</text>
+  <text x="278" y="112" font-size="12.5" fill="#70685D" text-anchor="middle">se lleva su parte</text>
+  <text x="490" y="94" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Saldo retenido</text>
+  <text x="490" y="112" font-size="12.5" fill="#70685D" text-anchor="middle">cola de pago</text>
+  <text x="684" y="102" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Tú</text>
+  <text x="490" y="146" font-size="12.5" fill="#8A2E14" text-anchor="middle">días después</text>
+  <g stroke="#C9BDB1" stroke-width="1.6" fill="none" marker-end="url(#arrow)">
+    <path d="M164 96 H 192"/>
+    <path d="M364 96 H 392"/>
+    <path d="M587 96 H 616"/>
+  </g>
+  <text x="36" y="216" font-size="15" fill="#8A2E14" text-anchor="start" font-weight="600" letter-spacing="1.4">LIVE.TIPS</text>
+  <rect x="36" y="236" width="120" height="60" rx="12" fill="#FFFFFF" stroke="#F0C9BB"/>
+  <rect x="614" y="236" width="129" height="60" rx="12" fill="#FDE7DF" stroke="#F0C9BB"/>
+  <text x="96" y="272" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Tu fan</text>
+  <text x="679" y="264" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Tú</text>
+  <text x="679" y="282" font-size="12.5" fill="#8A2E14" text-anchor="middle">en escena, ya</text>
+  <path d="M164 266 H 606" stroke="#E8542F" stroke-width="2" fill="none" marker-end="url(#arrow-coral)"/>
+  <text x="385" y="256" font-size="12.5" fill="#70685D" text-anchor="middle">sin intermediario</text>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3.6" orient="auto"><path d="M0 0 L 7.2 3.6 L 0 7.2 z" fill="#C9BDB1"/></marker>
+    <marker id="arrow-coral" markerWidth="9" markerHeight="9" refX="7" refY="3.6" orient="auto"><path d="M0 0 L 7.2 3.6 L 0 7.2 z" fill="#E8542F"/></marker>
+  </defs>
+</svg>

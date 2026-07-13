@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="es">
+  <title>Blog de live.tips</title>
+  <subtitle>Notas sobre cómo recibir propinas: códigos QR en el escenario, pagos con tarjeta sin intermediarios y lo que aprendemos construyendo live.tips a la vista de todos.</subtitle>
+  <link rel="self" href="https://live.tips/es/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/es/blog/"/>
+  <id>https://live.tips/es/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="es">
+    <title>Las propinas no son donaciones — y Stripe las trata como dos negocios distintos</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/es/blog/las-propinas-no-son-donaciones/"/>
+    <id>https://live.tips/es/blog/las-propinas-no-son-donaciones/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Un músico callejero que pide un «botón de donaciones» está describiendo un negocio que Stripe prohíbe en casi toda Europa. Una propina paga un servicio que ya prestaste; una donación es recaudación de fondos con fines benéficos. La diferencia decide en qué categoría cae tu cuenta — y un solo parámetro de la API puede elegir la equivocada por ti.</summary>
+  </entry>
+  <entry xml:lang="es">
+    <title>Cómo cobran con tarjeta los músicos callejeros ahora que nadie lleva efectivo</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/es/blog/cobrar-con-tarjeta-musicos-callejeros/"/>
+    <id>https://live.tips/es/blog/cobrar-con-tarjeta-musicos-callejeros/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Datáfonos, pago sin contacto con el móvil, códigos QR de apps de pago, plataformas de propinas. Lo que cuesta de verdad cada opción, lo que le hace a una propina de 2 €, y cómo elegir — escrito por gente que fabrica una de estas herramientas y aun así te dirá que compres un SumUp si esa es tu respuesta.</summary>
+  </entry>
+  <entry xml:lang="es">
+    <title>Propinas sin contacto para músicos callejeros, con honestidad</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/es/blog/propinas-sin-contacto-para-musicos-callejeros/"/>
+    <id>https://live.tips/es/blog/propinas-sin-contacto-para-musicos-callejeros/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap to Pay en el móvil, un lector de tarjetas, una pegatina NFC, un código QR — cuatro cosas distintas a las que se llama «sin contacto». Lo que cuesta de verdad cada una en 2026, lo que hace realmente una etiqueta NFC (no es lo que crees), y cuándo un toque gana al escaneo.</summary>
+  </entry>
+  <entry xml:lang="es">
+    <title>Monta un bote de propinas en tu propia cuenta de Stripe</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/es/blog/monta-un-bote-de-propinas-en-tu-propia-cuenta-de-stripe/"/>
+    <id>https://live.tips/es/blog/monta-un-bote-de-propinas-en-tu-propia-cuenta-de-stripe/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tres llamadas a la API te dan una página alojada de precio libre con Apple Pay y Google Pay, sin ningún servidor. Aquí está el montaje completo: la clave restringida, los permisos, cómo leer las propinas sin webhook y las cuentas de comisiones que nadie imprime.</summary>
+  </entry>
+  <entry xml:lang="es">
+    <title>Bote de propinas online para músicos callejeros: Ko-fi, Buy Me a Coffee y TipTopJar comparados</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/es/blog/botes-de-propinas-comparados/"/>
+    <id>https://live.tips/es/blog/botes-de-propinas-comparados/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Tres productos decentes para creadores en internet. Un músico callejero no es un creador en internet. Tu público está delante de ti y tienes ocho segundos — por qué 0 % no es lo mismo que nada, y por qué una propina de 5 € debería llegar como 5 €.</summary>
+  </entry>
+  <entry xml:lang="es">
+    <title>Un código QR, todos los métodos de pago</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/es/blog/un-codigo-qr-todos-metodos-pago/"/>
+    <id>https://live.tips/es/blog/un-codigo-qr-todos-metodos-pago/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>La mayoría de las herramientas de propinas te dan un código por cada proveedor de pago. Pega tres a un pie de micrófono y observa cómo la gente se rinde. Aquí está por qué live.tips se queda con uno.</summary>
+  </entry>
+  <entry xml:lang="es">
+    <title>Cómo live.tips gestiona el dinero (no lo hace)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/es/blog/como-live-tips-gestiona-dinero/"/>
+    <id>https://live.tips/es/blog/como-live-tips-gestiona-dinero/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>No hay saldo de live.tips, ni calendario de pagos, ni comisión. Aquí está la arquitectura que vuelve esas tres afirmaciones aburridas en lugar de valientes.</summary>
+  </entry>
+</feed>

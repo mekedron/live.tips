@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ro">
+  <title>live.tips blog</title>
+  <subtitle>Note despre bacșiș: coduri QR pe scenă, plăți cu cardul fără intermediar și ce învățăm construind live.tips la vedere.</subtitle>
+  <link rel="self" href="https://live.tips/ro/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/ro/blog/"/>
+  <id>https://live.tips/ro/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="ro">
+    <title>Bacșișul nu e donație — iar Stripe le tratează ca pe două afaceri diferite</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/ro/blog/bacsisul-nu-e-donatie/"/>
+    <id>https://live.tips/ro/blog/bacsisul-nu-e-donatie/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Un muzicant stradal care cere un „buton de donație&quot; descrie o afacere pe care Stripe o interzice în cea mai mare parte a Europei. Bacșișul plătește un serviciu pe care l-ai prestat deja; donația e strângere de fonduri în scop caritabil. Diferența decide în ce categorie ajunge contul tău — și un singur parametru de API o poate alege greșit în locul tău.</summary>
+  </entry>
+  <entry xml:lang="ro">
+    <title>Cum acceptă plăți cu cardul muzicanții stradali acum că nimeni nu mai are numerar</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/ro/blog/plati-cu-cardul-pentru-muzicanti-stradali/"/>
+    <id>https://live.tips/ro/blog/plati-cu-cardul-pentru-muzicanti-stradali/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Cititoare de card, plată prin telefon, coduri QR ale aplicațiilor de plată, platforme de bacșiș. Cât costă cu adevărat fiecare opțiune, ce face unui bacșiș de 2 €, și cum alegi — de la oameni care construiesc chiar unul dintre aceste instrumente și care îți vor spune totuși să-ți iei un SumUp dacă asta e răspunsul.</summary>
+  </entry>
+  <entry xml:lang="ro">
+    <title>Bacșiș contactless pentru muzicanți stradali, pe cinstite</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/ro/blog/bacsis-contactless-pentru-muzicanti-stradali/"/>
+    <id>https://live.tips/ro/blog/bacsis-contactless-pentru-muzicanti-stradali/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap to Pay pe telefon, un cititor de card, un sticker NFC, un cod QR — patru lucruri diferite cărora li se spune, tuturor, „contactless&quot;. Cât costă fiecare cu adevărat în 2026, ce face de fapt un tag NFC (nu e ce crezi) și când bate atingerea scanarea.</summary>
+  </entry>
+  <entry xml:lang="ro">
+    <title>Construiește un borcan de bacșiș pe propriul cont Stripe</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/ro/blog/construieste-un-borcan-de-bacsis-pe-propriul-cont-stripe/"/>
+    <id>https://live.tips/ro/blog/construieste-un-borcan-de-bacsis-pe-propriul-cont-stripe/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Trei apeluri de API îți dau o pagină găzduită de tip „plătește cât vrei”, cu Apple Pay și Google Pay, fără niciun server. Iată construcția completă: cheia restricționată, permisiunile, cum citești bacșișurile fără webhook și calculul comisioanelor pe care nu-l tipărește nimeni.</summary>
+  </entry>
+  <entry xml:lang="ro">
+    <title>Borcan de bacșiș online pentru muzicanți stradali: Ko-fi, Buy Me a Coffee și TipTopJar comparate</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/ro/blog/borcane-de-bacsis-comparate/"/>
+    <id>https://live.tips/ro/blog/borcane-de-bacsis-comparate/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Trei produse decente pentru creatori pe internet. Un muzicant stradal nu e un creator pe internet. Publicul îți stă chiar în față și ai opt secunde — de ce 0% nu e totuna cu nimic și de ce un bacșiș de €5 ar trebui să ajungă ca €5.</summary>
+  </entry>
+  <entry xml:lang="ro">
+    <title>Un cod QR, orice metodă de plată</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/ro/blog/un-cod-qr-orice-metoda-de-plata/"/>
+    <id>https://live.tips/ro/blog/un-cod-qr-orice-metoda-de-plata/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>Majoritatea instrumentelor de bacșiș îți dau câte un cod pentru fiecare furnizor de plată. Lipește trei pe stativul de microfon și uită-te cum renunță oamenii. Iată de ce live.tips rămâne la unul singur.</summary>
+  </entry>
+  <entry xml:lang="ro">
+    <title>Cum se ocupă live.tips de bani (nu se ocupă)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/ro/blog/cum-se-ocupa-live-tips-de-bani/"/>
+    <id>https://live.tips/ro/blog/cum-se-ocupa-live-tips-de-bani/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Nu există niciun sold live.tips, niciun calendar de plăți, niciun comision. Iată arhitectura care face ca aceste trei afirmații să fie plictisitoare în loc de curajoase.</summary>
+  </entry>
+</feed>

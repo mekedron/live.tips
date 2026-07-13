@@ -179,6 +179,18 @@ Four ways to be, three of them Firebase Auth:
 - **Guest** — an *explicit* anonymous account. It syncs and can be revoked, but
   there is nothing to recover it with if the device is lost.
 
+Sign-in flows that hand the artist to Google or Apple bounce through Firebase
+Auth's OAuth handler, and the artist reads that domain in the popup's address
+bar — so it is **`auth.live.tips`**, not `livetips-app.firebaseapp.com`. It is a
+custom domain on the same Hosting site as `tip.live.tips`, and Hosting serves the
+reserved `/__/auth/*` handler on every custom domain attached to a site. The web
+SDK takes the domain from `FirebaseOptions.authDomain`; the Android/Apple SDKs
+ignore that field and read `FirebaseAuth.customAuthDomain` instead (which is what
+Sign in with Apple *on Android* rides, having no native sheet). Both are set in
+`data/firebase/auth_domain.dart` and applied at boot in `main.dart` — deliberately
+not in the generated `firebase_options.dart`, which `flutterfire configure`
+would overwrite. `livetips-app.firebaseapp.com` stays authorized as a fallback.
+
 That last one collides with something: the relay *also* signs in anonymously,
 purely as a transport credential (see [Optional relay](#optional-relay-firebasetiplivetips)),
 so "is this Firebase user anonymous?" cannot be the question that decides

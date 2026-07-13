@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 802 300" width="802" height="300" role="img" aria-labelledby="mp-title" font-family="Outfit, ui-sans-serif, system-ui, sans-serif">
+  <title id="mp-title">Two ways a tip reaches a performer: through a platform, a held balance and a payout queue, or straight from the fan to the artist.</title>
+  <rect width="802" height="300" rx="14" fill="#FAF6F1"/>
+  <text x="36" y="46" font-size="15" fill="#70685D" text-anchor="start" font-weight="600" letter-spacing="1.4">ALKOTÓI PLATFORM</text>
+  <rect x="36" y="66" width="139" height="60" rx="12" fill="#FFFFFF" stroke="#E4DAD0"/>
+  <rect x="219" y="66" width="150" height="60" rx="12" fill="#FFFFFF" stroke="#E4DAD0"/>
+  <rect x="413" y="66" width="188" height="60" rx="12" fill="#FFFFFF" stroke="#E4DAD0"/>
+  <rect x="646" y="66" width="120" height="60" rx="12" fill="#FFFFFF" stroke="#E4DAD0"/>
+  <text x="105" y="102" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">A rajongód</text>
+  <text x="294" y="94" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Platform</text>
+  <text x="294" y="112" font-size="12.5" fill="#70685D" text-anchor="middle">levonja a részét</text>
+  <text x="507" y="94" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Zárolt egyenleg</text>
+  <text x="507" y="112" font-size="12.5" fill="#70685D" text-anchor="middle">kifizetési sor</text>
+  <text x="706" y="102" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Te</text>
+  <text x="507" y="146" font-size="12.5" fill="#8A2E14" text-anchor="middle">nappal később</text>
+  <g stroke="#C9BDB1" stroke-width="1.6" fill="none" marker-end="url(#arrow)">
+    <path d="M183 96 H 211"/>
+    <path d="M377 96 H 405"/>
+    <path d="M610 96 H 638"/>
+  </g>
+  <text x="36" y="216" font-size="15" fill="#8A2E14" text-anchor="start" font-weight="600" letter-spacing="1.4">LIVE.TIPS</text>
+  <rect x="36" y="236" width="139" height="60" rx="12" fill="#FFFFFF" stroke="#F0C9BB"/>
+  <rect x="622" y="236" width="143" height="60" rx="12" fill="#FDE7DF" stroke="#F0C9BB"/>
+  <text x="105" y="272" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">A rajongód</text>
+  <text x="694" y="264" font-size="16" fill="#221D18" text-anchor="middle" font-weight="600">Te</text>
+  <text x="694" y="282" font-size="12.5" fill="#8A2E14" text-anchor="middle">színpadon, most</text>
+  <path d="M183 266 H 614" stroke="#E8542F" stroke-width="2" fill="none" marker-end="url(#arrow-coral)"/>
+  <text x="399" y="256" font-size="12.5" fill="#70685D" text-anchor="middle">nincs egyenleg, sor, levonás</text>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3.6" orient="auto"><path d="M0 0 L 7.2 3.6 L 0 7.2 z" fill="#C9BDB1"/></marker>
+    <marker id="arrow-coral" markerWidth="9" markerHeight="9" refX="7" refY="3.6" orient="auto"><path d="M0 0 L 7.2 3.6 L 0 7.2 z" fill="#E8542F"/></marker>
+  </defs>
+</svg>

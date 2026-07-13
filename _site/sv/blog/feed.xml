@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="sv">
+  <title>live.tips blogg</title>
+  <subtitle>Tankar om att få dricks: QR-koder på scenen, kortbetalningar utan mellanhand och vad vi lär oss när vi bygger live.tips öppet.</subtitle>
+  <link rel="self" href="https://live.tips/sv/blog/feed.xml"/>
+  <link rel="alternate" type="text/html" href="https://live.tips/sv/blog/"/>
+  <id>https://live.tips/sv/blog/</id>
+  <updated>2026-07-13T00:00:00Z</updated>
+  <author><name>live.tips</name></author>
+  <entry xml:lang="sv">
+    <title>Dricks är inte donationer — och Stripe behandlar dem som två olika verksamheter</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/sv/blog/dricks-ar-inte-donation/"/>
+    <id>https://live.tips/sv/blog/dricks-ar-inte-donation/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>En gatumusikant som ber om en ”donationsknapp&quot; beskriver en verksamhet som Stripe förbjuder i större delen av Europa. Dricks betalar för en tjänst du redan utfört; en donation är insamling för välgörande ändamål. Skillnaden avgör vilken kategori ditt konto hamnar i — och en enda API-parameter kan välja fel åt dig.</summary>
+  </entry>
+  <entry xml:lang="sv">
+    <title>Så tar gatumusiker betalt med kort när ingen längre har kontanter</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/sv/blog/kortbetalningar-for-gatumusiker/"/>
+    <id>https://live.tips/sv/blog/kortbetalningar-for-gatumusiker/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Kortläsare, tap-to-pay med mobilen, QR-koder för betalappar, dricksplattformar. Vad varje alternativ faktiskt kostar, vad det gör med en dricks på 20 kronor, och hur du väljer — från folk som själva bygger ett av verktygen och ändå säger åt dig att köpa en SumUp om det är svaret.</summary>
+  </entry>
+  <entry xml:lang="sv">
+    <title>Kontaktlös dricks till gatumusiker, ärligt</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/sv/blog/kontaktlos-dricks-till-gatumusiker/"/>
+    <id>https://live.tips/sv/blog/kontaktlos-dricks-till-gatumusiker/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tap to Pay på mobilen, en kortläsare, ett NFC-klistermärke, en QR-kod — fyra olika saker som alla kallas ”kontaktlöst&quot;. Vad var och en faktiskt kostar 2026, vad ett NFC-tagg egentligen gör (det är inte vad du tror) och när en tryckning slår en skanning.</summary>
+  </entry>
+  <entry xml:lang="sv">
+    <title>Bygg en dricksburk på ditt eget Stripe-konto</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/sv/blog/bygg-en-dricksburk-pa-ditt-eget-stripe-konto/"/>
+    <id>https://live.tips/sv/blog/bygg-en-dricksburk-pa-ditt-eget-stripe-konto/</id>
+    <published>2026-07-11T00:00:00Z</published>
+    <updated>2026-07-11T00:00:00Z</updated>
+    <summary>Tre API-anrop ger dig en hostad betala-vad-du-vill-sida med Apple Pay och Google Pay — helt utan server. Här är hela bygget: den begränsade nyckeln, behörigheterna, hur du läser in dricksen utan webhook, och avgiftsmatten som ingen trycker.</summary>
+  </entry>
+  <entry xml:lang="sv">
+    <title>Dricksburk online för gatumusikanter: Ko-fi, Buy Me a Coffee och TipTopJar i jämförelse</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/sv/blog/dricksburkar-i-jamforelse/"/>
+    <id>https://live.tips/sv/blog/dricksburkar-i-jamforelse/</id>
+    <published>2026-07-10T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Tre hyfsade produkter för kreatörer på internet. En gatumusikant är ingen kreatör på internet. Publiken står framför dig och du har åtta sekunder — varför 0% inte är samma sak som ingenting, och varför en dricks på €5 borde komma fram som €5.</summary>
+  </entry>
+  <entry xml:lang="sv">
+    <title>En QR-kod, varje betalningsmetod</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/sv/blog/en-qr-kod-varje-betalningsmetod/"/>
+    <id>https://live.tips/sv/blog/en-qr-kod-varje-betalningsmetod/</id>
+    <published>2026-07-09T00:00:00Z</published>
+    <updated>2026-07-09T00:00:00Z</updated>
+    <summary>De flesta dricksverktyg ger dig en kod per betalningsleverantör. Tejpa tre på ett mikrofonstativ och se folk ge upp. Här är varför live.tips håller sig till en.</summary>
+  </entry>
+  <entry xml:lang="sv">
+    <title>Så hanterar live.tips pengar (det gör det inte)</title>
+    <link rel="alternate" type="text/html" href="https://live.tips/sv/blog/sa-hanterar-live-tips-pengar/"/>
+    <id>https://live.tips/sv/blog/sa-hanterar-live-tips-pengar/</id>
+    <published>2026-07-02T00:00:00Z</published>
+    <updated>2026-07-13T00:00:00Z</updated>
+    <summary>Det finns inget live.tips-saldo, inget utbetalningsschema och ingen andel. Här är arkitekturen som gör de tre påståendena tråkiga i stället för modiga.</summary>
+  </entry>
+</feed>
