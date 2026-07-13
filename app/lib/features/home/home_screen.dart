@@ -48,10 +48,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     if (_autoResume) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final controller = ref.read(liveSessionProvider.notifier);
         if (ref.read(liveSessionProvider) == null &&
             ref.read(storedSessionProvider) != null) {
-          final resumed = await controller.resumeStored();
+          final resumed = await _resumeStored();
           if (resumed && mounted) _openLive();
         }
       });
@@ -84,26 +83,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           .read(liveSessionProvider.notifier)
           .start(goalMinor: _goalMinor);
     } on SessionAlreadyActiveException catch (e) {
-      // The account is already live on another device — point at the Join
-      // banner instead of forking the night into two sessions.
-      if (!mounted) return;
-      final accounts = ref.read(appStateProvider).accounts;
-      final bandName = accounts
-              .where((a) => a.id == e.bandId)
-              .map((a) => a.name.trim())
-              .firstOrNull ??
-          '';
-      final band = bandName.isEmpty
-          ? context.s.t('widgets.profile_switcher.unnamed')
-          : bandName;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(context.s.t('home.already_live', {'band': band})),
-      ));
+      _showAlreadyLive(e);
       return;
     }
     // start() refuses quietly in edge states (mid band switch, nothing
     // configured) — never open the stage over a session that isn't there.
     if (mounted && ref.read(liveSessionProvider) != null) _openLive();
+  }
+
+  /// Resumes the stored (crash-recovery) session, absorbing the "another
+  /// device holds this session" outcome into the same snackbar Go live
+  /// shows — a silently dead Resume button teaches the artist nothing.
+  Future<bool> _resumeStored() async {
+    try {
+      return await ref.read(liveSessionProvider.notifier).resumeStored();
+    } on SessionAlreadyActiveException catch (e) {
+      _showAlreadyLive(e);
+      return false;
+    }
+  }
+
+  /// The account is already live on another device — point at the Join
+  /// banner instead of forking the night into two sessions.
+  void _showAlreadyLive(SessionAlreadyActiveException e) {
+    if (!mounted) return;
+    final accounts = ref.read(appStateProvider).accounts;
+    final bandName = accounts
+            .where((a) => a.id == e.bandId)
+            .map((a) => a.name.trim())
+            .firstOrNull ??
+        '';
+    final band = bandName.isEmpty
+        ? context.s.t('widgets.profile_switcher.unnamed')
+        : bandName;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(context.s.t('home.already_live', {'band': band})),
+    ));
   }
 
   void _openLive() {
@@ -125,6 +140,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       onEditGoal: () => _editGoal(app.currency),
       onBump: _setGoal,
       onStart: _startSession,
+      onResume: _resumeStored,
       onReturn: _openLive,
     );
 
@@ -346,6 +362,7 @@ class _GoalCard extends ConsumerWidget {
     required this.onEditGoal,
     required this.onBump,
     required this.onStart,
+    required this.onResume,
     required this.onReturn,
   });
 
@@ -355,6 +372,11 @@ class _GoalCard extends ConsumerWidget {
   final VoidCallback onEditGoal;
   final ValueChanged<int> onBump;
   final VoidCallback onStart;
+
+  /// Resumes the stored session; false means nothing to return to (another
+  /// device holds the session, or it ended elsewhere) — the owner already
+  /// told the artist why, so the card only decides whether to open the stage.
+  final Future<bool> Function() onResume;
   final VoidCallback onReturn;
 
   @override
@@ -432,7 +454,7 @@ class _GoalCard extends ConsumerWidget {
                 storedSession,
               );
               if (choice == _StoredSessionChoice.resume) {
-                final resumed = await controller.resumeStored();
+                final resumed = await onResume();
                 if (resumed && context.mounted) onReturn();
               } else if (choice == _StoredSessionChoice.discardAndStart) {
                 onStart();
@@ -458,7 +480,7 @@ class _GoalCard extends ConsumerWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final resumed = await controller.resumeStored();
+                      final resumed = await onResume();
                       if (resumed && context.mounted) onReturn();
                     },
                     icon: Icon(
