@@ -173,7 +173,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final isRail = AppShellScope.of(context)?.isRail ?? false;
     final app = ref.watch(appStateProvider);
     final sessions = ref
-        .watch(localStoreProvider)
+        .watch(accountDataRepositoryProvider)
         .readSessionHistory(app.accountId)
         .reversed
         .toList();

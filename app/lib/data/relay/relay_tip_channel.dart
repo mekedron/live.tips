@@ -4,23 +4,10 @@ import 'dart:math';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../domain/tip.dart';
+import '../tip_channel.dart';
 import 'relay_ws_codec.dart';
 
-/// Health of the relay tip feed, as shown on the stage screen.
-enum RelayHealth {
-  /// First connection attempt in flight — nothing has failed yet.
-  connecting,
-
-  /// Authenticated and receiving.
-  ok,
-
-  /// Connection lost — reconnecting with backoff.
-  down,
-
-  /// The relay rejected the secret or the jar is gone (close 4401/4410).
-  /// Terminal: no reconnect will fix it, the artist must re-link in Settings.
-  unauthorized,
-}
+export '../tip_channel.dart' show RelayHealth, TipChannel;
 
 /// Close codes the relay uses for "go away and stay away".
 const int _kCloseUnauthorized = 4401;
@@ -34,7 +21,7 @@ const String _kRawPing = '{"type":"ping"}';
 /// authenticate, decode tips, answer pings, and reconnect forever with
 /// exponential backoff — except on 4401/4410, which are terminal. Pure
 /// plumbing: no Riverpod, no persistence; whoever creates it disposes it.
-class RelayTipChannel {
+class RelayTipChannel implements TipChannel {
   RelayTipChannel({
     required Uri wsUri,
     required String secret,
@@ -76,12 +63,15 @@ class RelayTipChannel {
 
   /// Tips decoded from the feed. NOT exactly-once — the consumer must
   /// dedupe by tip id (the session already does for the Stripe poll).
+  @override
   Stream<Tip> get tips => _tips.stream;
 
   /// Emits on every health transition. Subscribe BEFORE [start] — broadcast
   /// streams don't replay.
+  @override
   Stream<RelayHealth> get status => _status.stream;
 
+  @override
   void start() {
     if (_started || _disposed) return;
     _started = true;
@@ -97,6 +87,7 @@ class RelayTipChannel {
   /// "Can't reach live.tips" on stage for no reason. The relay holds tips for
   /// a device that is away, so the only cost of an unnecessary redial is one
   /// handshake.
+  @override
   void reconnectNow() {
     if (_disposed || _terminal || !_started) return;
     _reconnectTimer?.cancel();
@@ -250,6 +241,7 @@ class RelayTipChannel {
     }
   }
 
+  @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;

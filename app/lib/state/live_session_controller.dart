@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/tip_source.dart';
-import '../data/relay/relay_tip_channel.dart';
+import '../data/tip_channel.dart';
 import '../data/stripe/stripe_client.dart';
 import '../domain/tip.dart';
 import '../domain/fx_rates.dart';
@@ -77,7 +77,7 @@ class LiveState {
 class LiveSessionController extends Notifier<LiveState?> {
   Timer? _timer;
   TipSource? _source;
-  RelayTipChannel? _relay;
+  TipChannel? _relay;
   StreamSubscription<Tip>? _relayTipsSub;
   ProviderSubscription<FxRates?>? _fxSub;
   StreamSubscription<RelayHealth>? _relayStatusSub;
@@ -119,17 +119,17 @@ class LiveSessionController extends Notifier<LiveState?> {
   Future<bool> resumeStored() async {
     final app = ref.read(appStateProvider);
     if (app.switching) return false;
-    final local = ref.read(localStoreProvider);
-    final stored = local.readActiveSession(app.accountId);
+    final repo = ref.read(accountDataRepositoryProvider);
+    final stored = repo.readActiveSession(app.accountId);
     if (stored == null) return false;
     await _begin(stored,
-        resumeCursor: local.readActiveCursor(app.accountId), resumed: true);
+        resumeCursor: repo.readActiveCursor(app.accountId), resumed: true);
     return true;
   }
 
   Future<void> discardStored() async {
     await ref
-        .read(localStoreProvider)
+        .read(accountDataRepositoryProvider)
         .clearActiveSession(ref.read(appStateProvider).accountId);
     ref.read(storedSessionProvider.notifier).refresh();
   }
@@ -168,7 +168,7 @@ class LiveSessionController extends Notifier<LiveState?> {
       relay: _relay == null ? null : RelayHealth.connecting,
     );
     await ref
-        .read(localStoreProvider)
+        .read(accountDataRepositoryProvider)
         .saveActiveSession(_accountId, session, resumeCursor);
     ref.read(storedSessionProvider.notifier).refresh();
 
@@ -240,7 +240,7 @@ class LiveSessionController extends Notifier<LiveState?> {
       newTips: tips,
     );
     unawaited(ref
-        .read(localStoreProvider)
+        .read(accountDataRepositoryProvider)
         .saveActiveSession(_accountId, current.session, _source?.cursor));
     // Tip-page (relay) tips exist nowhere but this device — archive them so
     // History still has them after the session ends. Real money only: demo
@@ -256,7 +256,7 @@ class LiveSessionController extends Notifier<LiveState?> {
       // SharedPreferences in-memory cache synchronously, so the refresh
       // below already sees the new tips — only the disk write is deferred.
       unawaited(ref
-          .read(localStoreProvider)
+          .read(accountDataRepositoryProvider)
           .appendRelayHistory(_accountId, relayTips));
       ref.read(relayHistoryProvider.notifier).refresh();
     }
@@ -285,7 +285,7 @@ class LiveSessionController extends Notifier<LiveState?> {
     current.session.applyRollovers();
     state = current.copyWith(session: current.session);
     unawaited(ref
-        .read(localStoreProvider)
+        .read(accountDataRepositoryProvider)
         .saveActiveSession(_accountId, current.session, _source?.cursor));
     final app = ref.read(appStateProvider);
     unawaited(ref
@@ -303,9 +303,9 @@ class LiveSessionController extends Notifier<LiveState?> {
     if (current == null) return null;
     _teardown();
     final session = current.session..endedAt = DateTime.now();
-    final local = ref.read(localStoreProvider);
-    await local.appendSessionToHistory(_accountId, session);
-    await local.clearActiveSession(_accountId);
+    final repo = ref.read(accountDataRepositoryProvider);
+    await repo.appendSessionToHistory(_accountId, session);
+    await repo.clearActiveSession(_accountId);
     state = null;
     ref.read(storedSessionProvider.notifier).refresh();
     // Tips that arrived during the set aren't in the home preview's cached
@@ -348,11 +348,13 @@ class StoredSessionNotifier extends Notifier<LiveSession?> {
   LiveSession? build() {
     final accountId =
         ref.watch(appStateProvider.select((s) => s.accountId));
-    return ref.read(localStoreProvider).readActiveSession(accountId);
+    return ref
+        .read(accountDataRepositoryProvider)
+        .readActiveSession(accountId);
   }
 
   void refresh() => state = ref
-      .read(localStoreProvider)
+      .read(accountDataRepositoryProvider)
       .readActiveSession(ref.read(appStateProvider).accountId);
 }
 

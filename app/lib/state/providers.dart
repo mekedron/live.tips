@@ -8,6 +8,7 @@ import '../data/local_store.dart';
 import '../data/relay/relay_client.dart';
 import '../data/relay/relay_config.dart';
 import '../data/relay/relay_tip_channel.dart';
+import '../data/repository/account_data_repository.dart';
 import '../data/secure_store.dart';
 import '../data/stripe/stripe_client.dart';
 import '../data/stripe/stripe_requests.dart';
@@ -26,6 +27,18 @@ final localStoreProvider =
     Provider<LocalStore>((ref) => throw UnimplementedError());
 final secureStoreProvider =
     Provider<SecureStore>((ref) => throw UnimplementedError());
+
+/// The active profile's data home. Today always the local stores; once
+/// cloud accounts land this resolves per active account (local profile →
+/// [LocalStoreRepository], signed-in → Firestore-backed). Device-wide
+/// plumbing that is local by design — the accounts registry, fx cache,
+/// pending secret wipes, boot migrations — stays on [localStoreProvider].
+final accountDataRepositoryProvider = Provider<AccountDataRepository>(
+  (ref) => LocalStoreRepository(
+    ref.watch(localStoreProvider),
+    () => ref.read(secureStoreProvider),
+  ),
+);
 
 /// Active band's API key, read from secure storage before the first frame.
 final initialApiKeyProvider = Provider<String?>((ref) => null);
@@ -176,15 +189,16 @@ class AppStateNotifier extends Notifier<AppState> {
       local.saveAccountsRegistry(registry); // fire-and-forget
     }
     final accountId = registry.activeId;
+    final repo = ref.read(accountDataRepositoryProvider);
     return AppState(
       accountId: accountId,
       accounts: registry.accounts,
       apiKey: ref.read(initialApiKeyProvider),
-      tipJar: local.readTipJar(accountId),
-      relayJar: local.readRelayJar(accountId),
+      tipJar: repo.readTipJar(accountId),
+      relayJar: repo.readRelayJar(accountId),
       relaySecret: ref.read(initialRelaySecretProvider),
-      settings: local.readSettings(),
-      band: local.readBandSettings(accountId),
+      settings: repo.readSettings(),
+      band: repo.readBandSettings(accountId),
     );
   }
 
@@ -194,10 +208,11 @@ class AppStateNotifier extends Notifier<AppState> {
   Future<void> connect(String apiKey) async {
     final accountId = state.accountId;
     final trimmed = apiKey.trim();
-    await ref.read(secureStoreProvider).writeApiKey(accountId, trimmed);
+    final repo = ref.read(accountDataRepositoryProvider);
+    await repo.writeApiKey(accountId, trimmed);
     // A newly connected account must not inherit demo/test tips from earlier
     // play — otherwise its history shows tips that never happened.
-    await ref.read(localStoreProvider).purgeSimulatedData(accountId);
+    await repo.purgeSimulatedData(accountId);
     if (state.accountId != accountId) return; // switched bands mid-await
     state = state.copyWith(apiKey: trimmed, demo: false);
   }
@@ -212,7 +227,7 @@ class AppStateNotifier extends Notifier<AppState> {
 
   Future<void> setTipJar(TipJar jar) async {
     final accountId = state.accountId;
-    await ref.read(localStoreProvider).saveTipJar(accountId, jar);
+    await ref.read(accountDataRepositoryProvider).saveTipJar(accountId, jar);
     // A jar names the band — adopt its display name as the registry name so
     // the switcher never shows "Unnamed band" for a configured one.
     await _renameInRegistry(accountId, jar.displayName);
@@ -225,9 +240,10 @@ class AppStateNotifier extends Notifier<AppState> {
   /// inherit demo/test tips from earlier play.
   Future<void> setRelayJar(RelayJar jar, String secret) async {
     final accountId = state.accountId;
-    await ref.read(secureStoreProvider).writeRelaySecret(accountId, secret);
-    await ref.read(localStoreProvider).saveRelayJar(accountId, jar);
-    await ref.read(localStoreProvider).purgeSimulatedData(accountId);
+    final repo = ref.read(accountDataRepositoryProvider);
+    await repo.writeRelaySecret(accountId, secret);
+    await repo.saveRelayJar(accountId, jar);
+    await repo.purgeSimulatedData(accountId);
     final current = _registry;
     if (current.contains(accountId) &&
         current.accounts.firstWhere((a) => a.id == accountId).name.isEmpty) {
@@ -241,7 +257,9 @@ class AppStateNotifier extends Notifier<AppState> {
   /// untouched and telling the relay itself is the caller's job.
   Future<void> updateRelayJarLocal(RelayJar jar) async {
     final accountId = state.accountId;
-    await ref.read(localStoreProvider).saveRelayJar(accountId, jar);
+    await ref
+        .read(accountDataRepositoryProvider)
+        .saveRelayJar(accountId, jar);
     if (state.accountId != accountId) return;
     state = state.copyWith(relayJar: jar);
   }
@@ -250,9 +268,10 @@ class AppStateNotifier extends Notifier<AppState> {
   /// (network DELETE) is the caller's job.
   Future<void> clearRelayJar() async {
     final accountId = state.accountId;
-    await ref.read(secureStoreProvider).deleteRelaySecret(accountId);
-    await ref.read(localStoreProvider).clearRelayJar(accountId);
-    await ref.read(localStoreProvider).clearRelayLinkReplaced(accountId);
+    final repo = ref.read(accountDataRepositoryProvider);
+    await repo.deleteRelaySecret(accountId);
+    await repo.clearRelayJar(accountId);
+    await repo.clearRelayLinkReplaced(accountId);
     ref.read(relayLinkNoticeProvider.notifier).refresh();
     if (state.accountId != accountId) return;
     state = state.copyWith(relayJar: null, relaySecret: null);
@@ -268,11 +287,10 @@ class AppStateNotifier extends Notifier<AppState> {
     String secret,
     String oldTipUrl,
   ) async {
-    await ref.read(secureStoreProvider).writeRelaySecret(accountId, secret);
-    await ref.read(localStoreProvider).saveRelayJar(accountId, jar);
-    await ref
-        .read(localStoreProvider)
-        .writeRelayLinkReplaced(accountId, oldTipUrl);
+    final repo = ref.read(accountDataRepositoryProvider);
+    await repo.writeRelaySecret(accountId, secret);
+    await repo.saveRelayJar(accountId, jar);
+    await repo.writeRelayLinkReplaced(accountId, oldTipUrl);
     ref.read(relayLinkNoticeProvider.notifier).refresh();
     if (state.accountId == accountId) {
       state = state.copyWith(relayJar: jar, relaySecret: secret);
@@ -282,19 +300,23 @@ class AppStateNotifier extends Notifier<AppState> {
   /// Dismisses the "your tip page link changed, please reprint" notice.
   Future<void> dismissRelayLinkNotice() async {
     final accountId = state.accountId;
-    await ref.read(localStoreProvider).clearRelayLinkReplaced(accountId);
+    await ref
+        .read(accountDataRepositoryProvider)
+        .clearRelayLinkReplaced(accountId);
     ref.read(relayLinkNoticeProvider.notifier).refresh();
   }
 
   Future<void> updateSettings(AppSettings settings) async {
-    await ref.read(localStoreProvider).saveSettings(settings);
+    await ref.read(accountDataRepositoryProvider).saveSettings(settings);
     state = state.copyWith(settings: settings);
   }
 
   /// Persists the active band's own preferences (QR mode, goal, poster).
   Future<void> updateBand(BandSettings band) async {
     final accountId = state.accountId;
-    await ref.read(localStoreProvider).saveBandSettings(accountId, band);
+    await ref
+        .read(accountDataRepositoryProvider)
+        .saveBandSettings(accountId, band);
     if (state.accountId != accountId) return;
     state = state.copyWith(band: band);
   }
@@ -304,15 +326,15 @@ class AppStateNotifier extends Notifier<AppState> {
   /// stays the caller's job (best effort, needs the network).
   Future<void> renameBand(String name) async {
     final accountId = state.accountId;
-    final local = ref.read(localStoreProvider);
+    final repo = ref.read(accountDataRepositoryProvider);
     await _renameInRegistry(accountId, name);
     final tipJar = state.tipJar;
     final relayJar = state.relayJar;
     if (tipJar != null) {
-      await local.saveTipJar(accountId, tipJar.copyWith(displayName: name));
+      await repo.saveTipJar(accountId, tipJar.copyWith(displayName: name));
     }
     if (relayJar != null) {
-      await local.saveRelayJar(
+      await repo.saveRelayJar(
           accountId, relayJar.copyWith(artistName: name));
     }
     if (state.accountId != accountId) return;
@@ -358,13 +380,13 @@ class AppStateNotifier extends Notifier<AppState> {
     ref.read(onboardingDraftProvider.notifier).clear();
 
     final local = ref.read(localStoreProvider);
-    final secure = ref.read(secureStoreProvider);
+    final repo = ref.read(accountDataRepositoryProvider);
     String? apiKey;
     String? relaySecret;
     var keychainOk = true;
     try {
-      apiKey = await secure.readApiKey(id);
-      relaySecret = await secure.readRelaySecret(id);
+      apiKey = await repo.readApiKey(id);
+      relaySecret = await repo.readRelaySecret(id);
     } catch (_) {
       // Locked/prompting keychain: the band opens signed-out this once,
       // exactly like a failed boot read. Its data is untouched.
@@ -382,11 +404,11 @@ class AppStateNotifier extends Notifier<AppState> {
       accountId: id,
       accounts: state.accounts,
       apiKey: apiKey,
-      tipJar: local.readTipJar(id),
-      relayJar: local.readRelayJar(id),
+      tipJar: repo.readTipJar(id),
+      relayJar: repo.readRelayJar(id),
       relaySecret: relaySecret,
       settings: state.settings,
-      band: local.readBandSettings(id),
+      band: repo.readBandSettings(id),
     );
     if (keychainOk) {
       await _maybeCollectAbandoned(previousId);
@@ -424,18 +446,18 @@ class AppStateNotifier extends Notifier<AppState> {
     ref.read(onboardingDraftProvider.notifier).clear();
 
     final local = ref.read(localStoreProvider);
-    final secure = ref.read(secureStoreProvider);
+    final repo = ref.read(accountDataRepositoryProvider);
 
     // Best effort: retire the band's connected-mode jar on the relay so the
     // public fan page dies with the local copy. Failures are ignored —
     // the removal must succeed even offline.
-    final jar = local.readRelayJar(id);
+    final jar = repo.readRelayJar(id);
     String? secret;
     if (id == state.accountId) {
       secret = state.relaySecret;
     } else {
       try {
-        secret = await secure.readRelaySecret(id);
+        secret = await repo.readRelaySecret(id);
       } catch (_) {}
     }
     if (jar != null && secret != null) {
@@ -471,8 +493,8 @@ class AppStateNotifier extends Notifier<AppState> {
       relaySecret = state.relaySecret;
     } else {
       try {
-        apiKey = await secure.readApiKey(successorId);
-        relaySecret = await secure.readRelaySecret(successorId);
+        apiKey = await repo.readApiKey(successorId);
+        relaySecret = await repo.readRelaySecret(successorId);
       } catch (_) {}
     }
     await local.saveAccountsRegistry(registry.withActive(successorId));
@@ -480,16 +502,16 @@ class AppStateNotifier extends Notifier<AppState> {
       accountId: successorId,
       accounts: registry.accounts,
       apiKey: apiKey,
-      tipJar: local.readTipJar(successorId),
-      relayJar: local.readRelayJar(successorId),
+      tipJar: repo.readTipJar(successorId),
+      relayJar: repo.readRelayJar(successorId),
       relaySecret: relaySecret,
       settings: state.settings,
-      band: local.readBandSettings(successorId),
+      band: repo.readBandSettings(successorId),
     );
 
-    await local.wipeAccount(id);
+    await repo.wipeAccountData(id);
     try {
-      await secure.wipeAccount(id);
+      await repo.wipeAccountSecrets(id);
     } catch (_) {
       // A locked keychain leaves the secrets behind — tombstone them so
       // the boot-time retry deletes them once the keychain cooperates.
@@ -505,7 +527,7 @@ class AppStateNotifier extends Notifier<AppState> {
   Future<void> cancelStripeSetup() async {
     final accountId = state.accountId;
     try {
-      await ref.read(secureStoreProvider).deleteApiKey(accountId);
+      await ref.read(accountDataRepositoryProvider).deleteApiKey(accountId);
     } catch (_) {
       // Locked keychain: the in-memory key still goes away this session;
       // the next boot re-reads the entry and the user can cancel again.
@@ -521,13 +543,14 @@ class AppStateNotifier extends Notifier<AppState> {
   /// page is the caller's job (best effort, needs the network).
   Future<void> disconnectStripe() async {
     final accountId = state.accountId;
+    final repo = ref.read(accountDataRepositoryProvider);
     try {
-      await ref.read(secureStoreProvider).deleteApiKey(accountId);
+      await repo.deleteApiKey(accountId);
     } catch (_) {
       // Locked keychain: the in-memory key still goes away this session; the
       // next boot re-reads the entry and the user can disconnect again.
     }
-    await ref.read(localStoreProvider).clearTipJar(accountId);
+    await repo.clearTipJar(accountId);
     if (state.accountId != accountId) return;
     state = state.copyWith(apiKey: null, tipJar: null);
   }
@@ -546,11 +569,11 @@ class AppStateNotifier extends Notifier<AppState> {
       return;
     }
     final local = ref.read(localStoreProvider);
-    if (local.accountHasData(id)) return;
+    final repo = ref.read(accountDataRepositoryProvider);
+    if (repo.accountHasData(id)) return;
     try {
-      final secure = ref.read(secureStoreProvider);
-      if (await secure.readApiKey(id) != null) return;
-      if (await secure.readRelaySecret(id) != null) return;
+      if (await repo.readApiKey(id) != null) return;
+      if (await repo.readRelaySecret(id) != null) return;
     } catch (_) {
       return;
     }
@@ -605,12 +628,12 @@ final tipSourceFactoryProvider = Provider<TipSourceFactory>(
   },
 );
 
-/// Builds the relay WebSocket tip feed for a session — a seam mirroring
+/// Builds the relay push tip feed for a session — a seam mirroring
 /// [tipSourceFactoryProvider] so controller tests can hand in a fake
 /// channel. Null means "this session has no relay feed": demo sessions
 /// synthesize their tips, and without a jar + secret there is nothing to
 /// authenticate against.
-typedef RelayChannelFactory = RelayTipChannel? Function({
+typedef RelayChannelFactory = TipChannel? Function({
   required bool demo,
   required RelayJar? jar,
   required String? secret,
@@ -656,11 +679,11 @@ class RelayHistoryNotifier extends Notifier<List<Tip>> {
   List<Tip> build() {
     final accountId =
         ref.watch(appStateProvider.select((s) => s.accountId));
-    return ref.read(localStoreProvider).readRelayHistory(accountId);
+    return ref.read(accountDataRepositoryProvider).readRelayHistory(accountId);
   }
 
   void refresh() => state = ref
-      .read(localStoreProvider)
+      .read(accountDataRepositoryProvider)
       .readRelayHistory(ref.read(appStateProvider).accountId);
 }
 
@@ -717,11 +740,13 @@ class RelayLinkNoticeNotifier extends Notifier<String?> {
   String? build() {
     final accountId =
         ref.watch(appStateProvider.select((s) => s.accountId));
-    return ref.read(localStoreProvider).readRelayLinkReplaced(accountId);
+    return ref
+        .read(accountDataRepositoryProvider)
+        .readRelayLinkReplaced(accountId);
   }
 
   void refresh() => state = ref
-      .read(localStoreProvider)
+      .read(accountDataRepositoryProvider)
       .readRelayLinkReplaced(ref.read(appStateProvider).accountId);
 }
 

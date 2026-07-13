@@ -16,9 +16,9 @@ String bandMethodsSummary(
   WidgetRef ref,
   String accountId,
 ) {
-  final store = ref.read(localStoreProvider);
-  final tipJar = store.readTipJar(accountId);
-  final relayJar = store.readRelayJar(accountId);
+  final repo = ref.read(accountDataRepositoryProvider);
+  final tipJar = repo.readTipJar(accountId);
+  final relayJar = repo.readRelayJar(accountId);
   final methods = <String>[
     if (tipJar != null) 'Stripe',
     if (relayJar?.hasRevolut ?? false) 'Revolut',
@@ -168,7 +168,7 @@ class _BandSwitcherSheet extends ConsumerWidget {
     final abandoning =
         account.id != leavingId &&
         !app.connected &&
-        !ref.read(localStoreProvider).accountHasData(leavingId);
+        !ref.read(accountDataRepositoryProvider).accountHasData(leavingId);
     if (abandoning) {
       final discard = await showDialog<bool>(
         context: context,

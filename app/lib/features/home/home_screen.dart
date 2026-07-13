@@ -257,7 +257,7 @@ class _DesktopHome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final url = app.activeQrUrl;
     final sessions = ref
-        .read(localStoreProvider)
+        .read(accountDataRepositoryProvider)
         .readSessionHistory(app.accountId);
     final last = sessions.isEmpty ? null : sessions.last;
 
