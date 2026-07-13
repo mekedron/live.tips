@@ -20,6 +20,42 @@ import 'venue_code_entry.dart';
 class VenueSignInScreen extends ConsumerWidget {
   const VenueSignInScreen({super.key});
 
+  /// The escape hatch for a mis-tapped device-kind choice. Venue mode shows
+  /// no Settings, no back button and no app bar leading — without this, a
+  /// signed-out venue install (QR flow down, or simply the wrong card tapped
+  /// at onboarding) is a soft-lock whose only exit is clearing app storage.
+  /// Runs the exact wipe-and-reset Settings' kind change runs, behind the
+  /// same blunt confirmation — because it IS that wipe: data written under
+  /// one trust model must not be inherited by the next.
+  Future<void> _confirmNotVenue(BuildContext context, WidgetRef ref) async {
+    final s = context.s;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.t('settings.device_kind.change_title')),
+        content: Text(s.t('settings.device_kind.change_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(s.t('common.cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(s.t('settings.device_kind.change_confirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    // Clearing the kind flips RootGate away from VenueGate — the device
+    // lands back on onboarding and chooses what it is again.
+    await ref.read(deviceKindProvider.notifier).wipeDevice();
+  }
+
   Future<String?> _onToken(WidgetRef ref, AppLocalizations s, String token) async {
     // The flag holds the gate's stray-account eviction off while the
     // directory has flipped but the session record isn't written yet.
@@ -115,6 +151,24 @@ class VenueSignInScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 VenueCodeEntry(
                   onToken: (token) => _onToken(ref, s, token),
+                ),
+                const SizedBox(height: 20),
+                // Always reachable, even signed out: the one door out of a
+                // mis-chosen venue mode (see [_confirmNotVenue]). Discreet
+                // on purpose — a real venue tablet shouldn't invite taps,
+                // and the wipe confirmation stands guard behind it.
+                Center(
+                  child: TextButton(
+                    onPressed: () => _confirmNotVenue(context, ref),
+                    child: Text(
+                      s.t('venue.sign_in.not_venue'),
+                      style: TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 13,
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

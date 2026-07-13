@@ -10,12 +10,14 @@ import '../../state/providers.dart';
 import '../../state/route_depth.dart';
 
 /// Moves this device's local profiles into [uid]'s account, reporting each
-/// profile as it lands. Null where there is no cloud to move them to (no
+/// profile as it lands, and returning the id of the band the profile should
+/// open on (the locally-active migrated one) — or null when nothing moved.
+/// The provider itself is null where there is no cloud to move them to (no
 /// Firebase) — the offer then never comes up at all.
 ///
 /// A provider so the gate's decisions (when to ask, when to record the
 /// answer) can be tested without a live Firestore behind them.
-typedef CloudUploadRunner = Future<void> Function(
+typedef CloudUploadRunner = Future<String?> Function(
   String uid, {
   void Function(String bandName, int done, int total)? onProgress,
 });
@@ -183,8 +185,9 @@ class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
       );
     }
     var failed = false;
+    String? migratedBandId;
     try {
-      await upload(uid, onProgress: (band, done, total) {
+      migratedBandId = await upload(uid, onProgress: (band, done, total) {
         progress.value = s.t('account.profile_upload.progress_profile', {
           'profile': band,
           'done': '$done',
@@ -204,5 +207,28 @@ class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
           ? 'account.profile_upload.failed'
           : 'account.profile_upload.done')),
     ));
+    if (!failed && migratedBandId != null) {
+      await _activateMigrated(uid, migratedBandId);
+    }
+  }
+
+  /// Lands the artist on the profile they just moved in. The user's mental
+  /// model is "I moved MY band here" — without this, the uploaded bands
+  /// arrive through the snapshot listener, the current (unrelated,
+  /// pre-existing) cloud band stays valid, and the app dumps the artist on
+  /// it: reads as data loss. The uploaded band reaches the mirror through
+  /// that listener, so give it a moment to be switchable-to.
+  Future<void> _activateMigrated(String uid, String bandId) async {
+    for (var i = 0; i < 40; i++) {
+      if (!mounted) return;
+      // The signed-in account may have changed while we waited — the band
+      // is not this profile's to switch to any more.
+      if (ref.read(authControllerProvider).user?.uid != uid) return;
+      if (ref.read(appStateProvider).accounts.any((a) => a.id == bandId)) {
+        await ref.read(appStateProvider.notifier).switchAccount(bandId);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
   }
 }

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +33,7 @@ Future<_Harness> _pump(
   WidgetTester tester, {
   bool alreadyOffered = false,
   bool signIn = true,
+  FirebaseFirestore? db,
 }) async {
   await tester.binding.setSurfaceSize(const Size(600, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -44,9 +47,16 @@ Future<_Harness> _pump(
     secureStoreProvider.overrideWithValue(FakeSecureStore()),
     initialApiKeyProvider.overrideWithValue(null),
     authServiceProvider.overrideWithValue(FakeAuthService()),
-    cloudUploadRunnerProvider.overrideWithValue((uid, {onProgress}) async {
-      uploads.add(uid);
-    }),
+    // With a Firestore wired in, the REAL runner (CloudMigrator over the
+    // fake db) runs; without one, a recording stub keeps the gate-decision
+    // tests independent of the migrator.
+    if (db != null)
+      firestoreProvider.overrideWithValue(db)
+    else
+      cloudUploadRunnerProvider.overrideWithValue((uid, {onProgress}) async {
+        uploads.add(uid);
+        return null;
+      }),
   ]);
   addTearDown(container.dispose);
 
@@ -134,6 +144,38 @@ void main() {
     await _pump(tester, alreadyOffered: true);
 
     expect(find.text(_title), findsNothing);
+  });
+
+  testWidgets(
+      'after the upload the app lands ON the migrated profile — not on some '
+      'unrelated pre-existing cloud band', (tester) async {
+    // The production shape: the account already owns a band ("Cloud"), and
+    // it is recorded as the cloud profile's active band. The migrated band
+    // must win over it once the upload commits.
+    final db = FakeFirebaseFirestore();
+    await db
+        .doc('users/uid_test/bands/band_cloud')
+        .set({'name': 'Cloud', 'createdAtMs': 1});
+    final h = await _pump(tester, db: db);
+    await h.local.saveActiveCloudBand('uid_test', 'band_cloud');
+    // Mount app state so the directory flip and the mirror drive it.
+    h.container.read(appStateProvider);
+
+    await tester.tap(find.text('Move profiles'));
+    await tester.pumpAndSettle();
+
+    // The band really moved into the account…
+    final doc = await db.doc('users/uid_test/bands/$kTestAccountId').get();
+    expect(doc.exists, isTrue);
+    expect(doc.data()!['name'], 'Solo Act');
+    // …and the app switched TO it, instead of keeping "Cloud" active just
+    // because it was still a valid id.
+    expect(h.local.readActiveCloudBand('uid_test'), kTestAccountId);
+    final app = h.container.read(appStateProvider);
+    expect(app.accountId, kTestAccountId,
+        reason: '"I moved MY band here" must not land on an unrelated '
+            'profile — that reads as data loss');
+    expect(app.accounts.map((a) => a.name), contains('Solo Act'));
   });
 
   testWidgets('a sign-in mid-onboarding waits for the flow to finish',

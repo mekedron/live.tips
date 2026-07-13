@@ -342,9 +342,25 @@ class CloudSessionCoordinator implements SessionCoordinator {
     if (_disposed || _stopping) return;
     final data = snap.data();
     if (data == null) return;
-    _lastLeaseUntilMs = (data['leaderLeaseUntilMs'] as num?)?.toInt() ?? 0;
 
     if (data['active'] != true || data['sessionId'] != _sessionId) {
+      // INVARIANT: a device that just won the claim transaction must not be
+      // told by a stale CACHED snapshot that its own session is over.
+      //
+      // Firestore transactions never write to the local cache, so the FIRST
+      // emission of the listener attached right after [_claim] is whatever
+      // the cache last saw — on any account past its first session, the
+      // PREVIOUS session's stopped doc (`active: false`). Tearing down on
+      // that killed every fresh session seconds after "Go live" and then
+      // presented the server doc this device leads as a foreign one.
+      //
+      // Ending a session is a server-side fact (a stop is a transaction,
+      // a stale-lease takeover is a transaction), so only a snapshot the
+      // server confirmed may end this one. The genuine case this branch
+      // exists for — another device really stops or supersedes the session
+      // — still arrives as a server snapshot (isFromCache: false) and
+      // tears down below.
+      if (snap.metadata.isFromCache) return;
       // Stopped on another device (or replaced after a stale takeover) —
       // this device's copy of the set is over. The stopping device owns the
       // archive; here only the snapshot goes.
@@ -353,6 +369,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
       _events.onRemoteEnded();
       return;
     }
+    _lastLeaseUntilMs = (data['leaderLeaseUntilMs'] as num?)?.toInt() ?? 0;
 
     // Goal edits are last-write-wins through the doc; the controller
     // ignores echoes of its own value. Rollovers recompute locally — they

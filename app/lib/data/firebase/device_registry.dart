@@ -188,9 +188,16 @@ class DeviceRegistry {
   /// only ever sent on the create path: the rules demand it there and forbid
   /// it changing later, so an update that merged it in would be rejected —
   /// and would be a revocation-laundering hole if it weren't.
-  Future<void> registerThisDevice(String uid) async {
+  ///
+  /// Returns whether the doc actually landed. Callers memoize registration
+  /// on SUCCESS ONLY: at boot this can run before the account slot's session
+  /// has restored, so the write goes through the DEFAULT (unauthenticated)
+  /// handle and the rules deny it — memoizing that failure left the account
+  /// with no device doc for the whole app run, the Security list with an
+  /// orphan row, and the "This device" pill with nothing to match.
+  Future<bool> registerThisDevice(String uid) async {
     final devices = _devices(uid);
-    if (devices == null) return;
+    if (devices == null) return false;
     final ref = devices.doc(deviceId);
     final description = await _describe();
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -203,7 +210,7 @@ class DeviceRegistry {
           if (description.model != null) 'model': description.model,
           'lastSeenAtMs': now,
         });
-        return;
+        return true;
       }
       await ref.set({
         'name': description.name,
@@ -213,25 +220,32 @@ class DeviceRegistry {
         'lastSeenAtMs': now,
         'revoked': false,
       });
+      return true;
     } catch (e) {
-      // Offline, or a session that was revoked out from under us. The next
-      // resume re-registers; nothing in the app blocks on this.
+      // Offline, a not-yet-authenticated handle, or a session revoked out
+      // from under us. The guard retries when the handle changes and on its
+      // heartbeat; nothing in the app blocks on this.
       debugPrint('device registration failed: $e');
+      return false;
     }
   }
 
-  /// Bumps `lastSeenAtMs` — called on app resume so "last seen" means it.
-  /// A doc that doesn't exist yet is not created here: only
-  /// [registerThisDevice] may create (it alone knows to stamp revoked:false).
+  /// Bumps `lastSeenAtMs` — the heartbeat behind an honest "last seen".
+  /// A doc that is missing (registration never landed, or the doc was
+  /// deleted server-side) is re-registered through [registerThisDevice] —
+  /// the only writer that knows to stamp `revoked: false` — instead of
+  /// letting `update()` fail silently forever.
   Future<void> touch(String uid) async {
     final devices = _devices(uid);
     if (devices == null) return;
+    final ref = devices.doc(deviceId);
     try {
-      await devices.doc(deviceId).update({
+      await ref.update({
         'lastSeenAtMs': DateTime.now().millisecondsSinceEpoch,
       });
     } catch (e) {
-      debugPrint('device touch failed: $e');
+      debugPrint('device touch failed, re-registering: $e');
+      await registerThisDevice(uid);
     }
   }
 

@@ -29,6 +29,17 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
   bool _busy = false;
 
   Future<void> _confirmRevoke(DeviceInfo device) async {
+    // THE device in your hand never gets the foreign-revoke path: revoking
+    // yourself wipes every profile's cached keys and dumps you to the
+    // sign-in screen, from a dialog that promised to ask "that device" to
+    // sign out. The row normally shows a pill instead of the button, but
+    // this guard holds even if the list's isCurrent marker ever drifts
+    // (a rotated device id, a failed registration) — the id comparison is
+    // against what THIS device calls itself right now.
+    if (device.isCurrent ||
+        device.id == ref.read(deviceRegistryProvider).deviceId) {
+      return _confirmSignOutSelf();
+    }
     final s = context.s;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -71,6 +82,34 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Leaving the account on THIS device is an ordinary sign-out, and the
+  /// dialog says exactly that — never the revoke wording, which describes
+  /// doing something to a device somewhere else.
+  Future<void> _confirmSignOutSelf() async {
+    final s = context.s;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.t('settings.security.sign_out_self_title')),
+        content: Text(s.t('settings.security.sign_out_self_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(s.t('common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(s.t('settings.account.sign_out')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ref.read(authControllerProvider.notifier).signOut();
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   /// The real kill switch. It takes THIS device's refresh token down with the
@@ -314,15 +353,16 @@ class _DeviceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     final s = context.s;
+    final name = device.name.isEmpty
+        ? s.t('settings.security.unnamed_device')
+        : device.name;
     final subtitle = device.revoked
         ? s.t('settings.security.revoked')
         : lastSeenLabel(context, device.lastSeenAtMs);
     return LtRow(
       icon: devicePlatformIcon(device.platform),
       iconColor: device.revoked ? c.textFaint : null,
-      title: device.name.isEmpty
-          ? s.t('settings.security.unnamed_device')
-          : device.name,
+      title: name,
       titleColor: device.revoked ? c.textMuted : null,
       subtitle: subtitle,
       trailing: device.isCurrent
@@ -330,9 +370,22 @@ class _DeviceRow extends StatelessWidget {
           : device.revoked
               ? null
               : IconButton(
-                  tooltip: s.t('settings.security.revoke'),
+                  // Names its device to the a11y tree, not just visually by
+                  // adjacency: a bare "Revoke" is a safety hazard when a
+                  // screen-reader user cannot tell WHOSE session the button
+                  // ends. The icon's semanticLabel is what TalkBack and
+                  // VoiceOver read; the tooltip matches it for sighted
+                  // long-pressers.
+                  tooltip:
+                      s.t('settings.security.revoke_named', {'name': name}),
                   onPressed: busy ? null : onRevoke,
-                  icon: Icon(Icons.logout_rounded, size: 20, color: c.danger),
+                  icon: Icon(
+                    Icons.logout_rounded,
+                    size: 20,
+                    color: c.danger,
+                    semanticLabel:
+                        s.t('settings.security.revoke_named', {'name': name}),
+                  ),
                 ),
     );
   }

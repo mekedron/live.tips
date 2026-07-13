@@ -39,6 +39,9 @@ final functionsProvider = Provider<FirebaseFunctions?>((ref) {
 final deviceRegistryProvider = Provider<DeviceRegistry>((ref) => DeviceRegistry(
       db: ref.watch(firestoreProvider),
       deviceId: ref.watch(deviceIdProvider),
+      // Through the provider, not the bare function: tests override it so
+      // registration doesn't hang on the device-info platform channel.
+      describe: ref.watch(describeDeviceProvider),
     ));
 
 /// How this device names itself when asking to be let into an account —

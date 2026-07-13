@@ -48,7 +48,15 @@ class CloudMigrator {
 
   /// Uploads every local band into [uid]'s Firestore subtree, or resumes a
   /// crashed upload. Safe to call when there is nothing to do.
-  Future<void> uploadLocalBands(
+  ///
+  /// Returns the id of the band that should be ACTIVE in the cloud profile —
+  /// the band that was active locally when several moved, else the first
+  /// moved one; null when nothing moved. The id is also persisted as the
+  /// cloud profile's active band here (at the commit point), so even a
+  /// crash-resumed upload lands the artist on the band they migrated: "I
+  /// moved MY band here" must never open on some unrelated pre-existing
+  /// profile — that reads as data loss.
+  Future<String?> uploadLocalBands(
     String uid, {
     void Function(String bandName, int done, int total)? onProgress,
   }) async {
@@ -66,7 +74,7 @@ class CloudMigrator {
       // Nothing local to move — a fresh profile, or a resumed run that had
       // already wiped. Either way, done.
       await _local.clearCloudUploadPending();
-      return;
+      return null;
     }
 
     // A resumed run only re-uploads the bands the crashed run had claimed:
@@ -79,7 +87,7 @@ class CloudMigrator {
     ];
     if (bands.isEmpty) {
       await _local.clearCloudUploadPending();
-      return;
+      return null;
     }
 
     await _local.saveCloudUploadPending(uid, [for (final b in bands) b.id]);
@@ -95,6 +103,12 @@ class CloudMigrator {
 
     // Commit point — nothing below runs until the server has everything.
     await _awaitPendingWrites();
+
+    // The just-migrated bands' new home should open ON one of them.
+    final migratedActiveId = bands.any((b) => b.id == registry.activeId)
+        ? registry.activeId
+        : bands.first.id;
+    await _local.saveActiveCloudBand(uid, migratedActiveId);
 
     for (final band in bands) {
       await _local.wipeAccount(band.id);
@@ -123,6 +137,7 @@ class CloudMigrator {
       ));
     }
     await _local.clearCloudUploadPending();
+    return migratedActiveId;
   }
 
   Future<void> _uploadBand(String uid, BandAccount band) async {

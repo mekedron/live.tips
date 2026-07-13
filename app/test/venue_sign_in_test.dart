@@ -9,6 +9,7 @@ import 'package:live_tips/data/firebase/device_registry.dart';
 import 'package:live_tips/data/firebase/link_codes.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/domain/app_account.dart';
+import 'package:live_tips/domain/device_kind.dart';
 import 'package:live_tips/features/venue/venue_code_entry.dart';
 import 'package:live_tips/features/venue/venue_identity_screen.dart';
 import 'package:live_tips/features/venue/venue_sign_in_screen.dart';
@@ -207,6 +208,47 @@ void main() {
         isFalse);
     expect(container.read(accountsDirectoryProvider).activeAccountId,
         kLocalAccountId);
+  });
+
+  testWidgets(
+      'the signed-out front door always offers a way out of venue mode — '
+      'a mis-tapped device kind must never be a soft-lock', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(900, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final env = await pumpVenueApp(
+      tester,
+      artist: const AuthUser(uid: 'uid_x', kind: AccountKind.google),
+    );
+
+    // Venue mode's front door has no Settings, no back button — the escape
+    // must live ON this screen or nowhere.
+    expect(find.byType(VenueSignInScreen), findsOneWidget);
+    final escape = find.text("This isn't a venue device");
+    await tester.scrollUntilVisible(escape, 80,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(escape);
+    await tester.pumpAndSettle();
+
+    // Same blunt warning as the Settings kind change — it IS that wipe.
+    expect(find.text('Wipe this device?'), findsOneWidget);
+
+    // Backing out leaves venue mode untouched.
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(env.store.readDeviceKind(), DeviceKind.venue);
+    expect(find.byType(VenueSignInScreen), findsOneWidget);
+
+    // Going through wipes the device kind and returns to onboarding.
+    await tester.tap(escape);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wipe and start over'));
+    await tester.pumpAndSettle();
+
+    expect(env.store.readDeviceKind(), isNull,
+        reason: 'the kind is cleared — the device chooses again');
+    expect(find.byType(VenueSignInScreen), findsNothing,
+        reason: 'the gate must fall away, not re-render the locked door');
   });
 
   testWidgets('a random QR payload is refused with a clear message',

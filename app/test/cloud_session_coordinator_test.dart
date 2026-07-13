@@ -72,6 +72,131 @@ class _NoopRevision extends RepoRevisionNotifier {
   void bump() {}
 }
 
+/// A [FirebaseFirestore] veneer over the shared fake that reproduces the ONE
+/// piece of real-SDK behaviour fake_cloud_firestore lacks — the cache-first
+/// listener: a `snapshots()` listener attached to [stalePath] FIRST emits the
+/// doc as the local cache last saw it (`metadata.isFromCache: true`), and only
+/// then hands over to the live stream. Real Firestore transactions never write
+/// to the local cache, so right after a claim transaction the cache still
+/// holds the PREVIOUS session's stopped doc — which is exactly what this
+/// serves every fresh listener first. That first stale emission is what shot
+/// down every production "Go live" after an account's first session.
+class StaleCacheFirestore extends Fake implements FirebaseFirestore {
+  StaleCacheFirestore(this.inner, this.stalePath, this.staleData);
+
+  final FakeFirebaseFirestore inner;
+  final String stalePath;
+
+  /// What the cache "remembers" for [stalePath] — fixed at construction,
+  /// mirroring a cache the claim transaction cannot refresh.
+  final Map<String, dynamic> staleData;
+
+  @override
+  DocumentReference<Map<String, dynamic>> doc(String documentPath) {
+    final real = inner.doc(documentPath);
+    if (documentPath == stalePath || real.path == stalePath) {
+      return _StaleCacheDocRef(real, staleData);
+    }
+    return real;
+  }
+
+  @override
+  CollectionReference<Map<String, dynamic>> collection(
+          String collectionPath) =>
+      inner.collection(collectionPath);
+
+  @override
+  WriteBatch batch() => inner.batch();
+
+  @override
+  Future<T> runTransaction<T>(TransactionHandler<T> transactionHandler,
+          {Duration timeout = const Duration(seconds: 30),
+          int maxAttempts = 5}) =>
+      inner.runTransaction(transactionHandler,
+          timeout: timeout, maxAttempts: maxAttempts);
+
+  @override
+  Future<void> waitForPendingWrites() => inner.waitForPendingWrites();
+}
+
+// Deliberate, like fake_cloud_firestore's own snapshot fakes.
+// ignore: subtype_of_sealed_class
+class _StaleCacheDocRef extends Fake
+    implements DocumentReference<Map<String, dynamic>> {
+  _StaleCacheDocRef(this.inner, this.staleData);
+
+  final DocumentReference<Map<String, dynamic>> inner;
+  final Map<String, dynamic> staleData;
+
+  @override
+  Stream<DocumentSnapshot<Map<String, dynamic>>> snapshots({
+    bool includeMetadataChanges = false,
+    ListenSource source = ListenSource.defaultSource,
+  }) async* {
+    yield _CachedSnap(inner, staleData);
+    yield* inner.snapshots(includeMetadataChanges: includeMetadataChanges);
+  }
+
+  @override
+  Future<DocumentSnapshot<Map<String, dynamic>>> get([GetOptions? options]) =>
+      inner.get(options);
+
+  @override
+  Future<void> set(Map<String, dynamic> data, [SetOptions? options]) =>
+      inner.set(data, options);
+
+  @override
+  Future<void> update(Map<Object, Object?> data) => inner.update(data);
+
+  @override
+  Future<void> delete() => inner.delete();
+
+  @override
+  CollectionReference<Map<String, dynamic>> collection(
+          String collectionPath) =>
+      inner.collection(collectionPath);
+
+  @override
+  String get id => inner.id;
+
+  @override
+  String get path => inner.path;
+}
+
+// The synthesized "from the local cache" emission. Implementing the sealed
+// class is deliberate, like fake_cloud_firestore's own snapshot fakes.
+// ignore: subtype_of_sealed_class
+class _CachedSnap extends Fake
+    implements DocumentSnapshot<Map<String, dynamic>> {
+  _CachedSnap(this._ref, this._data);
+
+  final DocumentReference<Map<String, dynamic>> _ref;
+  final Map<String, dynamic> _data;
+
+  @override
+  bool get exists => true;
+
+  @override
+  Map<String, dynamic>? data() => Map<String, dynamic>.of(_data);
+
+  @override
+  SnapshotMetadata get metadata => _CacheMeta();
+
+  @override
+  DocumentReference<Map<String, dynamic>> get reference => _ref;
+
+  @override
+  String get id => _ref.id;
+}
+
+class _CacheMeta extends Fake implements SnapshotMetadata {
+  @override
+  bool get isFromCache => true;
+
+  @override
+  bool get hasPendingWrites => false;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -105,14 +230,17 @@ void main() {
   /// One "device": its own container, device id, and scripted Stripe feed,
   /// over the shared Firestore + prefs. Waits until the cloud band mirror
   /// is warm so app state lands on the real band, not a placeholder.
+  /// [dbOverride] swaps in a wrapped Firestore (see [StaleCacheFirestore])
+  /// while the rest of the harness keeps writing to the shared fake.
   Future<ProviderContainer> device(String deviceId,
-      {List<List<Tip>> batches = const []}) async {
+      {List<List<Tip>> batches = const [],
+      FirebaseFirestore? dbOverride}) async {
     final container = ProviderContainer(overrides: [
       repoRevisionProvider.overrideWith(_NoopRevision.new),
       localStoreProvider.overrideWithValue(store),
       secureStoreProvider.overrideWithValue(FakeSecureStore(
           {'${SecureStore.kApiKeyBase}_$_bandId': 'sk_test_key'})),
-      firestoreProvider.overrideWithValue(db),
+      firestoreProvider.overrideWithValue(dbOverride ?? db),
       authServiceProvider.overrideWithValue(FakeAuthService(
           user: const AuthUser(uid: _uid, kind: AccountKind.google))),
       deviceIdProvider.overrideWithValue(deviceId),
@@ -371,6 +499,91 @@ void main() {
           (await sessionsCol().doc(sessionId).get()).data()!;
       expect(archived['endedAt'], isNotNull);
       expect((archived['tips'] as List).length, 1);
+    });
+  });
+
+  group('cache-first listener (the real SDK behaviour the fake lacks)', () {
+    /// The production shape: the account already ran (and stopped) a session,
+    /// so the local cache remembers `live/current` as `active: false` with
+    /// the OLD session id. The claim transaction commits server-side without
+    /// touching the cache, and the coordinator's fresh listener gets that
+    /// stale cached doc FIRST.
+    Map<String, dynamic> lastNightsDoc() => {
+          'active': false,
+          'bandId': _bandId,
+          'sessionId': 'ses_last_night',
+          'startedAtMs': DateTime.now()
+              .subtract(const Duration(days: 1))
+              .millisecondsSinceEpoch,
+          'currency': 'usd',
+          'goalMinor': 5000,
+          'leaderDeviceId': 'dev_a',
+          'leaderLeaseUntilMs': DateTime.now()
+              .subtract(const Duration(days: 1))
+              .millisecondsSinceEpoch,
+          'endedAtMs': DateTime.now()
+              .subtract(const Duration(hours: 20))
+              .millisecondsSinceEpoch,
+        };
+
+    test(
+        'a stale cached snapshot of the PREVIOUS session must not shoot down '
+        'the session this device just claimed', () async {
+      // Last night's stopped session, both on the "server" and in the cache.
+      final stale = lastNightsDoc();
+      await liveDoc().set(stale);
+      final a = await device('dev_a',
+          batches: [
+            [d('cs_1', 500)],
+          ],
+          dbOverride:
+              StaleCacheFirestore(db, 'users/$_uid/live/current', stale));
+
+      await a.read(liveSessionProvider.notifier).start(goalMinor: 10000);
+      await settle();
+
+      // Without the isFromCache guard the coordinator read the cached
+      // active:false doc as "stopped on another device", nulled the state,
+      // and the very session this device leads came back as a foreign
+      // Join banner.
+      final state = a.read(liveSessionProvider);
+      expect(state, isNotNull,
+          reason: 'a device that just won the claim transaction must not be '
+              'told by a stale cached snapshot that its own session is over');
+      final doc = (await liveDoc().get()).data()!;
+      expect(doc['active'], isTrue);
+      expect(doc['sessionId'], state!.session.id);
+      expect(doc['leaderDeviceId'], 'dev_a');
+      expect(state.session.totalMinor, 500,
+          reason: 'the session keeps running: polls flow, tips land');
+      expect(store.readActiveSession(_bandId), isNotNull,
+          reason: 'the crash snapshot survives — nothing tore down');
+    });
+
+    test(
+        'a genuine remote stop (server snapshot) still tears the session '
+        'down, stale cache emission or not', () async {
+      final stale = lastNightsDoc();
+      await liveDoc().set(stale);
+      final a = await device('dev_a',
+          dbOverride:
+              StaleCacheFirestore(db, 'users/$_uid/live/current', stale));
+
+      await a.read(liveSessionProvider.notifier).start(goalMinor: 10000);
+      await settle();
+      expect(a.read(liveSessionProvider), isNotNull);
+
+      // Another device stops the session: this lands as a SERVER snapshot
+      // (isFromCache: false) on the live listener and must still be obeyed.
+      await liveDoc().set({
+        'active': false,
+        'endedAtMs': DateTime.now().millisecondsSinceEpoch,
+      }, SetOptions(merge: true));
+      await settle();
+
+      expect(a.read(liveSessionProvider), isNull,
+          reason: 'the isFromCache guard must not deafen the coordinator to '
+              'real remote stops');
     });
   });
 

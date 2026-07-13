@@ -314,9 +314,18 @@ export async function confirmLinkCodeHandler(
 /**
  * Step 4, on the new device (B) — unauthenticated. B polls this with
  * {code, nonce}: while the code is claimed-but-unconfirmed it answers
- * {pending: true}; once confirmed, the transaction flips confirmed → used
- * (single use enforced by that transition) and only then a custom token for
- * the owning uid is minted and returned. Wrong nonces burn attempts.
+ * {pending: true}; once confirmed, a custom token for the owning uid is
+ * minted and THEN the code flips confirmed → used. Wrong nonces burn
+ * attempts.
+ *
+ * Mint-before-burn, deliberately: flipping to 'used' inside the validating
+ * transaction burnt the code BEFORE createCustomToken ran, so a failed mint
+ * (IAM misconfiguration, a transient Auth outage) consumed the code anyway —
+ * "Try again" needed a whole fresh QR, and the phone watching the doc saw
+ * 'used' and reported a sign-in that never happened. Single use still holds:
+ * the burn transaction re-validates, so of two racing collectors exactly one
+ * flips confirmed → used and returns its token; the loser's minted token is
+ * discarded unreturned (never disclosed to anyone, so inert).
  */
 export async function collectLinkTokenHandler(
   request: CallableRequest,
@@ -328,27 +337,43 @@ export async function collectLinkTokenHandler(
   const firestore = db();
   await bumpIpQuota(firestore, request, "link-collect", LINK_COLLECTS_PER_IP_PER_HOUR);
 
-  const outcome = await firestore.runTransaction(async (tx) => {
-    const ref = linkCodeRef(firestore, code);
-    const snap = await tx.get(ref);
-    if (!snap.exists) return { failed: "not-found" as const };
-    const state = snapshotOf(snap);
-    const storedHash = snap.get("redeemNonceHash") as string | undefined;
-    const nonceMatches = typeof storedHash === "string" && verifySecret(nonce, storedHash);
-    const decision = decideCollect(state, Date.now(), nonceMatches);
-    if (!decision.ok) {
-      applyRejection(tx, ref, state, decision);
-      return { failed: "precondition" as const, message: decision.message };
-    }
-    if (decision.pending) return { failed: false as const, pending: true as const };
-    tx.update(ref, { status: "used" satisfies LinkCodeStatus });
-    return { failed: false as const, uid: snap.get("uid") as string };
-  });
+  /** The validating read, shared by both phases; [consume] adds the burn. */
+  const attempt = (consume: boolean) =>
+    firestore.runTransaction(async (tx) => {
+      const ref = linkCodeRef(firestore, code);
+      const snap = await tx.get(ref);
+      if (!snap.exists) return { failed: "not-found" as const };
+      const state = snapshotOf(snap);
+      const storedHash = snap.get("redeemNonceHash") as string | undefined;
+      const nonceMatches = typeof storedHash === "string" && verifySecret(nonce, storedHash);
+      const decision = decideCollect(state, Date.now(), nonceMatches);
+      if (!decision.ok) {
+        applyRejection(tx, ref, state, decision);
+        return { failed: "precondition" as const, message: decision.message };
+      }
+      if (decision.pending) return { failed: false as const, pending: true as const };
+      if (consume) tx.update(ref, { status: "used" satisfies LinkCodeStatus });
+      return { failed: false as const, uid: snap.get("uid") as string };
+    });
 
+  // Phase 1: validate without consuming — wrong nonces still burn attempts.
+  const outcome = await attempt(false);
   if (outcome.failed === "not-found") throw new HttpsError("not-found", "not found");
   if (outcome.failed === "precondition") throw new HttpsError("failed-precondition", outcome.message);
   if ("pending" in outcome) return { pending: true };
+
+  // Phase 2: mint. A throw here leaves the code 'confirmed' and retryable.
   const token = await getAuth().createCustomToken(outcome.uid);
+
+  // Phase 3: burn, re-validated — only the winner returns its token, and
+  // 'used' on the doc now MEANS a token was actually handed over.
+  const burned = await attempt(true);
+  if (burned.failed === "not-found") throw new HttpsError("not-found", "not found");
+  if (burned.failed === "precondition") throw new HttpsError("failed-precondition", burned.message);
+  if ("pending" in burned) {
+    // Cannot regress confirmed → claimed mid-flight; refuse rather than leak.
+    throw new HttpsError("failed-precondition", "code is not collectable");
+  }
   return { token };
 }
 
@@ -575,33 +600,46 @@ export async function collectLoginTokenHandler(
   const firestore = db();
   await bumpIpQuota(firestore, request, "login-collect", LOGIN_COLLECTS_PER_IP_PER_HOUR);
 
-  const outcome = await firestore.runTransaction(async (tx) => {
-    const ref = loginRequestRef(firestore, requestId);
-    const snap = await tx.get(ref);
-    if (!snap.exists) return { failed: "not-found" as const };
-    const state = loginSnapshotOf(snap);
-    const storedHash = snap.get("collectNonceHash") as string | undefined;
-    const nonceMatches = typeof storedHash === "string" && verifySecret(nonce, storedHash);
-    const decision = decideLoginCollect(state, Date.now(), nonceMatches);
-    if (!decision.ok) {
-      applyRejection(tx, ref, state, decision);
-      return { failed: "precondition" as const, message: decision.message };
-    }
-    if (decision.pending) return { failed: false as const, pending: true as const };
-    const approvedUid = snap.get("approvedUid") as string | undefined;
-    // An 'approved' doc with no approvedUid cannot happen (one transaction
-    // writes both); if it ever did, mint nothing.
-    if (typeof approvedUid !== "string" || approvedUid.length === 0) {
-      return { failed: "precondition" as const, message: "request is not collectable" };
-    }
-    tx.update(ref, { status: "used" satisfies LoginRequestStatus });
-    return { failed: false as const, uid: approvedUid };
-  });
+  // Mint-before-burn, exactly like collectLinkTokenHandler (see the comment
+  // there): a failed mint must leave the request 'approved' and retryable,
+  // not consumed by a token that never existed.
+  const attempt = (consume: boolean) =>
+    firestore.runTransaction(async (tx) => {
+      const ref = loginRequestRef(firestore, requestId);
+      const snap = await tx.get(ref);
+      if (!snap.exists) return { failed: "not-found" as const };
+      const state = loginSnapshotOf(snap);
+      const storedHash = snap.get("collectNonceHash") as string | undefined;
+      const nonceMatches = typeof storedHash === "string" && verifySecret(nonce, storedHash);
+      const decision = decideLoginCollect(state, Date.now(), nonceMatches);
+      if (!decision.ok) {
+        applyRejection(tx, ref, state, decision);
+        return { failed: "precondition" as const, message: decision.message };
+      }
+      if (decision.pending) return { failed: false as const, pending: true as const };
+      const approvedUid = snap.get("approvedUid") as string | undefined;
+      // An 'approved' doc with no approvedUid cannot happen (one transaction
+      // writes both); if it ever did, mint nothing.
+      if (typeof approvedUid !== "string" || approvedUid.length === 0) {
+        return { failed: "precondition" as const, message: "request is not collectable" };
+      }
+      if (consume) tx.update(ref, { status: "used" satisfies LoginRequestStatus });
+      return { failed: false as const, uid: approvedUid };
+    });
 
+  const outcome = await attempt(false);
   if (outcome.failed === "not-found") throw new HttpsError("not-found", "not found");
   if (outcome.failed === "precondition") throw new HttpsError("failed-precondition", outcome.message);
   if ("pending" in outcome) return { pending: true };
+
   const token = await getAuth().createCustomToken(outcome.uid);
+
+  const burned = await attempt(true);
+  if (burned.failed === "not-found") throw new HttpsError("not-found", "not found");
+  if (burned.failed === "precondition") throw new HttpsError("failed-precondition", burned.message);
+  if ("pending" in burned) {
+    throw new HttpsError("failed-precondition", "request is not collectable");
+  }
   return { token };
 }
 

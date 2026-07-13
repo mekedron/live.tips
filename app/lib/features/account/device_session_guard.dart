@@ -33,8 +33,15 @@ class DeviceSessionGuard extends ConsumerStatefulWidget {
 
 class _DeviceSessionGuardState extends ConsumerState<DeviceSessionGuard>
     with WidgetsBindingObserver {
+  /// How often the heartbeat freshens `lastSeenAtMs` (and retries a
+  /// registration that hasn't landed). Same idea as the session leader's
+  /// lease heartbeat, at device-list granularity: "last seen" rounds to
+  /// minutes, so anything finer would be Firestore writes for nobody.
+  static const _heartbeatEvery = Duration(minutes: 5);
+
   bool _revoking = false;
   String? _registeredUid;
+  Timer? _heartbeat;
 
   @override
   void initState() {
@@ -45,10 +52,14 @@ class _DeviceSessionGuardState extends ConsumerState<DeviceSessionGuard>
       final uid = ref.read(authControllerProvider).user?.uid;
       if (uid != null) unawaited(_register(uid));
     });
+    // The lifecycle observer alone is not a heartbeat: an always-visible
+    // web tab never emits `resumed`, so its "last seen" froze at page load.
+    _heartbeat = Timer.periodic(_heartbeatEvery, (_) => _onHeartbeat());
   }
 
   @override
   void dispose() {
+    _heartbeat?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -56,14 +67,35 @@ class _DeviceSessionGuardState extends ConsumerState<DeviceSessionGuard>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
-    final uid = ref.read(authControllerProvider).user?.uid;
-    if (uid != null) unawaited(ref.read(deviceRegistryProvider).touch(uid));
+    _onHeartbeat();
   }
 
+  /// Freshens the device doc — or finishes a registration that hasn't
+  /// succeeded yet ([DeviceRegistry.touch] re-registers a missing doc).
+  void _onHeartbeat() {
+    final uid = ref.read(authControllerProvider).user?.uid;
+    if (uid == null) return;
+    if (_registeredUid == uid) {
+      unawaited(ref.read(deviceRegistryProvider).touch(uid));
+    } else {
+      unawaited(_register(uid));
+    }
+  }
+
+  /// Memoizes the uid on SUCCESS only. Registration used to stamp
+  /// `_registeredUid` before the await — one permission-denied at boot (the
+  /// account slot's session not restored yet, so the write went through the
+  /// unauthenticated default handle) and it never retried for the whole app
+  /// run: no device doc, an orphan Security row, no "This device" pill.
   Future<void> _register(String uid) async {
     if (_registeredUid == uid) return;
-    _registeredUid = uid;
-    await ref.read(deviceRegistryProvider).registerThisDevice(uid);
+    final ok = await ref.read(deviceRegistryProvider).registerThisDevice(uid);
+    if (!mounted || !ok) return;
+    // Only if this uid is still the signed-in one — a sign-out or account
+    // switch mid-await must not mark the NEW state as registered.
+    if (ref.read(authControllerProvider).user?.uid == uid) {
+      _registeredUid = uid;
+    }
   }
 
   @override
@@ -75,6 +107,16 @@ class _DeviceSessionGuardState extends ConsumerState<DeviceSessionGuard>
         return;
       }
       unawaited(_register(uid));
+    });
+    // Registration is driven by "there is an authenticated handle for this
+    // uid", not by "the app booted": the registry rebuilds whenever the
+    // Firestore handle resolves differently (an account slot's session
+    // restoring after boot is exactly that moment), and a registration that
+    // failed on the old handle must retry on the new one.
+    ref.listen(deviceRegistryProvider, (previous, next) {
+      _registeredUid = null;
+      final uid = ref.read(authControllerProvider).user?.uid;
+      if (uid != null) unawaited(_register(uid));
     });
     ref.listen(ownDeviceRevokedProvider, (previous, next) {
       if (next.value == true) unawaited(_onRevoked());

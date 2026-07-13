@@ -149,8 +149,15 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Device signed in'), findsOneWidget);
-    expect(find.text("Casey's iPad is on your account now."), findsOneWidget);
+    // Honest, not triumphant: 'used' means the device COLLECTED its sign-in
+    // token — it is still finishing on its own side. "X is on your account
+    // now" was a lie whenever the token mint failed after the status flip
+    // (see collectLinkTokenHandler's mint-before-burn).
+    expect(find.text('Device let in'), findsOneWidget);
+    expect(
+        find.text("Casey's iPad picked up its sign-in and is finishing up on "
+            'its side. It should appear in your device list in a moment.'),
+        findsOneWidget);
   });
 
   testWidgets('a guest account is told to link a provider, with no retry', (

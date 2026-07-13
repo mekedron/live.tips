@@ -53,6 +53,7 @@ Future<RecordingLinkCodeService> _pump(
   WidgetTester tester, {
   required List<DeviceInfo> devices,
   AccountKind kind = AccountKind.google,
+  String? ownDeviceId,
 }) async {
   await tester.binding.setSurfaceSize(const Size(600, 1200));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -79,6 +80,9 @@ Future<RecordingLinkCodeService> _pump(
         ),
         linkCodeServiceProvider.overrideWithValue(service),
         devicesProvider.overrideWith((ref) => Stream.value(devices)),
+        if (ownDeviceId != null)
+          deviceRegistryProvider.overrideWithValue(
+              DeviceRegistry(db: null, deviceId: ownDeviceId)),
       ],
       child: MaterialApp(
         localizationsDelegates: kTestL10nDelegates,
@@ -150,6 +154,53 @@ void main() {
 
     expect(service.revoked, isEmpty);
     expect(find.text('Revoke Old Pixel?'), findsNothing);
+  });
+
+  testWidgets(
+      'the revoke button names its device to the a11y tree — a screen-reader '
+      'user must know WHOSE session they are ending', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pump(tester, devices: [
+      _device(id: 'dev_a', name: "Casey's iPhone", isCurrent: true),
+      _device(id: 'dev_b', name: 'Old Pixel', platform: 'android'),
+    ]);
+
+    // A bare "Revoke" is exactly the production bug: one unlabeled tap with
+    // no way to tell which device it kills.
+    expect(find.bySemanticsLabel('Revoke'), findsNothing);
+    expect(find.bySemanticsLabel('Revoke Old Pixel'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets(
+      'the device in your hand never gets the foreign-revoke path — even '
+      'when the isCurrent marker has drifted', (tester) async {
+    // The production shape: registration failed / the device id rotated, so
+    // the list's isCurrent flag marks nothing — but a row still carries the
+    // id this device calls itself. Tapping its Revoke must NOT run
+    // revokeDevice (which wipes this device's own keys); it is a sign-out,
+    // and must say so.
+    final service = await _pump(
+      tester,
+      ownDeviceId: 'dev_self',
+      devices: [
+        _device(id: 'dev_self', name: 'This very phone', isCurrent: false),
+      ],
+    );
+
+    await tester.tap(find.byIcon(Icons.logout_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign out this device?'), findsOneWidget,
+        reason: 'an honest dialog: this is the device being held');
+    expect(find.textContaining('asks that device to sign out'), findsNothing,
+        reason: 'never the foreign-revoke wording for yourself');
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(service.revoked, isEmpty,
+        reason: 'revokeDevice must never be sent this device\'s own id');
   });
 
   testWidgets('a guest account cannot sign out everywhere else', (
