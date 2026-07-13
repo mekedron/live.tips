@@ -58,22 +58,17 @@ class WelcomeScreen extends ConsumerWidget {
 
   /// The quiet venue link — a shared device is a different trust decision,
   /// but it is rare enough that it no longer deserves a full onboarding step.
-  Future<void> _pickVenue(BuildContext context, WidgetRef ref) async {
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final s = context.s;
-    try {
-      await ref.read(deviceKindProvider.notifier).choose(DeviceKind.venue);
-    } catch (_) {
-      // A shared device without its at-rest cipher must not exist (see
-      // DeviceKindNotifier._applyKind) — the choice simply didn't take.
-      messenger.showSnackBar(
-        SnackBar(content: Text(s.t('venue.boot.choose_failed'))),
-      );
-      return;
-    }
-    if (!context.mounted) return;
-    navigator.push(
+  ///
+  /// It ASKS. It does not choose: nothing is written here, and the intro
+  /// screen's Continue is the only thing that ever writes the venue kind
+  /// (#42). This link used to commit the device and only then explain what it
+  /// had done — so the warning's Back arrow (the universal "I've read this, no
+  /// thanks") popped into a venue sign-in screen demanding a code, and the one
+  /// way back out was a destructive wipe. A question that costs a wipe to
+  /// un-ask is not a question. Backing out of the explanation now leaves the
+  /// device exactly as it was: unset, on Welcome.
+  void _pickVenue(BuildContext context) {
+    Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const VenueIntroScreen()),
     );
   }
@@ -209,8 +204,7 @@ class WelcomeScreen extends ConsumerWidget {
                           if (venueAvailable) ...[
                             const SizedBox(height: 4),
                             TextButton(
-                              onPressed: () =>
-                                  unawaited(_pickVenue(context, ref)),
+                              onPressed: () => _pickVenue(context),
                               child: Text(
                                 context.s.t('welcome.venue_link'),
                                 style: TextStyle(

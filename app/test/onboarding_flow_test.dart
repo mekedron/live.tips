@@ -94,8 +94,13 @@ void main() {
     expect(name.controller?.text, 'The Midnight Foxes');
   });
 
-  testWidgets('the quiet venue link on Welcome claims the device for the '
-      'venue and opens the intro', (tester) async {
+  // This test used to assert the bug as the rule ("claims the device for the
+  // venue AND opens the intro"): the link wrote the kind on the tap and the
+  // warning explained it afterwards, so Back popped into the venue sign-in door
+  // and the only way home was a wipe (#42). The link asks; the intro's Continue
+  // commits. venue_intro_commit_test.dart walks the whole path, Back included.
+  testWidgets('the quiet venue link on Welcome opens the intro and claims '
+      'nothing — the intro\'s Continue is the choice', (tester) async {
     await tester.binding.setSurfaceSize(const Size(600, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -119,6 +124,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('How a shared device works'), findsOneWidget);
+    expect(store.readDeviceKind(), isNull,
+        reason: 'asking what a venue device is may not make this one');
+
+    await tester.tap(find.text('Set up sign-in'));
+    await tester.pumpAndSettle();
+
     expect(store.readDeviceKind(), DeviceKind.venue);
   });
 }
