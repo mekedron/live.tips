@@ -744,13 +744,39 @@ class FirestoreRepository implements AccountDataRepository {
     }
   }
 
+  /// Stands in for [wipeAccountData]'s server-sourced listing in tests.
+  /// fake_cloud_firestore serves the truth for every get and so cannot
+  /// model the one condition the wipe must refuse to run under: an offline
+  /// device whose cache holds only part of a collection. Tests swap this in
+  /// to raise the `unavailable` the real client throws offline.
+  @visibleForTesting
+  Future<QuerySnapshot<Map<String, dynamic>>> Function(
+      Query<Map<String, dynamic>> query)? serverGetOverride;
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _serverGet(
+          Query<Map<String, dynamic>> query) =>
+      serverGetOverride != null
+          ? serverGetOverride!(query)
+          : query.get(const GetOptions(source: Source.server));
+
   @override
   Future<void> wipeAccountData(String accountId) async {
     // Queried, not mirrored: the wipe must catch docs the lazy listeners
     // never got around to (and the relay-tip query beyond the mirror's cap).
+    // And queried from the SERVER: offline, a plain get answers from the
+    // cache, which only knows what this device happened to sync — docs it
+    // never cached would survive the batch and strand an unreachable,
+    // undeletable history under the deleted band doc. A wipe that must be
+    // complete enumerates authoritatively or throws before deleting
+    // anything; the caller keeps the band and reports failure instead of
+    // half-deleting it.
     final refs = <DocumentReference<Map<String, dynamic>>>[
-      ...(await _sessionsCol(accountId).get()).docs.map((d) => d.reference),
-      ...(await _relayTipsCol(accountId).get()).docs.map((d) => d.reference),
+      ...(await _serverGet(_sessionsCol(accountId)))
+          .docs
+          .map((d) => d.reference),
+      ...(await _serverGet(_relayTipsCol(accountId)))
+          .docs
+          .map((d) => d.reference),
       _secretsDoc(accountId),
       _bandDoc(accountId),
     ];

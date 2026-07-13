@@ -560,6 +560,44 @@ void main() {
     expect(repo.listBands(), isEmpty);
   });
 
+  test('wipeAccountData refuses a cache-backed listing: offline it throws '
+      'and deletes NOTHING', () async {
+    final repo = makeRepo();
+    await repo.upsertBandEntry(
+        const BandAccount(id: _bandId, name: 'Band', createdAtMs: 5));
+    await repo.appendSessionToHistory(
+        _bandId, _session('live', [_stripeTip('cs_1', livemode: true)]));
+    await repo.appendRelayHistory(_bandId, [_relayTip(0)]);
+    await pumpEventQueue();
+
+    // Offline. The real client's server-sourced get throws `unavailable`
+    // instead of quietly answering from a partial cache — the fake serves
+    // the truth for every get, so the seam raises what the plugin would.
+    // (A cache-backed listing here once let docs this device never synced
+    // survive the batch, stranding an undeletable history under a deleted
+    // band doc.)
+    repo.serverGetOverride = (query) => throw FirebaseException(
+        plugin: 'cloud_firestore', code: 'unavailable');
+
+    await expectLater(repo.wipeAccountData(_bandId),
+        throwsA(isA<FirebaseException>()),
+        reason: 'a wipe that cannot enumerate authoritatively must fail '
+            'loudly, never run over whatever happens to be cached');
+
+    expect((await bandDoc().get()).exists, isTrue,
+        reason: 'nothing may be deleted on a refusal — a deleted band doc '
+            'over surviving history is exactly the orphan the server-sourced '
+            'listing exists to prevent');
+    expect((await bandDoc().collection('sessions').get()).docs, hasLength(1));
+    expect((await bandDoc().collection('relayTips').get()).docs, hasLength(1));
+
+    // Connectivity returns: the same wipe now completes.
+    repo.serverGetOverride = null;
+    await repo.wipeAccountData(_bandId);
+    expect((await bandDoc().get()).exists, isFalse);
+    expect((await bandDoc().collection('sessions').get()).docs, isEmpty);
+  });
+
   test('the active-session crash snapshot lives in LocalStore, never in '
       'Firestore', () async {
     final repo = makeRepo();

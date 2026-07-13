@@ -17,7 +17,10 @@ import 'secure_store.dart';
 /// 2. Per band, idempotently: set the band doc (name, jars, settings),
 ///    batch-set the history docs, merge the keychain secrets into
 ///    `secrets/v1`. Every doc id is the stable local id, so a resumed run
-///    overwrites its own partial work rather than duplicating it.
+///    overwrites its own partial work rather than duplicating it — and it
+///    skips bands whose local data is already gone (step 4 ran before the
+///    crash): those are uploaded whole, and re-reading their wiped blobs
+///    would push default settings over the cloud copy.
 /// 3. Commit point: [FirebaseFirestore.waitForPendingWrites] — reached only
 ///    online, so the local wipe below can never outrun the upload.
 /// 4. Wipe each local band, reset the local registry to one fresh empty
@@ -92,9 +95,22 @@ class CloudMigrator {
 
     await _local.saveCloudUploadPending(uid, [for (final b in bands) b.id]);
 
-    final total = bands.length;
+    // Of the claimed bands, a resumed run re-uploads only those that still
+    // HAVE local data. The wipe loop below runs strictly after the commit
+    // point, so a claimed band that is gone locally was already uploaded
+    // whole — and re-reading its wiped blobs would overwrite the cloud
+    // copy's bandSettings with defaults. The band still goes through the
+    // cleanup below; only the upload is skipped.
+    final toUpload = claimed == null
+        ? bands
+        : [
+            for (final band in bands)
+              if (_local.accountHasData(band.id)) band,
+          ];
+
+    final total = toUpload.length;
     var done = 0;
-    for (final band in bands) {
+    for (final band in toUpload) {
       onProgress?.call(band.name, done, total);
       await _uploadBand(uid, band);
       done++;

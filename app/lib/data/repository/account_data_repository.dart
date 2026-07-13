@@ -94,7 +94,12 @@ abstract interface class AccountDataRepository {
   bool? accountHasData(String accountId);
   Future<void> purgeSimulatedData(String accountId);
 
-  /// Removes every non-secret blob belonging to [accountId].
+  /// Removes every non-secret blob belonging to [accountId]. A wipe must be
+  /// COMPLETE, so the cloud implementation lists the band's docs on the
+  /// server and throws without deleting anything when it can't be reached —
+  /// a cache-backed listing would miss docs this device never synced and
+  /// strand them under a deleted band. The local implementation never
+  /// throws.
   Future<void> wipeAccountData(String accountId);
 
   /// Removes [accountId]'s secrets. May throw (locked keychain) — the

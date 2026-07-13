@@ -99,10 +99,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
     if (confirmed == true) {
-      await ref
+      final removed = await ref
           .read(appStateProvider.notifier)
           .removeAccount(ref.read(appStateProvider).accountId);
-      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+      if (!mounted) return;
+      if (!removed) {
+        // A cloud band's wipe refuses offline rather than half-deleting.
+        // Nothing was removed — and a silent no-op would read as a dead
+        // button.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.t('settings.main.remove_offline_snack'))),
+        );
+        return;
+      }
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/data/repository/account_data_repository.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/domain/band_settings.dart';
@@ -76,6 +77,17 @@ ProviderContainer _container(LocalStore local, SecureStore secure,
   ]);
   addTearDown(container.dispose);
   return container;
+}
+
+/// The cloud repository's offline refusal — wipeAccountData lists the
+/// band's docs on the server and throws when it can't be reached — modeled
+/// over the local delegation the rest of these tests run on.
+class _OfflineWipeRepository extends LocalStoreRepository {
+  _OfflineWipeRepository(super.local, super.secure);
+
+  @override
+  Future<void> wipeAccountData(String accountId) async =>
+      throw Exception('unavailable: the server cannot be reached');
 }
 
 void main() {
@@ -276,6 +288,39 @@ void main() {
     expect(container.read(relayHistoryProvider), isEmpty,
         reason: 'the archive follows the active band on its own');
     expect(local.readRelayHistory('acc_a'), isEmpty);
+  });
+
+  test('a wipe that fails (cloud band, offline) refuses the removal: the '
+      'band stays whole and the notifier stays unlocked', () async {
+    final (local, secure) = await _twoBands();
+    final container = ProviderContainer(overrides: [
+      localStoreProvider.overrideWithValue(local),
+      secureStoreProvider.overrideWithValue(secure),
+      initialApiKeyProvider.overrideWithValue('rk_live_a'),
+      initialRelaySecretProvider.overrideWithValue(null),
+      tipSourceFactoryProvider.overrideWithValue(
+          ({required demo, required apiKey, required jar}) =>
+              NullTipSource()),
+      relayChannelFactoryProvider.overrideWithValue(
+          ({required demo, required jar, required secret}) => null),
+      accountDataRepositoryProvider.overrideWith(
+          (ref) => _OfflineWipeRepository(local, () => secure)),
+    ]);
+    addTearDown(container.dispose);
+    final notifier = container.read(appStateProvider.notifier);
+
+    expect(await notifier.removeAccount('acc_a'), isFalse,
+        reason: 'a refused wipe reports failure instead of half-deleting');
+
+    final app = container.read(appStateProvider);
+    expect(app.accountId, 'acc_a');
+    expect(app.accounts, hasLength(2));
+    expect(app.switching, isFalse,
+        reason: 'the refusal must not leave every account action wedged '
+            'behind the switching flag');
+    expect(local.accountHasData('acc_a'), isTrue,
+        reason: 'nothing was deleted');
+    expect(local.readAccountsRegistry()?.accounts, hasLength(2));
   });
 
   test('removing the last band leaves a fresh empty one', () async {

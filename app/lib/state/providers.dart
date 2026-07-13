@@ -713,7 +713,9 @@ class AppStateNotifier extends Notifier<AppState> {
 
   /// Deletes [id]'s local data and secrets (and, best effort, its relay jar
   /// on the server), then activates the first remaining band — or a fresh
-  /// empty one when it was the last. Refused during a live session.
+  /// empty one when it was the last. Refused during a live session, and
+  /// when a cloud band's server-side wipe is unreachable (offline) — a
+  /// refusal deletes nothing and returns false.
   Future<bool> removeAccount(String id) async {
     if (accountActionsBlocked) return false;
     if (!_registry.contains(id)) return false;
@@ -725,7 +727,7 @@ class AppStateNotifier extends Notifier<AppState> {
 
     // Best effort: retire the band's connected-mode jar on the relay so the
     // public fan page dies with the local copy. Failures are ignored —
-    // the removal must succeed even offline.
+    // jar retirement must never block the removal.
     final jar = repo.readRelayJar(id);
     String? secret;
     if (id == state.accountId) {
@@ -748,7 +750,17 @@ class AppStateNotifier extends Notifier<AppState> {
     // Subtree first, band entry second: the cloud repository enumerates a
     // band's session/tip/secret docs by its collections, and deleting the
     // band doc first would leave the wipe nothing to hang the query on.
-    await repo.wipeAccountData(id);
+    // The cloud wipe lists those docs on the SERVER and throws offline — a
+    // cache-backed listing would miss docs this device never synced and
+    // strand them under a deleted band. A refusal deletes nothing, so put
+    // the switch flag back and report failure; the user retries online.
+    // (The local profile's wipe is all-prefs and never throws.)
+    try {
+      await repo.wipeAccountData(id);
+    } catch (_) {
+      state = state.copyWith(switching: false);
+      return false;
+    }
     var registry = _registry.withoutAccount(id);
     await repo.removeBandEntry(id);
     if (registry.accounts.isEmpty) {

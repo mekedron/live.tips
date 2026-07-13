@@ -174,6 +174,48 @@ void main() {
     expect(migrator.hasPendingUpload, isFalse);
   });
 
+  test('resume after a crash inside the local wipe does not re-upload the '
+      'wiped bands — cloud bandSettings survive', () async {
+    final (local, secure) = await _seedTwoBands();
+    final db = FakeFirebaseFirestore();
+    // The crashed run got past the commit point AND the wipe loop, but died
+    // before the registry reset: everything is safely in the cloud, the
+    // local blobs are gone, and both bands are still claimed by the flag.
+    await local.saveCloudUploadPending(_uid, ['acc_a', 'acc_b']);
+    final bands = db.collection('users').doc(_uid).collection('bands');
+    await bands.doc('acc_a').set({
+      'name': 'Alpha',
+      'createdAtMs': 1,
+      'tipJar': _tipJar.toJson(),
+      'bandSettings': const BandSettings(lastGoalMinor: 7500).toJson(),
+      'updatedAtMs': 1,
+    });
+    await bands.doc('acc_b').set({
+      'name': 'Beta',
+      'createdAtMs': 2,
+      'relayJar': _relayJar.toJson(),
+      'updatedAtMs': 1,
+    });
+    await local.wipeAccount('acc_a');
+    await local.wipeAccount('acc_b');
+
+    final migrator = CloudMigrator(local: local, secure: secure, db: db);
+    await migrator.uploadLocalBands(_uid);
+
+    final bandA = (await bands.doc('acc_a').get()).data()!;
+    expect((bandA['bandSettings'] as Map)['lastGoalMinor'], 7500,
+        reason: 'a wiped band re-uploaded reads default settings — the '
+            'resume must skip it, not clobber the cloud copy');
+    expect((bandA['tipJar'] as Map)['url'], 'https://buy.stripe.com/x');
+    // The resume still finishes the crashed run's cleanup.
+    final registry = local.readAccountsRegistry()!;
+    expect(registry.accounts.single.id, isNot(anyOf('acc_a', 'acc_b')),
+        reason: 'the registry reset the crash interrupted still happens');
+    expect(migrator.hasPendingUpload, isFalse);
+    expect(local.readActiveCloudBand(_uid), 'acc_a',
+        reason: 'the cloud profile still opens on the migrated band');
+  });
+
   test('a locked keychain skips secrets but never the migration', () async {
     final (local, secure) = await _seedTwoBands();
     secure.failing = true;

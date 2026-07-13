@@ -457,6 +457,7 @@ const Map<String, String> kEnStrings = {
   "settings.main.payment_methods_header": "Payment methods",
   "settings.main.poll_interval": "Check for new tips every",
   "settings.main.profile_details_header": "Profile details",
+  "settings.main.remove_offline_snack": "Can't remove this profile right now — its cloud data is unreachable. Nothing was deleted; try again online.",
   "settings.main.remove_profile_body_others_suffix": " Your other profiles stay.",
   "settings.main.remove_profile_body_relay": "Removes this profile's live.tips page and local data from this device. This action can't be undone.",
   "settings.main.remove_profile_body_stripe": "Removes the API key and this profile's local data. This action can't be undone.",
