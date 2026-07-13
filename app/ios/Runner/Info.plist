@@ -37,6 +37,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan the QR code shown on your other device to sign this one into your account.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Unlock the stage screen so only you can stop or change your live session.</string>
 	<key>UIApplicationSceneManifest</key>

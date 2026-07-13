@@ -28,6 +28,21 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- QR add-device universal link: https://tip.live.tips/link#c=<code>.
+                 autoVerify pins it to the app via the assetlinks.json served at
+                 https://tip.live.tips/.well-known/assetlinks.json (see
+                 firebase/hosting-public). The code itself rides in the URL
+                 fragment, which Android hands to the app and never puts on the
+                 wire. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="tip.live.tips"
+                    android:pathPrefix="/link"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "tips.live.live_tips",
+      "sha256_cert_fingerprints": [
+        "D7:05:08:76:AE:4C:2E:DD:7D:55:8F:06:64:88:6B:5E:D4:BD:BB:F9:F5:83:A0:84:C8:7B:1B:87:79:0A:EA:D8"
+      ]
+    }
+  }
+]

@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme.dart';
 import 'domain/app_settings.dart';
 import 'features/account/cloud_upload_offer.dart';
+import 'features/account/deep_link_gate.dart';
+import 'features/account/device_session_guard.dart';
 import 'features/live/stage/stage_overlay.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
@@ -53,9 +55,17 @@ class LiveTipsApp extends ConsumerWidget {
       navigatorObservers: [StageOverlayObserver()],
       // The keep-alive pings the relay on launch/resume (≤ once a day) so a
       // connected-mode jar never expires under an active artist. The upload
-      // gate offers to move local bands into a freshly signed-in account.
+      // gate offers to move local bands into a freshly signed-in account. The
+      // session guard keeps this device's entry in the account's device list
+      // and signs itself out when that account revokes it; the deep-link gate
+      // turns a scanned/opened `…/link#c=…` URL into the redeem flow.
       home: const RelayKeepalive(
-          child: CloudUploadOfferGate(child: RootGate())),
+        child: CloudUploadOfferGate(
+          child: DeviceSessionGuard(
+            child: DeepLinkGate(child: RootGate()),
+          ),
+        ),
+      ),
     );
   }
 }

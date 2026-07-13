@@ -18,6 +18,7 @@ import '../../widgets/sign_in_sheet.dart';
 import '../shell/app_shell.dart';
 import 'account_details_screen.dart';
 import 'relay_method_screen.dart';
+import 'security_screen.dart';
 import 'stripe_key_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -175,6 +176,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   accountProviderLabel(context, cloudEntry.kind),
                   if (cloudEntry.email != null) cloudEntry.email!,
                 ].join(' · '),
+              ),
+              LtRow(
+                icon: Icons.shield_outlined,
+                title: s.t('settings.security.row_title'),
+                subtitle: s.t('settings.security.row_subtitle'),
+                chevron: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SecurityScreen()),
+                ),
               ),
               LtRow(
                 icon: Icons.logout_rounded,

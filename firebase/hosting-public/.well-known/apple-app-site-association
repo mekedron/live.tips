@@ -1,0 +1,18 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["A4HHRH8Y9M.tips.live.liveTips"],
+        "components": [
+          {
+            "/": "/link*",
+            "comment": "QR add-device: opens the app straight into the redeem flow."
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["A4HHRH8Y9M.tips.live.liveTips"]
+  }
+}

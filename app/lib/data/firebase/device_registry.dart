@@ -1,0 +1,271 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
+
+/// One device signed into a cloud account, as `users/{uid}/devices/{id}`.
+///
+/// The app owns the descriptive fields (name, platform, model, timestamps);
+/// `revoked` is function-owned — rules reject any client write that touches
+/// it, so a revoked device cannot launder itself back to trusted. [isCurrent]
+/// is not stored: it's this device's id compared with the doc's, decided at
+/// read time.
+class DeviceInfo {
+  const DeviceInfo({
+    required this.id,
+    required this.name,
+    required this.platform,
+    this.model,
+    this.createdAtMs = 0,
+    this.lastSeenAtMs = 0,
+    this.revoked = false,
+    this.isCurrent = false,
+  });
+
+  final String id;
+  final String name;
+
+  /// 'ios' | 'android' | 'macos' | 'web' | 'unknown'.
+  final String platform;
+  final String? model;
+  final int createdAtMs;
+  final int lastSeenAtMs;
+  final bool revoked;
+  final bool isCurrent;
+
+  factory DeviceInfo.fromJson(
+    String id,
+    Map<String, dynamic> json, {
+    bool isCurrent = false,
+  }) =>
+      DeviceInfo(
+        id: id,
+        name: (json['name'] as String?) ?? '',
+        platform: (json['platform'] as String?) ?? 'unknown',
+        model: json['model'] as String?,
+        createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
+        lastSeenAtMs: (json['lastSeenAtMs'] as num?)?.toInt() ?? 0,
+        revoked: json['revoked'] == true,
+        isCurrent: isCurrent,
+      );
+
+  /// The doc as the app writes it. `revoked` is included only on CREATE (the
+  /// rules demand `revoked == false` there and forbid changing it after) —
+  /// see [DeviceRegistry.registerThisDevice].
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'platform': platform,
+        if (model != null) 'model': model,
+        'createdAtMs': createdAtMs,
+        'lastSeenAtMs': lastSeenAtMs,
+        'revoked': revoked,
+      };
+
+  DeviceInfo copyWith({bool? isCurrent}) => DeviceInfo(
+        id: id,
+        name: name,
+        platform: platform,
+        model: model,
+        createdAtMs: createdAtMs,
+        lastSeenAtMs: lastSeenAtMs,
+        revoked: revoked,
+        isCurrent: isCurrent ?? this.isCurrent,
+      );
+}
+
+/// What this device calls itself in somebody's device list.
+class DeviceDescription {
+  const DeviceDescription({
+    required this.name,
+    required this.platform,
+    this.model,
+  });
+
+  final String name;
+  final String platform;
+  final String? model;
+}
+
+/// Reads the human name of THIS device — "Nikita's iPhone", "MacBook Pro",
+/// "Chrome on macOS". Every platform channel is best-effort: a plugin that
+/// isn't there (tests, an unsupported build) falls back to the platform name
+/// rather than failing the sign-in that asked for it.
+Future<DeviceDescription> describeThisDevice([DeviceInfoPlugin? plugin]) async {
+  final info = plugin ?? DeviceInfoPlugin();
+  try {
+    if (kIsWeb) {
+      final web = await info.webBrowserInfo;
+      final browser = web.browserName.name;
+      final os = _webOsName(web.platform ?? '');
+      final pretty = browser.isEmpty
+          ? 'Browser'
+          : '${browser[0].toUpperCase()}${browser.substring(1)}';
+      return DeviceDescription(
+        name: os == null ? pretty : '$pretty on $os',
+        platform: 'web',
+        model: web.userAgent,
+      );
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+        final ios = await info.iosInfo;
+        // iOS 16+ hands out the generic model name unless the app carries the
+        // user-assigned-device-name entitlement — either way it reads fine.
+        return DeviceDescription(
+          name: ios.name.isNotEmpty ? ios.name : ios.model,
+          platform: 'ios',
+          model: ios.utsname.machine,
+        );
+      case TargetPlatform.macOS:
+        final mac = await info.macOsInfo;
+        return DeviceDescription(
+          name: mac.computerName.isNotEmpty ? mac.computerName : 'Mac',
+          platform: 'macos',
+          model: mac.model,
+        );
+      case TargetPlatform.android:
+        final android = await info.androidInfo;
+        final brand = android.manufacturer.trim();
+        final model = android.model.trim();
+        final name = [
+          if (brand.isNotEmpty) '${brand[0].toUpperCase()}${brand.substring(1)}',
+          if (model.isNotEmpty) model,
+        ].join(' ').trim();
+        return DeviceDescription(
+          name: name.isEmpty ? 'Android device' : name,
+          platform: 'android',
+          model: model.isEmpty ? null : model,
+        );
+      default:
+        return DeviceDescription(
+          name: defaultTargetPlatform.name,
+          platform: defaultTargetPlatform.name.toLowerCase(),
+        );
+    }
+  } catch (e) {
+    debugPrint('device description unavailable: $e');
+    return DeviceDescription(
+      name: kIsWeb ? 'Browser' : defaultTargetPlatform.name,
+      platform: kIsWeb ? 'web' : defaultTargetPlatform.name.toLowerCase(),
+    );
+  }
+}
+
+String? _webOsName(String platform) {
+  final p = platform.toLowerCase();
+  if (p.contains('mac')) return 'macOS';
+  if (p.contains('win')) return 'Windows';
+  if (p.contains('linux')) return 'Linux';
+  if (p.contains('iphone') || p.contains('ipad')) return 'iOS';
+  if (p.contains('android')) return 'Android';
+  return null;
+}
+
+/// The account's device list, `users/{uid}/devices`. Constructed with a null
+/// [FirebaseFirestore] wherever Firebase isn't (local mode, Windows/Linux,
+/// tests) — then every call is a no-op and every stream is empty, so the
+/// callers need no platform branches.
+class DeviceRegistry {
+  DeviceRegistry({
+    required FirebaseFirestore? db,
+    required this.deviceId,
+    Future<DeviceDescription> Function()? describe,
+  })  : _db = db,
+        _describe = describe ?? describeThisDevice;
+
+  final FirebaseFirestore? _db;
+
+  /// This device's stable id (`LocalStore.deviceId()`).
+  final String deviceId;
+
+  final Future<DeviceDescription> Function() _describe;
+
+  CollectionReference<Map<String, dynamic>>? _devices(String uid) =>
+      _db?.collection('users/$uid/devices');
+
+  /// Writes (or freshens) THIS device's doc under [uid]. `revoked: false` is
+  /// only ever sent on the create path: the rules demand it there and forbid
+  /// it changing later, so an update that merged it in would be rejected —
+  /// and would be a revocation-laundering hole if it weren't.
+  Future<void> registerThisDevice(String uid) async {
+    final devices = _devices(uid);
+    if (devices == null) return;
+    final ref = devices.doc(deviceId);
+    final description = await _describe();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    try {
+      final existing = await ref.get();
+      if (existing.exists) {
+        await ref.update({
+          'name': description.name,
+          'platform': description.platform,
+          if (description.model != null) 'model': description.model,
+          'lastSeenAtMs': now,
+        });
+        return;
+      }
+      await ref.set({
+        'name': description.name,
+        'platform': description.platform,
+        if (description.model != null) 'model': description.model,
+        'createdAtMs': now,
+        'lastSeenAtMs': now,
+        'revoked': false,
+      });
+    } catch (e) {
+      // Offline, or a session that was revoked out from under us. The next
+      // resume re-registers; nothing in the app blocks on this.
+      debugPrint('device registration failed: $e');
+    }
+  }
+
+  /// Bumps `lastSeenAtMs` — called on app resume so "last seen" means it.
+  /// A doc that doesn't exist yet is not created here: only
+  /// [registerThisDevice] may create (it alone knows to stamp revoked:false).
+  Future<void> touch(String uid) async {
+    final devices = _devices(uid);
+    if (devices == null) return;
+    try {
+      await devices.doc(deviceId).update({
+        'lastSeenAtMs': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      debugPrint('device touch failed: $e');
+    }
+  }
+
+  /// Every device on the account, newest-seen first, this device flagged.
+  Stream<List<DeviceInfo>> watchDevices(String uid) {
+    final devices = _devices(uid);
+    if (devices == null) return Stream.value(const []);
+    return devices.snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) =>
+              DeviceInfo.fromJson(d.id, d.data(), isCurrent: d.id == deviceId))
+          .toList()
+        ..sort((a, b) {
+          // This device pins to the top; the rest by recency.
+          if (a.isCurrent != b.isCurrent) return a.isCurrent ? -1 : 1;
+          return b.lastSeenAtMs.compareTo(a.lastSeenAtMs);
+        });
+      return list;
+    });
+  }
+
+  /// True once THIS device's doc says revoked — the cooperative signal the
+  /// app honours by signing itself out. A doc that was never created (or is
+  /// unreadable because the session is already dead) reads as "not revoked":
+  /// the guard must never sign out over a transient miss.
+  Stream<bool> watchOwnRevocation(String uid, String deviceId) {
+    final db = _db;
+    if (db == null) return Stream.value(false);
+    return db
+        .doc('users/$uid/devices/$deviceId')
+        .snapshots()
+        .map((snap) => snap.data()?['revoked'] == true)
+        .handleError((Object e) {
+      debugPrint('revocation watch failed: $e');
+    });
+  }
+}
