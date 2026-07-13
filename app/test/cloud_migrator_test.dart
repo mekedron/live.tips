@@ -118,8 +118,8 @@ class _OfflineDb extends FakeFirebaseFirestore {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('happy path: everything lands in the cloud, local becomes one fresh '
-      'empty band, keychain untouched', () async {
+  test('happy path: everything lands in the cloud, the local registry is left '
+      'EMPTY, keychain untouched', () async {
     final (local, secure) = await _seedTwoBands();
     final db = FakeFirebaseFirestore();
     final migrator = CloudMigrator(local: local, secure: secure, db: db);
@@ -151,14 +151,17 @@ void main() {
         await bands.doc('acc_b').collection('secrets').doc('v1').get();
     expect(secretsB.data()!['relaySecret'], 'jar_secret_1');
 
-    // The local side: bands wiped, one fresh empty band, flag cleared.
+    // The local side: bands wiped, registry EMPTY, flag cleared. The move used
+    // to leave one fresh unnamed band behind — a deliberate placeholder, so
+    // that switching back to the local profile landed on a ready band. An empty
+    // local profile is routable (it lands on the create step, #38/#40), and the
+    // placeholder was a profile the artist never made: unnamed, dataless, and
+    // exactly the phantom of #50 by another route.
     expect(local.accountHasData('acc_a'), isFalse);
     expect(local.accountHasData('acc_b'), isFalse);
     final registry = local.readAccountsRegistry()!;
-    expect(registry.accounts, hasLength(1));
-    expect(registry.accounts.single.id, isNot(anyOf('acc_a', 'acc_b')));
-    expect(registry.accounts.single.name, isEmpty);
-    expect(registry.activeId, registry.accounts.single.id);
+    expect(registry.accounts, isEmpty);
+    expect(registry.activeId, '');
     expect(migrator.hasPendingUpload, isFalse);
 
     // Keychain entries stay: they are now the cloud profile's cache under
@@ -203,7 +206,7 @@ void main() {
     expect((await bands.doc('acc_b').collection('relayTips').get()).docs,
         hasLength(1));
     expect(local.accountHasData('acc_a'), isFalse);
-    expect(local.readAccountsRegistry()!.accounts, hasLength(1));
+    expect(local.readAccountsRegistry()!.accounts, isEmpty);
     expect(migrator.hasPendingUpload, isFalse);
   });
 
@@ -242,7 +245,7 @@ void main() {
     expect((bandA['tipJar'] as Map)['url'], 'https://buy.stripe.com/x');
     // The resume still finishes the crashed run's cleanup.
     final registry = local.readAccountsRegistry()!;
-    expect(registry.accounts.single.id, isNot(anyOf('acc_a', 'acc_b')),
+    expect(registry.accounts, isEmpty,
         reason: 'the registry reset the crash interrupted still happens');
     expect(migrator.hasPendingUpload, isFalse);
     expect(local.readActiveCloudBand(_uid), 'acc_a',
@@ -299,7 +302,7 @@ void main() {
         reason: 'the secret stays local-only; the band still works here');
     expect((await bands.doc('acc_b').collection('secrets').doc('v1').get())
         .exists, isFalse);
-    expect(local.readAccountsRegistry()!.accounts, hasLength(1));
+    expect(local.readAccountsRegistry()!.accounts, isEmpty);
     expect(migrator.hasPendingUpload, isFalse);
   });
 
@@ -343,8 +346,10 @@ void main() {
       'not re-upload the fresh band', () async {
     SharedPreferences.setMockInitialValues({});
     final local = LocalStore(await SharedPreferences.getInstance());
-    // The crashed run finished everything except clearing the flag: the
-    // registry already holds the fresh post-upload band.
+    // An upload crashed under a build that still left the placeholder band
+    // behind, and this build resumes it: whatever the registry holds now, only
+    // the bands the crashed run CLAIMED are pre-sign-in data. (The boot sweep
+    // takes the placeholder itself — it is a phantom like any other, #50.)
     await local.saveAccountsRegistry(const AccountsRegistry(
       accounts: [BandAccount(id: 'acc_fresh', name: '', createdAtMs: 9)],
       activeId: 'acc_fresh',

@@ -44,6 +44,23 @@ Future<LocalStore> _store(Map<String, Object> values) async {
   return LocalStore(await SharedPreferences.getInstance());
 }
 
+/// The registry a device has once the artist has actually made a profile —
+/// which, since #50, is the ONLY way a band ever gets into one. The boot
+/// migration mints nothing on a fresh install, so a test that needs a band to
+/// exist has to say so, exactly like the artist does.
+Future<AccountsRegistry> _withBand(
+  LocalStore local, {
+  String id = 'acc_first',
+  String name = 'The Foxes',
+}) async {
+  final registry = AccountsRegistry(
+    accounts: [BandAccount(id: id, name: name, createdAtMs: 0)],
+    activeId: id,
+  );
+  await local.saveAccountsRegistry(registry);
+  return registry;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -114,12 +131,27 @@ void main() {
           'The Midnight Foxes');
     });
 
-    test('fresh install → one empty account, nothing else', () async {
+    test('fresh install → an EMPTY registry: no band is minted (#50)',
+        () async {
+      // The boot sequence used to write one nameless band here, before the
+      // artist had tapped anything. Down the cloud path nothing ever named it,
+      // opened it or cleaned it up — and a sign-out landed the device on the
+      // local profile, whose single band is not a choice, so the app opened it:
+      // a profile the artist never made, appearing on its own (#26's invariant).
       final local = await _store({});
       final registry = await ensureAccountsRegistry(local);
-      expect(registry.accounts, hasLength(1));
-      expect(registry.accounts.single.name, '');
-      expect(local.accountHasData(registry.activeId), isFalse);
+      expect(registry.accounts, isEmpty);
+      expect(registry.activeId, '');
+      // And it is a REGISTRY, not the absence of one: written, so it is an
+      // answer ("no bands") and not a fresh install to be seeded again.
+      expect(local.readAccountsRegistry()?.accounts, isEmpty);
+    });
+
+    test('a fresh install boots empty again and again', () async {
+      final local = await _store({});
+      await ensureAccountsRegistry(local);
+      final second = await ensureAccountsRegistry(local);
+      expect(second.accounts, isEmpty);
     });
 
     test('a deliberately emptied registry stays empty across boots',
@@ -211,15 +243,25 @@ void main() {
       expect(local.prefs.getBool(kKeychainMigratedFlag), isTrue);
     });
 
-    test('a reinstall adopts secrets the keychain kept alive', () async {
-      // Fresh prefs (the uninstall wiped them), surviving legacy keychain.
+    test('a reinstall waits for a band, then adopts the secrets the keychain '
+        'kept alive', () async {
+      // Fresh prefs (the uninstall wiped them), surviving legacy keychain. The
+      // reinstall boots with an EMPTY registry now — no band is invented to
+      // hold the secrets, and none has to be: they stay in their legacy slots.
       final local = await _store({});
-      final registry = await ensureAccountsRegistry(local);
+      final empty = await ensureAccountsRegistry(local);
       final secure = FakeSecureStore({'stripe_api_key': 'rk_live_kept'});
 
+      await migrateKeychainIfNeeded(local, secure, empty);
+      expect(await secure.readLegacyApiKey(), 'rk_live_kept',
+          reason: 'nothing to adopt into — the secret is left where it is');
+      expect(local.prefs.getBool(kKeychainMigratedFlag), isNull,
+          reason: 'the phase stays armed for the boot after the first profile');
+
+      // The artist makes their first profile; the next boot adopts into it.
+      final registry = await _withBand(local);
       await migrateKeychainIfNeeded(local, secure, registry);
-      expect(await secure.readApiKey(registry.accounts.first.id),
-          'rk_live_kept',
+      expect(await secure.readApiKey('acc_first'), 'rk_live_kept',
           reason: 'reinstall-stays-connected behavior is preserved');
     });
 
@@ -227,7 +269,8 @@ void main() {
       // Prefs are gone after the reinstall, but the keychain kept the old
       // install's suffixed secrets. They are unknown, not deletable.
       final local = await _store({});
-      final registry = await ensureAccountsRegistry(local);
+      await ensureAccountsRegistry(local);
+      final registry = await _withBand(local);
       final secure = FakeSecureStore({
         '${SecureStore.kApiKeyBase}_acc_old': 'rk_live_survivor',
         '${SecureStore.kRelaySecretBase}_acc_old': 'sec_survivor',
@@ -346,7 +389,8 @@ void main() {
 
     test('tombstones are processed even after migration completed', () async {
       final local = await _store({});
-      final registry = await ensureAccountsRegistry(local);
+      await ensureAccountsRegistry(local);
+      final registry = await _withBand(local);
       final secure = FakeSecureStore();
       await migrateKeychainIfNeeded(local, secure, registry);
       expect(local.prefs.getBool(kKeychainMigratedFlag), isTrue);
@@ -362,10 +406,141 @@ void main() {
     });
   });
 
+  // The devices already in the wild carry the band the old boot minted. Fixing
+  // the mint does nothing for them: the phantom is what their sign-out lands on
+  // and what their switcher lists as "Unnamed profile — Not set up yet". It is
+  // swept — and the sweep's whole job is knowing what is NOT a phantom.
+  group('phantom sweep', () {
+    test('drops the unnamed, dataless band — even though it is the ACTIVE one',
+        () async {
+      // Exactly the state the reporter's device is in: main() minted this band
+      // at first boot and made it active, the artist onboarded into a cloud
+      // account, and nothing ever came back for it.
+      final local = await _store({});
+      await local.saveAccountsRegistry(const AccountsRegistry(
+        accounts: [BandAccount(id: 'acc_phantom', name: '', createdAtMs: 0)],
+        activeId: 'acc_phantom',
+      ));
+      final swept = await sweepPhantomBands(
+          local, FakeSecureStore(), local.readAccountsRegistry()!);
+
+      expect(swept.accounts, isEmpty);
+      expect(swept.activeId, '');
+      expect(local.readAccountsRegistry()!.accounts, isEmpty,
+          reason: 'and it is gone from prefs, not just from this answer');
+    });
+
+    test('KEEPS a nameless band that holds data — relay tips are the only '
+        'copy of those tips anywhere', () async {
+      // A pre-registry install whose jar carried no display name: the boot
+      // migration adopts it into a nameless band. Nameless, but the artist's.
+      final local = await _store({});
+      await local.saveAccountsRegistry(const AccountsRegistry(
+        accounts: [BandAccount(id: 'acc_legacy', name: '', createdAtMs: 0)],
+        activeId: 'acc_legacy',
+      ));
+      await local.prefs.setString('relay_history_v1_acc_legacy',
+          '[{"id":"tip_1","createdAt":1,"amountMinor":500}]');
+
+      final swept = await sweepPhantomBands(
+          local, FakeSecureStore(), local.readAccountsRegistry()!);
+      expect(swept.accounts.map((b) => b.id), ['acc_legacy']);
+      expect(swept.activeId, 'acc_legacy');
+      expect(local.prefs.containsKey('relay_history_v1_acc_legacy'), isTrue);
+    });
+
+    test('KEEPS a nameless band whose Stripe key is in the keychain', () async {
+      // A reinstall re-adopted the legacy key into the first band it found and
+      // the artist never finished the jar. Prefs hold nothing for that band —
+      // and the key it holds exists nowhere else on earth.
+      final local = await _store({});
+      await local.saveAccountsRegistry(const AccountsRegistry(
+        accounts: [BandAccount(id: 'acc_keyed', name: '', createdAtMs: 0)],
+        activeId: 'acc_keyed',
+      ));
+      final secure = FakeSecureStore(
+          {'${SecureStore.kApiKeyBase}_acc_keyed': 'rk_live_only_copy'});
+
+      final swept = await sweepPhantomBands(
+          local, secure, local.readAccountsRegistry()!);
+      expect(swept.accounts.map((b) => b.id), ['acc_keyed']);
+      expect(await secure.readApiKey('acc_keyed'), 'rk_live_only_copy');
+    });
+
+    test('KEEPS a nameless band holding only a relay secret', () async {
+      final local = await _store({});
+      await local.saveAccountsRegistry(const AccountsRegistry(
+        accounts: [BandAccount(id: 'acc_relay', name: '', createdAtMs: 0)],
+        activeId: 'acc_relay',
+      ));
+      final secure = FakeSecureStore(
+          {'${SecureStore.kRelaySecretBase}_acc_relay': 'sec_only_copy'});
+
+      final swept = await sweepPhantomBands(
+          local, secure, local.readAccountsRegistry()!);
+      expect(swept.accounts.map((b) => b.id), ['acc_relay']);
+    });
+
+    test('a locked keychain deletes NOTHING — it proves nothing', () async {
+      final local = await _store({});
+      await local.saveAccountsRegistry(const AccountsRegistry(
+        accounts: [BandAccount(id: 'acc_phantom', name: '', createdAtMs: 0)],
+        activeId: 'acc_phantom',
+      ));
+      final secure = FakeSecureStore()..failing = true;
+
+      final swept = await sweepPhantomBands(
+          local, secure, local.readAccountsRegistry()!);
+      expect(swept.accounts.map((b) => b.id), ['acc_phantom'],
+          reason: 'a keychain that cannot answer is not a keychain that is '
+              'empty; the sweep retries at the next boot');
+      expect(local.readAccountsRegistry()!.accounts, hasLength(1));
+    });
+
+    test('a NAMED band is never touched, however empty', () async {
+      // The artist typed that name. An abandoned named band is the discard
+      // offer's business — and the discard offer ASKS.
+      final local = await _store({});
+      await local.saveAccountsRegistry(const AccountsRegistry(
+        accounts: [BandAccount(id: 'acc_named', name: 'Half Done',
+            createdAtMs: 0)],
+        activeId: 'acc_named',
+      ));
+      final swept = await sweepPhantomBands(
+          local, FakeSecureStore(), local.readAccountsRegistry()!);
+      expect(swept.accounts.map((b) => b.id), ['acc_named']);
+    });
+
+    test('sweeps the phantom out from beside a real band, and lands the '
+        'active id on the survivor', () async {
+      final local = await _store({});
+      await local.saveAccountsRegistry(const AccountsRegistry(
+        accounts: [
+          BandAccount(id: 'acc_real', name: 'The Foxes', createdAtMs: 0),
+          BandAccount(id: 'acc_phantom', name: '', createdAtMs: 1),
+        ],
+        activeId: 'acc_phantom',
+      ));
+      final swept = await sweepPhantomBands(
+          local, FakeSecureStore(), local.readAccountsRegistry()!);
+      expect(swept.accounts.map((b) => b.id), ['acc_real']);
+      expect(swept.activeId, 'acc_real',
+          reason: 'an activeId naming a swept band opens nothing');
+    });
+
+    test('a registry with nothing to sweep is not rewritten', () async {
+      final local = await _store({});
+      final registry = await _withBand(local);
+      final swept =
+          await sweepPhantomBands(local, FakeSecureStore(), registry);
+      expect(swept.accounts.map((b) => b.id), ['acc_first']);
+    });
+  });
+
   test('purging a pristine band leaves no empty history key behind',
       () async {
     final local = await _store({});
-    final registry = await ensureAccountsRegistry(local);
+    final registry = await _withBand(local);
     await local.purgeSimulatedData(registry.activeId);
     expect(local.accountHasData(registry.activeId), isFalse,
         reason: 'an empty-history write would block abandoned-band GC');
@@ -373,7 +548,7 @@ void main() {
 
   test('band settings JSON round-trips through the store', () async {
     final local = await _store({});
-    final registry = await ensureAccountsRegistry(local);
+    final registry = await _withBand(local);
     final id = registry.activeId;
     final band = local.readBandSettings(id);
     await local.saveBandSettings(id, band.copyWith(lastGoalMinor: 4200));

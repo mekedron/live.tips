@@ -36,14 +36,15 @@ class WelcomeScreen extends ConsumerWidget {
   /// an artist reaches by deleting their last local profile, so the next tap on
   /// this button quietly undid the deletion #23/#26/#37 fought to make possible,
   /// and the orphan it left behind travels nowhere and cleans itself up never
-  /// (#47). Both starting states are already handled without it: a fresh install
-  /// walks in with main()'s band active and the details step names it, and an
-  /// empty registry walks in with no active band and the details step mints as
-  /// it names ([OnboardingDetailsScreen], `activeAccount == null`).
+  /// (#47). Every starting state is handled without it: a fresh install walks in
+  /// with an empty registry, exactly like an artist who deleted their last
+  /// profile, and the details step mints as it names ([OnboardingDetailsScreen],
+  /// `activeAccount == null`). main() no longer seeds a band either — that seed
+  /// was the profile that appeared on the artist's device out of nowhere (#50).
   ///
   /// [firstBandSetupScreen] is deliberately NOT given `createsProfile: true`
-  /// here: on a fresh install that band already exists, and asking for a new one
-  /// would leave an unnamed duplicate behind on every install.
+  /// here: the details step already mints when there is no active band, and
+  /// asking for a second one would leave an unnamed duplicate behind.
   Future<void> _getStarted(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
     await ref.read(deviceKindProvider.notifier).choose(DeviceKind.performer);

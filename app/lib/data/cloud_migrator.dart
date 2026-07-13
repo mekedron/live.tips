@@ -83,12 +83,11 @@ bool _isTransient(Object e) {
 ///    would push default settings over the cloud copy.
 /// 3. Commit point: [FirebaseFirestore.waitForPendingWrites] — reached only
 ///    online, so the local wipe below can never outrun the upload.
-/// 4. Wipe each local band, reset the local registry to one fresh empty
-///    band (a pristine placeholder — unlike removal, the move is not "get
-///    rid of the local profile", so switching back to it should land on a
-///    ready band and not on the account picker), clear the flag. Keychain
-///    entries stay put: they are now the cloud profile's keychain cache
-///    under the same band ids.
+/// 4. Wipe each local band, leave the local registry holding whatever did NOT
+///    move (nothing, when everything did — an empty local profile is a legal,
+///    routable state, and no placeholder band is minted to stand in for it),
+///    clear the flag. Keychain entries stay put: they are now the cloud
+///    profile's keychain cache under the same band ids.
 ///
 /// A locked keychain skips step 2's secrets for the affected band and
 /// nothing else. The secret is not lost — it stays in the keychain, which
@@ -170,8 +169,7 @@ class CloudMigrator {
     }
 
     // A resumed run only re-uploads the bands the crashed run had claimed:
-    // anything newer in the registry (the fresh empty band a nearly-finished
-    // run already created) is not pre-sign-in data to move.
+    // anything newer in the registry is not pre-sign-in data to move.
     final claimed = pending?.bandIds.toSet();
     final bands = [
       for (final band in registry.accounts)
@@ -210,28 +208,23 @@ class CloudMigrator {
       for (final band in registry.accounts)
         if (!uploadedIds.contains(band.id)) band,
     ];
-    if (remaining.isEmpty) {
-      // One fresh empty band, a deliberate placeholder: a move is not a
-      // removal, so the local profile stays switchable-to (see the class
-      // note on step 4). It is unnamed and empty, so the upload offer and
-      // the Settings move-row both ignore it — and with an empty registry
-      // routable now (see AppStateNotifier.removeAccount), even this band
-      // can be removed for good.
-      final fresh = BandAccount(
-        id: BandAccount.newId(),
-        name: '',
-        createdAtMs: DateTime.now().millisecondsSinceEpoch,
-      );
-      await _local.saveAccountsRegistry(
-          AccountsRegistry(accounts: [fresh], activeId: fresh.id));
-    } else {
-      await _local.saveAccountsRegistry(AccountsRegistry(
-        accounts: remaining,
-        activeId: remaining.any((b) => b.id == registry.activeId)
-            ? registry.activeId
-            : remaining.first.id,
-      ));
-    }
+    // Every local band moved: the local registry is left EMPTY. It used to be
+    // left with one fresh unnamed band — a deliberate placeholder, so that
+    // switching back to the local profile landed on a ready band rather than
+    // on a picker, "because a move is not a removal". Its own comment carried
+    // the refutation: *with an empty registry routable now*. It is. An empty
+    // local profile lands on the create step, with the switcher and Settings on
+    // it (#38/#40) — the local profile is switchable-to whether or not it holds
+    // a band. What the placeholder actually did was hand the artist a profile
+    // they never made: unnamed, dataless, and indistinguishable from the one
+    // main() used to mint at boot (#50). It is gone, and nothing takes its
+    // place: a band is born from a name (#44).
+    await _local.saveAccountsRegistry(AccountsRegistry(
+      accounts: remaining,
+      activeId: remaining.any((b) => b.id == registry.activeId)
+          ? registry.activeId
+          : (remaining.isEmpty ? '' : remaining.first.id),
+    ));
     await _local.clearCloudUploadPending();
     return migratedActiveId;
   }

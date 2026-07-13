@@ -154,8 +154,10 @@ Future<void> main() async {
   );
   await AppLocalizations.load(bootLocale);
 
-  // Prefs-side migration/creation of the accounts registry. Never touches
-  // the keychain, so it can't block or fail transiently.
+  // Prefs-side migration of the accounts registry. Never touches the keychain,
+  // so it can't block or fail transiently — and it creates no band unless there
+  // is legacy data to adopt: a fresh install boots with an EMPTY registry, and
+  // the artist's first profile is born from the name they type (#50/#26).
   final registry = await ensureAccountsRegistry(localStore);
   var activeId = registry.activeId;
 
@@ -219,6 +221,20 @@ Future<void> main() async {
       // Keychain-side migration is retried each boot until it sticks; a
       // locked/prompting keychain just means booting signed-out this once.
       await migrateKeychainIfNeeded(localStore, secureStore, registry);
+      // Devices upgrading from a build that minted a band at boot carry that
+      // phantom — nameless, empty, and the thing a sign-out lands on (#50).
+      // Sweep it now the keychain has had its chance to adopt legacy secrets
+      // INTO a band (a band holding a secret is not a phantom and survives).
+      // Never while an upload is pending: the migrator resumed above owns the
+      // local registry and is rewriting it on another future — the phantom, if
+      // any, keeps until the next boot.
+      if (pendingUpload == null) {
+        final swept =
+            await sweepPhantomBands(localStore, secureStore, registry);
+        // Only the LOCAL profile's active band can have been swept; a cloud
+        // profile's active band came from readActiveCloudBand above.
+        if (activeId == registry.activeId) activeId = swept.activeId;
+      }
       apiKey = await secureStore.readApiKey(activeId);
       relaySecret = await secureStore.readRelaySecret(activeId);
     } catch (_) {

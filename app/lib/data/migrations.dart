@@ -37,11 +37,32 @@ const kKeychainTargetId = 'keychain_target_id_v1';
 /// Also sweeps legacy prefs keys left behind by a downgraded app version
 /// back into a (new) account, so downgrade-era data never becomes invisible.
 ///
-/// An existing registry with NO accounts is returned as-is: it means the
-/// artist removed the last local profile, and "no profile" is a routable
-/// state the app renders (RootGate) — minting a band here is how a removed
-/// profile used to come back at the next boot. Only a genuinely fresh
-/// install (no registry at all) gets its first band created.
+/// **A registry may be born empty. A band may not be born unasked.** A band is
+/// created here for exactly one reason: there is legacy data to adopt, and that
+/// data needs a band to live in. A genuinely fresh install has nothing to
+/// adopt, so it gets a registry with no accounts and no active band.
+///
+/// It did not always. This function used to mint one nameless band on every
+/// fresh install, before the artist had tapped anything. Down the LOCAL path
+/// the details step then renamed it, so it read as a harmless seed. Down the
+/// CLOUD path nothing ever touched it — the cloud profile is minted into the
+/// cloud repository — and that band sat in the local registry, unnamed, empty
+/// and unreachable, until a sign-out landed the device back on the local
+/// profile, where one band is not a choice and the app therefore opened it: a
+/// profile the artist never made, appearing on their device by itself (#50).
+/// The invariant is #26's — the app never creates a profile behind the artist's
+/// back — and a profile's one birthplace is the name they type
+/// (`AppStateNotifier.createFirstBand`, #44/#47).
+///
+/// Nothing downstream needs the seed. An empty profile set is routable in its
+/// own right: `activeProfileRenderProvider` answers `create`, RootGate lands on
+/// the create step (which carries the switcher and Settings itself, #40), and
+/// the details step mints as it names (`activeAccount == null`) — the very path
+/// an artist who deleted their last profile already walks.
+///
+/// An existing registry with NO accounts is returned as-is for the same reason:
+/// it means the artist removed the last local profile, and minting a band here
+/// is how a removed profile used to come back at the next boot.
 Future<AccountsRegistry> ensureAccountsRegistry(LocalStore local) async {
   final prefs = local.prefs;
   final existing = local.readAccountsRegistry();
@@ -66,18 +87,36 @@ Future<AccountsRegistry> ensureAccountsRegistry(LocalStore local) async {
       id = await _pendingId(local);
     }
     await _copyLegacyPrefs(local, id);
-    final registry = existing.contains(id)
+    var registry = existing.contains(id)
         ? existing
         : existing.withAccount(BandAccount(
             id: id,
             name: _legacyBandName(local),
             createdAtMs: DateTime.now().millisecondsSinceEpoch,
           ));
+    // An empty registry (the artist removed their last profile) that a
+    // downgrade sweep just gave a band names no active one — and an activeId
+    // pointing at nothing is a band nothing can open.
+    if (!registry.contains(registry.activeId)) {
+      registry = registry.withActive(id);
+    }
     await prefs.setString(kKeychainTargetId, id);
     await local.saveAccountsRegistry(registry);
     await _deleteLegacyPrefs(local);
     await prefs.remove(kMigrationPendingId);
     await prefs.remove(kKeychainMigratedFlag);
+    return registry;
+  }
+
+  // No registry and nothing to adopt: a genuinely fresh install. It gets an
+  // empty registry — the app has been told nothing about any band yet, and
+  // inventing one is the bug (#50). The keychain phase has nowhere to adopt
+  // legacy secrets into and simply postpones itself (see
+  // [migrateKeychainIfNeeded]) until the artist's first profile exists.
+  if (!_hasLegacyPrefs(local)) {
+    const registry = AccountsRegistry(accounts: [], activeId: '');
+    await local.saveAccountsRegistry(registry);
+    await prefs.remove(kMigrationPendingId);
     return registry;
   }
 
@@ -98,6 +137,69 @@ Future<AccountsRegistry> ensureAccountsRegistry(LocalStore local) async {
   await _deleteLegacyPrefs(local);
   await prefs.remove(kMigrationPendingId);
   return registry;
+}
+
+/// Drops the phantom bands older builds minted at boot: a band with no name,
+/// no local data and no keychain secrets — nothing the artist ever made, and
+/// nothing of theirs to lose. Returns the registry to boot on.
+///
+/// Devices in the wild carry these. Left alone, the phantom is what a sign-out
+/// lands on (one band is not a choice, so it opens) and what the switcher lists
+/// forever as "Unnamed profile — Not set up yet" (#50). Fixing the mint does
+/// nothing for a device that already has one.
+///
+/// The predicate is the one the rest of the app already uses for "is this a
+/// real profile?" — [ProfilePickScreen._real] and the upload offer both ignore
+/// exactly this band — plus the keychain, which they have no reason to consult
+/// and a deletion very much does:
+///
+/// * a **name** is the ask (#44), so a named band is the artist's, however
+///   empty; it is never touched here (an abandoned named band is the discard
+///   offer's business, and it asks).
+/// * [LocalStore.accountHasData] covers every per-band prefs key — jars,
+///   settings, session history, the relay-tip archive. A nameless band that
+///   somehow holds data IS the artist's work (a pre-registry install adopted by
+///   the migration above, whose jar carried no display name) and survives.
+/// * a Stripe key or relay secret in the keychain is data too, and prefs cannot
+///   see it: a reinstall re-adopts legacy secrets into the first band it finds,
+///   and that band's key exists nowhere else on earth. A keychain that throws
+///   proves nothing, so it means KEEP — the sweep just retries next boot.
+///
+/// The active band is not spared. On the device that reported this, the phantom
+/// IS the local registry's active id (main() minted it active and the cloud
+/// sign-in never came back to it), so sparing it would spare the whole bug.
+Future<AccountsRegistry> sweepPhantomBands(
+  LocalStore local,
+  SecureStore secure,
+  AccountsRegistry registry,
+) async {
+  final phantoms = <String>{};
+  for (final band in registry.accounts) {
+    if (band.name.trim().isNotEmpty) continue;
+    if (local.accountHasData(band.id)) continue;
+    try {
+      if (await secure.readApiKey(band.id) != null) continue;
+      if (await secure.readRelaySecret(band.id) != null) continue;
+    } catch (_) {
+      // Locked or prompting keychain: it cannot tell us this band is empty,
+      // so it stays. Nothing is deleted on a guess.
+      return registry;
+    }
+    phantoms.add(band.id);
+  }
+  if (phantoms.isEmpty) return registry;
+  final remaining = [
+    for (final band in registry.accounts)
+      if (!phantoms.contains(band.id)) band,
+  ];
+  final swept = AccountsRegistry(
+    accounts: remaining,
+    activeId: remaining.any((b) => b.id == registry.activeId)
+        ? registry.activeId
+        : (remaining.isEmpty ? '' : remaining.first.id),
+  );
+  await local.saveAccountsRegistry(swept);
+  return swept;
 }
 
 /// Moves the legacy keychain slots into [targetAccountId]'s suffixed keys.
@@ -129,9 +231,11 @@ Future<void> migrateKeychainIfNeeded(
   final targetAccountId = (stored != null && registry.contains(stored))
       ? stored
       : registry.accounts.firstOrNull?.id;
-  // An empty registry (last profile removed) has nowhere to adopt legacy
-  // secrets into — the flag stays unset, and a later registry with a band
-  // retries.
+  // An empty registry has nowhere to adopt legacy secrets into — the last
+  // profile was removed, or this is a fresh install/reinstall that has not
+  // been given a profile yet. The flag stays unset and the boot after the
+  // artist names their first band adopts them into it. (Nothing is lost
+  // meanwhile: the secrets sit in their legacy slots, untouched.)
   if (targetAccountId == null) return;
   try {
     final legacyKey = await secure.readLegacyApiKey();
