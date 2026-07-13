@@ -1,7 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/secure_store.dart';
+import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -99,6 +101,63 @@ class FakeSecureStore extends SecureStore {
     _check();
     values.clear();
   }
+}
+
+/// [AuthService] over no Firebase that still REPORTS available — widget
+/// tests use it to surface the cloud-account UI without a Firebase app.
+/// Every sign-in "succeeds" instantly with [nextUser].
+class FakeAuthService extends AuthService {
+  FakeAuthService({
+    this.user,
+    this.nextUser = const AuthUser(
+      uid: 'uid_test',
+      kind: AccountKind.google,
+      displayName: 'Casey',
+      email: 'casey@example.com',
+    ),
+  }) : super(null);
+
+  /// The already-signed-in user, if any.
+  AuthUser? user;
+
+  /// What the next sign-in resolves to (and [user] becomes).
+  AuthUser nextUser;
+
+  @override
+  bool get available => true;
+
+  @override
+  Stream<AuthUser?> userChanges() => Stream<AuthUser?>.value(user);
+
+  @override
+  AuthUser? get currentUser => user;
+
+  Future<AuthUser?> _signIn() async => user = nextUser;
+
+  @override
+  Future<AuthUser?> signInAnonymously() => _signIn();
+
+  @override
+  Future<AuthUser?> signInWithApple({bool link = false}) => _signIn();
+
+  @override
+  Future<AuthUser?> signInWithGoogle({bool link = false}) => _signIn();
+
+  @override
+  Future<void> updateDisplayName(String name) async {
+    final u = user;
+    if (u != null) {
+      user = AuthUser(
+        uid: u.uid,
+        kind: u.kind,
+        displayName: name.trim(),
+        email: u.email,
+      );
+    }
+  }
+
+  @override
+  Future<void> signOut() async => user = null;
 }
 
 /// The account id every seeded test store uses unless it asks for more.

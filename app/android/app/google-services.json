@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "623278585949",
+    "project_id": "livetips-app",
+    "storage_bucket": "livetips-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:623278585949:android:d00e52f17a5c5a29a4b5b4",
+        "android_client_info": {
+          "package_name": "tips.live.live_tips"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhLRImKreMz3FAGpiTPnY0qWbHVowb1FM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

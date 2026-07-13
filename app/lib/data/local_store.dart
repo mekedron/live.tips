@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/app_account.dart';
 import '../domain/app_settings.dart';
 import '../domain/band_account.dart';
 import '../domain/band_settings.dart';
@@ -25,6 +26,7 @@ class LocalStore {
 
   // Device-wide keys.
   static const kAccounts = 'accounts_v1';
+  static const kAccountsDirectory = 'accounts_directory_v1';
   static const _kSettings = 'settings_v1';
   static const _kPendingSecretWipes = 'pending_secret_wipes_v1';
   static const _kFxRates = 'fx_rates_v1';
@@ -78,6 +80,22 @@ class LocalStore {
 
   Future<void> saveAccountsRegistry(AccountsRegistry registry) =>
       _prefs.setString(kAccounts, jsonEncode(registry.toJson()));
+
+  // --- Accounts directory (device profiles: local + signed-in accounts) ---
+
+  AccountsDirectory? readAccountsDirectory() {
+    final raw = _prefs.getString(kAccountsDirectory);
+    if (raw == null) return null;
+    try {
+      return AccountsDirectory.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveAccountsDirectory(AccountsDirectory directory) =>
+      _prefs.setString(kAccountsDirectory, jsonEncode(directory.toJson()));
 
   /// Whether this band has any local data at all — used by the switcher's
   /// garbage collection of abandoned, never-configured bands. Deliberately

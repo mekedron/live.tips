@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// live.tips Firestore rules.
+//
+// Default-deny: no collection is publicly readable. Fans never touch
+// Firestore from the browser (the tip page is server-rendered), so the only
+// client principals are the app's signed-in users (incl. anonymous
+// transport uids). Jar documents and everything function-mediated arrive in
+// the relay phase; until then the users subtree is the whole surface.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // A user's own subtree: profile doc, bands, settings, history, devices.
+    // Nothing inside is visible to any other uid — cross-account reads are
+    // impossible by construction, URL-guessing included.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /{document=**} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Everything else is closed until a later phase opens it explicitly.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

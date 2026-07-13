@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/external_link.dart';
 
+import '../../core/platform_support.dart';
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
+import '../../domain/app_account.dart';
 import '../../domain/app_settings.dart';
 import '../../domain/tip_method.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
+import '../../widgets/sign_in_sheet.dart';
 import '../shell/app_shell.dart';
 import 'account_details_screen.dart';
 import 'relay_method_screen.dart';
@@ -79,6 +83,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _confirmSignOut() async {
+    final s = context.s;
+    final user = ref.read(authControllerProvider).user;
+    if (user == null) return;
+    // A guest account has no way back in — the dialog says so instead of
+    // the gentle "sign back in anytime".
+    final anonymous = user.kind == AccountKind.anonymous;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.t('settings.account.sign_out_title')),
+        content: Text(
+          anonymous
+              ? s.t('settings.account.sign_out_anonymous_warning')
+              : s.t('settings.account.sign_out_body'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(s.t('common.cancel')),
+          ),
+          FilledButton(
+            style: anonymous
+                ? FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Colors.white,
+                  )
+                : null,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(s.t('settings.account.sign_out')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(authControllerProvider.notifier).signOut();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
@@ -86,8 +129,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final app = ref.watch(appStateProvider);
     final settings = app.settings;
     final isRail = AppShellScope.of(context)?.isRail ?? false;
+    final auth = ref.watch(authControllerProvider);
+    // Watched so a rename from the naming step refreshes the row.
+    final directory = ref.watch(accountsDirectoryProvider);
+    // No section at all where cloud accounts can't exist (Windows/Linux,
+    // a failed Firebase boot) — local-only stays local-only. Demo hides it
+    // too: demo has its own Account group.
+    final cloudAvailable = !app.demo &&
+        platformSupportsCloudAccounts &&
+        ref.read(authControllerProvider.notifier).available;
+    // The signed-in row prefers the directory entry (its name is the
+    // app-chosen one); a user the directory hasn't caught up with yet
+    // falls back to what the provider knows.
+    final cloudEntry = auth.user == null
+        ? null
+        : directory.accounts
+                .where((a) => a.id == auth.user!.uid)
+                .firstOrNull ??
+            AppAccount(
+              id: auth.user!.uid,
+              name: auth.user!.displayName ?? '',
+              kind: auth.user!.kind,
+              email: auth.user!.email,
+            );
 
     final sections = <Widget>[
+      // --------------------------------------------------- cloud account ---
+      if (cloudAvailable)
+        LtRowGroup(
+          header: s.t('settings.account.header'),
+          children: [
+            if (cloudEntry == null)
+              LtRow(
+                icon: Icons.cloud_outlined,
+                title: s.t('settings.account.sign_in_row'),
+                subtitle: s.t('settings.account.sign_in_subtitle'),
+                chevron: true,
+                onTap: () => showSignInSheet(context),
+              )
+            else ...[
+              LtRow(
+                icon: Icons.account_circle_rounded,
+                title: accountDisplayName(context, cloudEntry),
+                subtitle: [
+                  accountProviderLabel(context, cloudEntry.kind),
+                  if (cloudEntry.email != null) cloudEntry.email!,
+                ].join(' · '),
+              ),
+              LtRow(
+                icon: Icons.logout_rounded,
+                title: s.t('settings.account.sign_out'),
+                subtitle: cloudEntry.kind == AccountKind.anonymous
+                    ? s.t('settings.account.sign_out_anonymous_warning')
+                    : null,
+                chevron: true,
+                onTap: _confirmSignOut,
+              ),
+            ],
+          ],
+        ),
       // ------------------------------------------------ account details ---
       if (app.demo)
         LtRowGroup(

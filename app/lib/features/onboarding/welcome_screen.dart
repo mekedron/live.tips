@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/install_prompt.dart';
+import '../../core/platform_support.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
-import 'install_hint_screen.dart';
-import 'onboarding_details_screen.dart';
+import 'account_step_screen.dart';
+import 'onboarding_flow.dart';
 
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
@@ -121,16 +122,26 @@ class WelcomeScreen extends ConsumerWidget {
                           LtPrimaryButton(
                             label: context.s.t('welcome.get_started'),
                             trailingIcon: Icons.arrow_forward_rounded,
-                            // Phones and tablets in a browser get the one-time
-                            // "Add to Home Screen" nudge first; desktop and the
-                            // installed PWA go straight to the details step.
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => shouldSuggestInstall
-                                    ? const InstallHintScreen()
-                                    : const OnboardingDetailsScreen(),
-                              ),
-                            ),
+                            // The account question comes first when this build
+                            // can host cloud accounts, Firebase is up and
+                            // nobody is signed in yet. Otherwise it's today's
+                            // local flow, untouched: the one-time "Add to Home
+                            // Screen" nudge on phone/tablet browsers, straight
+                            // to the details step everywhere else.
+                            onPressed: () {
+                              final offerSignIn = platformSupportsCloudAccounts &&
+                                  ref
+                                      .read(authControllerProvider.notifier)
+                                      .available &&
+                                  ref.read(authControllerProvider).user == null;
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => offerSignIn
+                                      ? const AccountStepScreen()
+                                      : firstBandSetupScreen(),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 10),
                           OutlinedButton.icon(

@@ -1,13 +1,19 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/platform_support.dart';
 import 'data/local_store.dart';
 import 'data/migrations.dart';
 import 'data/secure_store.dart';
+import 'firebase_options.dart';
 import 'l10n/app_locale.dart';
 import 'l10n/app_localizations.dart';
+import 'state/auth_providers.dart';
 import 'state/providers.dart';
 
 /// Dev convenience (debug builds only): skip the keychain and use this key.
@@ -21,6 +27,22 @@ Future<void> main() async {
 
   final localStore = await LocalStore.init();
   final secureStore = SecureStore();
+
+  // Cloud accounts are strictly additive: a failed Firebase boot (or an
+  // unsupported platform) leaves both handles null and the app runs local
+  // mode exactly as it always has.
+  FirebaseAuth? firebaseAuth;
+  FirebaseFirestore? firestore;
+  if (platformSupportsCloudAccounts) {
+    try {
+      await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform);
+      firebaseAuth = FirebaseAuth.instance;
+      firestore = FirebaseFirestore.instance;
+    } catch (e) {
+      debugPrint('firebase unavailable, running local-only: $e');
+    }
+  }
 
   // Warm the active locale's string table before the first frame so the UI
   // opens already translated (the saved language, else the device language,
@@ -91,6 +113,8 @@ Future<void> main() async {
         secureStoreProvider.overrideWithValue(secureStore),
         initialApiKeyProvider.overrideWithValue(apiKey),
         initialRelaySecretProvider.overrideWithValue(relaySecret),
+        firebaseAuthProvider.overrideWithValue(firebaseAuth),
+        firestoreProvider.overrideWithValue(firestore),
       ],
       child: const LiveTipsApp(),
     ),
