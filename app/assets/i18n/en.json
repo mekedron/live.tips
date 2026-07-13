@@ -198,6 +198,7 @@
   "onboarding.account_name.heading": "What should we call you?",
   "onboarding.account_name.hint": "e.g. Alex",
   "onboarding.account_name.label": "Account name",
+  "onboarding.account_name.not_this": "Not this account — sign out and go back",
   "onboarding.account_name.skip_hint": "Leave it empty to skip — you can name the account later in Settings.",
   "onboarding.account_name.step_pill": "Step {step} of {total}",
   "onboarding.account_name.title": "Account name",
