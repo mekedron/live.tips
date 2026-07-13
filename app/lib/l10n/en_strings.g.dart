@@ -338,6 +338,7 @@ const Map<String, String> kEnStrings = {
   "onboarding.profile_pick.heading": "Welcome back",
   "onboarding.profile_pick.last_used": "Last used",
   "onboarding.profile_pick.loading": "Checking your account…",
+  "onboarding.profile_pick.signed_in": "Signed in to this account",
   "onboarding.profile_pick.subtitle": "This account already has profiles. Pick one to use on this device, or start a new one.",
   "onboarding.profile_pick.title": "Your profiles",
   "onboarding.relay_setup.cancel": "Cancel",

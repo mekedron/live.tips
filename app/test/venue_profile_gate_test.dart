@@ -122,6 +122,10 @@ void main() {
     // A public device has no account door: accounts arrive and leave through
     // the banner's approve-and-wipe ceremony, and nowhere else.
     expect(find.text('Switch account'), findsNothing);
+    // The identity is not a door, and it stays: the tablet says whose account
+    // it is showing tonight — the fact #51 put on every form of this screen.
+    expect(find.text('Ana'), findsOneWidget);
+    expect(find.text('Google'), findsOneWidget);
 
     // The proof that asking mints nothing: the account's band docs are still
     // exactly the two the artist brought.

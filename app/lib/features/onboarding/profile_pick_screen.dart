@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../data/repository/account_data_repository.dart';
+import '../../domain/app_account.dart';
 import '../../domain/band_account.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../state/venue_providers.dart';
+import '../../widgets/lt_ui.dart';
 import '../../widgets/profile_switcher.dart';
 import '../settings/settings_screen.dart';
 import 'onboarding_flow.dart';
@@ -225,27 +227,29 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     // screen exists for.
     final lastUsed = repo.readActiveBandId();
     final empty = existing.isEmpty;
+    // WHOSE profiles this screen is asking about. It used to keep one bit of
+    // this — isLocal, for the heading — and throw the account itself away, so
+    // the screen said "this account" three times and never named it: no name,
+    // no email, no provider, nothing to tell an artist with two accounts which
+    // one tonight's QR would be created under (#51).
+    final account = ref.watch(accountsDirectoryProvider).active;
     // The device profile has no account behind it, so "no profile in this
     // account" would name a thing that does not exist. Same screen, same card,
-    // honest heading.
-    final local =
-        ref.watch(accountsDirectoryProvider.select((d) => d.active.isLocal));
+    // honest heading — and an identity line that says "On this device" rather
+    // than inventing an account for it to be in.
+    final local = account.isLocal;
     // A venue tablet has no account door at all: accounts are entered and left
     // through the banner's approve-and-wipe ceremony, and the switcher hides
     // its account half there anyway — so an action that says "Switch account"
     // on a public device would open a sheet listing the profiles this screen is
-    // already asking about, under a name for something it cannot do (#43).
+    // already asking about, under a name for something it cannot do (#43). The
+    // identity stays: knowing whose tablet this is tonight is not a door.
     final venue = ref.watch(venueModeActiveProvider);
     return Scaffold(
       appBar: AppBar(
         title: Text(s.t('onboarding.profile_pick.title')),
         actions: [
-          if (asRoot) ...[
-            if (!venue)
-              TextButton(
-                onPressed: _switchAccount,
-                child: Text(s.t('settings.account.switch_title')),
-              ),
+          if (asRoot)
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: IconButton(
@@ -254,7 +258,6 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
                 icon: const Icon(Icons.settings_outlined),
               ),
             ),
-          ],
         ],
       ),
       body: Center(
@@ -286,6 +289,18 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              // WHO is being asked. The root form is a forced question with
+              // nothing under it, and "is this the right account?" is the first
+              // half of it — so the answer stands on the screen, above the
+              // profiles, with the door to change it beside the identity it
+              // raises rather than floating in the app bar (#51).
+              if (asRoot) ...[
+                _AccountIdentity(
+                  account: account,
+                  onSwitch: venue ? null : _switchAccount,
+                ),
+                const SizedBox(height: 12),
+              ],
               // The switcher's rows, on the switcher's rules — this screen asks
               // the same question, it just has no answer on file yet.
               for (final band in existing)
@@ -303,6 +318,123 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// WHICH account this screen is talking about — named, on the screen, without a
+/// tap (#51).
+///
+/// The root picker said "this account" in its title, its heading and its
+/// subtitle, and never once said which: an artist who keeps the band's account
+/// beside their own could not tell, from anything on the screen, whose account
+/// the profile they were about to create would land in. Nothing even showed a
+/// cloud account was signed in at all — the one hint was a bare "Switch account"
+/// in the app bar, which reads as a way OUT, not as a fact about where you are.
+///
+/// It is the switcher's own identity line, deliberately: the same avatar, the
+/// same [accountDisplayName], the same provider pill the account sheet draws —
+/// so the account the artist recognises here is the account they recognise
+/// there. And the door sits ON it, because "which account is this?" and "not
+/// this one" are the same question and its answer.
+///
+/// The LOCAL mode is not an account and must not grow a costume of one: no
+/// provider pill, no email, no avatar initial — a phone, "On this device", and
+/// the caption that says in words that it is not an account. Its door still
+/// opens (the account sheet is where the accounts of this device are, and the
+/// local mode is one row in it); a VENUE tablet's does not — accounts arrive and
+/// leave there through the banner's approve-and-wipe ceremony (#43).
+class _AccountIdentity extends StatelessWidget {
+  const _AccountIdentity({required this.account, required this.onSwitch});
+
+  final AppAccount account;
+
+  /// Null on a venue device: the identity is a fact, not a door (#43).
+  final VoidCallback? onSwitch;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    final s = context.s;
+    final local = account.isLocal;
+    final name = accountDisplayName(context, account);
+    final email = account.email?.trim();
+    final subtitle = local
+        ? s.t('widgets.switcher.local_caption')
+        : email != null && email.isNotEmpty && email != name
+            ? email
+            : s.t('onboarding.profile_pick.signed_in');
+    return Container(
+      decoration: BoxDecoration(
+        color: c.card,
+        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      child: Row(
+        children: [
+          if (local)
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: c.chip, shape: BoxShape.circle),
+              child: Icon(Icons.smartphone_rounded,
+                  size: 20, color: c.textSecondary),
+            )
+          else
+            InitialAvatar(
+              name: name,
+              anonymous: account.kind == AccountKind.anonymous,
+              size: 38,
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: outfitStyle(15, c.text, weight: FontWeight.w700),
+                      ),
+                    ),
+                    // The provider is half of "which account": two Google rows
+                    // are told apart by the email, a Google one from an Apple
+                    // one by this.
+                    if (!local) ...[
+                      const SizedBox(width: 8),
+                      LtPill(
+                        label: accountProviderLabel(context, account.kind),
+                        soft: false,
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 12.5,
+                    color: c.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onSwitch != null)
+            TextButton(
+              onPressed: onSwitch,
+              child: Text(s.t('settings.account.switch_title')),
+            ),
+        ],
       ),
     );
   }

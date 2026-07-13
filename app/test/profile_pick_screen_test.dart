@@ -72,6 +72,7 @@ Future<LocalStore> _signedInStore() async {
           id: _uid,
           name: 'Casey',
           kind: AccountKind.google,
+          email: 'casey@example.com',
         ))
         .withActive(_uid),
   );
@@ -354,6 +355,135 @@ void main() {
           listen: false);
       expect(container.read(appStateProvider).accounts, isEmpty);
       expect(container.read(appStateProvider).accountId, isEmpty);
+    });
+  });
+
+  // ——— #51: the screen that says "this account" says WHICH account ———
+  //
+  // Every test in this file knew whose account it had pumped — and the screen
+  // never said. That is the shape of the bug: a widget test cannot notice a
+  // fact it supplied itself. These assert the fact is on the SCREEN.
+  group('the account this screen is asking about', () {
+    testWidgets('an empty cloud account NAMES itself — name, provider, email — '
+        'and the door beside it opens the ACCOUNTS', (tester) async {
+      final db = FakeFirebaseFirestore();
+
+      final container = await _bootApp(tester, await _signedInStore(), db);
+
+      expect(find.byType(ProfilePickScreen), findsOneWidget);
+      expect(find.text('No profile in this account yet'), findsOneWidget);
+      // …under a line that says which one it is. The artist who keeps the
+      // band's account beside their own reads this before deciding whether to
+      // create a profile here at all.
+      expect(find.text('Casey'), findsOneWidget,
+          reason: 'the account the profile would be created in, by name');
+      expect(find.text('Google'), findsOneWidget,
+          reason: 'and the provider, for two accounts with the same name');
+      expect(find.text('casey@example.com'), findsOneWidget,
+          reason: 'and the email, for two Google accounts');
+
+      // The door is on the identity, not floating in the app bar — and it opens
+      // the ACCOUNT sheet, which is the answer to the question the line raises.
+      await tester.tap(find.text('Switch account'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your accounts'), findsOneWidget);
+      expect(find.text('Add a profile'), findsNothing,
+          reason: 'the profiles are not what this label promises (#49)');
+
+      // Nothing on this screen mints anything (#44/#47).
+      expect(container.read(appStateProvider).accounts, isEmpty);
+      expect((await _bands(db).get()).docs, isEmpty);
+    });
+
+    testWidgets('a guest account is named by what it is — no email invented',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final store = LocalStore(await SharedPreferences.getInstance());
+      await store.saveAccountsDirectory(
+        AccountsDirectory.initial()
+            .withAccount(const AppAccount(
+              id: _uid,
+              name: '',
+              kind: AccountKind.anonymous,
+            ))
+            .withActive(_uid),
+      );
+      await tester.binding.setSurfaceSize(const Size(600, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            localStoreProvider.overrideWithValue(store),
+            secureStoreProvider.overrideWithValue(FakeSecureStore()),
+            initialApiKeyProvider.overrideWithValue(null),
+            firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
+            authServiceProvider.overrideWithValue(FakeAuthService(
+              user: const AuthUser(uid: _uid, kind: AccountKind.anonymous),
+            )),
+          ],
+          child: const LiveTipsApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfilePickScreen), findsOneWidget);
+      // A guest has no name and no email — and the screen says the honest thing
+      // rather than nothing at all.
+      expect(find.text('Guest'), findsWidgets);
+      expect(find.text('Signed in to this account'), findsOneWidget);
+      expect(find.text('Switch account'), findsOneWidget);
+    });
+
+    testWidgets('the LOCAL form does not pretend to have an account',
+        (tester) async {
+      // The device profile with no profiles left, beside a cloud account the
+      // device knows but is signed out of. There is no account for a device
+      // profile to be "in" — so no name, no email, no provider pill may appear
+      // here, and the known account's name must NOT be borrowed as an identity.
+      SharedPreferences.setMockInitialValues({});
+      final store = LocalStore(await SharedPreferences.getInstance());
+      await store.saveAccountsRegistry(
+          const AccountsRegistry(accounts: [], activeId: ''));
+      await store.saveAccountsDirectory(
+        AccountsDirectory.initial().withAccount(const AppAccount(
+          id: _uid,
+          name: 'Casey',
+          kind: AccountKind.google,
+          email: 'casey@example.com',
+        )),
+      );
+
+      await tester.binding.setSurfaceSize(const Size(600, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            localStoreProvider.overrideWithValue(store),
+            secureStoreProvider.overrideWithValue(FakeSecureStore()),
+            initialApiKeyProvider.overrideWithValue(null),
+            authServiceProvider.overrideWithValue(FakeAuthService()),
+          ],
+          child: const LiveTipsApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfilePickScreen), findsOneWidget);
+      expect(find.text('No profile on this device yet'), findsOneWidget);
+      // What it IS, said in words that refuse the word "account".
+      expect(find.text('On this device'), findsOneWidget);
+      expect(find.text('Not an account — these stay on this device'),
+          findsOneWidget);
+      expect(find.text('Casey'), findsNothing,
+          reason: 'a signed-out account this device remembers is not the '
+              'identity of the device profile');
+      expect(find.text('casey@example.com'), findsNothing);
+      expect(find.text('Google'), findsNothing,
+          reason: 'a device profile has no provider to show');
+      expect(find.text('Signed in to this account'), findsNothing);
+      // …and the way to a real account is still one tap away, next to the mode
+      // it would replace.
+      expect(find.text('Switch account'), findsOneWidget);
     });
   });
 }

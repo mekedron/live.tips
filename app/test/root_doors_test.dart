@@ -179,8 +179,11 @@ void main() {
       expect(find.text('Add a profile'), findsNothing,
           reason: 'the profile sheet is not what this label promises');
       // The accounts this device knows, the mode that is not one, and the door
-      // to an account it has never seen.
-      expect(find.text('Casey'), findsOneWidget);
+      // to an account it has never seen. Casey appears TWICE: in the sheet's
+      // row, and on the screen underneath it, which now names the account it is
+      // asking about (#51) — the sheet is a modal, so the room it opened over is
+      // still standing.
+      expect(find.text('Casey'), findsNWidgets(2));
       expect(find.text('On this device'), findsOneWidget);
       expect(find.text('Sign in to another account'), findsOneWidget);
       // A sheet, not a route: the screen that opened it is still standing.
