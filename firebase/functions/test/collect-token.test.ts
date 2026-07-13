@@ -47,6 +47,7 @@ vi.mock("../src/store", () => ({
   db: () => fakeDb,
   linkCodeRef: (_db: unknown, code: string) => ({ path: `linkCodes/${code}` }),
   loginRequestRef: (_db: unknown, id: string) => ({ path: `loginRequests/${id}` }),
+  securityRef: (_db: unknown, uid: string) => ({ path: `users/${uid}/private/security` }),
   bumpQuota: async () => true,
   LINK_COLLECTS_PER_IP_PER_HOUR: 120,
   LINK_REDEEMS_PER_IP_PER_HOUR: 30,
@@ -95,6 +96,7 @@ function seedConfirmedLinkCode() {
     expiresAt: { toMillis: () => Date.now() + 60_000 },
     attempts: 0,
     redeemNonceHash: sha256Hex(NONCE),
+    confirmedAtMs: Date.now(),
   });
 }
 
@@ -102,11 +104,17 @@ function seedApprovedLoginRequest() {
   docs.set(`loginRequests/${REQUEST_ID}`, {
     status: "approved",
     approvedUid: "uid_artist",
+    approvedAtMs: Date.now(),
     createdAtMs: Date.now(),
     expiresAt: { toMillis: () => Date.now() + 60_000 },
     attempts: 0,
     collectNonceHash: sha256Hex(NONCE),
   });
+}
+
+/** The revocation watermark, as revokeAllOtherDevices writes it. */
+function seedWatermark(uid: string, watermarkMs: number) {
+  docs.set(`users/${uid}/private/security`, { sessionsValidAfterMs: watermarkMs });
 }
 
 beforeEach(() => {
@@ -188,5 +196,82 @@ describe("collectLoginToken: mint before burn (the venue tablet's flow)", () => 
 
     await collectLoginTokenHandler(loginRequest());
     await expect(collectLoginTokenHandler(loginRequest())).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The revocation watermark gate (issue #7). revokeAllOtherDevices sweeps live
+// grants to 'expired', but a confirm/approve can race the sweep — so collect*
+// must ALSO refuse a grant whose confirm/approve predates the uid's
+// sessionsValidAfterMs watermark. These tests exercise exactly that race: the
+// doc is still 'confirmed'/'approved' (as if the sweep missed it), and the
+// mint must not happen.
+
+describe("collectLinkToken vs the revocation watermark", () => {
+  it("a code confirmed BEFORE revokeAllOtherDevices must not mint", async () => {
+    seedConfirmedLinkCode();
+    docs.get(`linkCodes/${CODE}`)!["confirmedAtMs"] = Date.now() - 5_000;
+    seedWatermark("uid_owner", Date.now());
+
+    await expect(collectLinkTokenHandler(linkRequest())).rejects.toThrow();
+
+    expect(createCustomToken).not.toHaveBeenCalled();
+    // The refusal burns the grant too: retrying cannot revive it.
+    expect(docs.get(`linkCodes/${CODE}`)!["status"]).toBe("expired");
+  });
+
+  it("a confirmed code with no confirmedAtMs fails closed once a watermark exists", async () => {
+    seedConfirmedLinkCode();
+    delete docs.get(`linkCodes/${CODE}`)!["confirmedAtMs"];
+    seedWatermark("uid_owner", Date.now());
+
+    await expect(collectLinkTokenHandler(linkRequest())).rejects.toThrow();
+    expect(createCustomToken).not.toHaveBeenCalled();
+  });
+
+  it("a code confirmed AFTER the watermark mints — a fresh session confirmed it", async () => {
+    seedConfirmedLinkCode();
+    docs.get(`linkCodes/${CODE}`)!["confirmedAtMs"] = Date.now();
+    seedWatermark("uid_owner", Date.now() - 5_000);
+    createCustomToken.mockResolvedValueOnce("token-123");
+
+    const result = await collectLinkTokenHandler(linkRequest());
+
+    expect(result.token).toBe("token-123");
+    expect(docs.get(`linkCodes/${CODE}`)!["status"]).toBe("used");
+  });
+});
+
+describe("collectLoginToken vs the revocation watermark", () => {
+  it("a request approved BEFORE revokeAllOtherDevices must not mint", async () => {
+    seedApprovedLoginRequest();
+    docs.get(`loginRequests/${REQUEST_ID}`)!["approvedAtMs"] = Date.now() - 5_000;
+    seedWatermark("uid_artist", Date.now());
+
+    await expect(collectLoginTokenHandler(loginRequest())).rejects.toThrow();
+
+    expect(createCustomToken).not.toHaveBeenCalled();
+    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("expired");
+  });
+
+  it("an approved request with no approvedAtMs fails closed once a watermark exists", async () => {
+    seedApprovedLoginRequest();
+    delete docs.get(`loginRequests/${REQUEST_ID}`)!["approvedAtMs"];
+    seedWatermark("uid_artist", Date.now());
+
+    await expect(collectLoginTokenHandler(loginRequest())).rejects.toThrow();
+    expect(createCustomToken).not.toHaveBeenCalled();
+  });
+
+  it("a request approved AFTER the watermark mints — a fresh session approved it", async () => {
+    seedApprovedLoginRequest();
+    docs.get(`loginRequests/${REQUEST_ID}`)!["approvedAtMs"] = Date.now();
+    seedWatermark("uid_artist", Date.now() - 5_000);
+    createCustomToken.mockResolvedValueOnce("token-456");
+
+    const result = await collectLoginTokenHandler(loginRequest());
+
+    expect(result.token).toBe("token-456");
+    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("used");
   });
 });

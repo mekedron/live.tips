@@ -7,8 +7,11 @@
 ///    ("my old phone is in a drawer"), not the hostile one.
 ///  - revokeAllOtherDevices is the real kill switch: it stamps the
 ///    sessionsValidAfterMs watermark (rules cut every pre-watermark ID token
-///    off users/** immediately) AND revokes refresh tokens server-side, so
-///    stolen sessions die within the ID-token hour and cannot renew. The
+///    off users/** immediately), expires the uid's open QR grants (a
+///    confirmed link code or approved login request would otherwise mint a
+///    fresh POST-watermark token through the unauthenticated collect
+///    handlers), AND revokes refresh tokens server-side, so stolen sessions
+///    die within the ID-token hour and cannot renew. The
 ///    caller's own token predates the watermark too — the calling client
 ///    must silently re-authenticate right after (its refresh credential is
 ///    gone, its provider session is not).
@@ -304,7 +307,10 @@ export async function confirmLinkCodeHandler(
       applyRejection(tx, ref, state, decision);
       return { failed: "precondition" as const, message: decision.message };
     }
-    tx.update(ref, { status: "confirmed" satisfies LinkCodeStatus });
+    // confirmedAtMs is what collectLinkToken measures against the owner's
+    // revocation watermark — a code confirmed before a revokeAllOtherDevices
+    // call must never mint after it.
+    tx.update(ref, { status: "confirmed" satisfies LinkCodeStatus, confirmedAtMs: Date.now() });
     return { failed: false as const };
   });
 
@@ -355,8 +361,25 @@ export async function collectLinkTokenHandler(
         return { failed: "precondition" as const, message: decision.message };
       }
       if (decision.pending) return { failed: false as const, pending: true as const };
+      const uid = snap.get("uid") as string;
+      // The kill switch must hold HERE too: a code confirmed BEFORE the
+      // owner's sessionsValidAfterMs watermark was pre-positioned by a session
+      // the revocation has since killed, and minting for it would hand that
+      // session a fresh post-watermark token. revokeAllOtherDevices sweeps
+      // such codes to 'expired'; this gate closes the race with a confirm
+      // that lands after the sweep ran. A confirmed code with no
+      // confirmedAtMs fails closed once a watermark exists.
+      const security = await tx.get(securityRef(firestore, uid));
+      const watermark = security.get("sessionsValidAfterMs") as number | undefined;
+      if (watermark !== undefined) {
+        const confirmedAtMs = snap.get("confirmedAtMs") as number | undefined;
+        if (typeof confirmedAtMs !== "number" || confirmedAtMs < watermark) {
+          tx.update(ref, { status: "expired" satisfies LinkCodeStatus });
+          return { failed: "precondition" as const, message: "code expired" };
+        }
+      }
       if (consume) tx.update(ref, { status: "used" satisfies LinkCodeStatus });
-      return { failed: false as const, uid: snap.get("uid") as string };
+      return { failed: false as const, uid };
     });
 
   // Phase 1: validate without consuming — wrong nonces still burn attempts.
@@ -560,9 +583,13 @@ export async function approveLoginRequestHandler(
       applyRejection(tx, ref, state, decision);
       return { failed: "precondition" as const, message: decision.message };
     }
+    // approvedAtMs is what collectLoginToken measures against the approver's
+    // revocation watermark — an approval that predates a revokeAllOtherDevices
+    // call must never mint after it.
     tx.update(ref, {
       status: "approved" satisfies LoginRequestStatus,
       approvedUid: uid,
+      approvedAtMs: Date.now(),
       attempts: state.attempts + 1,
     });
     return { failed: false as const };
@@ -626,6 +653,19 @@ export async function collectLoginTokenHandler(
       if (typeof approvedUid !== "string" || approvedUid.length === 0) {
         return { failed: "precondition" as const, message: "request is not collectable" };
       }
+      // The same watermark gate as collectLinkToken (see there for the full
+      // argument): an approval stamped before the approver's revocation
+      // watermark was made by a session the revocation killed, so it may not
+      // mint. Missing approvedAtMs fails closed once a watermark exists.
+      const security = await tx.get(securityRef(firestore, approvedUid));
+      const watermark = security.get("sessionsValidAfterMs") as number | undefined;
+      if (watermark !== undefined) {
+        const approvedAtMs = snap.get("approvedAtMs") as number | undefined;
+        if (typeof approvedAtMs !== "number" || approvedAtMs < watermark) {
+          tx.update(ref, { status: "expired" satisfies LoginRequestStatus });
+          return { failed: "precondition" as const, message: "request expired" };
+        }
+      }
       if (consume) tx.update(ref, { status: "used" satisfies LoginRequestStatus });
       return { failed: false as const, uid: approvedUid };
     });
@@ -684,14 +724,19 @@ export async function revokeDeviceHandler(
 }
 
 /**
- * The real kill switch, in three moves:
+ * The real kill switch, in four moves:
  *  1. sessionsValidAfterMs = now — rules instantly shut every pre-now ID
  *     token out of users/** (and this surface, via requireFreshSession);
- *  2. every device doc except currentDeviceId gets revoked:true (the
+ *  2. every live QR grant dies: link codes this uid owns and login requests
+ *     it approved flip to 'expired'. The watermark alone cannot reach them —
+ *     collect* is unauthenticated and mints POST-watermark tokens, so a code
+ *     the stolen session already confirmed (or a request it approved) would
+ *     otherwise walk straight through the revocation;
+ *  3. every device doc except currentDeviceId gets revoked:true (the
  *     cooperative sign-out signal, plus honest UI state);
- *  3. admin revokeRefreshTokens(uid) — stolen sessions cannot renew, so they
+ *  4. admin revokeRefreshTokens(uid) — stolen sessions cannot renew, so they
  *     die for good when their current ID token expires (≤1h).
- * The CALLER is caught by 1 and 3 as well: their client must silently
+ * The CALLER is caught by 1 and 4 as well: their client must silently
  * re-authenticate immediately afterwards (fresh auth_time, fresh refresh
  * token). Non-anonymous only — an anonymous account cannot re-authenticate.
  */
@@ -708,6 +753,33 @@ export async function revokeAllOtherDevicesHandler(
   // Watermark first: from this write on, every pre-existing token is out,
   // whatever happens to the rest of this handler.
   await securityRef(firestore, uid).set({ sessionsValidAfterMs: now }, { merge: true });
+
+  // Move 2: the grant sweep. linkCodes rides the same (uid ASC, expiresAt
+  // ASC) composite index as createLinkCode, status filtered in-memory;
+  // loginRequests is a single equality on approvedUid (auto-indexed, no
+  // composite needed) — the field only exists once someone approved, and a
+  // uid stamps at most a handful before the hourly sweep deletes them.
+  const [ownedCodes, approvedLogins] = await Promise.all([
+    firestore
+      .collection("linkCodes")
+      .where("uid", "==", uid)
+      .where("expiresAt", ">", Timestamp.fromMillis(now))
+      .get(),
+    loginRequestsCol(firestore).where("approvedUid", "==", uid).get(),
+  ]);
+  const grants = firestore.batch();
+  for (const doc of ownedCodes.docs) {
+    const status = doc.get("status") as LinkCodeStatus;
+    if (status === "pending" || status === "claimed" || status === "confirmed") {
+      grants.update(doc.ref, { status: "expired" satisfies LinkCodeStatus });
+    }
+  }
+  for (const doc of approvedLogins.docs) {
+    if ((doc.get("status") as LoginRequestStatus) === "approved") {
+      grants.update(doc.ref, { status: "expired" satisfies LoginRequestStatus });
+    }
+  }
+  await grants.commit();
 
   const devices = await devicesCol(firestore, uid).get();
   let revokedCount = 0;

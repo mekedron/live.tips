@@ -211,6 +211,13 @@ export interface LinkCodeDoc {
   requester?: { name: string; platform: string };
   /** sha256 of the redeem nonce; the nonce itself is never at rest. */
   redeemNonceHash?: string;
+  /**
+   * Stamped at confirm. collectLinkToken refuses to mint when this predates
+   * the owner's sessionsValidAfterMs watermark (a missing value fails closed
+   * once a watermark exists): a code confirmed by a since-revoked session
+   * must not outlive revokeAllOtherDevices.
+   */
+  confirmedAtMs?: number;
 }
 
 /**
@@ -234,6 +241,13 @@ export interface LoginRequestDoc {
   devicePlatform?: string;
   /** Stamped by the approver; the uid the custom token will be minted for. */
   approvedUid?: string;
+  /**
+   * Stamped at approve. collectLoginToken refuses to mint when this predates
+   * the approver's sessionsValidAfterMs watermark (a missing value fails
+   * closed once a watermark exists): an approval by a since-revoked session
+   * must not outlive revokeAllOtherDevices.
+   */
+  approvedAtMs?: number;
   /**
    * sha256 of the collect nonce. Always written at create (optional only so a
    * read of a malformed/legacy doc fails closed rather than throwing); the
