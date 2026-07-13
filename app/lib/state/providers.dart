@@ -860,10 +860,15 @@ class AppStateNotifier extends Notifier<AppState> {
   Future<void> _landAfterRemoval(String id, AccountsRegistry registry) async {
     final repo = ref.read(accountDataRepositoryProvider);
     // Load the successor BEFORE wiping, so the UI lands on coherent state.
-    // '' when [id] was the last band: there is no successor, and nothing
-    // below reads or writes on its behalf.
+    // Which successor is not this method's to invent: it answers with
+    // [_pickActive], the same rule every other landing obeys — the last
+    // surviving band opens, several of them ask (RootGate shows the picker),
+    // and none leaves '' behind. Naming a successor here instead would only
+    // be overruled by the next rebuild, which asks; and picking a profile
+    // for the artist is the very thing that opened the wrong gig.
     final successorId = id == state.accountId
-        ? (registry.accounts.firstOrNull?.id ?? '')
+        ? _pickActive(registry.accounts, repo.readActiveBandId(),
+            ask: _askForBand)
         : state.accountId;
     String? apiKey;
     String? relaySecret;

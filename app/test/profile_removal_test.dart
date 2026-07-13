@@ -136,6 +136,14 @@ Future<void> _warm(ProviderContainer container) async {
   await pumpEventQueue();
   expect(container.read(appStateProvider).accounts.map((b) => b.id),
       [_bandA, _bandB]);
+  // An account with several profiles opens on NONE of them until the artist
+  // answers the picker — so these tests, which are about removing the ACTIVE
+  // profile, have to answer it first. Picking is the artist's move, and the
+  // app no longer makes it for them.
+  expect(container.read(appStateProvider).accountId, '',
+      reason: 'two profiles, nobody asked yet');
+  await container.read(appStateProvider.notifier).switchAccount(_bandA);
+  expect(container.read(appStateProvider).accountId, _bandA);
 }
 
 Future<List<String>> _bandDocs(FakeFirebaseFirestore db) async =>
@@ -149,9 +157,10 @@ Future<void> _pumpSettings(
   FakeFirebaseFirestore db,
   FakeSecureStore secure,
 ) async {
+  final container = _container(local, db, secure, relay: FakeCallables());
   await tester.pumpWidget(
     UncontrolledProviderScope(
-      container: _container(local, db, secure, relay: FakeCallables()),
+      container: container,
       child: MaterialApp(
         localizationsDelegates: kTestL10nDelegates,
         locale: const Locale('en'),
@@ -161,6 +170,12 @@ Future<void> _pumpSettings(
     ),
   );
   // The first bands snapshot has to land before the profile has a name.
+  await tester.pumpAndSettle();
+  // An account with several profiles opens on none of them until the artist
+  // says which — the picker's job (RootGate routes there), which Settings is
+  // pumped past here. Answer it the way the artist would, or Settings has no
+  // profile to show.
+  await container.read(appStateProvider.notifier).switchAccount(_bandA);
   await tester.pumpAndSettle();
   expect(find.text('The Foxes'), findsOneWidget);
 }
