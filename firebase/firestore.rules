@@ -13,15 +13,84 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // A user's own subtree: profile doc, bands, settings, history, devices.
-    // Nothing inside is visible to any other uid — cross-account reads are
-    // impossible by construction, URL-guessing included.
-    match /users/{uid} {
-      allow read, write: if isOwner(uid);
+    // Revocation watermark. revokeAllOtherDevices stamps
+    // users/{uid}/private/security.sessionsValidAfterMs; an ID token minted
+    // (auth_time, seconds) before that instant loses the whole users subtree
+    // immediately — not after its remaining ≤1h of cryptographic validity.
+    // Accounts that never revoked have no security doc and short-circuit on
+    // exists(). Cost note: exists()+get() are 2 document reads per evaluated
+    // operation against the 10-doc rules limit — acceptable here.
+    function notRevoked(uid) {
+      return !exists(/databases/$(database)/documents/users/$(uid)/private/security)
+        || request.auth.token.auth_time * 1000
+             >= get(/databases/$(database)/documents/users/$(uid)/private/security).data.sessionsValidAfterMs;
+    }
 
-      match /{document=**} {
-        allow read, write: if isOwner(uid);
+    // A user's own subtree. Nothing inside is visible to any other uid —
+    // cross-account reads are impossible by construction, URL-guessing
+    // included. NO recursive owner wildcard here: overlapping matches are
+    // OR'd in rules (any allow grants), so the old `{document=**}` block
+    // would have handed the client the very fields the device/private
+    // carve-outs below exist to protect. Each subtree the app uses is
+    // matched explicitly instead; anything unlisted falls to default deny.
+    match /users/{uid} {
+      // Root profile doc.
+      allow read, write: if isOwner(uid) && notRevoked(uid);
+
+      // Bands and everything nested under them (secrets/v1, sessions,
+      // relayTips) — same owner-only semantics as before.
+      match /bands/{document=**} {
+        allow read, write: if isOwner(uid) && notRevoked(uid);
       }
+
+      // App settings (settings/app today).
+      match /settings/{document=**} {
+        allow read, write: if isOwner(uid) && notRevoked(uid);
+      }
+
+      // Live-session coordination (live/current): the account's devices
+      // read it to see and join the running set, and write it to start,
+      // heartbeat the leader lease, edit the goal, and stop. One doc for
+      // the whole account — that IS the "one session at a time" invariant.
+      match /live/{document=**} {
+        allow read, write: if isOwner(uid) && notRevoked(uid);
+      }
+
+      // Device registry. The app creates and maintains its own doc (name,
+      // platform, model, createdAtMs, lastSeenAtMs) but `revoked` /
+      // `revokedAtMs` are function-owned: a create must declare
+      // revoked:false and carry no revokedAtMs; an update may change
+      // neither. No client delete — delete+recreate would launder a
+      // revoked:true back to false.
+      match /devices/{deviceId} {
+        allow read: if isOwner(uid) && notRevoked(uid);
+        allow create: if isOwner(uid) && notRevoked(uid)
+          && request.resource.data.revoked == false
+          && !('revokedAtMs' in request.resource.data);
+        allow update: if isOwner(uid) && notRevoked(uid)
+          && request.resource.data.revoked == resource.data.revoked
+          && request.resource.data.get('revokedAtMs', null) == resource.data.get('revokedAtMs', null);
+        allow delete: if false;
+      }
+
+      // Function-written security state (private/security): the owner may
+      // read their own watermark, never write anything here.
+      match /private/{document=**} {
+        allow read: if isOwner(uid) && notRevoked(uid);
+        allow write: if false;
+      }
+    }
+
+    // QR add-device link codes. Top-level because the redeeming device is
+    // unauthenticated. Readable ONLY by the owning uid (device A's listener
+    // shows the requester name + live status); the redeeming device never
+    // reads the doc — it learns everything from callable returns. Every
+    // write is function-mediated (the status machine lives in the callables).
+    match /linkCodes/{codeId} {
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.uid
+        && notRevoked(request.auth.uid);
+      allow write: if false;
     }
 
     // Jars: readable by the owner and linked reader devices; every write is

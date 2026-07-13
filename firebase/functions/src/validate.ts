@@ -235,3 +235,8 @@ export function validateTip(
 export function isValidJarId(id: string): boolean {
   return /^[0-9a-z]{20,32}$/.test(id);
 }
+
+/** deviceId as the app mints it (opaque install id) — a safe Firestore doc id. */
+export function isValidDeviceId(id: string): boolean {
+  return /^[A-Za-z0-9_-]{1,64}$/.test(id);
+}

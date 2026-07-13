@@ -16,6 +16,18 @@ jars/{jarId}/private/auth        { secretHash }           — server-only
 jars/{jarId}/private/rate        minute/hour counters + hashed 60s dedupe sigs
 jars/{jarId}/pendingTips/{uuid}  undelivered tips, expiresAt = tsMs + 1h
 rateLimits/{key}                 quota buckets (salted IP hashes, uid days)
+users/{uid}/devices/{deviceId}   app-written device registry (name, platform,
+                                 model?, createdAtMs, lastSeenAtMs); the
+                                 revoked/revokedAtMs fields are function-only
+                                 (rules pin them; create must say revoked:false)
+users/{uid}/private/security     { sessionsValidAfterMs } — function-written
+                                 revocation watermark; rules gate all of
+                                 users/** on auth_time·1000 ≥ watermark
+linkCodes/{codeId}               QR add-device handshake (top-level: the
+                                 redeeming device is unauthenticated); uid,
+                                 status pending→claimed→confirmed→used |
+                                 expired, attempts, requester?, redeemNonceHash,
+                                 expiresAt = createdAtMs + 2 min
 ```
 
 ## Functions
@@ -25,8 +37,19 @@ rateLimits/{key}                 quota buckets (salted IP hashes, uid days)
 - Callables: `createJar`, `claimJar`, `updateJarProfile`, `deleteJar`,
   `rotateJarSecret`, `jarSeen`. All require Firebase Auth (anonymous ok);
   update/delete/seen accept owner-uid OR the jar secret.
+- Device linking (QR handshake, see `src/linkcodes.ts` for the lifecycle):
+  `createLinkCode` (auth, NON-anonymous) → `{code, expiresAtMs}`;
+  `redeemLinkCode {code, deviceName, devicePlatform}` (no auth, IP-limited)
+  → `{nonce}`; `confirmLinkCode {code}` (auth, owner — the anti-phishing
+  tap); `collectLinkToken {code, nonce}` (no auth, polled) → `{pending:true}`
+  until confirmed, then `{token}` (single-use custom token).
+- Revocation: `revokeDevice {deviceId}` (cooperative flag only) and
+  `revokeAllOtherDevices {currentDeviceId}` (NON-anonymous; watermark +
+  device flags + `revokeRefreshTokens` — the caller must silently
+  re-authenticate afterwards).
 - Scheduled: `sweepPendingTips` (10 min — fan text at rest ≤ ~70 min),
-  `expireJars` (daily; unowned jars past expiresAt), `sweepRateLimits` (hourly).
+  `expireJars` (daily; unowned jars past expiresAt), `sweepRateLimits`
+  (hourly), `sweepLinkCodes` (hourly; codes past expiresAt).
 
 ## Secrets (required — handlers fail closed when unset)
 
@@ -51,6 +74,8 @@ gcloud firestore fields ttl-policies update expiresAt \
   --collection-group=pendingTips --project=livetips-app
 gcloud firestore fields ttl-policies update expiresAt \
   --collection-group=rateLimits --project=livetips-app
+gcloud firestore fields ttl-policies update expiresAt \
+  --collection-group=linkCodes --project=livetips-app
 ```
 
 Do NOT add a TTL policy on `jars.expiresAt`: TTL deletes are unconditional,

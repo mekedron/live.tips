@@ -13,6 +13,7 @@ import {
   getFirestore,
 } from "firebase-admin/firestore";
 import { sha256Hex } from "./auth";
+import type { LinkCodeStatus } from "./linkcodes";
 import type { JarProfile, TipRequest } from "./types";
 
 export const DAY_MS = 86_400_000;
@@ -51,6 +52,15 @@ export const TIPS_PER_IP_PER_HOUR = 120;
 
 /** How many readers one jar can have (artist's own devices). */
 export const MAX_READER_UIDS = 5;
+
+/** QR link-code redemptions per (salted) IP hash per hour: a scan is a
+ * once-per-new-device act, so a generous human budget is still tiny. */
+export const LINK_REDEEMS_PER_IP_PER_HOUR = 30;
+
+/** collectLinkToken calls per (salted) IP hash per hour. Deliberately roomy:
+ * the joining device POLLS collect until the owner confirms (2 min windows,
+ * ~1 poll/s worst case), so this only stops abuse, never a handshake. */
+export const LINK_COLLECTS_PER_IP_PER_HOUR = 600;
 
 let cached: Firestore | null = null;
 
@@ -99,8 +109,73 @@ export interface PendingTipDoc {
   expiresAt: Timestamp;
 }
 
+/**
+ * users/{uid}/devices/{deviceId} — one doc per app install. Created and
+ * updated by the APP writing Firestore directly (name, platform, model?,
+ * createdAtMs, lastSeenAtMs), EXCEPT `revoked`/`revokedAtMs`: the rules pin
+ * those client-side (create must say revoked:false, update may never change
+ * either), so only the revoke callables can flip them.
+ */
+export interface DeviceDoc {
+  name: string;
+  platform: string;
+  model?: string;
+  createdAtMs: number;
+  lastSeenAtMs: number;
+  revoked: boolean;
+  revokedAtMs?: number;
+}
+
+/**
+ * users/{uid}/private/security — function-written revocation watermark.
+ * Rules deny every client write and gate the whole users/** subtree on
+ * `auth_time * 1000 >= sessionsValidAfterMs`, so ID tokens minted before a
+ * revokeAllOtherDevices call lose Firestore access immediately (not after
+ * their remaining ≤1h of cryptographic validity).
+ */
+export interface SecurityDoc {
+  sessionsValidAfterMs: number;
+}
+
+/**
+ * linkCodes/{codeId} — QR add-device handshake state. TOP-LEVEL on purpose:
+ * the redeeming device is unauthenticated and callables must reach the doc
+ * without a uid in the path. Only the owning uid may READ one (rules); every
+ * write is function-mediated; the redeeming device never reads the doc at
+ * all — it learns via callable returns. See linkcodes.ts for the lifecycle.
+ */
+export interface LinkCodeDoc {
+  uid: string;
+  status: LinkCodeStatus;
+  createdAtMs: number;
+  /** createdAtMs + 2 min; the hourly sweep (or a TTL policy) deletes past it. */
+  expiresAt: Timestamp;
+  /** Redeems + bad-nonce collects; ≥5 force-expires the code. */
+  attempts: number;
+  /** Set at redeem: what device A's confirm screen shows. */
+  requester?: { name: string; platform: string };
+  /** sha256 of the redeem nonce; the nonce itself is never at rest. */
+  redeemNonceHash?: string;
+}
+
 export function jarRef(firestore: Firestore, jarId: string): DocumentReference {
   return firestore.collection("jars").doc(jarId);
+}
+
+export function linkCodeRef(firestore: Firestore, codeId: string): DocumentReference {
+  return firestore.collection("linkCodes").doc(codeId);
+}
+
+export function deviceRef(firestore: Firestore, uid: string, deviceId: string): DocumentReference {
+  return firestore.collection("users").doc(uid).collection("devices").doc(deviceId);
+}
+
+export function devicesCol(firestore: Firestore, uid: string) {
+  return firestore.collection("users").doc(uid).collection("devices");
+}
+
+export function securityRef(firestore: Firestore, uid: string): DocumentReference {
+  return firestore.collection("users").doc(uid).collection("private").doc("security");
 }
 
 export function jarAuthRef(firestore: Firestore, jarId: string): DocumentReference {

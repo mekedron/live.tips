@@ -58,6 +58,20 @@ export async function expireJarsHandler(): Promise<void> {
   if (total > 0) console.log(`expireJars: deleted ${total} expired jars`);
 }
 
+/**
+ * QR link codes live 2 minutes; whatever state they end in (used, expired,
+ * abandoned mid-handshake) the doc is garbage once expiresAt passes — it
+ * still names a device and hashes a nonce, so it does not get to linger.
+ */
+export async function sweepLinkCodesHandler(): Promise<void> {
+  const firestore = db();
+  const swept = await deleteByQuery(
+    firestore,
+    firestore.collection("linkCodes").where("expiresAt", "<", Timestamp.now()),
+  );
+  if (swept > 0) console.log(`sweepLinkCodes: deleted ${swept} stale link codes`);
+}
+
 /** Quota buckets outlive their usefulness after ~2h; clear them hourly. */
 export async function sweepRateLimitsHandler(): Promise<void> {
   const firestore = db();

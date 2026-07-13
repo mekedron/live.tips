@@ -23,13 +23,13 @@ import { isValidJarId, validateProfile } from "./validate";
 
 export const TIP_URL_BASE = "https://tip.live.tips/t/";
 
-function requireUid(request: CallableRequest): string {
+export function requireUid(request: CallableRequest): string {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "sign-in required");
   return uid;
 }
 
-function dataObject(request: CallableRequest): Record<string, unknown> {
+export function dataObject(request: CallableRequest): Record<string, unknown> {
   const data: unknown = request.data;
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     throw new HttpsError("invalid-argument", "payload must be an object");
