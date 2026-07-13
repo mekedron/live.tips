@@ -18,7 +18,11 @@ import 'onboarding_details_screen.dart';
 /// they stay in lockstep with the stage's fullscreen hint. Shown only where
 /// [shouldSuggestInstall] is true (gated by the caller), never on desktop.
 class InstallHintScreen extends StatelessWidget {
-  const InstallHintScreen({super.key});
+  const InstallHintScreen({super.key, this.createsProfile = false});
+
+  /// Passed straight through to the details step: this run creates a profile
+  /// rather than naming the one already open (#44).
+  final bool createsProfile;
 
   /// The nudge is advisory, but skipping it has real costs — confirm once and
   /// spell them out before connecting inside the browser. [noFullscreen] is the
@@ -59,7 +63,11 @@ class InstallHintScreen extends StatelessWidget {
     );
     if (proceed == true) {
       navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingDetailsScreen()),
+        MaterialPageRoute(
+          builder: (_) => OnboardingDetailsScreen(
+            createsProfile: createsProfile,
+          ),
+        ),
       );
     }
   }

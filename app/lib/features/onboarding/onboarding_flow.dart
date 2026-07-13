@@ -14,9 +14,16 @@ import 'onboarding_method_screen.dart';
 /// tablets in a browser get the one-time "Add to Home Screen" nudge first
 /// (it carries on to the details step itself); desktop and the installed
 /// PWA go straight to the band details.
-Widget firstBandSetupScreen() => shouldSuggestInstall
-    ? const InstallHintScreen()
-    : const OnboardingDetailsScreen();
+///
+/// [createsProfile] rides along to the details step: this run was started by an
+/// artist asking for a NEW profile ("Add a profile", "Create a new profile"), so
+/// the name they type names a profile that does not exist yet instead of
+/// renaming the one they are standing in. The profile is written there, as it is
+/// named — never on the tap that opened this (#44).
+Widget firstBandSetupScreen({bool createsProfile = false}) =>
+    shouldSuggestInstall
+        ? InstallHintScreen(createsProfile: createsProfile)
+        : OnboardingDetailsScreen(createsProfile: createsProfile);
 
 /// Pushes the next onboarding setup step after [after] (null = the first one).
 /// Steps run in a fixed order — Stripe, then the relay methods — for whichever

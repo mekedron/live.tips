@@ -11,6 +11,7 @@ import '../features/venue/venue_reapproval_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../state/auth_providers.dart';
 import '../state/live_session_controller.dart';
+import '../state/onboarding_draft.dart';
 import '../state/providers.dart';
 import '../state/venue_providers.dart';
 import 'lt_ui.dart';
@@ -399,14 +400,22 @@ Future<bool> _confirmDiscard(BuildContext context) async {
   return discard == true;
 }
 
-/// Adds a profile to the account in use — or says why it can't. The ONE "Add a
-/// profile", shared by the switcher's row and the root picker's create card:
-/// the old silent `return` on a refusal made the button look broken, and two
-/// copies of the rule were free to disagree about what a refusal even was.
+/// STARTS adding a profile — or says why it can't. The ONE "Add a profile",
+/// shared by the switcher's row and the root picker's create card: the old
+/// silent `return` on a refusal made the button look broken, and two copies of
+/// the rule were free to disagree about what a refusal even was.
 ///
-/// The new empty profile is active when this returns true, and the caller walks
-/// straight into the setup that names it — nothing is written for a profile the
-/// artist did not ask for (#26).
+/// It writes NOTHING. The tap opens the form; the profile is written by the
+/// details step, out of the name typed into it (`createFirstBand`). It used to
+/// mint the band here, on the tap, before the artist had typed a character —
+/// and an artist who then backed out of the form was left with an "Unnamed"
+/// profile they never made, active, and on a cloud account on every device they
+/// own, forcing the picker on every cold boot of each (#44). A tap on "Create"
+/// is the artist asking for the FORM; the name is the ask.
+///
+/// True means the caller may walk into the setup — which it must open with
+/// `firstBandSetupScreen(createsProfile: true)`, so the name lands on a new
+/// profile rather than renaming the one the artist is standing in.
 Future<bool> addProfile(BuildContext context, WidgetRef ref) async {
   // Creating a profile changes the account's data — on a venue device that,
   // too, waits for the phone's nod.
@@ -416,13 +425,10 @@ Future<bool> addProfile(BuildContext context, WidgetRef ref) async {
       sessionKey: 'widgets.profile_switcher.stop_session_add')) {
     return false;
   }
-  final messenger = ScaffoldMessenger.of(context);
-  final addFailed = context.s.t('widgets.profile_switcher.add_failed');
-  final account = await ref.read(appStateProvider.notifier).addAccount();
-  if (account == null) {
-    messenger.showSnackBar(SnackBar(content: Text(addFailed)));
-    return false;
-  }
+  // A new run: it inherits no method choices from the last one, and its step
+  // counter starts at the details step (there are no account steps in it).
+  ref.read(onboardingDraftProvider.notifier).clear();
+  ref.read(onboardingPreludeProvider.notifier).reset();
   return true;
 }
 
@@ -569,11 +575,13 @@ class _SwitcherSheet extends ConsumerWidget {
     final sheet = Navigator.of(context);
     if (!await addProfile(context, ref)) return;
     if (sheet.canPop()) sheet.pop();
-    // The new empty profile is active now; the setup starts by naming it, and
-    // the shell's empty-state home (behind this route) is where the artist
-    // lands if they back out — never a dead end.
+    // The setup starts by naming the profile — and naming it is what creates
+    // it. Backing out of that form leaves the artist where they were, on the
+    // profile they were already in, with nothing new written anywhere.
     rootNavigator.push(
-      MaterialPageRoute(builder: (_) => firstBandSetupScreen()),
+      MaterialPageRoute(
+        builder: (_) => firstBandSetupScreen(createsProfile: true),
+      ),
     );
   }
 

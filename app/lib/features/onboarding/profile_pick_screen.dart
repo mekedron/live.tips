@@ -147,17 +147,18 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
         MaterialPageRoute(builder: (_) => const SettingsRouteScreen()),
       ));
 
-  /// "Add a profile" by another name — the same one place a profile is minted.
+  /// "Add a profile" by another name — the same call, the same rule: the tap
+  /// opens the form, and the form's own Save is what writes the profile, out of
+  /// the name typed into it. Abandoning it leaves this screen exactly as it was
+  /// and nothing behind it (#44).
   Future<void> _createNew() async {
     final navigator = Navigator.of(context);
-    // The band setup's details step renames the ACTIVE band — which right now
-    // is one of the account's real profiles (or nothing at all). A new empty
-    // one has to be created and activated first. This tap is the artist asking
-    // for a profile, which is the only thing that may ever write a band entry.
     if (!await addProfile(context, ref)) return;
     if (!mounted) return;
     navigator.push(
-      MaterialPageRoute(builder: (_) => firstBandSetupScreen()),
+      MaterialPageRoute(
+        builder: (_) => firstBandSetupScreen(createsProfile: true),
+      ),
     );
   }
 

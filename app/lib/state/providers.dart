@@ -703,10 +703,11 @@ class AppStateNotifier extends Notifier<AppState> {
   }
 
   /// Writes a fresh unnamed band and makes it active. The ONE place a band
-  /// entry is born, and both its callers are the artist asking for a profile
-  /// — a tap on "Add a profile" / "Create a new profile" ([addAccount]), or
-  /// the name they just typed into the first step ([createFirstBand]). An
-  /// empty band list is never "repaired" by calling this.
+  /// entry is born, and its callers are the artist asking for a profile — the
+  /// name they just typed into the first step ([createFirstBand], which is now
+  /// every "Add a profile" / "Create a new profile" too), or Welcome seeding the
+  /// device's first local band as onboarding begins ([addAccount]). An empty
+  /// band list is never "repaired" by calling this.
   Future<BandAccount> _mintBand() async {
     final account = BandAccount(
       id: BandAccount.newId(),
@@ -719,8 +720,13 @@ class AppStateNotifier extends Notifier<AppState> {
     return account;
   }
 
-  /// Creates a fresh unnamed band and makes it active — the caller sends the
-  /// user into onboarding (method select). Returns null when refused.
+  /// Creates a fresh unnamed band and makes it active — Welcome's seed for the
+  /// device's first local profile, as onboarding begins. Returns null when
+  /// refused.
+  ///
+  /// NOT the way a profile is added any more: "Add a profile" and "Create a new
+  /// profile" go through the details step, which mints as it names ([addProfile]
+  /// → [createFirstBand]). A tap is not an ask (#44).
   Future<BandAccount?> addAccount() async {
     if (accountActionsBlocked) return null;
     ref.read(onboardingDraftProvider.notifier).clear();
@@ -735,11 +741,14 @@ class AppStateNotifier extends Notifier<AppState> {
     return account;
   }
 
-  /// The first band of an account that has none — created as the artist NAMES
-  /// it (onboarding's details step), and at no other moment. The app used to
-  /// mint it the instant a warm account read back empty, which invented a
-  /// nameless profile nobody asked for and synced it over a deletion made on
-  /// another device.
+  /// A band, created as the artist NAMES it (onboarding's details step) and at
+  /// no other moment — the account's first, or another one they asked for on
+  /// "Add a profile". The app used to mint the first the instant a warm account
+  /// read back empty, which invented a nameless profile nobody asked for and
+  /// synced it over a deletion made on another device (#26); and it used to mint
+  /// the others on the tap that opened the form, which left a phantom behind on
+  /// every device whenever the form was abandoned (#44). Both are the same rule:
+  /// a name is the ask.
   ///
   /// Unlike [addAccount] it leaves the onboarding draft and the step counter
   /// alone: this is the run already in progress, not a new one. Returns null
@@ -747,9 +756,13 @@ class AppStateNotifier extends Notifier<AppState> {
   Future<BandAccount?> createFirstBand() async {
     if (accountActionsBlocked) return null;
     final account = await _mintBand();
-    state = state.copyWith(
+    // A whole new AppState, never copyWith: the band that was open may have had
+    // a Stripe key, a jar and a relay secret, and carrying those over onto a
+    // profile that owns none of them is another band's gig on this one's screen.
+    state = AppState(
       accountId: account.id,
       accounts: [...state.accounts, account],
+      settings: state.settings,
     );
     return account;
   }

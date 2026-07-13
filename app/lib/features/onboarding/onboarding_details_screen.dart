@@ -13,8 +13,20 @@ import 'method_select_screen.dart';
 /// thank-you message fans see. Collected once, up front, so the later method
 /// steps never re-ask; they reuse these when building the Stripe link and the
 /// tip page.
+///
+/// It is also the ONE place a profile is born. [createsProfile] says this run
+/// was opened by an artist asking for a new one ("Add a profile", "Create a new
+/// profile") rather than finishing the one they are standing in — and the band
+/// is written HERE, out of the name they just typed, not on the tap that opened
+/// the form. Tapping "Create" used to write an unnamed band immediately; backing
+/// out of this screen left it behind, active, and — on a cloud account, where
+/// the profile set is the same on every device (#37) — on every phone and tablet
+/// the artist owns, forcing the picker on every cold boot of each of them (#44).
 class OnboardingDetailsScreen extends ConsumerStatefulWidget {
-  const OnboardingDetailsScreen({super.key});
+  const OnboardingDetailsScreen({super.key, this.createsProfile = false});
+
+  /// This run creates a profile; without it the run names the active one.
+  final bool createsProfile;
 
   @override
   ConsumerState<OnboardingDetailsScreen> createState() =>
@@ -31,13 +43,23 @@ class _OnboardingDetailsScreenState
   // dependencies (Localizations) are available — see didChangeDependencies.
   bool _thanksInitialized = false;
 
+  /// Still to be written: this run asked for a new profile and has not named it
+  /// yet. Cleared the moment it is created, so coming BACK to this step and
+  /// continuing again renames that profile instead of minting a second one.
+  late bool _pendingProfile = widget.createsProfile;
+
   @override
   void initState() {
     super.initState();
     // A profile that was named but never got a payment method comes back
     // through here ("Set it up"): it already has a name, and asking for it
-    // again on an empty field reads like the profile was lost.
-    _nameController.text = ref.read(appStateProvider).activeAccount?.name ?? '';
+    // again on an empty field reads like the profile was lost. A run that is
+    // CREATING a profile prefills nothing — the active band is somebody else,
+    // and its name is not a suggestion for the new one.
+    if (!widget.createsProfile) {
+      _nameController.text =
+          ref.read(appStateProvider).activeAccount?.name ?? '';
+    }
     // Coming back to this step (or re-adding a band) — prefill from the draft.
     final draft = ref.read(onboardingDraftProvider);
     if (draft != null) {
@@ -77,13 +99,15 @@ class _OnboardingDetailsScreenState
       setState(() => _error = context.s.t('onboarding.details.name_required'));
       return;
     }
-    // A fresh cloud account walks in here with no profile at all: the app no
-    // longer mints one the moment the account reads back empty (it wrote the
-    // fabrication to the cloud, where it undid deletions made on other
-    // devices). THIS is the moment the artist asks for a profile — a name
-    // they just typed — so the band is created now, and everything below
-    // works on it.
-    if (ref.read(appStateProvider).activeAccount == null) {
+    // THE mint, and the only one. A fresh cloud account walks in here with no
+    // profile at all (the app no longer invents one the moment the account
+    // reads back empty — the fabrication went to the cloud and undid deletions
+    // made on other devices, #26); and an artist who asked for another profile
+    // walks in here with [createsProfile]. Either way this — a name they just
+    // typed — is the moment a profile is asked for, and the band is created now.
+    // A tap on "Create a new profile" is not that moment: abandoning the form
+    // used to leave the unnamed band behind, on every device the account has.
+    if (_pendingProfile || ref.read(appStateProvider).activeAccount == null) {
       final created =
           await ref.read(appStateProvider.notifier).createFirstBand();
       if (!mounted) return;
@@ -92,6 +116,7 @@ class _OnboardingDetailsScreenState
             context.s.t('widgets.profile_switcher.add_failed'));
         return;
       }
+      _pendingProfile = false;
     }
     final thankYou = _thanksController.text.trim();
     // Preserve any methods already picked (back-navigation), just refresh the

@@ -7,6 +7,7 @@ import 'package:live_tips/app.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/domain/app_account.dart';
+import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/features/onboarding/onboarding_details_screen.dart';
 import 'package:live_tips/features/onboarding/profile_pick_screen.dart';
 import 'package:live_tips/features/shell/app_shell.dart';
@@ -139,8 +140,8 @@ void main() {
     expect((await _bands(db).get()).docs.map((d) => d.id), [_bandId]);
   });
 
-  testWidgets('"create a new profile" continues to the band setup with a '
-      'fresh active band', (tester) async {
+  testWidgets('"create a new profile" opens the setup and writes NOTHING — the '
+      'name is what creates the profile', (tester) async {
     final db = FakeFirebaseFirestore();
     await _bands(db).doc(_bandId).set({'name': 'The Foxes', 'createdAtMs': 1});
 
@@ -148,11 +149,59 @@ void main() {
     await tester.tap(find.text('Create a new profile'));
     await tester.pumpAndSettle();
 
-    // The details step, working on a NEW empty band — not renaming The
-    // Foxes (the details step renames whatever band is active).
+    // This test used to assert the opposite — that the tap minted the band —
+    // and the bug it encoded is #44: an artist who backed out of the form was
+    // left with an "Unnamed" profile they never made, on every device the
+    // account touches. The tap opens the form. That is all it does.
     expect(find.byType(OnboardingDetailsScreen), findsOneWidget);
-    expect(store.readActiveCloudBand(_uid), isNot(_bandId));
-    expect((await _bands(db).get()).docs, hasLength(2));
+    expect((await _bands(db).get()).docs.map((d) => d.id), [_bandId]);
+    expect(store.readActiveCloudBand(_uid), isNot('acc_new'));
+    // …and the field is empty: the run is creating a profile, so the active
+    // band's name is not a suggestion for it.
+    expect(
+        (tester.widget(find.byType(TextField).first) as TextField)
+            .controller!
+            .text,
+        isEmpty);
+
+    await tester.enterText(find.byType(TextField).first, 'Duo Sundays');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    final docs = (await _bands(db).get()).docs;
+    expect(docs, hasLength(2), reason: 'the named profile — and only it');
+    final fresh = docs.firstWhere((d) => d.id != _bandId);
+    expect(fresh.data()['name'], 'Duo Sundays');
+    expect(store.readActiveCloudBand(_uid), fresh.id,
+        reason: 'and the artist is standing in the one they just named');
+  });
+
+  testWidgets('abandoning the create form leaves NOTHING behind — no band, no '
+      'registry entry, on the account or on this device', (tester) async {
+    final db = FakeFirebaseFirestore();
+    await _bands(db).doc(_bandId).set({'name': 'The Foxes', 'createdAtMs': 1});
+
+    final store = await _signInFromWelcome(tester, db);
+    await tester.tap(find.text('Create a new profile'));
+    await tester.pumpAndSettle();
+    expect(find.byType(OnboardingDetailsScreen), findsOneWidget);
+
+    // The artist changes their mind, and presses Back. Nothing was promised
+    // and nothing may be kept: the profile set is what it was.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProfilePickScreen), findsOneWidget);
+    expect((await _bands(db).get()).docs.map((d) => d.id), [_bandId],
+        reason: 'a phantom here lands on every device the artist owns (#37)');
+    final container = ProviderScope.containerOf(
+        tester.element(find.byType(ProfilePickScreen)),
+        listen: false);
+    expect(container.read(appStateProvider).accounts.map((a) => a.id),
+        [_bandId],
+        reason: 'nothing minted, nothing activated — the account is as it was');
+    expect(store.readActiveCloudBand(_uid), isNull,
+        reason: 'and no phantom to force the picker on the next cold boot');
   });
 
   testWidgets('a fresh account with no profiles goes straight to the band '
@@ -240,9 +289,71 @@ void main() {
       await tester.tap(find.text('Create a new profile'));
       await tester.pumpAndSettle();
 
+      // The form, and still nothing written: the tap asked for the form, the
+      // name is what asks for the profile (#44).
       expect(find.byType(OnboardingDetailsScreen), findsOneWidget);
-      expect((await _bands(db).get()).docs, hasLength(1),
-          reason: 'the artist asked for it — that is what may write a band');
+      expect((await _bands(db).get()).docs, isEmpty);
+
+      await tester.enterText(find.byType(TextField).first, 'The Foxes');
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      final docs = (await _bands(db).get()).docs;
+      expect(docs, hasLength(1),
+          reason: 'the artist named it — that is what may write a band');
+      expect(docs.first.data()['name'], 'The Foxes');
+    });
+
+    testWidgets('abandoning the create form on the LOCAL profile leaves the '
+        'device exactly as it was', (tester) async {
+      // The reported screen: no profile on this device, a cloud account the
+      // device still knows. The only forward move offered is "create" — and
+      // taking it back must cost nothing.
+      SharedPreferences.setMockInitialValues({});
+      final store = LocalStore(await SharedPreferences.getInstance());
+      await store.saveAccountsRegistry(
+          const AccountsRegistry(accounts: [], activeId: ''));
+      await store.saveAccountsDirectory(
+        AccountsDirectory.initial().withAccount(const AppAccount(
+          id: _uid,
+          name: 'Casey',
+          kind: AccountKind.google,
+        )),
+      );
+
+      await tester.binding.setSurfaceSize(const Size(600, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            localStoreProvider.overrideWithValue(store),
+            secureStoreProvider.overrideWithValue(FakeSecureStore()),
+            initialApiKeyProvider.overrideWithValue(null),
+            authServiceProvider.overrideWithValue(FakeAuthService()),
+          ],
+          child: const LiveTipsApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No profile on this device yet'), findsOneWidget);
+      await tester.tap(find.text('Create a new profile'));
+      await tester.pumpAndSettle();
+      expect(find.byType(OnboardingDetailsScreen), findsOneWidget);
+      expect(store.readAccountsRegistry()!.accounts, isEmpty,
+          reason: 'the tap opened a form; it did not write a profile');
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfilePickScreen), findsOneWidget);
+      expect(find.text('No profile on this device yet'), findsOneWidget);
+      expect(store.readAccountsRegistry()!.accounts, isEmpty);
+      final container = ProviderScope.containerOf(
+          tester.element(find.byType(ProfilePickScreen)),
+          listen: false);
+      expect(container.read(appStateProvider).accounts, isEmpty);
+      expect(container.read(appStateProvider).accountId, isEmpty);
     });
   });
 }
