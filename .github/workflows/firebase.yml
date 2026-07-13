@@ -1,0 +1,53 @@
+name: Deploy firebase (livetips-app)
+
+# The Firebase pipeline — Firestore rules/indexes, the gen2 functions, and
+# Hosting for live.tips's tip pages. Independent of worker.yml (the relay)
+# and pages.yml (the site). Authenticates as the github-deployer service
+# account (FIREBASE_SERVICE_ACCOUNT holds its JSON key).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "firebase/**"
+      - ".github/workflows/firebase.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-deploy
+  # Never cancel a deploy mid-flight — let it finish, queue the next one.
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: firebase/functions/package-lock.json
+      - run: npm ci
+        working-directory: firebase/functions
+      - run: npm test
+        working-directory: firebase/functions
+      - run: npm run build
+        working-directory: firebase/functions
+      - name: Deploy to Firebase
+        working-directory: firebase
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
+          npx firebase-tools@latest deploy \
+            --only firestore,functions,hosting \
+            --project livetips-app \
+            --non-interactive --force
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Clean up credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-sa.json"
