@@ -5,8 +5,9 @@ updated: 2026-07-13
 updated_label: Päivitetty viimeksi 13. heinäkuuta 2026
 ---
 
-Nämä ehdot koskevat live.tips-sovellusta, tätä sivustoa ja valinnaista välitintä osoitteessa
-`api.live.tips`. live.tipsiä ylläpitää **Nikita Rabykin**, yksityinen kehittäjä, ja se
+Nämä ehdot koskevat live.tips-sovellusta, tätä sivustoa, valinnaista live.tips-**tiliä** ja
+valinnaista välitintä, joka on osoitteessa `tip.live.tips` olevien tippisivujen takana.
+live.tipsiä ylläpitää **Nikita Rabykin**, yksityinen kehittäjä — ei yritys, ei tiimi — ja se
 julkaistaan vapaana ja avoimen lähdekoodin ohjelmistona
 [MIT-lisenssillä](https://github.com/mekedron/live.tips/blob/main/LICENSE).
 
@@ -23,7 +24,7 @@ fanien tipatessa.
 
 **Emme ole maksupalvelu, pankki, sulkutili emmekä osapuoli liiketoimissasi.** Emme koskaan
 pidä hallussamme, reititä tai koske kenenkään rahoihin. Tippi kulkee suoraan fanilta artistin
-omalle maksutilille. Välissä ei ole live.tips-tiliä, koska live.tips-tiliä ei ole lainkaan.
+omalle maksutilille. Välissä ei ole live.tips-saldoa, koska live.tips-saldoa ei ole lainkaan.
 
 Käytännössä tämä tarkoittaa:
 
@@ -43,6 +44,35 @@ varainkeruualusta. Artistien on kuvattava toimintansa maksupalveluntarjoajalleen
 mukaisesti — erityisesti Stripe kohtelee esiintymistä ja varainkeruuta eri asioina, ja vain
 toinen niistä olet sinä.
 
+## Tilit
+
+Tili on **valinnainen**, eikä edelleenkään ole mitään, mihin sinun täytyisi rekisteröityä.
+Sovellus toimii täysin ilman tiliä — se on oletus, kaikki pysyy laitteellasi, eikä yksikään
+live.tips-palvelin ole mukana.
+
+Jos haluat bändisi, asetuksesi ja historiasi useammalle kuin yhdelle laitteelle, voit kirjautua
+sisään **Applella**, **Googlella** tai anonyyminä **vieraana**. Tili on paikka, jossa säilyttää
+*omia* tietojasi **Firebasessa** (Google), luettavissa sinun tilillesi eikä millekään muulle.
+Mitä se pitää sisällään — ja mitä sisäänkirjautuminen muuttaa yksityisyytesi kannalta — kerrotaan
+tietosuojaselosteessa, joka kannattaa lukea ennen kirjautumista.
+
+Jos sinulla on tili:
+
+- **Se on sinun vastuullasi.** Kuka tahansa, joka pystyy kirjautumaan sinuna, näkee kaiken sen
+  sisällä. Pidä kirjautumistapasi turvassa ja käytä **Asetukset → Turvallisuus** -näkymää
+  laitteidesi tarkasteluun, jonkin niistä peruuttamiseen tai uloskirjautumiseen kaikkialta
+  muualta.
+- **Vierastiliä ei voi palauttaa.** Siinä ei ole sähköpostia eikä salasanaa. Menetä kaikki
+  laitteet, joilla olet kirjautuneena siihen, ja sen tiedot ovat poissa — se on hinta siitä,
+  että kirjaudut antamatta meille mitään. Käytä Applea tai Googlea, jos tuolla on sinulle
+  väliä.
+- **Olet vastuussa siitä, mitä siellä on** — bändiesi nimistä, julkisista viesteistäsi ja
+  kaikesta muusta, mitä sinne laitat.
+- **Laitteen lisääminen vaatii vahvistuksesi** laitteella, joka on jo kirjautuneena. Älä
+  vahvista laitetta, jota et pyytänyt, äläkä anna kenenkään valokuvata QR-koodia ja napauta
+  sitten silti vahvistusta.
+- **Voimme keskeyttää tai poistaa tilin** — katso *Lopettaminen* alta.
+
 ## Jos olet artisti
 
 Olet vastuussa seuraavista:
@@ -54,9 +84,14 @@ Olet vastuussa seuraavista:
 - **Palautukset, riitautukset ja chargebackit**, jotka hoidat omassa maksuhallintapaneelissasi.
 - **Esiintymispaikkasi lainsäädäntö** — katusoittoluvat, tapahtumapaikan säännöt ja kaikki muu
   paikallinen.
-- **Se, mitä julkaiset.** Artistinimesi ja viestisi näkyvät julkisella sivulla; pidä ne
+- **Se, mitä julkaiset.** Artistinimesi ja viestisi näkyvät julkisella tippisivulla; pidä ne
   laillisina ja ominasi.
-- **Stripe-avaimesi.** Se sijaitsee laitteellasi. Kohtele laitetta kuin kohtelisit käteistä.
+- **Stripe-avaimesi.** Se on rajoitettu avain, jonka loit itse, ja se sijaitsee laitteellasi —
+  ja, jos kirjaudut sisään, myös tilisi yksityisessä tallennustilassa, jotta muut laitteesi
+  voivat käyttää sitä. Kummassakin tapauksessa se on sinun: kohtele laitetta kuin kohtelisit
+  käteistä, ja peru avain Stripe-hallintapaneelissasi, jos jokin laite katoaa.
+- **Bändisi ja ne fanien viestit, jotka laitat näytölle.** Nimi ja viesti näytetään täydelle
+  salilliselle ihmisiä. Se, mitä tuolla näytöllä näkyy, on sinun moderoitavanasi.
 
 ## Jos olet fani
 
@@ -82,14 +117,16 @@ live.tips merkitsee nämä tipit **vahvistamattomiksi**, ja se tarkoittaa täsm�
 ne omaa Revolut-, MobilePay- tai Monzo-sovellustaan vasten. Stripe-tipit ovat ainoat, jotka
 live.tips voi oikeasti vahvistaa, ja siksi Stripe on suositeltu tapa.
 
-## Välitin
+## Välitin ja tippisivut
 
-Välitin tarjotaan **maksutta, vastaantulona, ilman minkäänlaista takuuta**. Se toimii parhaan
-yrityksen periaatteella: sitä voidaan rajoittaa, se voi olla poissa käytöstä, tipit voivat
-viivästyä tai kadota, eikä se tallenna mitään, minkä avulla kukaan voisi jälkikäteen palauttaa
-ne.
+Tippisivut sijaitsevat osoitteessa `tip.live.tips`, ja niitä tarjoilee pieni välitin, jota
+ylläpidämme Firebasessa. Se tarjotaan **maksutta, vastaantulona, ilman minkäänlaista takuuta**.
+Se toimii parhaan yrityksen periaatteella: sitä voidaan rajoittaa, se voi olla poissa käytöstä,
+tipit voivat viivästyä tai kadota, eikä se tarkoituksella säilytä mitään, minkä avulla kukaan
+voisi jälkikäteen palauttaa ne — toimitettu tippi poistetaan sillä hetkellä, kun artistin näyttö
+näyttää sen, ja toimittamatta jäänyt poistetaan tunnin kuluttua.
 
-- Tippisivut **poistetaan 90 päivän käyttämättömyyden jälkeen**.
+- Tippisivu, jonka **takana ei ole tiliä, poistetaan 90 päivän käyttämättömyyden jälkeen**.
 - Voimme **rajoittaa, estää tai poistaa minkä tahansa tippisivun**, milloin tahansa, ilman
   ennakkoilmoitusta — erityisesti silloin, kun havaitsemme petoksen, toisena esiintymisen,
   väärinkäytön, laittoman sisällön tai yrityksen ylikuormittaa palvelua.
@@ -97,9 +134,24 @@ ne.
   Stripeä käyttävät kokoonpanot jatkavat toimintaansa, koska ne eivät koskaan olleet meistä
   riippuvaisia.
 
-Et saa käyttää välitintä esiintyäksesi jonakuna toisena, petoksen tekemiseen, laittoman tai
-loukkaavan sisällön julkaisemiseen, hyväntekeväisyyslahjoitusten keräämiseen väärin
-perustein, tai palvelun vahingoittamiseen.
+Et saa käyttää välitintä, tippisivua tai tiliä esiintyäksesi jonakuna toisena, petoksen
+tekemiseen, laittoman tai loukkaavan sisällön julkaisemiseen, hyväntekeväisyyslahjoitusten
+keräämiseen väärin perustein, pyyntörajoitusten tai bottitarkistuksen kiertämiseen, tai palvelun
+vahingoittamiseen.
+
+## Lopettaminen
+
+- **Sinä** voit lopettaa milloin tahansa: kirjaudu ulos, poista bändi, poista tippisivu tai
+  poista sovellus. Tietosuojaseloste kertoo tarkalleen, mitä kukin näistä poistaa — ja se
+  kertoo rehellisesti, että koko tilin poistaminen on toistaiseksi sähköposti osoitteeseen
+  **[contact@live.tips](mailto:contact@live.tips)** eikä nappi sovelluksessa.
+- **Me** voimme keskeyttää, peruuttaa tai poistaa tilin, tippisivun tai pääsyn palveluun, jos
+  niitä käytetään mihin tahansa yllä luetelluista asioista, tai jos niiden käynnissä pitäminen
+  vaarantaisi palvelun tai muut ihmiset. Täällä ei ole valituslautakuntaa. Täällä on
+  sähköpostiosoite ja ihminen, joka lukee sen.
+- Jos isännöity palvelu joskus suljetaan, kerromme siitä tällä sivustolla. Mitään arvokasta ei
+  ole lukittuna sen sisään: rahat ovat jo omalla maksutililläsi, sovellus on avointa
+  lähdekoodia, eikä pelkkää Stripeä käyttävä kokoonpano koskaan tarvinnut meitä lainkaan.
 
 ## Ei takuuta
 
@@ -108,17 +160,19 @@ konkludenttista, mukaan lukien mikä tahansa takuu kaupallisesta hyödynnettävy
 soveltuvuudesta tiettyyn tarkoitukseen tai oikeuksien loukkaamattomuudesta. Tämä on MIT-lisenssin
 vakiokanta, ja se on tarkoitettu kirjaimellisesti.
 
-Emme lupaa, että ohjelmisto on virheetön, että sovellus näyttää jokaisen tipin, että välitin on
-tavoitettavissa keikkasi aikana, tai että jokin kolmannen osapuolen palvelu käyttäytyy hyvin.
+Emme lupaa, että ohjelmisto on virheetön, että sovellus näyttää jokaisen tipin, että tilisi
+synkronoituu, että välitin on tavoitettavissa keikkasi aikana, tai että jokin kolmannen osapuolen
+palvelu käyttäytyy hyvin.
 
 ## Vastuu
 
 **Lain sallimissa enimmäisrajoissa emme ole vastuussa** mistään menetyksestä tai vahingosta,
 joka aiheutuu live.tipsin käytöstäsi. Tämä sisältää — rajoituksetta — puuttuvat, viivästyneet,
 kahdentuneet tai toimittamatta jääneet tipit; vahvistamattomina näytetyt tipit, joita ei koskaan
-maksettu; menetetyt tulot; lavalla pettäneen laitteen; Stripen, Revolutin, MobilePayn, Monzon,
-Cloudflaren tai GitHubin teot, käyttökatkot tai päätökset; ja kaiken, minkä menetit siksi, että
-luotit näytöllä olevaan lukuun.
+maksettu; tiedot, jotka eivät synkronoituneet tai jotka katosivat sellaisen tilin mukana, jota et
+saanut palautettua; menetetyt tulot; lavalla pettäneen laitteen; Stripen, Revolutin, MobilePayn,
+Monzon, Googlen, Applen, Cloudflaren tai GitHubin teot, käyttökatkot tai päätökset; ja kaiken,
+minkä menetit siksi, että luotit näytöllä olevaan lukuun.
 
 live.tips on ilmaista ohjelmistoa, jonka yksi ihminen antaa pois. Täällä ei ole tuloja, joilla
 rahoittaa vastuuta, eikä sellaista oteta kannettavaksi.
@@ -139,7 +193,8 @@ rehellinen vastaus on: pyöritä omaasi. Lähdekoodi on osoitteessa
 [github.com/mekedron/live.tips](https://github.com/mekedron/live.tips).
 
 Mikään näissä ehdoissa ei rajoita niitä oikeuksia, jotka MIT-lisenssi myöntää sinulle itse
-koodiin; nämä ehdot koskevat **isännöityä palvelua** (tätä sivustoa ja ylläpitämäämme välitintä).
+koodiin; nämä ehdot koskevat **isännöityä palvelua** — tätä sivustoa, tilejä ja ylläpitämäämme
+välitintä.
 
 ## Muutokset
 

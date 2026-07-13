@@ -5,9 +5,10 @@ updated: 2026-07-13
 updated_label: Sidst opdateret 13. juli 2026
 ---
 
-Disse vilkår dækker live.tips-appen, dette website og det valgfrie relæ på
-`api.live.tips`. live.tips drives af **Nikita Rabykin**, en enkelt udvikler, og udgives som
-fri og open source-software under
+Disse vilkår dækker live.tips-appen, dette website, den valgfrie live.tips-**konto** og det
+valgfrie relæ bag drikkepengesiderne på `tip.live.tips`. live.tips drives af **Nikita
+Rabykin**, en enkelt udvikler — ikke et selskab, ikke et team — og udgives som fri og open
+source-software under
 [MIT-licensen](https://github.com/mekedron/live.tips/blob/main/LICENSE).
 
 Ved at bruge live.tips accepterer du det følgende. Det er kort, fordi live.tips gør meget
@@ -23,8 +24,8 @@ fyldes op, efterhånden som fans giver drikkepenge.
 
 **Vi er ikke en betalingstjeneste, en bank, en deponeringsordning eller en part i dine
 transaktioner.** Vi holder, dirigerer eller rører aldrig nogens penge. Drikkepenge rejser
-direkte fra fanen til kunstnerens egen betalingskonto. Der er ingen live.tips-konto i
-midten, fordi der slet ikke findes nogen live.tips-konto.
+direkte fra fanen til kunstnerens egen betalingskonto. Der er ingen live.tips-saldo i
+midten, fordi der slet ikke findes nogen live.tips-saldo.
 
 Konkret betyder det:
 
@@ -43,6 +44,33 @@ indsamlingsplatform. Kunstnere skal beskrive deres virksomhed over for deres
 betalingsudbyder i overensstemmelse hermed — Stripe behandler i særdeleshed optræden og
 indsamling som to forskellige ting, og kun den ene af dem er dig.
 
+## Konti
+
+En konto er **valgfri**, og der er stadig ikke noget, du skal melde dig til. Appen virker
+helt uden konto — det er standarden, alt bliver på din enhed, og ingen live.tips-server er
+involveret.
+
+Vil du have dine bands, indstillinger og din historik på mere end én enhed, kan du logge ind
+med **Apple**, med **Google** eller som anonym **gæst**. En konto er et sted at opbevare
+*dine egne* data, på **Firebase** (Google), læsbare af din konto og af ingen anden. Hvad den
+indeholder — og hvad det at logge ind ændrer ved dit privatliv — står i Privatlivspolitikken,
+som er værd at læse, før du logger ind.
+
+Har du en konto:
+
+- **Den er din at passe på.** Enhver, der kan logge ind som dig, kan se alt i den. Hold din
+  login-metode sikker, og brug **Indstillinger → Sikkerhed** til at gennemgå dine enheder,
+  tilbagekalde en eller logge ud alle andre steder.
+- **En gæstekonto kan ikke gendannes.** Den har ingen e-mail og ingen adgangskode. Mister du
+  alle enheder, der er logget ind på den, er dens data væk — det er prisen for at logge ind
+  uden at give os noget. Brug Apple eller Google, hvis det betyder noget for dig.
+- **Du er ansvarlig for, hvad der er i den** — dine bandnavne, dine offentlige hilsner og alt
+  andet, du lægger derind.
+- **At tilføje en enhed kræver din bekræftelse** på en enhed, der allerede er logget ind.
+  Bekræft ikke en enhed, du ikke selv har bedt om, og lad ikke nogen fotografere QR-koden for
+  så alligevel at trykke bekræft.
+- **Vi kan suspendere eller slette en konto** — se *At sætte punktum* nedenfor.
+
 ## Hvis du er kunstner
 
 Du er ansvarlig for:
@@ -55,10 +83,14 @@ Du er ansvarlig for:
   betalingsdashboard.
 - **Loven der, hvor du optræder** — tilladelser til gadeoptræden, spillestedets regler og
   alt andet lokalt.
-- **Det, du offentliggør.** Dit kunstnernavn og din hilsen vises på en offentlig side; hold
-  dem lovlige og dine egne.
-- **Din Stripe-nøgle.** Den bor på din enhed. Behandl enheden, som du ville behandle
-  kontanter.
+- **Det, du offentliggør.** Dit kunstnernavn og din hilsen vises på en offentlig
+  drikkepengeside; hold dem lovlige og dine egne.
+- **Din Stripe-nøgle.** Det er en begrænset nøgle, du selv har oprettet, og den bor på din
+  enhed — og, hvis du logger ind, også i din kontos private lagring, så dine andre enheder
+  kan bruge den. Uanset hvad er den din: behandl enheden, som du ville behandle kontanter, og
+  tilbagekald nøglen i dit Stripe-dashboard, hvis en enhed forsvinder.
+- **Dine bands og de fan-hilsner, du sætter på skærmen.** Et navn og en hilsen vises for et
+  lokale fuldt af mennesker. Hvad der kommer op på den skærm, er dit at moderere.
 
 ## Hvis du er fan
 
@@ -84,22 +116,40 @@ live.tips markerer disse drikkepenge som **uverificerede**, og det betyder præc
 mod deres egen Revolut-, MobilePay- eller Monzo-app. Drikkepenge via Stripe er de eneste,
 live.tips rent faktisk kan bekræfte, og det er derfor, Stripe er den anbefalede metode.
 
-## Relæet
+## Relæet og drikkepengesiderne
 
-Relæet tilbydes **gratis, som en venlig gestus, uden nogen form for garanti**. Det er
+Drikkepengesider bor på `tip.live.tips` og serveres af et lille relæ, vi driver på Firebase.
+Det tilbydes **gratis, som en venlig gestus, uden nogen form for garanti**. Det er
 best effort: det kan blive rate-limitet, det kan være utilgængeligt, drikkepenge kan blive
-forsinket eller gå tabt, og det gemmer intet, der ville lade nogen genskabe dem bagefter.
+forsinket eller gå tabt, og det gemmer med vilje intet, der ville lade nogen genskabe dem
+bagefter — leverede drikkepenge slettes i det øjeblik, kunstnerens skærm viser dem, og
+ikke-leverede slettes efter en time.
 
-- Drikkepengesider **slettes efter 90 dages inaktivitet**.
+- En drikkepengeside **uden en konto bag sig slettes efter 90 dages inaktivitet**.
 - Vi kan **rate-limite, blokere eller slette enhver drikkepengeside**, når som helst, uden
   varsel — i særdeleshed hvor vi ser svindel, identitetsmisbrug, misbrug, ulovligt indhold
   eller et forsøg på at overbelaste tjenesten.
 - Vi kan **ændre relæet eller lukke det helt ned**. Skulle vi nogensinde gøre det, vil
   opsætninger med kun Stripe blive ved med at virke, fordi de aldrig var afhængige af os.
 
-Du må ikke bruge relæet til at udgive dig for at være en anden, til at begå svindel, til at
-offentliggøre ulovligt eller krænkende indhold, til at indsamle velgørende donationer under
-falske forudsætninger eller til at angribe tjenesten.
+Du må ikke bruge relæet, en drikkepengeside eller en konto til at udgive dig for at være en
+anden, til at begå svindel, til at offentliggøre ulovligt eller krænkende indhold, til at
+indsamle velgørende donationer under falske forudsætninger, til at omgå rate-limits eller
+anti-bot-tjekket eller til at angribe tjenesten.
+
+## At sætte punktum
+
+- **Du** kan stoppe når som helst: log ud, fjern et band, slet en drikkepengeside, eller
+  afinstaller appen. Privatlivspolitikken siger præcis, hvad hver af de handlinger sletter —
+  og siger ærligt, at det at slette en hel konto indtil videre er en e-mail til
+  **[contact@live.tips](mailto:contact@live.tips)** frem for en knap i appen.
+- **Vi** kan suspendere, tilbagekalde eller slette en konto, en drikkepengeside eller adgang
+  til tjenesten, hvor den bruges til noget af det ovennævnte, eller hvor det at lade den køre
+  ville udsætte tjenesten eller andre mennesker for risiko. Der er ingen ankenævn her. Der er
+  en e-mailadresse og et menneske, der læser den.
+- Bliver den hostede tjeneste nogensinde lukket ned, siger vi det på dette website. Der er
+  intet af værdi låst inde i den: pengene er allerede på din egen betalingskonto, appen er
+  open source, og en opsætning med kun Stripe havde aldrig brug for os.
 
 ## Ingen garanti
 
@@ -107,17 +157,19 @@ live.tips leveres **“som den er”, uden nogen form for garanti**, udtrykkelig
 underforstået, herunder enhver garanti for salgbarhed, egnethed til et bestemt formål eller
 ikke-krænkelse. Det er standardpositionen i MIT, og den er ment bogstaveligt.
 
-Vi lover ikke, at softwaren er fri for fejl, at appen viser hver eneste skilling, at relæet
-er tilgængeligt under dit sæt, eller at nogen tredjepartstjeneste opfører sig ordentligt.
+Vi lover ikke, at softwaren er fri for fejl, at appen viser hver eneste skilling, at din
+konto synkroniserer, at relæet er tilgængeligt under dit sæt, eller at nogen
+tredjepartstjeneste opfører sig ordentligt.
 
 ## Ansvar
 
 **I det videst mulige omfang, loven tillader, er vi ikke ansvarlige** for tab eller skade,
 der opstår som følge af din brug af live.tips. Det omfatter — uden begrænsning — mistede,
 forsinkede, duplikerede eller ikke-leverede drikkepenge; drikkepenge vist som uverificerede,
-som aldrig blev betalt; tabt indtægt; en enhed, der svigtede på scenen; handlinger,
-nedbrud eller beslutninger fra Stripe, Revolut, MobilePay, Monzo, Cloudflare eller GitHub;
-og alt, du har mistet, fordi du stolede på et tal på en skærm.
+som aldrig blev betalt; data, der ikke blev synkroniseret, eller som fulgte med en konto, du
+ikke kunne gendanne; tabt indtægt; en enhed, der svigtede på scenen; handlinger, nedbrud
+eller beslutninger fra Stripe, Revolut, MobilePay, Monzo, Google, Apple, Cloudflare eller
+GitHub; og alt, du har mistet, fordi du stolede på et tal på en skærm.
 
 live.tips er fri software, som én person giver væk. Der er ingen indtægt her til at
 finansiere et ansvar, og intet accepteres.
@@ -137,7 +189,8 @@ open source giver dig: kør din egen. Kildekoden ligger på
 [github.com/mekedron/live.tips](https://github.com/mekedron/live.tips).
 
 Intet i disse vilkår begrænser de rettigheder, MIT-licensen giver dig over selve koden;
-disse vilkår regulerer den **hostede tjeneste** (dette website og det relæ, vi driver).
+disse vilkår regulerer den **hostede tjeneste** — dette website, kontiene og det relæ, vi
+driver.
 
 ## Ændringer
 

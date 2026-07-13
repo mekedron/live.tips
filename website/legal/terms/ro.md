@@ -5,9 +5,10 @@ updated: 2026-07-13
 updated_label: Ultima actualizare 13 iulie 2026
 ---
 
-Acești termeni acoperă aplicația live.tips, acest site și releul opțional de la
-`api.live.tips`. live.tips este administrat de **Nikita Rabykin**, un dezvoltator individual, și este
-lansat ca software liber și open-source sub
+Acești termeni acoperă aplicația live.tips, acest site, **contul** live.tips opțional și releul
+opțional din spatele paginilor de bacșiș de la `tip.live.tips`. live.tips este administrat de **Nikita
+Rabykin**, un dezvoltator individual — nu o companie, nu o echipă — și este lansat ca software liber și
+open-source sub
 [licența MIT](https://github.com/mekedron/live.tips/blob/main/LICENSE).
 
 Folosind live.tips accepți cele ce urmează. Sunt scurte, pentru că live.tips face foarte
@@ -23,8 +24,8 @@ pe măsură ce fanii lasă bacșiș.
 
 **Nu suntem un serviciu de plăți, o bancă, un serviciu de custodie și nici parte la tranzacțiile tale.**
 Nu deținem, nu rutăm și nu atingem niciodată banii nimănui. Un bacșiș călătorește direct de la fan către
-contul de plată al artistului. Nu există niciun cont live.tips la mijloc, pentru că nu există
-niciun cont live.tips deloc.
+contul de plată al artistului. Nu există niciun sold live.tips la mijloc, pentru că nu există
+niciun sold live.tips deloc.
 
 Concret, asta înseamnă:
 
@@ -43,6 +44,33 @@ trebuie să își descrie activitatea către furnizorul lor de plăți în conse
 tratează prestația artistică și strângerea de fonduri ca lucruri diferite, iar doar una dintre ele
 ești tu.
 
+## Conturi
+
+Contul este **opțional** și tot nu există nimic la care să fii nevoit să te înregistrezi. Aplicația
+funcționează fără niciun cont — asta este varianta implicită, totul rămâne pe dispozitivul tău și
+niciun server live.tips nu este implicat.
+
+Dacă vrei să ai trupele, setările și istoricul pe mai mult de un dispozitiv, te poți autentifica cu
+**Apple**, cu **Google** sau ca **invitat** anonim. Un cont este un loc în care să îți ții datele *tale*,
+pe **Firebase** (Google), lizibile de contul tău și de niciun altul. Ce anume conține — și ce schimbă
+autentificarea în privința confidențialității tale — este descris în Politica de confidențialitate, pe
+care merită să o citești înainte să te autentifici.
+
+Dacă ai un cont:
+
+- **Este al tău și tu ai grijă de el.** Oricine se poate autentifica în locul tău vede tot ce se află
+  în el. Ține-ți metoda de autentificare în siguranță și folosește **Setări → Securitate** ca să îți
+  revizuiești dispozitivele, să revoci unul sau să te deconectezi peste tot în altă parte.
+- **Un cont de invitat nu poate fi recuperat.** Nu are e-mail și nu are parolă. Pierde fiecare
+  dispozitiv autentificat în el și datele lui sunt duse — acesta este târgul pentru autentificarea fără
+  să ne dai nimic. Dacă asta contează pentru tine, folosește Apple sau Google.
+- **Ești responsabil pentru ce se află în el** — numele trupelor tale, mesajele tale publice și orice
+  altceva pui acolo.
+- **Adăugarea unui dispozitiv are nevoie de confirmarea ta** pe un dispozitiv deja autentificat. Nu
+  confirma un dispozitiv pe care nu l-ai cerut și nu lăsa pe cineva să fotografieze codul QR, ca apoi
+  să apeși oricum „confirmă”.
+- **Putem suspenda sau șterge un cont** — vezi *Cum se încheie*, mai jos.
+
 ## Dacă ești artist
 
 Ești responsabil pentru:
@@ -54,9 +82,14 @@ Ești responsabil pentru:
 - **Rambursări, dispute și contestații de plată**, pe care le gestionezi în propriul tău panou de plăți.
 - **Legea de acolo unde cânți** — permise de artist stradal, regulile locului, și orice altceva ține de
   regulile locale.
-- **Ce publici.** Numele tău de artist și mesajul tău apar pe o pagină publică; ține-le legale și
-  ale tale.
-- **Cheia ta Stripe.** Ea stă pe dispozitivul tău. Tratează dispozitivul așa cum ai trata banii gheață.
+- **Ce publici.** Numele tău de artist și mesajul tău apar pe o pagină de bacșiș publică; ține-le legale
+  și ale tale.
+- **Cheia ta Stripe.** Este o cheie restricționată pe care ți-ai creat-o singur și stă pe dispozitivul
+  tău — iar dacă te autentifici, și în spațiul privat de stocare al contului tău, ca să o poată folosi
+  și celelalte dispozitive ale tale. Oricum ar fi, este a ta: tratează dispozitivul așa cum ai trata
+  banii gheață și revocă cheia în panoul tău Stripe dacă vreunul dispare.
+- **Trupele tale și mesajele fanilor pe care le pui pe ecran.** Un nume și un mesaj sunt arătate unei
+  săli pline de oameni. Ce apare pe acel ecran ține de tine să moderezi.
 
 ## Dacă ești fan
 
@@ -80,23 +113,40 @@ live.tips etichetează aceste bacșișuri drept **neverificate**, iar asta înse
 în propria aplicație Revolut, MobilePay sau Monzo. Bacșișurile prin Stripe sunt singurele pe care
 live.tips le poate confirma cu adevărat, motiv pentru care Stripe este metoda recomandată.
 
-## Releul
+## Releul și paginile de bacșiș
 
-Releul este oferit **gratuit, ca o curtoazie, fără nicio garanție de niciun fel**.
+Paginile de bacșiș se află la `tip.live.tips` și sunt servite de un mic releu pe care îl rulăm pe
+Firebase. Este oferit **gratuit, ca o curtoazie, fără nicio garanție de niciun fel**.
 Funcționează pe principiul „cel mai bun efort”: poate fi limitat ca rată, poate fi indisponibil,
-bacșișurile pot fi întârziate sau pierdute, iar el nu stochează nimic care să permită cuiva să le
-recupereze ulterior.
+bacșișurile pot fi întârziate sau pierdute, iar el nu stochează în mod deliberat nimic care să permită
+cuiva să le recupereze ulterior — un bacșiș livrat este șters în clipa în care ecranul artistului îl
+afișează, iar unul nelivrat este șters după o oră.
 
-- Paginile de bacșiș sunt **șterse după 90 de zile de inactivitate**.
+- O pagină de bacșiș în spatele căreia **nu stă niciun cont este ștearsă după 90 de zile de
+  inactivitate**.
 - Putem **limita rata, bloca sau șterge orice pagină de bacșiș**, oricând, fără preaviz — în special
   acolo unde vedem fraudă, uzurpare de identitate, abuz, conținut ilegal sau o încercare de a
   supraîncărca serviciul.
 - Putem **modifica sau închide complet releul**. Dacă vom face vreodată asta, configurațiile doar-Stripe
   vor continua să funcționeze, pentru că nu au depins niciodată de noi.
 
-Nu ai voie să folosești releul pentru a te da drept altcineva, pentru a comite fraude, pentru a publica
-conținut ilegal sau abuziv, pentru a solicita donații caritabile sub pretexte false sau pentru a ataca
-serviciul.
+Nu ai voie să folosești releul, o pagină de bacșiș sau un cont pentru a te da drept altcineva, pentru a
+comite fraude, pentru a publica conținut ilegal sau abuziv, pentru a solicita donații caritabile sub
+pretexte false, pentru a ocoli limitele de rată ori verificarea anti-bot, sau pentru a ataca serviciul.
+
+## Cum se încheie
+
+- **Tu** poți opri oricând: deconectează-te, elimină o trupă, șterge o pagină de bacșiș sau
+  dezinstalează aplicația. Politica de confidențialitate spune exact ce șterge fiecare dintre acestea —
+  și spune cinstit că ștergerea unui cont întreg este, deocamdată, un e-mail la
+  **[contact@live.tips](mailto:contact@live.tips)**, nu un buton în aplicație.
+- **Noi** putem suspenda, revoca sau șterge un cont, o pagină de bacșiș sau accesul la serviciu acolo
+  unde sunt folosite pentru oricare dintre lucrurile enumerate mai sus, ori acolo unde lăsarea lor să
+  ruleze ar pune în pericol serviciul sau alte persoane. Nu există aici o comisie de contestații.
+  Există o adresă de e-mail și un om care o citește.
+- Dacă serviciul găzduit va fi vreodată închis, o vom spune pe acest site. Nimic de valoare nu este
+  încuiat înăuntru: banii sunt deja în propriul tău cont de plată, aplicația este open source, iar o
+  configurație doar-Stripe nu a avut niciodată nevoie de noi.
 
 ## Fără garanție
 
@@ -104,17 +154,18 @@ live.tips este furnizat **„ca atare”, fără garanții de niciun fel**, expr
 inclusiv orice garanție de vandabilitate, de conformitate cu un anumit scop sau de
 neîncălcare a drepturilor. Aceasta este poziția standard MIT și este menită literal.
 
-Nu promitem că software-ul este lipsit de erori, că aplicația va afișa fiecare bacșiș,
-că releul va fi accesibil în timpul concertului tău sau că vreun serviciu terț se va
-comporta cum trebuie.
+Nu promitem că software-ul este lipsit de erori, că aplicația va afișa fiecare bacșiș, că
+contul tău se va sincroniza, că releul va fi accesibil în timpul concertului tău sau că vreun
+serviciu terț se va comporta cum trebuie.
 
 ## Răspundere
 
 **În măsura maximă permisă de lege, nu suntem răspunzători** pentru nicio pierdere sau daună
 rezultată din utilizarea live.tips. Aici intră — fără limitare — bacșișuri ratate,
 întârziate, duplicate sau nelivrate; bacșișuri afișate ca neverificate care nu au fost plătite niciodată;
+date care nu s-au sincronizat sau care s-au dus odată cu un cont pe care nu l-ai putut recupera;
 venituri pierdute; un dispozitiv care a cedat pe scenă; faptele, întreruperile sau deciziile Stripe,
-Revolut, MobilePay, Monzo, Cloudflare sau GitHub; și orice ai pierdut pentru că
+Revolut, MobilePay, Monzo, Google, Apple, Cloudflare sau GitHub; și orice ai pierdut pentru că
 te-ai încrezut într-un număr de pe un ecran.
 
 live.tips este software liber, dat pe gratis de un singur om. Nu există aici venituri din care să se
@@ -135,7 +186,8 @@ sincer pe care ți-l dă open source-ul este: rulează-ți propriul serviciu. Su
 [github.com/mekedron/live.tips](https://github.com/mekedron/live.tips).
 
 Nimic din acești termeni nu restrânge drepturile pe care licența MIT ți le acordă asupra codului
-în sine; acești termeni guvernează **serviciul găzduit** (acest site și releul pe care îl rulăm noi).
+în sine; acești termeni guvernează **serviciul găzduit** — acest site, conturile și releul pe care îl
+rulăm noi.
 
 ## Modificări
 

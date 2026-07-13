@@ -5,9 +5,10 @@ updated: 2026-07-13
 updated_label: Son güncelleme 13 Temmuz 2026
 ---
 
-Bu koşullar live.tips uygulamasını, bu web sitesini ve `api.live.tips` adresindeki isteğe
-bağlı aktarıcıyı kapsar. live.tips, bireysel bir geliştirici olan **Nikita Rabykin**
-tarafından işletilir ve
+Bu koşullar live.tips uygulamasını, bu web sitesini, isteğe bağlı live.tips **hesabını** ve
+`tip.live.tips` adresindeki bahşiş sayfalarının arkasındaki isteğe bağlı aktarıcıyı kapsar.
+live.tips, bireysel bir geliştirici olan **Nikita Rabykin** tarafından işletilir — bir şirket
+değil, bir ekip değil — ve
 [MIT lisansı](https://github.com/mekedron/live.tips/blob/main/LICENSE) altında ücretsiz ve
 açık kaynaklı yazılım olarak yayımlanır.
 
@@ -24,8 +25,8 @@ canlı bir bahşiş kavanozuna dönüştürür.
 
 **Bir ödeme hizmeti, banka, emanet kuruluşu ya da işlemlerinizin tarafı değiliz.** Kimsenin
 parasını asla tutmaz, yönlendirmez veya ona dokunmayız. Bir bahşiş doğrudan hayrandan
-sanatçının kendi ödeme hesabına gider. Arada bir live.tips hesabı yoktur, çünkü hiç
-live.tips hesabı yoktur.
+sanatçının kendi ödeme hesabına gider. Arada bir live.tips bakiyesi yoktur, çünkü hiç
+live.tips bakiyesi yoktur.
 
 Bu, somut olarak şu anlama gelir.
 
@@ -44,6 +45,34 @@ toplama platformu değildir. Sanatçılar, işlerini ödeme sağlayıcılarına 
 tanımlamalıdır — özellikle Stripe, performansı ve bağış toplamayı farklı şeyler olarak ele
 alır ve bunlardan yalnızca biri sizsiniz.
 
+## Hesaplar
+
+Hesap **isteğe bağlıdır** ve kaydolmanız gereken bir şey hâlâ yoktur. Uygulama hiç hesap
+olmadan çalışır — varsayılan durum budur, her şey cihazınızda kalır ve hiçbir live.tips
+sunucusu işin içine girmez.
+
+Gruplarınızı, ayarlarınızı ve geçmişinizi birden fazla cihazda istiyorsanız, **Apple** ile,
+**Google** ile ya da anonim bir **misafir** olarak oturum açabilirsiniz. Hesap, *kendi*
+verilerinizi tutmaya yarayan bir yerdir; **Firebase** (Google) üzerinde durur ve yalnızca
+sizin hesabınız tarafından okunabilir, başka hiçbir hesap tarafından değil. Neleri barındırdığı
+— ve oturum açmanın gizliliğiniz açısından neyi değiştirdiği — Gizlilik Politikası'nda
+anlatılır; oturum açmadan önce okumaya değer.
+
+Bir hesabınız varsa:
+
+- **Onu korumak size düşer.** Sizin olarak oturum açabilen herkes içindeki her şeyi görebilir.
+  Oturum açma yönteminizi güvende tutun ve cihazlarınızı gözden geçirmek, birini iptal etmek ya
+  da diğer her yerde oturumu kapatmak için **Ayarlar → Güvenlik**'i kullanın.
+- **Bir misafir hesabı kurtarılamaz.** E-postası ve parolası yoktur. Ona bağlı her cihazı
+  kaybedin, verileri gitmiştir — bize hiçbir şey vermeden oturum açmanın bedeli budur. Bu sizin
+  için önemliyse Apple veya Google kullanın.
+- **İçindekilerden siz sorumlusunuz** — grup adlarınız, herkese açık mesajlarınız ve oraya
+  koyduğunuz her şey.
+- **Cihaz eklemek, zaten oturum açmış bir cihazda onayınızı gerektirir.** İstemediğiniz bir
+  cihazı onaylamayın ve birinin QR kodunuzun fotoğrafını çekmesine izin verip ardından yine de
+  onaya dokunmayın.
+- **Bir hesabı askıya alabilir veya silebiliriz** — aşağıdaki *Sona erdirmek* bölümüne bakın.
+
 ## Sanatçıysanız
 
 Şunlardan siz sorumlusunuz.
@@ -55,9 +84,14 @@ alır ve bunlardan yalnızca biri sizsiniz.
 - Kendi ödeme panelinizde yönettiğiniz **iadeler, itirazlar ve ters ibrazlar**.
 - **Performans sergilediğiniz yerin hukuku** — sokak müziği izinleri, mekân kuralları ve
   diğer tüm yerel düzenlemeler.
-- **Yayımladıklarınız.** Sanatçı adınız ve mesajınız herkese açık bir sayfada görünür;
+- **Yayımladıklarınız.** Sanatçı adınız ve mesajınız herkese açık bir bahşiş sayfasında görünür;
   bunları hukuka uygun ve size ait tutun.
-- **Stripe anahtarınız.** O, cihazınızda durur. Cihaza, nakde davrandığınız gibi davranın.
+- **Stripe anahtarınız.** O, kendi oluşturduğunuz kısıtlı bir anahtardır ve cihazınızda durur —
+  oturum açarsanız, diğer cihazlarınız da kullanabilsin diye hesabınızın özel deposunda da
+  durur. Her hâlükârda o sizindir: cihaza, nakde davrandığınız gibi davranın ve bir cihaz
+  kaybolursa anahtarı Stripe panelinizden iptal edin.
+- **Gruplarınız ve ekrana koyduğunuz hayran mesajları.** Bir ad ve bir mesaj, insan dolu bir
+  salona gösterilir. O ekranda ne belirdiğini denetlemek size düşer.
 
 ## Hayransanız
 
@@ -83,14 +117,17 @@ MobilePay veya Monzo uygulamalarıyla mutabakat yapmalıdır. live.tips'in gerç
 doğrulayabildiği tek bahşişler Stripe bahşişleridir; Stripe'ın önerilen yöntem olmasının
 nedeni budur.
 
-## Aktarıcı
+## Aktarıcı ve bahşiş sayfaları
 
-Aktarıcı, **ücretsiz olarak, bir nezaket olarak ve hiçbir türde garanti verilmeksizin**
-sunulur. En iyi çaba esasına dayanır — hız sınırlamasına takılabilir, erişilemez olabilir,
-bahşişler gecikebilir veya kaybolabilir ve sonrasında herhangi birinin onları kurtarmasına
-imkân verecek hiçbir şey saklamaz.
+Bahşiş sayfaları `tip.live.tips` adresinde durur ve Firebase üzerinde işlettiğimiz küçük bir
+aktarıcı tarafından sunulur. Aktarıcı, **ücretsiz olarak, bir nezaket olarak ve hiçbir türde
+garanti verilmeksizin** sunulur. En iyi çaba esasına dayanır — hız sınırlamasına takılabilir,
+erişilemez olabilir, bahşişler gecikebilir veya kaybolabilir ve sonrasında herhangi birinin
+onları kurtarmasına imkân verecek hiçbir şeyi bilerek saklamaz: teslim edilen bir bahşiş,
+sanatçının ekranı onu gösterdiği anda silinir; teslim edilmeyen bir bahşiş ise bir saat sonra
+silinir.
 
-- Bahşiş sayfaları **90 gün hareketsizlikten sonra silinir**.
+- Arkasında **hesap olmayan bir bahşiş sayfası, 90 gün hareketsizlikten sonra silinir**.
 - **Herhangi bir bahşiş sayfasını**, herhangi bir zamanda ve bildirimde bulunmadan **hız
   sınırlamasına tabi tutabilir, engelleyebilir veya silebiliriz** — özellikle
   dolandırıcılık, kimliğe bürünme, kötüye kullanım, yasa dışı içerik veya hizmeti aşırı
@@ -98,9 +135,25 @@ imkân verecek hiçbir şey saklamaz.
 - Aktarıcıyı **değiştirebilir veya tamamen kapatabiliriz**. Bunu yaparsak, yalnızca Stripe
   kullanan kurulumlar çalışmaya devam eder, çünkü hiçbir zaman bize bağımlı olmadılar.
 
-Aktarıcıyı; birinin kimliğine bürünmek, dolandırıcılık yapmak, yasa dışı veya taciz edici
-içerik yayımlamak, yanıltıcı bahanelerle hayır amaçlı bağış toplamak ya da hizmete saldırmak
-için kullanamazsınız.
+Aktarıcıyı, bir bahşiş sayfasını ya da bir hesabı; birinin kimliğine bürünmek, dolandırıcılık
+yapmak, yasa dışı veya taciz edici içerik yayımlamak, yanıltıcı bahanelerle hayır amaçlı bağış
+toplamak, hız sınırlarını ya da bot karşıtı denetimi aşmak veya hizmete saldırmak için
+kullanamazsınız.
+
+## Sona erdirmek
+
+- **Siz** istediğiniz zaman durabilirsiniz: oturumu kapatın, bir grubu kaldırın, bir bahşiş
+  sayfasını silin ya da uygulamayı kaldırın. Gizlilik Politikası bunların her birinin tam olarak
+  neyi sildiğini söyler — ve bir hesabın tümüyle silinmesinin şimdilik uygulamadaki bir düğme
+  değil, **[contact@live.tips](mailto:contact@live.tips)** adresine yazılan bir e-posta olduğunu
+  dürüstçe belirtir.
+- **Biz**, yukarıda sayılanlardan herhangi biri için kullanıldığında ya da çalışmaya devam
+  etmesi hizmeti veya başkalarını riske atacaksa, bir hesabı, bir bahşiş sayfasını veya hizmete
+  erişimi askıya alabilir, iptal edebilir ya da silebiliriz. Burada bir itiraz kurulu yok. Bir
+  e-posta adresi ve onu okuyan bir insan var.
+- Barındırılan hizmet bir gün kapatılırsa, bunu bu sitede duyururuz. İçinde kilitli kalan
+  değerli hiçbir şey yok: para zaten kendi ödeme hesabınızda, uygulama açık kaynak ve yalnızca
+  Stripe kullanan bir kurulumun bize zaten hiç ihtiyacı olmadı.
 
 ## Garanti verilmez
 
@@ -108,17 +161,18 @@ live.tips, açık veya zımni hiçbir türde garanti verilmeksizin **"olduğu gi
 buna satılabilirlik, belirli bir amaca uygunluk veya ihlal etmeme garantileri de dahildir.
 Bu, standart MIT tutumudur ve tam anlamıyla kastedilmektedir.
 
-Yazılımın hatasız olduğunu, uygulamanın her bahşişi göstereceğini, performansınız sırasında
-aktarıcıya erişilebileceğini ya da herhangi bir üçüncü taraf hizmetin düzgün davranacağını
-vaat etmeyiz.
+Yazılımın hatasız olduğunu, uygulamanın her bahşişi göstereceğini, hesabınızın eşitleneceğini,
+performansınız sırasında aktarıcıya erişilebileceğini ya da herhangi bir üçüncü taraf hizmetin
+düzgün davranacağını vaat etmeyiz.
 
 ## Sorumluluk
 
 **Hukukun izin verdiği azami ölçüde, live.tips'i kullanmanızdan doğan hiçbir kayıp veya
 zarardan sorumlu değiliz.** Buna — sınırlama olmaksızın — kaçırılan, geciken, mükerrer ya da
 teslim edilmemiş bahşişler; hiçbir zaman ödenmemiş olduğu hâlde doğrulanmamış olarak
-gösterilen bahşişler; kaybedilen gelir; sahnede arızalanan bir cihaz; Stripe, Revolut,
-MobilePay, Monzo, Cloudflare veya GitHub'ın eylemleri, kesintileri ya da kararları; ve bir
+gösterilen bahşişler; eşitlenemeyen ya da kurtaramadığınız bir hesapla birlikte kaybolan
+veriler; kaybedilen gelir; sahnede arızalanan bir cihaz; Stripe, Revolut, MobilePay, Monzo,
+Google, Apple, Cloudflare veya GitHub'ın eylemleri, kesintileri ya da kararları; ve bir
 ekrandaki bir sayıya güvendiğiniz için kaybettiğiniz her şey dahildir.
 
 live.tips, tek bir kişinin karşılıksız verdiği özgür bir yazılımdır. Burada bir sorumluluğu
@@ -140,8 +194,8 @@ işletme biçimimizi beğenmiyorsanız, açık kaynağın size verdiği dürüst
 [github.com/mekedron/live.tips](https://github.com/mekedron/live.tips) adresindedir.
 
 Bu koşullardaki hiçbir şey, MIT lisansının kodun kendisi üzerinde size tanıdığı hakları
-kısıtlamaz; bu koşullar **barındırılan hizmeti** (bu web sitesi ve işlettiğimiz aktarıcı)
-düzenler.
+kısıtlamaz; bu koşullar **barındırılan hizmeti** — bu web sitesini, hesapları ve işlettiğimiz
+aktarıcıyı — düzenler.
 
 ## Değişiklikler
 

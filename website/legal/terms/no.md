@@ -5,9 +5,10 @@ updated: 2026-07-13
 updated_label: Sist oppdatert 13. juli 2026
 ---
 
-Disse vilkårene dekker live.tips-appen, dette nettstedet og det valgfrie reléet på
-`api.live.tips`. live.tips drives av **Nikita Rabykin**, en enkeltutvikler, og er utgitt som fri
-programvare med åpen kildekode under
+Disse vilkårene dekker live.tips-appen, dette nettstedet, den valgfrie live.tips-**kontoen** og det
+valgfrie reléet bak tipssidene på `tip.live.tips`. live.tips drives av **Nikita Rabykin**, en
+enkeltutvikler — ikke et selskap, ikke et team — og er utgitt som fri programvare med åpen
+kildekode under
 [MIT-lisensen](https://github.com/mekedron/live.tips/blob/main/LICENSE).
 
 Ved å bruke live.tips godtar du det som følger. Det er kort, fordi live.tips gjør svært lite på
@@ -23,8 +24,8 @@ etter hvert som fansen gir tips.
 
 **Vi er ingen betalingstjeneste, ingen bank, ingen depotordning og ingen part i transaksjonene
 dine.** Vi holder, ruter eller rører aldri noens penger. Et tips reiser direkte fra fansen til
-artistens egen betalingskonto. Det finnes ingen live.tips-konto i midten, fordi det ikke finnes
-noen live.tips-konto i det hele tatt.
+artistens egen betalingskonto. Det finnes ingen live.tips-saldo i midten, fordi det ikke finnes
+noen live.tips-saldo i det hele tatt.
 
 Konkret betyr dette:
 
@@ -43,6 +44,33 @@ innsamlingsplattform. Artister må beskrive virksomheten sin overfor betalingsle
 tilsvarende — Stripe behandler særlig opptreden og pengeinnsamling som to forskjellige ting, og
 bare den ene av dem er deg.
 
+## Kontoer
+
+En konto er **valgfri**, og det finnes fortsatt ingenting du må registrere deg for. Appen virker
+helt uten konto — det er standarden, alt blir liggende på enheten din, og ingen live.tips-server er
+involvert.
+
+Vil du ha bandene, innstillingene og historikken din på mer enn én enhet, kan du logge inn med
+**Apple**, med **Google**, eller som anonym **gjest**. En konto er et sted å oppbevare *dine egne*
+data, på **Firebase** (Google), lesbare for kontoen din og for ingen andre. Hva den inneholder — og
+hva det å logge inn endrer for personvernet ditt — står i personvernerklæringen, som er verdt å
+lese før du logger inn.
+
+Hvis du har en konto:
+
+- **Det er ditt ansvar å passe på den.** Alle som kan logge inn som deg, kan se alt som ligger i
+  den. Hold innloggingsmetoden din sikker, og bruk **Innstillinger → Sikkerhet** til å gå gjennom
+  enhetene dine, tilbakekalle én, eller logge ut alle andre steder.
+- **En gjestekonto kan ikke gjenopprettes.** Den har verken e-post eller passord. Mister du hver
+  eneste enhet som er logget inn på den, er dataene borte — det er byttehandelen for å logge inn
+  uten å gi oss noe. Bruk Apple eller Google hvis det betyr noe for deg.
+- **Du er ansvarlig for det som ligger i den** — bandnavnene dine, de offentlige hilsenene dine, og
+  alt annet du legger inn der.
+- **Å legge til en enhet krever bekreftelsen din** på en enhet som allerede er innlogget. Ikke
+  bekreft en enhet du ikke har bedt om, og ikke la noen fotografere QR-koden og så trykke bekreft
+  likevel.
+- **Vi kan suspendere eller slette en konto** — se *Å avslutte*, nedenfor.
+
 ## Hvis du er artist
 
 Du er ansvarlig for:
@@ -54,10 +82,14 @@ Du er ansvarlig for:
 - **Refusjoner, tvister og tilbakeføringer**, som du håndterer i ditt eget betalingsdashbord.
 - **Loven der du opptrer** — gatemusikanttillatelser, husregler på spillestedet og alt annet
   lokalt.
-- **Det du publiserer.** Artistnavnet og hilsenen din vises på en offentlig side; hold dem
+- **Det du publiserer.** Artistnavnet og hilsenen din vises på en offentlig tipsside; hold dem
   lovlige og dine egne.
-- **Stripe-nøkkelen din.** Den bor på enheten din. Behandle enheten som du ville behandlet
-  kontanter.
+- **Stripe-nøkkelen din.** Den er en begrenset nøkkel du selv har laget, og den bor på enheten din
+  — og, hvis du logger inn, også i kontoens private lagring, slik at de andre enhetene dine kan
+  bruke den. Uansett er den din: behandle enheten som du ville behandlet kontanter, og tilbakekall
+  nøkkelen i Stripe-dashbordet ditt hvis en enhet blir borte.
+- **Bandene dine, og fanshilsenene du setter opp på skjermen.** Et navn og en hilsen vises for et
+  rom fullt av folk. Det som dukker opp på den skjermen, er ditt å moderere.
 
 ## Hvis du er fan
 
@@ -81,22 +113,39 @@ betalte.* De er en sceneeffekt, ikke en kvittering.
 Revolut-, MobilePay- eller Monzo-app. Stripe-tips er de eneste live.tips faktisk kan bekrefte, og
 det er derfor Stripe er den anbefalte metoden.
 
-## Reléet
+## Reléet og tipssidene
 
-Reléet tilbys **gratis, som en tjeneste, uten noen form for garanti**. Det er «beste forsøk»: det
-kan bli frekvensbegrenset, det kan være utilgjengelig, tips kan bli forsinket eller gå tapt, og
-det lagrer ingenting som ville latt noen gjenopprette dem i etterkant.
+Tipssidene ligger på `tip.live.tips` og serveres av et lite relé vi driver på Firebase. Det tilbys
+**gratis, som en tjeneste, uten noen form for garanti**. Det er «beste forsøk»: det kan bli
+frekvensbegrenset, det kan være utilgjengelig, tips kan bli forsinket eller gå tapt, og det
+beholder bevisst ingenting som ville latt noen gjenopprette dem i etterkant — et levert tips
+slettes i det øyeblikket artistens skjerm viser det, og et ulevert slettes etter en time.
 
-- Tipssider **slettes etter 90 dager uten aktivitet**.
+- En tipsside **uten konto bak seg slettes etter 90 dager uten aktivitet**.
 - Vi kan **frekvensbegrense, blokkere eller slette enhver tipsside**, når som helst, uten varsel
   — særlig der vi ser svindel, identitetsmisbruk, misbruk, ulovlig innhold eller forsøk på å
   overbelaste tjenesten.
 - Vi kan **endre reléet eller legge det ned helt**. Skulle vi noen gang gjøre det, vil oppsett med
   bare Stripe fortsette å virke, fordi de aldri var avhengige av oss.
 
-Du må ikke bruke reléet til å utgi deg for å være noen andre, til å begå svindel, til å publisere
-ulovlig eller krenkende innhold, til å samle inn veldedige donasjoner under falske forutsetninger,
-eller til å angripe tjenesten.
+Du må ikke bruke reléet, en tipsside eller en konto til å utgi deg for å være noen andre, til å
+begå svindel, til å publisere ulovlig eller krenkende innhold, til å samle inn veldedige donasjoner
+under falske forutsetninger, til å omgå frekvensgrensene eller bot-sjekken, eller til å angripe
+tjenesten.
+
+## Å avslutte
+
+- **Du** kan slutte når som helst: logg ut, fjern et band, slett en tipsside, eller avinstaller
+  appen. Personvernerklæringen sier nøyaktig hva hver av dem sletter — og sier ærlig at det å
+  slette en hel konto foreløpig er en e-post til
+  **[contact@live.tips](mailto:contact@live.tips)** og ikke en knapp i appen.
+- **Vi** kan suspendere, tilbakekalle eller slette en konto, en tipsside eller tilgangen til
+  tjenesten der den brukes til noe av det som er nevnt ovenfor, eller der det å la den kjøre ville
+  sette tjenesten eller andre mennesker i fare. Her finnes det ingen klagenemnd. Det finnes en
+  e-postadresse, og et menneske som leser den.
+- Skulle den driftede tjenesten noen gang bli lagt ned, sier vi fra på dette nettstedet. Ingenting
+  av verdi er låst inne i den: pengene ligger allerede på din egen betalingskonto, appen er åpen
+  kildekode, og et oppsett med bare Stripe trengte oss aldri i det hele tatt.
 
 ## Ingen garanti
 
@@ -105,17 +154,19 @@ underforstått, herunder enhver garanti om salgbarhet, egnethet for et bestemt f
 fravær av inngrep i tredjeparts rettigheter. Dette er standardposisjonen i MIT, og den er ment
 bokstavelig.
 
-Vi lover ikke at programvaren er fri for feil, at appen vil vise hvert eneste tips, at reléet vil
-være tilgjengelig under settet ditt, eller at noen tredjepartstjeneste vil oppføre seg.
+Vi lover ikke at programvaren er fri for feil, at appen vil vise hvert eneste tips, at kontoen din
+vil synkronisere, at reléet vil være tilgjengelig under settet ditt, eller at noen
+tredjepartstjeneste vil oppføre seg.
 
 ## Ansvar
 
 **I den grad loven tillater det, er vi ikke ansvarlige** for noe tap eller skade som oppstår som
 følge av din bruk av live.tips. Det omfatter — uten begrensning — tips som er gått glipp av,
-forsinket, duplisert eller ikke levert; tips som vises som uverifiserte og aldri ble betalt; tapt
+forsinket, duplisert eller ikke levert; tips som vises som uverifiserte og aldri ble betalt; data
+som ikke lot seg synkronisere, eller som forsvant med en konto du ikke kunne gjenopprette; tapt
 inntekt; en enhet som sviktet på scenen; handlingene, nedetiden eller beslutningene til Stripe,
-Revolut, MobilePay, Monzo, Cloudflare eller GitHub; og alt du tapte fordi du stolte på et tall på
-en skjerm.
+Revolut, MobilePay, Monzo, Google, Apple, Cloudflare eller GitHub; og alt du tapte fordi du stolte
+på et tall på en skjerm.
 
 live.tips er fri programvare gitt bort av én person. Det finnes ingen inntekter her til å finansiere
 et ansvar, og intet ansvar påtas.
@@ -135,7 +186,7 @@ gir deg: kjør din egen. Kilden finnes på
 [github.com/mekedron/live.tips](https://github.com/mekedron/live.tips).
 
 Ingenting i disse vilkårene begrenser rettighetene MIT-lisensen gir deg over selve koden; disse
-vilkårene styrer den **driftede tjenesten** (dette nettstedet og reléet vi driver).
+vilkårene styrer den **driftede tjenesten** — dette nettstedet, kontoene og reléet vi driver.
 
 ## Endringer
 

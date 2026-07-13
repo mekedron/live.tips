@@ -5,8 +5,9 @@ updated: 2026-07-13
 updated_label: Ultimo aggiornamento 13 luglio 2026
 ---
 
-Questi termini riguardano l'app live.tips, questo sito e il relay facoltativo all'indirizzo
-`api.live.tips`. live.tips è gestito da **Nikita Rabykin**, uno sviluppatore individuale, ed è
+Questi termini riguardano l'app live.tips, questo sito, l'**account** live.tips facoltativo e il
+relay facoltativo dietro le pagine delle mance all'indirizzo `tip.live.tips`. live.tips è gestito
+da **Nikita Rabykin**, uno sviluppatore individuale — non una società, non un team — ed è
 rilasciato come software libero e open source con
 [licenza MIT](https://github.com/mekedron/live.tips/blob/main/LICENSE).
 
@@ -23,8 +24,8 @@ mentre i fan lasciano le mance.
 
 **Non siamo un servizio di pagamento, una banca, un deposito di garanzia né una parte delle tue
 transazioni.** Non deteniamo, non instradiamo e non tocchiamo mai il denaro di nessuno. Una mancia
-viaggia direttamente dal fan all'account di pagamento dell'artista. Non c'è alcun account live.tips
-nel mezzo, perché non esiste alcun account live.tips.
+viaggia direttamente dal fan all'account di pagamento dell'artista. Non c'è alcun saldo live.tips
+nel mezzo, perché non esiste alcun saldo live.tips.
 
 In concreto, questo significa:
 
@@ -43,6 +44,33 @@ Gli artisti devono descrivere di conseguenza la propria attività al proprio for
 pagamento — Stripe, in particolare, considera la performance e la raccolta fondi due cose diverse,
 e solo una delle due sei tu.
 
+## Account
+
+L'account è **facoltativo**, e non c'è tuttora nulla a cui tu debba registrarti. L'app funziona
+senza alcun account — è l'impostazione predefinita, tutto resta sul tuo dispositivo e nessun server
+live.tips è coinvolto.
+
+Se vuoi le tue band, le tue impostazioni e il tuo storico su più di un dispositivo, puoi accedere
+con **Apple**, con **Google** o come **ospite** anonimo. Un account è un posto dove tenere i *tuoi*
+dati, su **Firebase** (Google), leggibili dal tuo account e da nessun altro. Cosa contiene — e cosa
+cambia per la tua privacy quando accedi — è spiegato nell'Informativa sulla privacy, che vale la
+pena leggere prima di accedere.
+
+Se hai un account:
+
+- **Sei tu a doverne avere cura.** Chiunque riesca ad accedere al posto tuo può vedere tutto ciò
+  che contiene. Tieni al sicuro il tuo metodo di accesso e usa **Impostazioni → Sicurezza** per
+  rivedere i tuoi dispositivi, revocarne uno o uscire da ogni altro dispositivo.
+- **Un account ospite non può essere recuperato.** Non ha email né password. Se perdi tutti i
+  dispositivi da cui vi hai effettuato l'accesso, i suoi dati sono persi — è questo il prezzo di
+  accedere senza darci nulla. Usa Apple o Google se la cosa ti interessa.
+- **Sei responsabile di ciò che vi si trova dentro** — i nomi delle tue band, i tuoi messaggi
+  pubblici e qualsiasi altra cosa tu vi metta.
+- **Aggiungere un dispositivo richiede la tua conferma** su un dispositivo che ha già effettuato
+  l'accesso. Non confermare un dispositivo che non hai richiesto, e non lasciare che qualcuno
+  fotografi il QR code per poi toccare comunque «conferma».
+- **Possiamo sospendere o cancellare un account** — vedi *Chiudere tutto*, qui sotto.
+
 ## Se sei un artista
 
 Sei responsabile di:
@@ -54,10 +82,14 @@ Sei responsabile di:
 - **Rimborsi, contestazioni e chargeback**, che gestisci nella tua dashboard di pagamento.
 - **La legge del luogo in cui ti esibisci** — permessi per l'esibizione di strada, regole del locale
   e qualsiasi altra norma locale.
-- **Ciò che pubblichi.** Il tuo nome d'arte e il tuo messaggio compaiono su una pagina pubblica;
-  fa' in modo che siano leciti e tuoi.
-- **La tua chiave Stripe.** Vive sul tuo dispositivo. Tratta il dispositivo come tratteresti dei
-  contanti.
+- **Ciò che pubblichi.** Il tuo nome d'arte e il tuo messaggio compaiono su una pagina delle mance
+  pubblica; fa' in modo che siano leciti e tuoi.
+- **La tua chiave Stripe.** È una chiave con permessi limitati che hai creato tu stesso, e vive sul
+  tuo dispositivo — e, se effettui l'accesso, anche nell'archiviazione privata del tuo account,
+  così che gli altri tuoi dispositivi possano usarla. In ogni caso è tua: tratta il dispositivo
+  come tratteresti dei contanti, e revoca la chiave nella tua dashboard Stripe se ne perdi uno.
+- **Le tue band e i messaggi dei fan che mandi sullo schermo.** Un nome e un messaggio vengono
+  mostrati a una sala piena di gente. Ciò che compare su quello schermo sta a te moderarlo.
 
 ## Se sei un fan
 
@@ -81,22 +113,41 @@ live.tips etichetta queste mance come **non verificate**, e significa esattament
 riconciliarla con la propria app Revolut, MobilePay o Monzo. Le mance via Stripe sono le uniche che
 live.tips può davvero confermare, ed è per questo che Stripe è il metodo consigliato.
 
-## Il relay
+## Il relay e le pagine delle mance
 
-Il relay è offerto **gratuitamente, per cortesia, senza garanzie di alcun tipo**. Funziona secondo
+Le pagine delle mance vivono su `tip.live.tips`, servite da un piccolo relay che gestiamo su
+Firebase. È offerto **gratuitamente, per cortesia, senza garanzie di alcun tipo**. Funziona secondo
 il principio del massimo impegno: può essere soggetto a limiti di frequenza, può non essere
-disponibile, le mance possono subire ritardi o andare perse, e non memorizza nulla che consenta a
-chiunque di recuperarle in seguito.
+disponibile, le mance possono subire ritardi o andare perse, e non memorizza deliberatamente nulla
+che consenta a chiunque di recuperarle in seguito — una mancia consegnata viene cancellata
+nell'istante stesso in cui lo schermo dell'artista la mostra, e una non consegnata viene cancellata
+dopo un'ora.
 
-- Le pagine delle mance vengono **cancellate dopo 90 giorni di inattività**.
+- Una pagina delle mance **senza un account dietro viene cancellata dopo 90 giorni di inattività**.
 - Possiamo **limitare la frequenza, bloccare o cancellare qualsiasi pagina delle mance**, in
   qualsiasi momento e senza preavviso — in particolare quando riscontriamo frodi, furto d'identità,
   abusi, contenuti illegali o un tentativo di sovraccaricare il servizio.
 - Possiamo **modificare o chiudere del tutto il relay**. Se mai dovessimo farlo, le configurazioni
   solo-Stripe continueranno a funzionare, perché non hanno mai dipeso da noi.
 
-Non devi usare il relay per fingerti qualcun altro, per commettere frodi, per pubblicare contenuti
-illegali o abusivi, per sollecitare donazioni benefiche con l'inganno o per attaccare il servizio.
+Non devi usare il relay, una pagina delle mance o un account per fingerti qualcun altro, per
+commettere frodi, per pubblicare contenuti illegali o abusivi, per sollecitare donazioni benefiche
+con l'inganno, per aggirare i limiti di frequenza o il controllo anti-bot, o per attaccare il
+servizio.
+
+## Chiudere tutto
+
+- **Tu** puoi smettere in qualsiasi momento: esci dall'account, rimuovi una band, cancella una
+  pagina delle mance o disinstalla l'app. L'Informativa sulla privacy dice esattamente cosa cancella
+  ciascuna di queste azioni — e dice onestamente che cancellare un intero account è, per ora,
+  un'email a **[contact@live.tips](mailto:contact@live.tips)** e non un pulsante nell'app.
+- **Noi** possiamo sospendere, revocare o cancellare un account, una pagina delle mance o l'accesso
+  al servizio quando vengono usati per una delle cose elencate qui sopra, o quando lasciarli
+  funzionare metterebbe a rischio il servizio o altre persone. Qui non c'è alcuna commissione di
+  ricorso. C'è un indirizzo email, e una persona che lo legge.
+- Se il servizio ospitato dovesse mai essere chiuso, lo diremo su questo sito. Al suo interno non
+  resta bloccato nulla di valore: il denaro è già sul tuo account di pagamento, l'app è open source
+  e una configurazione solo-Stripe non ha mai avuto bisogno di noi.
 
 ## Nessuna garanzia
 
@@ -104,17 +155,19 @@ live.tips è fornito **«così com'è», senza garanzie di alcun tipo**, esplici
 le garanzie di commerciabilità, idoneità a uno scopo specifico o non violazione di diritti altrui.
 È la posizione standard della licenza MIT, ed è da intendersi alla lettera.
 
-Non promettiamo che il software sia privo di bug, che l'app mostri ogni mancia, che il relay sia
-raggiungibile durante la tua esibizione o che un qualsiasi servizio di terze parti si comporti bene.
+Non promettiamo che il software sia privo di bug, che l'app mostri ogni mancia, che il tuo account
+si sincronizzi, che il relay sia raggiungibile durante la tua esibizione o che un qualsiasi servizio
+di terze parti si comporti bene.
 
 ## Responsabilità
 
 **Nella massima misura consentita dalla legge, non siamo responsabili** per alcuna perdita o danno
 derivante dal tuo utilizzo di live.tips. Ciò include — a titolo esemplificativo e non esaustivo —
 mance mancate, ritardate, duplicate o non consegnate; mance mostrate come non verificate e mai
-pagate; mancati guadagni; un dispositivo che ha smesso di funzionare sul palco; le azioni, i disservizi
-o le decisioni di Stripe, Revolut, MobilePay, Monzo, Cloudflare o GitHub; e qualsiasi cosa tu abbia
-perso per aver dato fiducia a un numero su uno schermo.
+pagate; dati che non si sono sincronizzati, o che se ne sono andati con un account che non hai
+potuto recuperare; mancati guadagni; un dispositivo che ha smesso di funzionare sul palco; le
+azioni, i disservizi o le decisioni di Stripe, Revolut, MobilePay, Monzo, Google, Apple, Cloudflare
+o GitHub; e qualsiasi cosa tu abbia perso per aver dato fiducia a un numero su uno schermo.
 
 live.tips è software libero regalato da una sola persona. Qui non ci sono ricavi con cui finanziare
 una responsabilità, e nessuna viene accettata.
@@ -134,7 +187,7 @@ servizio, la risposta onesta che l'open source ti dà è: gestiscine uno tuo. Il
 [github.com/mekedron/live.tips](https://github.com/mekedron/live.tips).
 
 Nulla in questi termini limita i diritti che la licenza MIT ti concede sul codice in sé; questi
-termini disciplinano il **servizio ospitato** (questo sito e il relay che gestiamo noi).
+termini disciplinano il **servizio ospitato** — questo sito, gli account e il relay che gestiamo noi.
 
 ## Modifiche
 

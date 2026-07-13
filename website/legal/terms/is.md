@@ -5,9 +5,10 @@ updated: 2026-07-13
 updated_label: Síðast uppfært 13. júlí 2026
 ---
 
-Þessir skilmálar ná yfir live.tips-appið, þessa vefsíðu og valfrjálsa milliliðinn á
-`api.live.tips`. live.tips er rekið af **Nikita Rabykin**, einstökum forritara, og er
-gefið út sem frjáls hugbúnaður með opnum kóða undir
+Þessir skilmálar ná yfir live.tips-appið, þessa vefsíðu, valfrjálsa live.tips-**aðganginn**
+og valfrjálsa milliliðinn að baki þjórfjársíðunum á `tip.live.tips`. live.tips er rekið af
+**Nikita Rabykin**, einstökum forritara — ekki fyrirtæki, ekki teymi — og er gefið út sem
+frjáls hugbúnaður með opnum kóða undir
 [MIT-leyfinu](https://github.com/mekedron/live.tips/blob/main/LICENSE).
 
 Með því að nota live.tips samþykkir þú það sem hér fer á eftir. Það er stutt, því
@@ -23,8 +24,8 @@ sem fyllist eftir því sem aðdáendur gefa þjórfé.
 
 **Við erum ekki greiðsluþjónusta, ekki banki, ekki vörsluaðili og ekki aðili að
 viðskiptum þínum.** Við geymum, leiðum eða snertum aldrei peninga nokkurs manns. Þjórfé
-ferðast beint frá aðdáandanum inn á greiðslureikning listamannsins sjálfs. Það er enginn
-live.tips-aðgangur á milli, því það er enginn live.tips-aðgangur yfirhöfuð.
+ferðast beint frá aðdáandanum inn á greiðslureikning listamannsins sjálfs. Það er engin
+live.tips-innstæða á milli, því það er engin live.tips-innstæða yfirhöfuð.
 
 Í reynd þýðir þetta:
 
@@ -43,6 +44,34 @@ fjáröflunarvettvangur. Listamenn verða að lýsa starfsemi sinni fyrir greið
 sinni í samræmi við það — Stripe, sérstaklega, lítur á flutning og fjáröflun sem ólíka
 hluti, og aðeins annað þeirra á við um þig.
 
+## Aðgangar
+
+Aðgangur er **valfrjáls**, og það er enn ekkert sem þú þarft að skrá þig fyrir. Appið
+virkar alveg án aðgangs — það er sjálfgefið, allt situr eftir í tækinu þínu, og enginn
+live.tips-þjónn kemur nálægt því.
+
+Ef þú vilt hafa hljómsveitirnar þínar, stillingarnar og söguna í fleiri en einu tæki
+geturðu skráð þig inn með **Apple**, með **Google**, eða sem nafnlaus **gestur**. Aðgangur
+er staður til að geyma *þín eigin* gögn, á **Firebase** (Google), læsileg þínum aðgangi og
+engum öðrum. Hvað hann geymir — og hvað innskráning breytir um persónuvernd þína — er
+útlistað í persónuverndarstefnunni, sem er þess virði að lesa áður en þú skráir þig inn.
+
+Ef þú átt aðgang:
+
+- **Það er þitt að gæta hans.** Hver sem getur skráð sig inn sem þú sér allt sem í honum
+  er. Haltu innskráningarleiðinni þinni öruggri, og notaðu **Stillingar → Öryggi** til að
+  fara yfir tækin þín, afturkalla eitt, eða skrá þig út alls staðar annars staðar.
+- **Gestaaðgang er ekki hægt að endurheimta.** Hann hefur hvorki netfang né lykilorð.
+  Týnirðu öllum tækjum sem eru innskráð í hann eru gögnin hans farin — það eru skiptin fyrir
+  að skrá sig inn án þess að gefa okkur nokkuð. Notaðu Apple eða Google ef það skiptir þig
+  máli.
+- **Þú berð ábyrgð á því sem í honum er** — nöfnum hljómsveitanna þinna, opinberum
+  skilaboðum þínum og öllu öðru sem þú setur þangað.
+- **Að bæta við tæki krefst staðfestingar þinnar** í tæki sem er þegar innskráð. Ekki
+  staðfesta tæki sem þú baðst ekki um, og ekki láta einhvern ljósmynda QR-kóðann og ýta svo
+  samt á staðfesta.
+- **Við getum lokað fyrir eða eytt aðgangi** — sjá *Að hætta* hér að neðan.
+
 ## Ef þú ert listamaður
 
 Þú berð ábyrgð á:
@@ -55,10 +84,15 @@ hluti, og aðeins annað þeirra á við um þig.
   greiðslustjórnborði.
 - **Lögunum þar sem þú kemur fram** — leyfum fyrir götuspil, reglum staðarins og öllu öðru
   staðbundnu.
-- **Því sem þú birtir.** Listamannsnafn þitt og skilaboð birtast á opinberri síðu; hafðu
-  þau lögleg og þín eigin.
-- **Stripe-lyklinum þínum.** Hann býr í tækinu þínu. Farðu með tækið eins og þú færir með
-  reiðufé.
+- **Því sem þú birtir.** Listamannsnafn þitt og skilaboð birtast á opinberri þjórfjársíðu;
+  hafðu þau lögleg og þín eigin.
+- **Stripe-lyklinum þínum.** Hann er takmarkaður lykill sem þú bjóst til sjálf(ur), og hann
+  býr í tækinu þínu — og, ef þú skráir þig inn, einnig í einkageymslu aðgangsins þíns, svo
+  hin tækin þín geti notað hann. Hvort heldur sem er: hann er þinn. Farðu með tækið eins og
+  þú færir með reiðufé, og afturkallaðu lykilinn í Stripe-stjórnborðinu þínu ef eitthvert
+  þeirra týnist.
+- **Hljómsveitunum þínum, og skilaboðum aðdáenda sem þú setur á skjáinn.** Nafn og skilaboð
+  eru sýnd fullum sal af fólki. Það sem birtist á þeim skjá er þitt að ritstýra.
 
 ## Ef þú ert aðdáandi
 
@@ -83,14 +117,16 @@ hafa borgað.* Það er sviðsbrella, ekki kvittun.
 saman við sitt eigið Revolut-, MobilePay- eða Monzo-app. Þjórfé um Stripe er það eina sem
 live.tips getur í raun staðfest, og þess vegna er Stripe leiðin sem við mælum með.
 
-## Milliliðurinn
+## Milliliðurinn og þjórfjársíðurnar
 
-Milliliðurinn er boðinn **án endurgjalds, sem greiði, án nokkurrar ábyrgðar**. Hann gerir
-sitt besta og ekki meira: hann kann að vera tíðnitakmarkaður, hann kann að vera
-óaðgengilegur, þjórfé kann að seinka eða glatast, og hann geymir ekkert sem gerði nokkrum
-kleift að endurheimta það eftir á.
+Þjórfjársíður búa á `tip.live.tips`, afhentar af litlum millilið sem við rekum á Firebase.
+Hann er boðinn **án endurgjalds, sem greiði, án nokkurrar ábyrgðar**. Hann gerir sitt besta
+og ekki meira: hann kann að vera tíðnitakmarkaður, hann kann að vera óaðgengilegur, þjórfé
+kann að seinka eða glatast, og hann geymir vísvitandi ekkert sem gerði nokkrum kleift að
+endurheimta það eftir á — afhentu þjórfé er eytt um leið og skjár listamannsins sýnir það,
+og óafhentu þjórfé er eytt eftir klukkustund.
 
-- Þjórfjársíðum er **eytt eftir 90 daga án virkni**.
+- Þjórfjársíðu sem **enginn aðgangur stendur að baki er eytt eftir 90 daga án virkni**.
 - Við getum **takmarkað tíðni, lokað á eða eytt hvaða þjórfjársíðu sem er**, hvenær sem er,
   án fyrirvara — einkum þar sem við sjáum svik, persónufölsun, misnotkun, ólöglegt efni eða
   tilraun til að yfirkeyra þjónustuna.
@@ -98,9 +134,25 @@ kleift að endurheimta það eftir á.
   munu uppsetningar sem nota eingöngu Stripe halda áfram að virka, því þær reiddu sig
   aldrei á okkur.
 
-Þú mátt ekki nota milliliðinn til að þykjast vera einhver annar, til að fremja svik, til
-að birta ólöglegt eða móðgandi efni, til að safna góðgerðarframlögum undir fölsku
-yfirskini, eða til að ráðast á þjónustuna.
+Þú mátt ekki nota milliliðinn, þjórfjársíðu eða aðgang til að þykjast vera einhver annar,
+til að fremja svik, til að birta ólöglegt eða móðgandi efni, til að safna
+góðgerðarframlögum undir fölsku yfirskini, til að komast fram hjá tíðnitakmörkunum eða
+vélmennavörninni, eða til að ráðast á þjónustuna.
+
+## Að hætta
+
+- **Þú** getur hætt hvenær sem er: skráðu þig út, fjarlægðu hljómsveit, eyddu þjórfjársíðu,
+  eða fjarlægðu appið. Persónuverndarstefnan segir nákvæmlega hverju hvert þessara eyðir —
+  og segir hreinskilnislega að það að eyða heilum aðgangi sé, í bili, tölvupóstur á
+  **[contact@live.tips](mailto:contact@live.tips)** frekar en hnappur í appinu.
+- **Við** getum lokað fyrir, afturkallað eða eytt aðgangi, þjórfjársíðu eða aðgengi að
+  þjónustunni þar sem hún er notuð í eitthvað af því sem talið er upp hér að ofan, eða þar
+  sem það að láta hana ganga áfram myndi stofna þjónustunni eða öðru fólki í hættu. Hér er
+  engin áfrýjunarnefnd. Hér er netfang, og manneskja sem les það.
+- Ef hýstu þjónustunni verður einhvern tímann lokað segjum við frá því á þessari vefsíðu.
+  Ekkert verðmætt er læst inni í henni: peningarnir eru þegar á þínum eigin
+  greiðslureikningi, appið er opinn hugbúnaður, og uppsetning sem notar eingöngu Stripe
+  þurfti aldrei á okkur að halda.
 
 ## Engin ábyrgð
 
@@ -110,17 +162,18 @@ live.tips er veitt **„eins og það er“, án ábyrgðar af nokkru tagi**, hv
 er meint bókstaflega.
 
 Við lofum því ekki að hugbúnaðurinn sé gallalaus, að appið sýni hvert einasta þjórfé, að
-milliliðurinn verði aðgengilegur meðan á settinu þínu stendur, eða að nokkur þjónusta
-þriðja aðila hegði sér vel.
+aðgangurinn þinn samstillist, að milliliðurinn verði aðgengilegur meðan á settinu þínu
+stendur, eða að nokkur þjónusta þriðja aðila hegði sér vel.
 
 ## Bótaábyrgð
 
 **Að því marki sem lög framast leyfa berum við ekki ábyrgð** á neinu tjóni eða skaða sem
 hlýst af notkun þinni á live.tips. Það felur í sér — án takmarkana — þjórfé sem misfórst,
 seinkaði, tvöfaldaðist eða skilaði sér ekki; þjórfé sem birtist sem óstaðfest en var aldrei
-greitt; tapaðar tekjur; tæki sem bilaði á sviði; athafnir, bilanir eða ákvarðanir Stripe,
-Revolut, MobilePay, Monzo, Cloudflare eða GitHub; og allt sem þú tapaðir vegna þess að þú
-treystir tölu á skjá.
+greitt; gögn sem tókst ekki að samstilla, eða sem fóru með aðgangi sem þú gast ekki
+endurheimt; tapaðar tekjur; tæki sem bilaði á sviði; athafnir, bilanir eða ákvarðanir
+Stripe, Revolut, MobilePay, Monzo, Google, Apple, Cloudflare eða GitHub; og allt sem þú
+tapaðir vegna þess að þú treystir tölu á skjá.
 
 live.tips er frjáls hugbúnaður sem einn einstaklingur gefur frá sér. Hér eru engar tekjur
 til að fjármagna bótaábyrgð, og engin slík ábyrgð er tekin á sig.
@@ -142,8 +195,8 @@ ekki hvernig við rekum þjónustuna er heiðarlega svarið sem opinn hugbúnað
 [github.com/mekedron/live.tips](https://github.com/mekedron/live.tips).
 
 Ekkert í þessum skilmálum takmarkar þau réttindi sem MIT-leyfið veitir þér yfir kóðanum
-sjálfum; þessir skilmálar gilda um **hýstu þjónustuna** (þessa vefsíðu og milliliðinn sem
-við rekum).
+sjálfum; þessir skilmálar gilda um **hýstu þjónustuna** — þessa vefsíðu, aðgangana og
+milliliðinn sem við rekum.
 
 ## Breytingar
 
