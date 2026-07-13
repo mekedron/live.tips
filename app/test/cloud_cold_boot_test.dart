@@ -41,6 +41,7 @@ ProviderContainer _container(
   LocalStore local,
   FakeFirebaseFirestore db, {
   AuthUser? user = _guest,
+  AuthService? auth,
 }) {
   final container = ProviderContainer(overrides: [
     localStoreProvider.overrideWithValue(local),
@@ -48,7 +49,8 @@ ProviderContainer _container(
     initialApiKeyProvider.overrideWithValue(null),
     initialRelaySecretProvider.overrideWithValue(null),
     firestoreProvider.overrideWithValue(db),
-    authServiceProvider.overrideWithValue(FakeAuthService(user: user)),
+    authServiceProvider
+        .overrideWithValue(auth ?? FakeAuthService(user: user)),
     tipSourceFactoryProvider.overrideWithValue(
         ({required demo, required apiKey, required jar}) => NullTipSource()),
     relayChannelFactoryProvider.overrideWithValue(
@@ -244,6 +246,97 @@ void main() {
         reason: 'the removal must stay removed in the cloud');
     // …and the phone, which is still listening too.
     expect(phone.read(appStateProvider).accounts, isEmpty);
+  });
+
+  // ------------------------------------------------------------ #37 ---
+  //
+  // The invariant the app is built on now: a cloud account's profile set is
+  // IDENTICAL on every device, and the only device-local fact is which profile
+  // is currently open. There used to be an operation that broke it on purpose
+  // ("remove from this device"); it is gone, and these two tests are what stand
+  // in its place — the invariant, asserted, and the one honest exception, which
+  // is a rendering state and not a second profile set.
+
+  test('a cloud account shows the SAME profile set on a second device: a fresh '
+      'sign-in adopts every profile, and no device holds a subset', () async {
+    await _bands(db).doc('acc_duo').set({'name': 'Duo', 'createdAtMs': 2});
+
+    // The first device: signed in, warm, holding both profiles.
+    final phoneStore = await _guestStore();
+    final phone = _container(phoneStore, db);
+    phone.read(appStateProvider);
+    await pumpEventQueue();
+    expect(phone.read(appStateProvider).accounts.map((a) => a.id),
+        [_bandId, 'acc_duo']);
+
+    // The second device has never seen this account. It signs in — same uid,
+    // same Firestore — and the account it gets is the WHOLE account.
+    final tabletStore = await seededStore(bandName: 'Tablet Local');
+    final tablet = _container(
+      tabletStore,
+      db,
+      auth: FakeAuthService(nextUser: _guest),
+    );
+    tablet.read(appStateProvider);
+    await pumpEventQueue();
+    final signedIn =
+        await tablet.read(authControllerProvider.notifier).signInAnonymously();
+    expect(signedIn?.uid, _uid);
+    await pumpEventQueue();
+
+    expect(tablet.read(accountsDirectoryProvider).activeAccountId, _uid);
+    expect(
+      tablet.read(appStateProvider).accounts.map((a) => a.id),
+      phone.read(appStateProvider).accounts.map((a) => a.id),
+      reason: "a cloud account's profile set is identical on every device",
+    );
+    // The one device-local fact, and the only one: which profile is open. The
+    // tablet has been asked nothing yet, so it opens on none of them (#28) —
+    // that is a device-local ANSWER, not a device-local profile set.
+    expect(tablet.read(appStateProvider).accountId, isEmpty);
+    expect(tablet.read(activeProfileRenderProvider), ProfileRender.pick);
+
+    // The phone answers the question on its own, and that answer stays on the
+    // phone: it changes which profile is OPEN there, and nothing about which
+    // profiles either device has.
+    expect(await phone.read(appStateProvider.notifier).switchAccount(_bandId),
+        isTrue);
+    await pumpEventQueue();
+    expect(phone.read(appStateProvider).accountId, _bandId);
+    expect(tablet.read(appStateProvider).accountId, isEmpty,
+        reason: 'which profile is open is the one device-local fact');
+    expect(tablet.read(appStateProvider).accounts.map((a) => a.id),
+        [_bandId, 'acc_duo']);
+  });
+
+  test('a mirror that has not spoken renders SILENCE, not an empty account',
+      () async {
+    // The honest exception: a device that has never synced cannot show profiles
+    // it has not seen. That is a rendering state of one profile set that has not
+    // arrived — never "you have no profiles", never the create step, and nothing
+    // may be written to the account on the strength of it.
+    final local = await _guestStore();
+    await local.saveActiveCloudBand(_uid, _bandId);
+    final container = _container(local, db);
+    final repo =
+        container.read(accountDataRepositoryProvider) as FirestoreRepository;
+    container.read(appStateProvider);
+    // The empty from-cache snapshot an offline boot raises — a cache proves what
+    // exists, never what is absent.
+    repo.applyBandsSnapshot(const {}, fromCache: true);
+
+    expect(repo.isWarm, isFalse);
+    expect(container.read(appStateProvider).accounts, isEmpty);
+    expect(container.read(activeProfileRenderProvider), ProfileRender.band,
+        reason: 'the shell with no claim about the profile set — not create');
+
+    // And when the server does speak, the account is whole, on this device too.
+    await pumpEventQueue();
+    expect(repo.isWarm, isTrue);
+    expect(container.read(appStateProvider).accounts.map((a) => a.id),
+        [_bandId]);
+    expect((await _bands(db).get()).docs, hasLength(1),
+        reason: 'silence writes nothing');
   });
 
   test('guest → local → guest round-trips: the session survives and the '

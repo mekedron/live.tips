@@ -18,12 +18,15 @@ import 'helpers.dart';
 
 /// "Remove this profile from this device" DELETED a cloud profile from the
 /// whole account, on every device, for good — the copy promised the opposite of
-/// what the code did, and the operation it promised did not exist at all (#27).
+/// what the code did (#27). The fix named the act honestly and, for a few hours,
+/// also built the operation the label had promised. That operation is gone
+/// (#37): a cloud account's profile set is identical on every device, and a
+/// control that takes one profile off one device is the per-device-subset model
+/// the app is being rid of. Its tests came out with it.
 ///
-/// Two operations now, each named for what it does:
-///   * Delete this profile — account-wide, irreversible, and the copy says so.
-///   * Remove from this device — the local copy and the keychain secrets go,
-///     the band stays in the account, and no byte of the network is needed.
+/// A profile has ONE removal, and it is account-wide. Signing out is what takes
+/// an account (and with it every profile) off a device, offline and destroying
+/// nothing — see the sign-out test below, and #31.
 ///
 /// The old tests asserted exactly what the code did (the registry, the wipe),
 /// so nothing noticed that the artist was told the opposite. These assert the
@@ -216,57 +219,8 @@ void main() {
     expect(app.accountId, _bandB);
   });
 
-  test('REMOVE FROM THIS DEVICE keeps the account whole: the cloud band, its '
-      'history and its tip page all survive; the device keeps nothing',
-      () async {
-    final local = await _cloudStore();
-    final db = await _cloudAccount();
-    final secure = _keychain();
-    final relay = FakeCallables();
-    final container = _container(local, db, secure, relay: relay);
-    // A device-local blob of the cloud band (the reprint notice) — device-local
-    // by contract, and so exactly the kind of thing this removal exists to drop.
-    await local.writeRelayLinkReplaced(_bandA, 'https://live.tips/t/old');
-    expect(local.accountHasData(_bandA), isTrue);
-    await _warm(container);
-
-    expect(
-      await container
-          .read(appStateProvider.notifier)
-          .removeAccountFromDevice(_bandA),
-      isTrue,
-    );
-
-    // The account is untouched — this is the whole promise the dialog makes.
-    expect(await _bandDocs(db), [_bandA, _bandB]);
-    expect((await _bands(db).doc(_bandA).collection('sessions').get()).docs,
-        hasLength(1));
-    expect((await _bands(db).doc(_bandA).collection('relayTips').get()).docs,
-        hasLength(1));
-    expect((await _bands(db).doc(_bandA).collection('secrets').get()).docs,
-        hasLength(1),
-        reason: "the account's own copy of the secret stays in the account");
-    expect(relay.names, isEmpty,
-        reason: 'the tip page belongs to a band that still exists');
-
-    // This device, on the other hand, keeps nothing of it: no keychain entry,
-    // no local blob, no row in the switcher.
-    expect(secure.values.containsKey('${SecureStore.kApiKeyBase}_$_bandA'),
-        isFalse);
-    expect(secure.values.containsKey('${SecureStore.kRelaySecretBase}_$_bandA'),
-        isFalse);
-    expect(local.accountHasData(_bandA), isFalse);
-    expect(secure.values.containsKey('${SecureStore.kApiKeyBase}_$_bandB'),
-        isTrue,
-        reason: 'the other profile of the same account is not collateral');
-    final app = container.read(appStateProvider);
-    expect(app.accounts.map((b) => b.id), [_bandB]);
-    expect(app.accountId, _bandB);
-    expect(app.switching, isFalse);
-  });
-
-  test('the device removal needs no network — exactly where the delete can '
-      'only refuse', () async {
+  test('a delete that cannot reach the account deletes NOTHING — and there is '
+      'no device-local removal to fall back on', () async {
     final local = await _cloudStore();
     final db = await _cloudAccount();
     final secure = _keychain();
@@ -282,13 +236,14 @@ void main() {
 
     expect(await notifier.removeAccount(_bandA), isFalse);
     expect(await _bandDocs(db), [_bandA, _bandB], reason: 'nothing deleted');
-
-    // The device-local removal touches no server at all — this is the one an
-    // artist can run on a venue tablet with no bars.
-    expect(await notifier.removeAccountFromDevice(_bandA), isTrue);
-    expect(await _bandDocs(db), [_bandA, _bandB]);
-    expect(container.read(appStateProvider).accounts.map((b) => b.id),
-        [_bandB]);
+    // The profile is still on the device, whole: a refused delete is a no-op,
+    // and the offline escape hatch that used to sit here ("remove from this
+    // device") took a profile off ONE device — the state the model forbids.
+    // The offline-safe act is signing the ACCOUNT out.
+    final app = container.read(appStateProvider);
+    expect(app.accounts.map((b) => b.id), [_bandA, _bandB]);
+    expect(app.accountId, _bandA);
+    expect(app.switching, isFalse);
   });
 
   test('sign out takes the account OFF this device — and signing back in '
@@ -333,7 +288,7 @@ void main() {
   // this device" while deleting from the account — a test that only asserts the
   // effect passes just as happily on a lie.
 
-  testWidgets('a cloud profile offers both removals, and each says what it does',
+  testWidgets('a cloud profile offers ONE removal, and it is account-wide',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(600, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -341,15 +296,17 @@ void main() {
     final db = await _cloudAccount();
     await _pumpSettings(tester, local, db, _keychain());
 
-    expect(find.text('Remove from this device'), findsOneWidget);
-    expect(find.text('Keeps it in your account — this device stops holding a copy'),
-        findsOneWidget);
     expect(find.text('Delete this profile'), findsOneWidget);
     expect(find.text('Deletes it from your account, on all your devices'),
         findsOneWidget);
     // The lie that was: no row anywhere may promise a device-local removal and
     // run an account-wide delete.
     expect(find.text('Remove this profile from this device'), findsNothing);
+    // And no row may offer a device-local removal at all (#37): the profile set
+    // is the same on every device, so there is nothing for such a row to do.
+    expect(find.text('Remove from this device'), findsNothing);
+    // What the profile section offers instead — switch, and delete.
+    expect(find.text('Switch profile'), findsOneWidget);
   });
 
   testWidgets('the delete dialog names the ACCOUNT, says every device, and '
@@ -371,7 +328,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Your other profiles stay.'), findsOneWidget);
-    expect(find.textContaining('use “Remove from this device”'), findsOneWidget);
+    // The dialog no longer points at a gentler alternative, because there is
+    // none: delete is account-wide or it is nothing (#37).
+    expect(find.textContaining('Remove from this device'), findsNothing);
 
     // Proportional to the act: the button stays dead until the word is typed.
     FilledButton deleteButton() => tester.widget<FilledButton>(find.ancestor(
@@ -387,34 +346,4 @@ void main() {
         reason: 'the confirmed delete really is the account-wide one');
   });
 
-  testWidgets('the device removal says the profile stays in the account — and '
-      'it does', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(600, 1600));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final local = await _cloudStore();
-    final db = await _cloudAccount();
-    final secure = _keychain();
-    await _pumpSettings(tester, local, db, secure);
-
-    await tester.tap(find.text('Remove from this device'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Remove The Foxes from this device?'), findsOneWidget);
-    expect(
-      find.textContaining(
-          'stays in your account (ana@example.com) — nothing is deleted'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('Needs no connection.'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
-    await tester.pumpAndSettle();
-
-    expect(await _bandDocs(db), [_bandA, _bandB],
-        reason: 'the account keeps the profile it was promised to keep');
-    expect(secure.values.containsKey('${SecureStore.kApiKeyBase}_$_bandA'),
-        isFalse);
-    expect(find.text("The Foxes is off this device. It's still in your account."),
-        findsOneWidget);
-  });
 }

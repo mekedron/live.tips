@@ -58,8 +58,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _accountLabel(AppAccount profile) =>
       profile.email ?? accountDisplayName(context, profile);
 
-  /// Whichever removal is asked for, it is refused for the same reasons and in
-  /// the same words: mid-switch, or a session live here or on another device.
+  /// The removal is refused for the same reasons, and in the same words, as
+  /// every other account-level act: mid-switch, or a session live here or on
+  /// another device.
   bool _removalBlocked() {
     final s = context.s;
     // A refusal always names itself — and it asks the same guard add/switch
@@ -78,13 +79,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   /// DELETES the profile — from the ACCOUNT, on every device, for good. This
   /// is what the row labelled "Remove this profile from this device" used to
-  /// run while promising the opposite (#27), so the dialog now says the word
+  /// run while promising the opposite (#27), so the dialog says the word
   /// delete, names the account it is deleting from, says "every other device",
   /// and — since a tap can't be taken back — makes the artist type the word.
   ///
-  /// On the LOCAL profile the two removals collapse: there is no account for
-  /// the profile to survive in, deleting it is the only thing removal could
-  /// ever mean, and the red button is the whole ceremony, as before.
+  /// The ONLY removal a profile has (#37). A profile is in the account or it is
+  /// not; there is no third state in which this device holds fewer of them than
+  /// the artist's other phone. An artist walking away from a borrowed tablet
+  /// signs the ACCOUNT out — which takes every profile off it, offline, and
+  /// deletes nothing.
   Future<void> _confirmDeleteProfile() async {
     // On a venue device, destroying a profile is an account-level act — it
     // needs the same fresh phone approval as switching one.
@@ -107,8 +110,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ? s.t('settings.main.delete_body_cloud',
                     {'name': name, 'account': _accountLabel(profile)})
                 : s.t('settings.main.delete_body_local')) +
-            (hasOthers ? s.t('settings.main.delete_body_others_suffix') : '') +
-            (cloud ? s.t('settings.main.delete_body_use_remove_suffix') : ''),
+            (hasOthers ? s.t('settings.main.delete_body_others_suffix') : ''),
         // Type-to-confirm exactly where the act reaches past this device and
         // past this artist's other devices. The local profile's delete is
         // just as permanent, but it destroys only what is in front of you.
@@ -130,61 +132,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return;
     }
     Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
-  /// Takes the profile off THIS DEVICE and leaves it in the account — the
-  /// operation the app never had (#27), and the natural end of a gig on a
-  /// borrowed tablet. Nothing is deleted, nothing needs the network, and the
-  /// dialog says both. Cloud profiles only: a local band has no account to
-  /// stay in, so its row is [_confirmDeleteProfile] alone.
-  Future<void> _confirmRemoveFromDevice() async {
-    // Same venue rule as every other profile-level act on a shared tablet:
-    // nobody but the artist reshuffles what is on it mid-stint.
-    if (!await ensureVenueReapproval(context, ref)) return;
-    if (!mounted) return;
-    final s = context.s;
-    if (_removalBlocked()) return;
-    final app = ref.read(appStateProvider);
-    final profile = ref.read(accountsDirectoryProvider).active;
-    final name = app.displayName.isEmpty
-        ? s.t('settings.main.this_profile_fallback')
-        : app.displayName;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(s.t('settings.main.remove_device_title', {'name': name})),
-        content: Text(s.t('settings.main.remove_device_body',
-            {'name': name, 'account': _accountLabel(profile)})),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(s.t('common.cancel')),
-          ),
-          // No red: this destroys nothing. The profile is still in the
-          // account when the artist walks away with it.
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(s.t('common.remove')),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    final removed = await ref
-        .read(appStateProvider.notifier)
-        .removeAccountFromDevice(ref.read(appStateProvider).accountId);
-    if (!mounted) return;
-    if (!removed) {
-      // Nothing offline can refuse this one — only the guards can, and only
-      // by a session starting while the dialog sat open.
-      _removalBlocked();
-      return;
-    }
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    messenger.showSnackBar(SnackBar(
-      content: Text(s.t('settings.main.removed_device_snack', {'name': name})),
-    ));
   }
 
   Future<void> _confirmSignOut() async {
@@ -567,19 +514,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               chevron: true,
               onTap: () => showBandSwitcherSheet(context, ref),
             ),
-            // Two removals, each named for what it does (#27). The safe one
-            // comes first: it is what the single old row always promised and
-            // never did, and it is the one an artist ending a gig on a
-            // borrowed tablet actually wants. A LOCAL profile has no account
-            // to stay in, so the two collapse and only the delete shows.
-            if (!activeProfile.isLocal)
-              LtRow(
-                icon: Icons.phonelink_erase_rounded,
-                title: s.t('settings.main.remove_device_row'),
-                subtitle: s.t('settings.main.remove_device_subtitle'),
-                chevron: true,
-                onTap: _confirmRemoveFromDevice,
-              ),
+            // ONE removal, and it is account-wide (#37). "Remove from this
+            // device" sat here for a few hours and had to go with the model it
+            // came from: a profile is in the account or it is not, and it is on
+            // every device either way. The artist ending a gig on a borrowed
+            // tablet signs the account OUT — offline-safe, and it takes the
+            // whole account with it instead of one profile.
             LtRow(
               icon: Icons.delete_forever_rounded,
               iconColor: c.danger,

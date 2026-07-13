@@ -757,10 +757,11 @@ class AppStateNotifier extends Notifier<AppState> {
   /// DELETES [id] — from the account, on every device, for good: its data,
   /// its secrets, its band entry, and (best effort) its relay jar on the
   /// server, so the public fan page dies with it. On a CLOUD profile this
-  /// reaches the whole account; the local profile has nowhere else to reach,
-  /// and there this is also the only removal Settings offers (see
-  /// [removeAccountFromDevice] for the other one). Every surface that calls
-  /// this must say *delete*, and say *account*.
+  /// reaches the whole account; the local profile has nowhere else to reach.
+  /// The ONLY removal a profile has (#37): a cloud account's profile set is
+  /// identical on every device, so there is no such thing as taking a profile
+  /// off one of them. Every surface that calls this must say *delete*, and say
+  /// *account*.
   ///
   /// Then activates the first remaining band. Removing the LAST band leaves
   /// the registry honestly empty — no replacement is minted. That used to be
@@ -823,41 +824,9 @@ class AppStateNotifier extends Notifier<AppState> {
     return true;
   }
 
-  /// Takes [id] off THIS DEVICE and leaves it in the account: the cached copy
-  /// and the keychain secrets go, the band doc, its history and its tip page
-  /// stay exactly where they are, and the copy comes back the next time this
-  /// device syncs with the account. The operation the "remove from this device"
-  /// label promised while [removeAccount] ran underneath it.
-  ///
-  /// Nothing here goes near the network — no relay call, no cloud wipe — so it
-  /// works with no signal at all, which is the state a venue tablet is usually
-  /// in at the end of a gig, and the one thing [removeAccount] can only refuse
-  /// to work in. It never returns false for being offline; only the guards
-  /// refuse (an unknown band, a live session — here or on another device).
-  ///
-  /// Only offered for a CLOUD profile. A local band has no account to stay in,
-  /// so there the two collapse and [removeAccount] is the whole story.
-  Future<bool> removeAccountFromDevice(String id) async {
-    if (accountActionsBlocked) return false;
-    if (!_registry.contains(id)) return false;
-    state = state.copyWith(switching: true);
-    ref.read(onboardingDraftProvider.notifier).clear();
-    ref.read(onboardingPreludeProvider.notifier).reset();
-
-    final repo = ref.read(accountDataRepositoryProvider);
-    // No jar retirement: the fan page belongs to a band that still exists and
-    // still takes tips — retiring it here would kill an account-wide thing to
-    // satisfy a device-local one.
-    final registry = _registry.withoutAccount(id);
-    await repo.forgetAccountOnDevice(id);
-    await _landAfterRemoval(id, registry);
-    return true;
-  }
-
-  /// The tail both removals share: land the app on a surviving band and drop
-  /// [id]'s keychain secrets. What went before it is the whole difference
-  /// between them — a delete wipes the account's copy, a device removal does
-  /// not — and after it there is nothing left on this device either way.
+  /// The tail of a removal: land the app on a surviving band and drop [id]'s
+  /// keychain secrets. Split out from [removeAccount] because the landing rule
+  /// is worth stating once, away from the wipe that precedes it.
   Future<void> _landAfterRemoval(String id, AccountsRegistry registry) async {
     final repo = ref.read(accountDataRepositoryProvider);
     // Load the successor BEFORE wiping, so the UI lands on coherent state.

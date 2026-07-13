@@ -114,20 +114,13 @@ abstract interface class AccountDataRepository {
   /// caller tombstones and retries at boot.
   Future<void> wipeAccountSecrets(String accountId);
 
-  /// Forgets [accountId] on THIS DEVICE and nowhere else: the cached copy of
-  /// the band and every device-local blob it owns. The exact opposite of
-  /// [wipeAccountData] — the cloud implementation touches no document, so the
-  /// band keeps its place in the account, its tip page keeps serving, and the
-  /// next snapshot brings the copy back. NEVER needs the network: this is the
-  /// removal an artist can run on a venue tablet with no signal, and the one
-  /// the words "remove from this device" have always promised.
-  ///
-  /// The local profile has no elsewhere for a band to stay, so there the copy
-  /// IS the band and the two operations collapse into one — the local
-  /// implementation removes it outright, which is what it has always done.
-  ///
-  /// The keychain is [wipeAccountSecrets]' job in both, as always.
-  Future<void> forgetAccountOnDevice(String accountId);
+  // There is no "forget this band on this device". A cloud account's profile
+  // set is identical on every device, and the only device-local fact is which
+  // profile is currently open (#37). A repository that could drop one band and
+  // keep the rest was a repository deliberately disagreeing with the server —
+  // in a codebase whose hardest-won rule is that the server is the only thing
+  // that gets to say what exists. Forgetting the whole ACCOUNT is the account's
+  // operation, and it is sign-out's (see signOutProvider).
 
   // --- Device settings ---
   AppSettings readSettings();
@@ -308,16 +301,6 @@ class LocalStoreRepository implements AccountDataRepository {
   @override
   Future<void> wipeAccountSecrets(String accountId) =>
       _secure.wipeAccount(accountId);
-
-  /// The collapse: a local band lives on this device and nowhere else, so
-  /// forgetting the copy IS deleting the band. Same two calls [wipeAccountData]
-  /// and the notifier's removal make, in the same order — and no network, which
-  /// the local profile never needed anyway.
-  @override
-  Future<void> forgetAccountOnDevice(String accountId) async {
-    await _local.wipeAccount(accountId);
-    await removeBandEntry(accountId);
-  }
 
   @override
   AppSettings readSettings() => _local.readSettings();
