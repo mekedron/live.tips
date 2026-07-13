@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/platform_support.dart';
 import '../../core/theme.dart';
 import '../../data/firebase/auth_service.dart';
+import '../../domain/pending_redirect.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/onboarding_draft.dart';
@@ -61,6 +62,11 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
   ///
   /// A success REPLACES this step: the account question is settled, and going
   /// Back from the details screen must not offer to answer it again.
+  ///
+  /// On the web an Apple/Google sign-in also returns null — the page is leaving
+  /// for the provider. Nothing to do here: the flow resumes from
+  /// RedirectSignInGate on the way back, which pushes the very same next
+  /// screen (naming, or the band setup) that a success below pushes.
   Future<void> _signIn(
     Future<AuthUser?> Function(AuthController) attempt,
   ) async {
@@ -138,7 +144,8 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
                 leading: Icon(Icons.apple, size: 22, color: c.text),
                 title: context.s.t('onboarding.account_step.apple'),
                 enabled: !auth.busy,
-                onTap: () => _signIn((a) => a.signInWithApple()),
+                onTap: () => _signIn(
+                    (a) => a.signInWithApple(origin: RedirectOrigin.onboarding)),
               ),
               const SizedBox(height: 12),
               _AccountOption(
@@ -148,7 +155,8 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
                 ),
                 title: context.s.t('onboarding.account_step.google'),
                 enabled: !auth.busy,
-                onTap: () => _signIn((a) => a.signInWithGoogle()),
+                onTap: () => _signIn((a) =>
+                    a.signInWithGoogle(origin: RedirectOrigin.onboarding)),
               ),
               const SizedBox(height: 12),
               _AccountOption(

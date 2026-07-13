@@ -167,6 +167,40 @@ class FakeAuthService extends AuthService {
   @override
   Future<AuthUser?> signInWithCustomToken(String token) => _signIn();
 
+  // --- Web redirect sign-in (see AuthService.beginRedirectSignIn) ---
+
+  /// What [completeRedirectSignIn] resolves to — null models "no redirect was
+  /// pending" (a normal boot) or a user who backed out of the provider page.
+  AuthUser? redirectResult;
+
+  /// Thrown by [completeRedirectSignIn]: a failed/expired redirect.
+  Object? redirectError;
+
+  /// Thrown by [beginRedirectSignIn]: the redirect could not even start.
+  Object? redirectStartError;
+
+  /// Every redirect this service was asked to start.
+  final redirectStarts = <({OAuthProviderKind kind, bool link})>[];
+
+  @override
+  Future<void> beginRedirectSignIn(
+    OAuthProviderKind kind, {
+    bool link = false,
+  }) async {
+    final error = redirectStartError;
+    if (error != null) throw error;
+    redirectStarts.add((kind: kind, link: link));
+  }
+
+  @override
+  Future<AuthUser?> completeRedirectSignIn() async {
+    final error = redirectError;
+    if (error != null) throw error;
+    final result = redirectResult;
+    if (result != null) user = result;
+    return result;
+  }
+
   @override
   Future<void> updateDisplayName(String name) async {
     final u = user;

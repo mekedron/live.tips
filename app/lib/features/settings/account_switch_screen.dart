@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/platform_support.dart';
 import '../../core/theme.dart';
 import '../../domain/app_account.dart';
+import '../../domain/pending_redirect.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../widgets/band_switcher.dart';
@@ -42,9 +43,13 @@ class AccountSwitchScreen extends ConsumerWidget {
       return;
     }
     final controller = ref.read(authControllerProvider.notifier);
+    // On the web this leaves the page for the provider and returns null; the
+    // sign-in finishes on the way back and lands on Settings (RedirectOrigin).
     final user = switch (account.kind) {
-      AccountKind.apple => await controller.signInWithApple(),
-      AccountKind.google => await controller.signInWithGoogle(),
+      AccountKind.apple =>
+        await controller.signInWithApple(origin: RedirectOrigin.settings),
+      AccountKind.google =>
+        await controller.signInWithGoogle(origin: RedirectOrigin.settings),
       // A guest account has no credential: with its session gone there is
       // nothing to sign back in with. That row is disabled (and removable).
       _ => null,

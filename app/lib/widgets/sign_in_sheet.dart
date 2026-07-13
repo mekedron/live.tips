@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme.dart';
 import '../data/firebase/auth_service.dart';
+import '../domain/pending_redirect.dart';
 import '../l10n/app_localizations.dart';
 import '../state/auth_providers.dart';
 
@@ -16,15 +17,24 @@ import '../state/auth_providers.dart';
 /// Resolves to the signed-in user, or null when dismissed; a failed attempt
 /// keeps the sheet up with the error inline. Callers gate on
 /// [platformSupportsCloudAccounts] and the controller's `available`.
-Future<AuthUser?> showSignInSheet(BuildContext context) {
+///
+/// On the web an Apple/Google choice never resolves to a user here: the page
+/// leaves for the provider and the sheet dies with it. The sign-in completes on
+/// the way back (RedirectSignInGate), which lands the user on [origin].
+Future<AuthUser?> showSignInSheet(
+  BuildContext context, {
+  RedirectOrigin origin = RedirectOrigin.settings,
+}) {
   return showModalBottomSheet<AuthUser?>(
     context: context,
-    builder: (_) => const _SignInSheet(),
+    builder: (_) => _SignInSheet(origin: origin),
   );
 }
 
 class _SignInSheet extends ConsumerWidget {
-  const _SignInSheet();
+  const _SignInSheet({required this.origin});
+
+  final RedirectOrigin origin;
 
   Future<void> _attempt(
     BuildContext context,
@@ -60,7 +70,8 @@ class _SignInSheet extends ConsumerWidget {
               leading: Icon(Icons.apple, size: 22, color: c.text),
               label: context.s.t('widgets.account_switcher.sign_in_apple'),
               enabled: !auth.busy,
-              onTap: () => _attempt(context, controller.signInWithApple),
+              onTap: () => _attempt(
+                  context, () => controller.signInWithApple(origin: origin)),
             ),
             _ProviderRow(
               leading: Text(
@@ -69,7 +80,8 @@ class _SignInSheet extends ConsumerWidget {
               ),
               label: context.s.t('widgets.account_switcher.sign_in_google'),
               enabled: !auth.busy,
-              onTap: () => _attempt(context, controller.signInWithGoogle),
+              onTap: () => _attempt(
+                  context, () => controller.signInWithGoogle(origin: origin)),
             ),
             _ProviderRow(
               leading: Icon(Icons.person_outline_rounded, size: 22, color: c.text),

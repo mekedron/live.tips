@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../domain/app_account.dart';
 import '../../domain/app_settings.dart';
 import '../../domain/device_kind.dart';
+import '../../domain/pending_redirect.dart';
 import '../../domain/tip_method.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
@@ -156,10 +157,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     switch (choice) {
       case _SignOutChoice.signOut:
         await auth.signOut();
+      // The guest upgrade. On the web this is linkWithRedirect: the page leaves
+      // and the LINK is remembered across the reload (PendingRedirect.link), so
+      // the guest's uid — and every band under it — is upgraded in place rather
+      // than a second, empty account being signed in beside it.
       case _SignOutChoice.linkApple:
-        await auth.signInWithApple(link: true);
+        await auth.signInWithApple(link: true, origin: RedirectOrigin.settings);
       case _SignOutChoice.linkGoogle:
-        await auth.signInWithGoogle(link: true);
+        await auth.signInWithGoogle(
+            link: true, origin: RedirectOrigin.settings);
       case _SignOutChoice.cancel:
       case null:
         break;

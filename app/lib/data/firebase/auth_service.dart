@@ -18,6 +18,17 @@ class AuthUnavailableException implements Exception {
   String toString() => message;
 }
 
+/// The federated providers the app offers. Named rather than passed as a
+/// Firebase [AuthProvider] because a redirect sign-in has to name its provider
+/// in local storage and rebuild it after a page reload.
+enum OAuthProviderKind {
+  google,
+  apple;
+
+  static OAuthProviderKind fromName(String name) =>
+      values.where((v) => v.name == name).firstOrNull ?? OAuthProviderKind.google;
+}
+
 /// A signed-in Firebase user reduced to what the app actually shows.
 class AuthUser {
   const AuthUser({
@@ -93,19 +104,19 @@ class AuthService {
     return user == null ? null : toAuthUser(user);
   }
 
+  /// The provider flows that hand the browser away and come back through a
+  /// page reload live in [beginRedirectSignIn] / [completeRedirectSignIn].
+  /// There is deliberately NO popup path any more: popups are blocked on iOS
+  /// Safari, and inside an installed PWA the popup cannot post its result back
+  /// to the app at all — it hangs, forever, which is exactly the failure this
+  /// seam exists to make impossible.
+  static const _noWebProviderFlow = AuthUnavailableException(
+      'Web sign-in runs through a redirect — see beginRedirectSignIn.');
+
   /// [link] upgrades the CURRENT (anonymous) user instead of switching users.
   Future<AuthUser?> signInWithGoogle({bool link = false}) async {
     final auth = _required;
-    if (kIsWeb) {
-      // The plugin's web path is the deprecated button-flow — the popup
-      // through Firebase Auth is the supported route there.
-      final provider = GoogleAuthProvider();
-      final result = link && auth.currentUser != null
-          ? await auth.currentUser!.linkWithPopup(provider)
-          : await auth.signInWithPopup(provider);
-      final user = result.user;
-      return user == null ? null : toAuthUser(user);
-    }
+    if (kIsWeb) throw _noWebProviderFlow;
     final credential = await _googleCredential();
     if (credential == null) return null; // user closed the account picker
     final result = link && auth.currentUser != null
@@ -117,14 +128,7 @@ class AuthService {
 
   Future<AuthUser?> signInWithApple({bool link = false}) async {
     final auth = _required;
-    if (kIsWeb) {
-      final provider = AppleAuthProvider()..addScope('email');
-      final result = link && auth.currentUser != null
-          ? await auth.currentUser!.linkWithPopup(provider)
-          : await auth.signInWithPopup(provider);
-      final user = result.user;
-      return user == null ? null : toAuthUser(user);
-    }
+    if (kIsWeb) throw _noWebProviderFlow;
     if (defaultTargetPlatform == TargetPlatform.android) {
       // No native Apple flow on Android — Firebase drives the web flow.
       final provider = AppleAuthProvider()..addScope('email');
@@ -170,6 +174,44 @@ class AuthService {
           .trim();
       if (fullName.isNotEmpty) await user.updateDisplayName(fullName);
     }
+    return user == null ? null : toAuthUser(user);
+  }
+
+  /// WEB: hands the browser to the provider's own page. This does not return a
+  /// user — the app is torn down by the navigation and the result is picked up
+  /// by [completeRedirectSignIn] on the next boot. Callers must have persisted
+  /// everything they need to resume BEFORE awaiting this.
+  ///
+  /// [link] upgrades the CURRENT (anonymous) user in place (`linkWithRedirect`)
+  /// rather than signing a new one in.
+  Future<void> beginRedirectSignIn(
+    OAuthProviderKind kind, {
+    bool link = false,
+  }) async {
+    final auth = _required;
+    final AuthProvider provider = switch (kind) {
+      OAuthProviderKind.google => GoogleAuthProvider(),
+      OAuthProviderKind.apple => AppleAuthProvider()..addScope('email'),
+    };
+    if (link) {
+      final user = auth.currentUser;
+      if (user == null) {
+        throw const AuthUnavailableException(
+            'There is no account to link this provider to.');
+      }
+      await user.linkWithRedirect(provider);
+      return;
+    }
+    await auth.signInWithRedirect(provider);
+  }
+
+  /// WEB: the result of a redirect started before the page reload — for a
+  /// sign-in AND for a link, which resolve through the same door. Null when no
+  /// redirect was pending (a normal boot, or the user backed out of the
+  /// provider's page): that is not an error, it is "nothing happened".
+  Future<AuthUser?> completeRedirectSignIn() async {
+    final result = await _required.getRedirectResult();
+    final user = result.user;
     return user == null ? null : toAuthUser(user);
   }
 

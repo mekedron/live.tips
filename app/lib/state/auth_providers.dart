@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/firebase/account_sessions.dart';
 import '../data/firebase/auth_service.dart';
 import '../domain/app_account.dart';
+import '../domain/pending_redirect.dart';
+import 'onboarding_draft.dart';
 import 'providers.dart';
 
 /// The per-account Firebase stacks, overridden in main() on platforms that
@@ -65,6 +67,12 @@ final authServiceProvider =
 /// script the provider flows without a Firebase app behind them.
 final slotAuthServiceFactoryProvider =
     Provider<AuthService Function(FirebaseAuth)>((ref) => AuthService.new);
+
+/// Whether an Apple/Google sign-in leaves the page (redirect) instead of
+/// opening a popup. TRUE ON ALL OF THE WEB, and there is no popup path left at
+/// all — see the note on [AuthController.signInWithGoogle]. A provider only so
+/// tests can drive the redirect machinery without a browser under them.
+final webRedirectSignInProvider = Provider<bool>((ref) => kIsWeb);
 
 /// Every profile this device knows (the local one plus signed-in Firebase
 /// accounts) and which is active. Persisted device-wide in prefs.
@@ -178,12 +186,38 @@ class AuthController extends Notifier<AuthState> {
 
   bool get available => ref.read(authServiceProvider).available;
 
-  Future<AuthUser?> signInWithApple({bool link = false}) =>
-      _run((s) => s.signInWithApple(link: link), link: link);
+  /// On the WEB these do not return a user: they hand the browser to the
+  /// provider ([_startRedirect]) and the app is torn down by the navigation.
+  /// The result is claimed on the next boot by [consumePendingRedirect], which
+  /// routes it through the very same slot/adopt path a native sign-in takes.
+  ///
+  /// There is no popup path any more, on any browser. Popups are blocked on
+  /// iOS Safari unless they open inside a direct user gesture (the await before
+  /// Firebase opens one is already enough to lose it), and inside an installed
+  /// PWA the popup opens in a context that cannot post its result back — so it
+  /// never errors, it just hangs. A "try popup, fall back on error" scheme
+  /// cannot see that hang; the only way for a spinner to have no path to
+  /// running forever is to not open a popup at all.
+  ///
+  /// [origin] is where the user was, so the return leg can put them back.
+  Future<AuthUser?> signInWithApple({
+    bool link = false,
+    RedirectOrigin origin = RedirectOrigin.app,
+  }) =>
+      ref.read(webRedirectSignInProvider)
+          ? _startRedirect(OAuthProviderKind.apple, link: link, origin: origin)
+          : _run((s) => s.signInWithApple(link: link), link: link);
 
-  Future<AuthUser?> signInWithGoogle({bool link = false}) =>
-      _run((s) => s.signInWithGoogle(link: link), link: link);
+  Future<AuthUser?> signInWithGoogle({
+    bool link = false,
+    RedirectOrigin origin = RedirectOrigin.app,
+  }) =>
+      ref.read(webRedirectSignInProvider)
+          ? _startRedirect(OAuthProviderKind.google, link: link, origin: origin)
+          : _run((s) => s.signInWithGoogle(link: link), link: link);
 
+  /// A guest account needs no provider page, so it never redirects — the same
+  /// in-page sign-in on every platform.
   Future<AuthUser?> signInAnonymously() =>
       _run((s) => s.signInAnonymously());
 
@@ -235,6 +269,131 @@ class AuthController extends Notifier<AuthState> {
       debugPrint('sign-in failed: $e');
       state = state.copyWith(busy: false, error: friendlyAuthError(e));
       return null;
+    } finally {
+      _signingIn = false;
+    }
+  }
+
+  /// The web half of [_run]: opens the slot, writes down everything the return
+  /// leg will need, and hands the browser to the provider. Nothing after the
+  /// navigation runs — this whole app instance is about to be destroyed — so
+  /// the record MUST be persisted before the redirect starts, not after.
+  ///
+  /// Returns null: on the web a sign-in has no synchronous result. Callers
+  /// treat that exactly as they treat a cancellation (stay put), and the page
+  /// leaves under them.
+  Future<AuthUser?> _startRedirect(
+    OAuthProviderKind kind, {
+    required bool link,
+    required RedirectOrigin origin,
+  }) async {
+    if (state.busy) return null;
+    state = state.copyWith(busy: true, clearError: true);
+    _signingIn = true;
+    final sessions = ref.read(accountSessionsProvider);
+    final store = ref.read(localStoreProvider);
+    PendingSession? pending;
+    try {
+      final AuthService service;
+      final String appName;
+      if (!link && sessions.available) {
+        // A fresh sign-in gets its OWN app, same as the native path: the
+        // accounts already signed in on this device must not be disturbed, and
+        // the web SDK will file the redirect's result under this app's name.
+        pending = await sessions.begin();
+        service = ref.read(slotAuthServiceFactoryProvider)(pending.auth);
+        appName = pending.appName;
+      } else {
+        // A link upgrades the CURRENT user, so it runs on that account's own
+        // instance — the one authServiceProvider already fronts.
+        service = ref.read(authServiceProvider);
+        appName = (link ? sessions.appNameFor(state.user?.uid ?? '') : null) ??
+            AccountSessions.defaultSlot;
+      }
+      await store.savePendingRedirect(PendingRedirect(
+        appName: appName,
+        provider: kind.name,
+        link: link,
+        uid: link ? state.user?.uid : null,
+        origin: origin,
+        prelude: ref.read(onboardingPreludeProvider),
+        draft: ref.read(onboardingDraftProvider)?.toJson(),
+        startedAtMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+      await service.beginRedirectSignIn(kind, link: link);
+      // The page is on its way out; the spinner rides along with it. If the
+      // navigation somehow never happens, the record is still on disk and the
+      // next boot clears it (a redirect with no result is "nothing happened").
+      return null;
+    } catch (e) {
+      if (pending != null) unawaited(sessions.abandon(pending));
+      await store.clearPendingRedirect();
+      debugPrint('redirect sign-in failed to start: $e');
+      state = state.copyWith(busy: false, error: friendlyAuthError(e));
+      return null;
+    } finally {
+      _signingIn = false;
+    }
+  }
+
+  /// The return leg of a web sign-in, consumed ONCE, early in startup (see
+  /// RedirectSignInGate). Everything a popup sign-in does — slot commit,
+  /// directory adopt, profile doc, the cloud-upload offer downstream of
+  /// [AuthState.user] — happens here too, from the other side of a page reload.
+  ///
+  /// Null when there was nothing pending: the overwhelmingly common boot.
+  Future<RedirectResume?> consumePendingRedirect() async {
+    final store = ref.read(localStoreProvider);
+    final record = store.readPendingRedirect();
+    if (record == null) return null;
+    // A record left behind by a build that could still redirect, on a platform
+    // that cannot: drop it rather than carry it forever.
+    if (!ref.read(webRedirectSignInProvider)) {
+      await store.clearPendingRedirect();
+      return null;
+    }
+    state = state.copyWith(busy: true, clearError: true);
+    _signingIn = true;
+    final sessions = ref.read(accountSessionsProvider);
+    PendingSession? pending;
+    try {
+      final AuthService service;
+      if (!record.link && sessions.available) {
+        pending = await sessions.reopen(record.appName);
+        service = pending == null
+            ? ref.read(authServiceProvider)
+            : ref.read(slotAuthServiceFactoryProvider)(pending.auth);
+      } else {
+        // A LINK never opens a slot: the guest account keeps the session (and
+        // the uid) it already had, and only gains a provider. Opening a slot
+        // for it would leave two apps fighting over one uid — and a guest
+        // whose session lost that fight is a guest with no way back in.
+        service = ref.read(authServiceProvider);
+      }
+      // A hard ceiling on the one await that stands between the user and the
+      // app: whatever happens to the SDK, the boot spinner ends.
+      final user = await service
+          .completeRedirectSignIn()
+          .timeout(const Duration(seconds: 30));
+      await store.clearPendingRedirect();
+      if (user == null) {
+        // The user backed out of the provider's page, or the record was stale.
+        // Not an error — but the empty slot goes back on the shelf.
+        if (pending != null) await sessions.abandon(pending);
+        state = state.copyWith(busy: false);
+        return RedirectResume(record: record, user: null);
+      }
+      if (pending != null) await sessions.commit(pending, user.uid);
+      state = state.copyWith(user: user, busy: false);
+      await _adopt(user);
+      return RedirectResume(record: record, user: user);
+    } catch (e) {
+      if (pending != null) unawaited(sessions.abandon(pending));
+      await store.clearPendingRedirect();
+      debugPrint('redirect sign-in failed: $e');
+      final message = friendlyAuthError(e);
+      state = state.copyWith(busy: false, error: message);
+      return RedirectResume(record: record, user: null, error: message);
     } finally {
       _signingIn = false;
     }
@@ -324,6 +483,18 @@ class AuthController extends Notifier<AuthState> {
         .setActive(kLocalAccountId);
     state = state.copyWith(clearUser: true, busy: false);
   }
+}
+
+/// What a consumed redirect turned out to be: the record that was waiting, and
+/// the user it produced (null = cancelled, or [error] when it failed). The
+/// caller needs the RECORD, not just the user: only it knows whether this was
+/// a link, and where in the app the flow started.
+class RedirectResume {
+  const RedirectResume({required this.record, this.user, this.error});
+
+  final PendingRedirect record;
+  final AuthUser? user;
+  final String? error;
 }
 
 final authControllerProvider =

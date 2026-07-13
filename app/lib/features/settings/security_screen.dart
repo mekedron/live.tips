@@ -6,6 +6,7 @@ import '../../data/firebase/auth_service.dart';
 import '../../data/firebase/device_registry.dart';
 import '../../data/firebase/link_codes.dart';
 import '../../domain/app_account.dart';
+import '../../domain/pending_redirect.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/device_providers.dart';
@@ -160,16 +161,28 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     // Our own refresh token is gone. Re-run the same provider sign-in: same
     // uid, fresh auth_time (which the rules' watermark now demands).
     final auth = ref.read(authControllerProvider.notifier);
+    // On the WEB that re-auth is a redirect: it returns null because the page
+    // is leaving for the provider, NOT because it failed. Treating that null as
+    // a failure would sign the artist out on their way to the sign-in page —
+    // and the redirect would come back to a signed-out app.
+    final redirecting = ref.read(webRedirectSignInProvider) &&
+        (kind == AccountKind.apple || kind == AccountKind.google);
     AuthUser? refreshed;
     try {
       refreshed = switch (kind) {
-        AccountKind.apple => await auth.signInWithApple(),
-        AccountKind.google => await auth.signInWithGoogle(),
+        AccountKind.apple =>
+          await auth.signInWithApple(origin: RedirectOrigin.settings),
+        AccountKind.google =>
+          await auth.signInWithGoogle(origin: RedirectOrigin.settings),
         _ => null,
       };
     } catch (_) {
       refreshed = null;
     }
+    // The page is on its way to the provider — unless the redirect could not
+    // even start, which the controller reports as an error and which IS a
+    // failure to re-authenticate.
+    if (redirecting && ref.read(authControllerProvider).error == null) return;
     if (!mounted) return;
     if (refreshed == null) {
       // We cut our own session and could not restore it — land on the local

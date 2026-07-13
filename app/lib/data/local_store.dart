@@ -11,6 +11,7 @@ import '../domain/device_kind.dart';
 import '../domain/tip.dart';
 import '../domain/fx_rates.dart';
 import '../domain/live_session.dart';
+import '../domain/pending_redirect.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
 import 'local_cipher.dart';
@@ -241,6 +242,32 @@ class LocalStore {
 
   Future<void> clearCloudUploadPending() async {
     await _prefs.remove(_kCloudUploadPending);
+  }
+
+  // --- Pending web redirect sign-in ---
+  //
+  // Written BEFORE the browser is handed to Apple/Google and consumed exactly
+  // once on the way back (see PendingRedirect). The reload destroys every bit
+  // of in-memory state, so this is the only thread connecting the two halves
+  // of a web sign-in.
+
+  static const _kPendingRedirect = 'pending_redirect_v1';
+
+  PendingRedirect? readPendingRedirect() {
+    final raw = _getString(_kPendingRedirect);
+    if (raw == null) return null;
+    try {
+      return PendingRedirect.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> savePendingRedirect(PendingRedirect pending) =>
+      _setString(_kPendingRedirect, jsonEncode(pending.toJson()));
+
+  Future<void> clearPendingRedirect() async {
+    await _prefs.remove(_kPendingRedirect);
   }
 
   /// Whether [uid] was already offered the local→cloud band upload —

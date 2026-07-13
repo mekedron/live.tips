@@ -10,6 +10,7 @@ import 'domain/device_kind.dart';
 import 'features/account/cloud_upload_offer.dart';
 import 'features/account/deep_link_gate.dart';
 import 'features/account/device_session_guard.dart';
+import 'features/account/redirect_sign_in_gate.dart';
 import 'features/live/stage/stage_overlay.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
@@ -76,10 +77,16 @@ class LiveTipsApp extends ConsumerWidget {
       // session guard keeps this device's entry in the account's device list
       // and signs itself out when that account revokes it; the deep-link gate
       // turns a scanned/opened `…/link#c=…` URL into the redeem flow.
+      // RedirectSignInGate sits INSIDE the upload gate: a web sign-in comes back
+      // through a page reload, and the offer to move local profiles into the
+      // fresh account only fires if the gate above is already listening when
+      // the redirect's user lands.
       home: const RelayKeepalive(
         child: CloudUploadOfferGate(
           child: DeviceSessionGuard(
-            child: DeepLinkGate(child: RootGate()),
+            child: DeepLinkGate(
+              child: RedirectSignInGate(child: RootGate()),
+            ),
           ),
         ),
       ),

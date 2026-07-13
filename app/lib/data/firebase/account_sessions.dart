@@ -135,8 +135,13 @@ class AccountSessions {
   bool isAlive(String uid) => _sessions.containsKey(uid);
   List<String> get liveUids => List.unmodifiable(_sessions.keys);
 
+  /// Which [FirebaseApp] holds [uid]'s session, if any — what a redirect
+  /// sign-in records so the return leg can find its way back to the same one.
+  String? appNameFor(String uid) => _sessions[uid]?.appName;
+
   static const _slotPrefix = 'acct_slot_';
-  static const _defaultSlot = '[DEFAULT]';
+  static const defaultSlot = '[DEFAULT]';
+  static const _defaultSlot = defaultSlot;
 
   Future<SessionHandles> _open(String appName) async {
     final custom = _openApp;
@@ -258,6 +263,18 @@ class AccountSessions {
     if (handles.auth.currentUser != null) {
       await handles.auth.signOut();
     }
+    return PendingSession(appName: appName, handles: handles);
+  }
+
+  /// Re-opens the slot a WEB redirect sign-in was started on, so its result
+  /// can be claimed after the page reload destroyed the running app (see
+  /// PendingRedirect). The slot was never committed — no uid was known yet —
+  /// so [restore] does not revive it; only the app name, written before the
+  /// redirect, can find it again. The web SDK keys its pending-redirect state
+  /// by app, which is why it has to be THIS app and not a fresh one.
+  Future<PendingSession?> reopen(String appName) async {
+    if (!available) return null;
+    final handles = await _open(appName);
     return PendingSession(appName: appName, handles: handles);
   }
 

@@ -73,6 +73,34 @@ class OnboardingDraft {
   /// 1-based position of a per-method step (after details + method select).
   int stepOfMethod(TipMethod method) => 3 + setupOrder.indexOf(method);
 
+  /// The draft as plain JSON. It lives in memory only — but a WEB sign-in
+  /// redirect reloads the whole app (see PendingRedirect), and a half-filled
+  /// band setup that evaporated across that reload would read as data loss.
+  /// So the redirect snapshots the draft through here and restores it on the
+  /// way back.
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'currency': currency,
+        'thankYouMessage': thankYouMessage,
+        'methods': [for (final m in methods) m.wire],
+        if (revolutUsername != null) 'revolutUsername': revolutUsername,
+        if (mobilepayBoxId != null) 'mobilepayBoxId': mobilepayBoxId,
+        if (monzoUsername != null) 'monzoUsername': monzoUsername,
+      };
+
+  static OnboardingDraft fromJson(Map<String, dynamic> json) => OnboardingDraft(
+        name: json['name'] as String? ?? '',
+        currency: json['currency'] as String? ?? 'eur',
+        thankYouMessage: json['thankYouMessage'] as String? ?? '',
+        methods: {
+          for (final wire in (json['methods'] as List? ?? const []))
+            ?TipMethod.fromWire(wire as String?),
+        },
+        revolutUsername: json['revolutUsername'] as String?,
+        mobilepayBoxId: json['mobilepayBoxId'] as String?,
+        monzoUsername: json['monzoUsername'] as String?,
+      );
+
   OnboardingDraft copyWith({
     String? name,
     String? currency,
@@ -140,6 +168,13 @@ class OnboardingPreludeNotifier extends Notifier<int> {
   /// A new run begins (Welcome's "Get started", adding a band later, a
   /// device wipe) — the prelude belongs to the run, not the device.
   void reset() => state = 0;
+
+  /// Puts back the count a web sign-in redirect carried across the page
+  /// reload, so the step indicator resumes where the user left it instead of
+  /// starting the flow over at "1 of 3".
+  void restore(int steps) {
+    if (steps > state) state = steps;
+  }
 }
 
 final onboardingPreludeProvider =
