@@ -341,10 +341,6 @@ class FirestoreRepository implements AccountDataRepository {
         .orderBy('createdAt')
         .snapshots()
         .listen((snap) {
-      // The band's sessions listener going out of the map means the copy is
-      // gone from this device (or the band with it) — its tips are not ours
-      // to mirror any more.
-      if (_forgotten(bandId, _sessionSubs)) return;
       applySessionTipsSnapshot(
         bandId,
         sessionId,
