@@ -112,29 +112,17 @@ class _OnboardingMethodScreenState
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
-    final draft = ref.watch(onboardingDraftProvider);
-    final prelude = ref.watch(onboardingPreludeProvider);
-    final step =
-        draft == null ? null : prelude + draft.stepOfMethod(widget.method);
-    final total = draft == null ? null : prelude + draft.totalSteps;
     final linkHint = relayMethodHint(widget.method);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.method.l10nLabel(context)),
         actions: [
-          if (step != null && total != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: LtPill(
-                  label: context.s.t('onboarding.method.step_pill', {
-                    'step': step,
-                    'total': total,
-                  }),
-                ),
-              ),
-            ),
+          OnboardingProgress(
+            step: OnboardingStep.method,
+            method: widget.method,
+            pillOnly: true,
+          ),
         ],
       ),
       body: Center(
@@ -143,10 +131,11 @@ class _OnboardingMethodScreenState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
-              if (step != null && total != null) ...[
-                LtProgressSegments(total: total, filled: step),
-                const SizedBox(height: 16),
-              ],
+              OnboardingProgress(
+                step: OnboardingStep.method,
+                method: widget.method,
+              ),
+              const SizedBox(height: 16),
               Text(
                 context.s.t('onboarding.method.intro_$_wire'),
                 style: TextStyle(

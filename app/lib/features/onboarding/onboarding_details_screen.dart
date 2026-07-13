@@ -8,6 +8,7 @@ import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/lt_ui.dart';
 import 'method_select_screen.dart';
+import 'onboarding_flow.dart';
 
 /// First onboarding step: the band's details — name, currency, and the
 /// thank-you message fans see. Collected once, up front, so the later method
@@ -143,31 +144,11 @@ class _OnboardingDetailsScreenState
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
-    // Methods aren't picked yet at this step — fall back to the minimum
-    // flow length (details + methods + one method step), same estimate
-    // the method-select screen uses before anything is checked. The account
-    // steps that ran before this (the prelude) count too: they were steps
-    // the user walked through, and a counter that forgot them read like the
-    // app lost track.
-    final prelude = ref.watch(onboardingPreludeProvider);
-    final total =
-        prelude + (ref.watch(onboardingDraftProvider)?.totalSteps ?? 3);
-    final step = prelude + 1;
     return Scaffold(
       appBar: AppBar(
         title: Text(context.s.t('onboarding.details.title')),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: LtPill(
-                label: context.s.t('onboarding.details.step_pill_n', {
-                  'step': step,
-                  'total': total,
-                }),
-              ),
-            ),
-          ),
+        actions: const [
+          OnboardingProgress(step: OnboardingStep.details, pillOnly: true),
         ],
       ),
       body: Center(
@@ -176,7 +157,7 @@ class _OnboardingDetailsScreenState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
-              LtProgressSegments(total: total, filled: step),
+              const OnboardingProgress(step: OnboardingStep.details),
               const SizedBox(height: 16),
               Text(
                 context.s.t('onboarding.details.heading'),

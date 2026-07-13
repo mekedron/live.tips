@@ -390,7 +390,6 @@ class AuthController extends Notifier<AuthState> {
         link: link,
         uid: link ? state.user?.uid : null,
         origin: origin,
-        prelude: ref.read(onboardingPreludeProvider),
         draft: ref.read(onboardingDraftProvider)?.toJson(),
         startedAtMs: DateTime.now().millisecondsSinceEpoch,
         nonce: nonce,

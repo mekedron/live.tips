@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
-import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
 import 'account_step_screen.dart';
 import 'profile_pick_screen.dart';
@@ -61,14 +60,6 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
           ? entry.name
           : (user?.displayName ?? ''),
     );
-    // As an onboarding step this counts in the indicator; the Settings
-    // rename is the same screen but not a step of anything.
-    if (!widget.rename) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ref.read(onboardingPreludeProvider.notifier).markNameStep();
-      });
-    }
   }
 
   @override
@@ -87,8 +78,6 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
     final navigator = Navigator.of(context);
     await ref.read(signOutProvider)();
     if (!mounted) return;
-    // The run starts over from the question, so the step counter does too.
-    ref.read(onboardingPreludeProvider.notifier).reset();
     navigator.popUntil((route) => route.isFirst);
     navigator.push(
       MaterialPageRoute(builder: (_) => const AccountStepScreen()),
@@ -125,12 +114,10 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final rename = widget.rename;
-    // Step 2 of the run (after the account question). The prelude may not
-    // have caught up with this screen on the first frame — count it as if
-    // it had, so the pill never dips below what the previous screen showed.
-    final prelude = ref.watch(onboardingPreludeProvider);
-    final total = (prelude < 2 ? 2 : prelude) +
-        (ref.watch(onboardingDraftProvider)?.totalSteps ?? 3);
+    // Unnumbered, like the account question it follows: this screen only exists
+    // when the provider handed over no name, and the run's length is still not
+    // known here (the account may hold profiles, and picking one ends
+    // onboarding on the spot). See OnboardingStep.
     final busy = ref.watch(authControllerProvider).busy;
     // The arrow is not the only way back: Android's system Back and the iOS
     // edge-swipe pop a route whatever the app bar shows. They pop into the root
@@ -157,20 +144,6 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
         title: Text(context.s.t(rename
             ? 'settings.account.rename_title'
             : 'onboarding.account_name.title')),
-        actions: [
-          if (!rename)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: LtPill(
-                  label: context.s.t('onboarding.account_name.step_pill', {
-                    'step': 2,
-                    'total': total,
-                  }),
-                ),
-              ),
-            ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -178,10 +151,6 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
-              if (!rename) ...[
-                LtProgressSegments(total: total, filled: 2),
-                const SizedBox(height: 16),
-              ],
               Text(
                 context.s.t(rename
                     ? 'settings.account.rename_heading'

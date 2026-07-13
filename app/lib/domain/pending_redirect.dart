@@ -16,7 +16,6 @@ class PendingRedirect {
     required this.provider,
     required this.link,
     this.origin = RedirectOrigin.app,
-    this.prelude = 0,
     this.draft,
     this.uid,
     this.startedAtMs = 0,
@@ -44,10 +43,6 @@ class PendingRedirect {
   /// them back rather than dumping them on the app root.
   final RedirectOrigin origin;
 
-  /// The onboarding step-indicator prelude counter (in-memory state that the
-  /// reload would otherwise reset — see OnboardingPreludeNotifier).
-  final int prelude;
-
   /// The in-flight onboarding draft, serialized. In-memory only in the running
   /// app; without this a redirect started mid-onboarding would silently eat a
   /// half-filled band setup.
@@ -66,7 +61,6 @@ class PendingRedirect {
         'link': link,
         if (uid != null) 'uid': uid,
         'origin': origin.name,
-        'prelude': prelude,
         if (draft != null) 'draft': draft,
         'startedAtMs': startedAtMs,
         'nonce': nonce,
@@ -81,7 +75,6 @@ class PendingRedirect {
                 .where((o) => o.name == json['origin'])
                 .firstOrNull ??
             RedirectOrigin.app,
-        prelude: (json['prelude'] as num?)?.toInt() ?? 0,
         draft: json['draft'] == null
             ? null
             : Map<String, dynamic>.from(json['draft'] as Map),

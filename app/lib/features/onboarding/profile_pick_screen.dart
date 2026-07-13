@@ -8,7 +8,6 @@ import '../../data/repository/account_data_repository.dart';
 import '../../domain/band_account.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
-import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/profile_switcher.dart';
 import '../settings/settings_screen.dart';
@@ -124,9 +123,7 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     if (!await switchTo(context, ref, account: account, band: band)) return;
     if (!mounted) return;
     // Entering an existing profile IS the end of onboarding: drop the whole
-    // stack so RootGate shows the shell, and clear the step counter the way
-    // the done screen does.
-    ref.read(onboardingPreludeProvider.notifier).reset();
+    // stack so RootGate shows the shell.
     navigator.popUntil((route) => route.isFirst);
   }
 

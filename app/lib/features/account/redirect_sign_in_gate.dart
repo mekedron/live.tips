@@ -75,7 +75,6 @@ class _RedirectSignInGateState extends ConsumerState<RedirectSignInGate> {
           .read(onboardingDraftProvider.notifier)
           .set(OnboardingDraft.fromJson(draft));
     }
-    ref.read(onboardingPreludeProvider.notifier).restore(record.prelude);
 
     final error = resume.error;
     if (error != null) {

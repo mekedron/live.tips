@@ -126,7 +126,6 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
     ref.read(onboardingDraftProvider.notifier).clear();
     // The run is over; its account steps must not inflate the next one's
     // step counter (adding a band later starts at "Step 1").
-    ref.read(onboardingPreludeProvider.notifier).reset();
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 

@@ -425,10 +425,9 @@ Future<bool> addProfile(BuildContext context, WidgetRef ref) async {
       sessionKey: 'widgets.profile_switcher.stop_session_add')) {
     return false;
   }
-  // A new run: it inherits no method choices from the last one, and its step
-  // counter starts at the details step (there are no account steps in it).
+  // A new run: it inherits no method choices from the last one — and the draft
+  // IS the run, so clearing it puts the step counter back to "1 of 3".
   ref.read(onboardingDraftProvider.notifier).clear();
-  ref.read(onboardingPreludeProvider.notifier).reset();
   return true;
 }
 

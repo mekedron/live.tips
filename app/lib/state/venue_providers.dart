@@ -86,7 +86,6 @@ class DeviceKindNotifier extends Notifier<DeviceKind?> {
     ref.invalidate(accountsDirectoryProvider);
     ref.invalidate(venueSessionProvider);
     ref.read(onboardingDraftProvider.notifier).clear();
-    ref.read(onboardingPreludeProvider.notifier).reset();
     ref.invalidate(appStateProvider);
   }
 }

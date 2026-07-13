@@ -8,7 +8,6 @@ import '../../core/theme.dart';
 import '../../domain/device_kind.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
-import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../state/venue_providers.dart';
 import '../../widgets/language_switcher.dart';
@@ -42,7 +41,6 @@ class WelcomeScreen extends ConsumerWidget {
   Future<void> _getStarted(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
     // A fresh run: the step counter starts clean.
-    ref.read(onboardingPreludeProvider.notifier).reset();
     await _ensureFirstBand(ref);
     await ref.read(deviceKindProvider.notifier).choose(DeviceKind.performer);
     if (!context.mounted) return;

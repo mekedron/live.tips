@@ -42,27 +42,17 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
   Widget build(BuildContext context) {
     final c = context.lt;
     final nonStripe = _selected.any(TipMethod.relayMethods.contains);
-    // The pill previews the flow length for the current selection: any
-    // account steps already walked (the prelude) + details + this step +
-    // one per chosen method.
-    final prelude = ref.watch(onboardingPreludeProvider);
-    final total = prelude + 2 + (_selected.isEmpty ? 1 : _selected.length);
-    final step = prelude + 2;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(context.s.t('onboarding.method_select.title')),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: LtPill(
-                label: context.s.t('onboarding.method_select.step_pill_n', {
-                  'step': step,
-                  'total': total,
-                }),
-              ),
-            ),
+          // The one screen whose total can move — and it moves with the
+          // artist's own ticks, which is the whole point of it.
+          OnboardingProgress(
+            step: OnboardingStep.methodSelect,
+            selected: _selected,
+            pillOnly: true,
           ),
         ],
       ),
@@ -72,7 +62,10 @@ class _MethodSelectScreenState extends ConsumerState<MethodSelectScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
-              LtProgressSegments(total: total, filled: step),
+              OnboardingProgress(
+                step: OnboardingStep.methodSelect,
+                selected: _selected,
+              ),
               const SizedBox(height: 16),
               Text(
                 context.s.t('onboarding.method_select.heading'),

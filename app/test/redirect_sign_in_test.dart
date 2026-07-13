@@ -108,7 +108,8 @@ void main() {
       'leaves for the bridge, and everything the return leg needs is written '
       'down first', () async {
     final h = await _harness();
-    // Mid-onboarding: a draft in memory, and two prelude steps already walked.
+    // Mid-onboarding: a draft in memory — the run, and the only thing the
+    // reload must not eat (the step counter is derived from it now).
     h.container.read(onboardingDraftProvider.notifier).set(const OnboardingDraft(
           name: 'Nightbirds',
           currency: 'dkk',
@@ -116,7 +117,6 @@ void main() {
           methods: {TipMethod.stripe, TipMethod.revolut},
           revolutUsername: 'nightbirds',
         ));
-    h.container.read(onboardingPreludeProvider.notifier).markNameStep();
 
     final user = await h.container
         .read(authControllerProvider.notifier)
@@ -133,7 +133,6 @@ void main() {
     expect(record!.link, isFalse);
     expect(record.provider, 'google');
     expect(record.origin, RedirectOrigin.onboarding);
-    expect(record.prelude, 2);
     expect(record.nonce, isNotEmpty,
         reason: 'the nonce is what pairs the answer with THIS attempt');
     // And the bridge was told the same story the record tells.
@@ -528,7 +527,6 @@ void main() {
         provider: 'google',
         link: false,
         origin: RedirectOrigin.app,
-        prelude: 2,
         nonce: 'n1',
         draft: const OnboardingDraft(
           name: 'Nightbirds',
@@ -558,8 +556,9 @@ void main() {
     expect(draft.currency, 'dkk');
     expect(draft.methods, {TipMethod.mobilepay});
     expect(draft.mobilepayBoxId, '12345');
-    // And the step counter it was walking, so the flow does not restart at 1.
-    expect(h.container.read(onboardingPreludeProvider), 2);
+    // And with the draft comes the step counter: the run's length IS the draft
+    // (one method chosen → "3 of 3"), so restoring one restores the other.
+    expect(draft.totalSteps, 3);
   });
 
   test('the bridge fragment round-trips: what signin.html sends is what the '

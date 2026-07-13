@@ -661,10 +661,9 @@ class AppStateNotifier extends Notifier<AppState> {
     final previousId = state.accountId;
     state = state.copyWith(switching: true);
     // A stale onboarding draft must never leak across bands — it would
-    // hijack the next band's setup flow with this band's method choices.
-    // The step-counter prelude goes with it: it belongs to the run.
+    // hijack the next band's setup flow with this band's method choices, and
+    // with them its step count.
     ref.read(onboardingDraftProvider.notifier).clear();
-    ref.read(onboardingPreludeProvider.notifier).reset();
 
     final repo = ref.read(accountDataRepositoryProvider);
     String? apiKey;
@@ -730,8 +729,6 @@ class AppStateNotifier extends Notifier<AppState> {
   Future<BandAccount?> addAccount() async {
     if (accountActionsBlocked) return null;
     ref.read(onboardingDraftProvider.notifier).clear();
-    // A fresh band's onboarding has no account steps — step 1 is details.
-    ref.read(onboardingPreludeProvider.notifier).reset();
     final account = await _mintBand();
     state = AppState(
       accountId: account.id,
@@ -791,7 +788,6 @@ class AppStateNotifier extends Notifier<AppState> {
     if (!_registry.contains(id)) return false;
     state = state.copyWith(switching: true);
     ref.read(onboardingDraftProvider.notifier).clear();
-    ref.read(onboardingPreludeProvider.notifier).reset();
 
     final repo = ref.read(accountDataRepositoryProvider);
 
