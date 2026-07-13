@@ -1,5 +1,5 @@
-/// The mint-vs-burn ordering of collectLinkToken / collectLoginToken, driven
-/// through the real handlers over an in-memory Firestore stand-in.
+/// The mint-vs-burn ordering of collectLinkToken, driven through the real
+/// handler over an in-memory Firestore stand-in.
 ///
 /// The production failure this pins down: the handler flipped the code to
 /// 'used' INSIDE the validating transaction, BEFORE createCustomToken ran —
@@ -46,14 +46,10 @@ const fakeDb = {
 vi.mock("../src/store", () => ({
   db: () => fakeDb,
   linkCodeRef: (_db: unknown, code: string) => ({ path: `linkCodes/${code}` }),
-  loginRequestRef: (_db: unknown, id: string) => ({ path: `loginRequests/${id}` }),
   securityRef: (_db: unknown, uid: string) => ({ path: `users/${uid}/private/security` }),
   bumpQuota: async () => true,
   LINK_COLLECTS_PER_IP_PER_HOUR: 120,
   LINK_REDEEMS_PER_IP_PER_HOUR: 30,
-  LOGIN_COLLECTS_PER_IP_PER_HOUR: 900,
-  LOGIN_CREATES_PER_IP_PER_HOUR: 60,
-  LOGIN_DESCRIBES_PER_IP_PER_HOUR: 60,
 }));
 
 vi.mock("../src/params", () => ({
@@ -65,25 +61,17 @@ vi.mock("firebase-admin/auth", () => ({
   getAuth: () => ({ createCustomToken }),
 }));
 
-import { collectLinkTokenHandler, collectLoginTokenHandler } from "../src/devices";
+import { collectLinkTokenHandler } from "../src/devices";
 
 // ---------------------------------------------------------------------------
 
 const CODE = "A".repeat(22); // valid 22-char base64url shape
-const REQUEST_ID = "B".repeat(22);
 const NONCE = "n".repeat(22);
 
 function linkRequest(): never {
   // CallableRequest is structurally typed; only what the handler reads.
   return {
     data: { code: CODE, nonce: NONCE },
-    rawRequest: { headers: {}, socket: { remoteAddress: "203.0.113.7" } },
-  } as never;
-}
-
-function loginRequest(): never {
-  return {
-    data: { requestId: REQUEST_ID, collectNonce: NONCE },
     rawRequest: { headers: {}, socket: { remoteAddress: "203.0.113.7" } },
   } as never;
 }
@@ -97,18 +85,6 @@ function seedConfirmedLinkCode() {
     attempts: 0,
     redeemNonceHash: sha256Hex(NONCE),
     confirmedAtMs: Date.now(),
-  });
-}
-
-function seedApprovedLoginRequest() {
-  docs.set(`loginRequests/${REQUEST_ID}`, {
-    status: "approved",
-    approvedUid: "uid_artist",
-    approvedAtMs: Date.now(),
-    createdAtMs: Date.now(),
-    expiresAt: { toMillis: () => Date.now() + 60_000 },
-    attempts: 0,
-    collectNonceHash: sha256Hex(NONCE),
   });
 }
 
@@ -173,39 +149,13 @@ describe("collectLinkToken: mint before burn", () => {
   });
 });
 
-describe("collectLoginToken: mint before burn (the venue tablet's flow)", () => {
-  it("a failed mint must NOT consume the request", async () => {
-    seedApprovedLoginRequest();
-    createCustomToken.mockRejectedValueOnce(
-      new Error("Permission iam.serviceAccounts.signBlob denied"),
-    );
-
-    await expect(collectLoginTokenHandler(loginRequest())).rejects.toThrow();
-    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("approved");
-
-    createCustomToken.mockResolvedValueOnce("token-456");
-    const retry = await collectLoginTokenHandler(loginRequest());
-    expect(retry.token).toBe("token-456");
-    expect(createCustomToken).toHaveBeenLastCalledWith("uid_artist");
-    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("used");
-  });
-
-  it("single use still holds after a successful collect", async () => {
-    seedApprovedLoginRequest();
-    createCustomToken.mockResolvedValue("token-456");
-
-    await collectLoginTokenHandler(loginRequest());
-    await expect(collectLoginTokenHandler(loginRequest())).rejects.toThrow();
-  });
-});
-
 // ---------------------------------------------------------------------------
 // The revocation watermark gate (issue #7). revokeAllOtherDevices sweeps live
-// grants to 'expired', but a confirm/approve can race the sweep — so collect*
-// must ALSO refuse a grant whose confirm/approve predates the uid's
+// grants to 'expired', but a confirm can race the sweep — so collectLinkToken
+// must ALSO refuse a code whose confirm predates the owner's
 // sessionsValidAfterMs watermark. These tests exercise exactly that race: the
-// doc is still 'confirmed'/'approved' (as if the sweep missed it), and the
-// mint must not happen.
+// doc is still 'confirmed' (as if the sweep missed it), and the mint must not
+// happen.
 
 describe("collectLinkToken vs the revocation watermark", () => {
   it("a code confirmed BEFORE revokeAllOtherDevices must not mint", async () => {
@@ -239,39 +189,5 @@ describe("collectLinkToken vs the revocation watermark", () => {
 
     expect(result.token).toBe("token-123");
     expect(docs.get(`linkCodes/${CODE}`)!["status"]).toBe("used");
-  });
-});
-
-describe("collectLoginToken vs the revocation watermark", () => {
-  it("a request approved BEFORE revokeAllOtherDevices must not mint", async () => {
-    seedApprovedLoginRequest();
-    docs.get(`loginRequests/${REQUEST_ID}`)!["approvedAtMs"] = Date.now() - 5_000;
-    seedWatermark("uid_artist", Date.now());
-
-    await expect(collectLoginTokenHandler(loginRequest())).rejects.toThrow();
-
-    expect(createCustomToken).not.toHaveBeenCalled();
-    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("expired");
-  });
-
-  it("an approved request with no approvedAtMs fails closed once a watermark exists", async () => {
-    seedApprovedLoginRequest();
-    delete docs.get(`loginRequests/${REQUEST_ID}`)!["approvedAtMs"];
-    seedWatermark("uid_artist", Date.now());
-
-    await expect(collectLoginTokenHandler(loginRequest())).rejects.toThrow();
-    expect(createCustomToken).not.toHaveBeenCalled();
-  });
-
-  it("a request approved AFTER the watermark mints — a fresh session approved it", async () => {
-    seedApprovedLoginRequest();
-    docs.get(`loginRequests/${REQUEST_ID}`)!["approvedAtMs"] = Date.now();
-    seedWatermark("uid_artist", Date.now() - 5_000);
-    createCustomToken.mockResolvedValueOnce("token-456");
-
-    const result = await collectLoginTokenHandler(loginRequest());
-
-    expect(result.token).toBe("token-456");
-    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("used");
   });
 });

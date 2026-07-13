@@ -1,10 +1,10 @@
 /// The interleaving issue #7 says was never tested: an attacker pre-positions
-/// a grant with a stolen session (confirms a link code, or approves a login
-/// request), the victim hits "revoke all other devices", and the attacker's
-/// device collects AFTERWARDS. collect* is unauthenticated and mints custom
-/// tokens whose auth_time postdates the watermark, so the watermark alone
-/// cannot stop the mint — the revocation must kill the GRANT itself. Driven
-/// through the real handlers over an in-memory Firestore stand-in.
+/// a grant with a stolen session (confirms a link code), the victim hits
+/// "revoke all other devices", and the attacker's device collects AFTERWARDS.
+/// collectLinkToken is unauthenticated and mints custom tokens whose auth_time
+/// postdates the watermark, so the watermark alone cannot stop the mint — the
+/// revocation must kill the GRANT itself. Driven through the real handlers over
+/// an in-memory Firestore stand-in.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sha256Hex } from "../src/auth";
@@ -93,8 +93,6 @@ const fakeDb = {
 vi.mock("../src/store", () => ({
   db: () => fakeDb,
   linkCodeRef: (_db: unknown, code: string) => ({ path: `linkCodes/${code}` }),
-  loginRequestRef: (_db: unknown, id: string) => ({ path: `loginRequests/${id}` }),
-  loginRequestsCol: (_db: unknown) => fakeQuery("loginRequests"),
   devicesCol: (_db: unknown, uid: string) => fakeQuery(`users/${uid}/devices`),
   securityRef: (_db: unknown, uid: string) => {
     const path = `users/${uid}/private/security`;
@@ -109,9 +107,6 @@ vi.mock("../src/store", () => ({
   bumpQuota: async () => true,
   LINK_COLLECTS_PER_IP_PER_HOUR: 120,
   LINK_REDEEMS_PER_IP_PER_HOUR: 30,
-  LOGIN_COLLECTS_PER_IP_PER_HOUR: 900,
-  LOGIN_CREATES_PER_IP_PER_HOUR: 60,
-  LOGIN_DESCRIBES_PER_IP_PER_HOUR: 60,
 }));
 
 vi.mock("../src/params", () => ({
@@ -125,9 +120,7 @@ vi.mock("firebase-admin/auth", () => ({
 }));
 
 import {
-  approveLoginRequestHandler,
   collectLinkTokenHandler,
-  collectLoginTokenHandler,
   confirmLinkCodeHandler,
   revokeAllOtherDevicesHandler,
 } from "../src/devices";
@@ -136,7 +129,6 @@ import {
 
 const VICTIM = "uid_victim";
 const CODE = "A".repeat(22);
-const REQUEST_ID = "B".repeat(22);
 const NONCE = "n".repeat(22);
 
 /** A signed-in (non-anonymous) callable request — only what the handlers read. */
@@ -171,19 +163,6 @@ function seedClaimedLinkCode(uid = VICTIM, code = CODE) {
     attempts: 1,
     requester: { name: "Attacker's phone", platform: "android" },
     redeemNonceHash: sha256Hex(NONCE),
-  });
-}
-
-function seedPendingLoginRequest(requestId = REQUEST_ID) {
-  docs.set(`loginRequests/${requestId}`, {
-    status: "pending",
-    createdAtMs: Date.now(),
-    expiresAt: { toMillis: () => Date.now() + 60_000 },
-    displayCode: "A4KP9TXM",
-    deviceName: "Bar tablet",
-    devicePlatform: "ipad",
-    collectNonceHash: sha256Hex(NONCE),
-    attempts: 0,
   });
 }
 
@@ -246,48 +225,5 @@ describe("confirm, THEN revoke, THEN collect — the link-code kill switch", () 
     expect(docs.get(`linkCodes/${CODE}`)!["status"]).toBe("expired");
     expect(docs.get(`linkCodes/${usedCode}`)!["status"]).toBe("used");
     expect(docs.get(`linkCodes/${otherCode}`)!["status"]).toBe("confirmed");
-  });
-});
-
-describe("approve, THEN revoke, THEN collect — the login-request kill switch", () => {
-  it("an approved login request does not survive revokeAllOtherDevices", async () => {
-    seedPendingLoginRequest();
-    seedDevices();
-
-    // 1. The stolen session approves the attacker's tablet.
-    await approveLoginRequestHandler(signedIn(VICTIM, { code: REQUEST_ID }));
-    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("approved");
-    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["approvedUid"]).toBe(VICTIM);
-
-    // 2. The kill switch. The sweep must expire the approved request.
-    await revokeAllOtherDevicesHandler(signedIn(VICTIM, { currentDeviceId: "phone-1" }));
-    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("expired");
-
-    // 3. The tablet collects — inside the 60 s window — and must get nothing.
-    await expect(
-      collectLoginTokenHandler(
-        unauthenticated({ requestId: REQUEST_ID, collectNonce: NONCE }),
-      ),
-    ).rejects.toThrow();
-    expect(createCustomToken).not.toHaveBeenCalled();
-  });
-
-  it("the sweep leaves pending requests and other approvers alone", async () => {
-    seedPendingLoginRequest();
-    const otherId = "E".repeat(22);
-    seedPendingLoginRequest(otherId);
-    Object.assign(docs.get(`loginRequests/${otherId}`)!, {
-      status: "approved",
-      approvedUid: "uid_other",
-      approvedAtMs: Date.now(),
-    });
-    seedDevices();
-
-    await revokeAllOtherDevicesHandler(signedIn(VICTIM, { currentDeviceId: "phone-1" }));
-
-    // A pending request has no approvedUid — nothing of the victim's to kill —
-    // and another uid's approval is not this revocation's business.
-    expect(docs.get(`loginRequests/${REQUEST_ID}`)!["status"]).toBe("pending");
-    expect(docs.get(`loginRequests/${otherId}`)!["status"]).toBe("approved");
   });
 });

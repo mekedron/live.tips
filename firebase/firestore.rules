@@ -102,24 +102,6 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // QR sign-in requests (the mirror flow: a shared, NOT-signed-in tablet
-    // shows the QR; the artist's signed-in phone scans and approves it).
-    //
-    // NOTHING is granted here, and that is deliberate, not an omission — do
-    // not "fix" it by adding a read rule later:
-    //  - the tablet that creates a request has NO uid at all, so there is no
-    //    principal a read rule could even be written against; a rule loose
-    //    enough to let the tablet watch its own request would let anyone
-    //    enumerate every live request in the bar (and every device label in
-    //    it). The tablet polls collectLoginToken instead, proving it is the
-    //    creator with a collectNonce that never appears in the QR.
-    //  - the approving phone has a uid, but the request is not *its* document
-    //    and it needs nothing from it that describeLoginRequest does not
-    //    return (the device label, the expiry) under an attempt cap and an
-    //    IP quota — an unmediated read would hand a code-guesser an oracle.
-    // Every transition (pending→approved→used|expired) is function-mediated.
-    // Falls through to the default deny at the bottom of this file.
-
     // Jars: readable by the owner and linked reader devices; every write is
     // function-mediated (the callables + tip endpoint hold the invariants —
     // validation, quotas, hashed secrets — that rules cannot express).

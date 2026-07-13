@@ -36,8 +36,46 @@ function docRef(path: string) {
   };
 }
 
+/** Firestore serializes transactions on the docs they read; so does this — the
+ * bodies run one at a time, and the second one sees what the first committed. */
+let txChain: Promise<unknown> = Promise.resolve();
+
 const fakeDb = {
   collection: (name: string) => colRef(name),
+  runTransaction: <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
+    const run = txChain.then(() => {
+      // Buffered like a real transaction: the writes land at the end, together.
+      const ops: (() => void)[] = [];
+      const tx = {
+        get: async (ref: { path: string }) => {
+          const data = docs.get(ref.path);
+          return { exists: data !== undefined, data: () => (data === undefined ? undefined : { ...data }) };
+        },
+        create: (ref: { path: string }, doc: Record<string, unknown>) =>
+          ops.push(() => {
+            if (docs.has(ref.path)) throw new Error(`create on existing ${ref.path}`);
+            docs.set(ref.path, { ...doc });
+          }),
+        set: (ref: { path: string }, data: Record<string, unknown>, opts?: { merge?: boolean }) =>
+          ops.push(() => {
+            const existing = (opts?.merge ? docs.get(ref.path) : undefined) ?? {};
+            const connections = {
+              ...(existing["connections"] as Record<string, unknown> | undefined),
+              ...(data["connections"] as Record<string, unknown> | undefined),
+            };
+            docs.set(ref.path, { ...existing, ...data, connections });
+          }),
+        delete: (ref: { path: string }) => ops.push(() => docs.delete(ref.path)),
+      };
+      return fn(tx).then((result) => {
+        for (const op of ops) op();
+        return result;
+      });
+    });
+    // A rejected transaction must not break the chain for the next one.
+    txChain = run.catch(() => undefined);
+    return run;
+  },
   batch: () => {
     // Buffered like the real thing: nothing lands until commit().
     const ops: (() => void)[] = [];
@@ -117,6 +155,22 @@ const OLD_LINK = "plink_1OldTipJarLink";
 let linkLookupDown = false;
 /** Every request the handler made, as "METHOD path". */
 let stripeRequests: string[] = [];
+/**
+ * When set, POST webhook_endpoints blocks until `size` callers have arrived —
+ * the only way to hold two connects inside the lookup→commit gap at once, which
+ * is where the race of issue #19(c) lives.
+ */
+let endpointBarrier: (() => Promise<void>) | null = null;
+
+function barrier(size: number): () => Promise<void> {
+  let arrived = 0;
+  let release!: () => void;
+  const open = new Promise<void>((resolve) => { release = resolve; });
+  return async () => {
+    if (++arrived === size) release();
+    await open;
+  };
+}
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status });
@@ -138,6 +192,7 @@ const fakeStripeFetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
   // The five key probes are plain list GETs; both accounts grant them all.
   if (method === "GET") return json(200, { object: "list", data: [] });
   if (method === "POST" && path === "webhook_endpoints") {
+    if (endpointBarrier) await endpointBarrier();
     return json(200, { id: `we_new_${account}`, object: "webhook_endpoint", secret: `whsec_new_${account}` });
   }
   if (method === "DELETE") return json(200, { deleted: true });
@@ -182,6 +237,8 @@ beforeEach(() => {
   docs.clear();
   stripeRequests = [];
   linkLookupDown = false;
+  endpointBarrier = null;
+  txChain = Promise.resolve();
   vi.stubGlobal("fetch", fakeStripeFetch);
 });
 
@@ -250,5 +307,65 @@ describe("stripeConnect: the reconnect carry-over", () => {
     expect(result.ok).toBe(true);
     expect(currentConnection().paymentLinkId).toBeNull();
     expect(stripeRequests.filter((r) => r.startsWith("GET payment_links/"))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #19(c): the lookup→commit race. The lookup happens BEFORE the Stripe
+// round-trips, so two connects for one band can both be holding the same
+// `existing` when they reach the commit. Before the fix both wrote a connection
+// doc and the pointer merge picked a winner at random — the loser's doc (a
+// sealed key AND a live webhook endpoint on the artist's Stripe account) was
+// orphaned forever: nothing follows anything but the pointer, and no sweep
+// touches stripeConnections. The barrier below holds both calls inside exactly
+// that gap.
+
+/** Every connection doc currently stored — an orphan is one nobody points at. */
+function connectionIds(): string[] {
+  return [...docs.keys()]
+    .filter((path) => path.startsWith("stripeConnections/"))
+    .map((path) => path.slice("stripeConnections/".length));
+}
+
+describe("stripeConnect: two connects for one band cannot both commit", () => {
+  it("a first connect racing itself leaves ONE connection and no orphan", async () => {
+    endpointBarrier = barrier(2);
+
+    const results = await Promise.allSettled([
+      stripeConnectHandler(connectRequest(KEY_A_FRESH)),
+      stripeConnectHandler(connectRequest(KEY_A_FRESH)),
+    ]);
+
+    // Both registered an endpoint (that is the race), but only one committed.
+    expect(stripeRequests.filter((r) => r === "POST webhook_endpoints")).toHaveLength(2);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const loser = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(loser.reason).toMatchObject({ code: "aborted" });
+
+    // The loser left nothing behind: no second doc, and its endpoint was
+    // rolled back off the artist's Stripe account.
+    expect(connectionIds()).toHaveLength(1);
+    const pointer = docs.get(`users/${UID}/private/stripe`)!["connections"] as Record<string, string>;
+    expect(pointer[BAND]).toBe(connectionIds()[0]);
+    expect(stripeRequests).toContain("DELETE webhook_endpoints/we_new_A");
+  });
+
+  it("a reconnect racing itself replaces exactly once", async () => {
+    await seedConnection();
+    endpointBarrier = barrier(2);
+
+    const results = await Promise.allSettled([
+      stripeConnectHandler(connectRequest(KEY_A_FRESH)),
+      stripeConnectHandler(connectRequest(KEY_A_FRESH)),
+    ]);
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    // The old connection is gone (the winner replaced it), the loser's is
+    // never created — one band, one connection, whatever the interleaving.
+    expect(connectionIds()).toHaveLength(1);
+    expect(connectionIds()[0]).not.toBe(OLD_CONN);
+    const doc = currentConnection();
+    expect(doc.webhookEndpointId).toBe("we_new_A");
+    expect(doc.paymentLinkId).toBe(OLD_LINK);
   });
 });

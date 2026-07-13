@@ -39,30 +39,47 @@ function docRef(path: string) {
   };
 }
 
+/** The buffered writes a batch and a transaction both take (see #19c: connect
+ * commits in a transaction now, disconnect still in a batch). */
+function writeOps() {
+  const ops: (() => void)[] = [];
+  return {
+    ops,
+    create: (ref: { path: string }, doc: Record<string, unknown>) =>
+      ops.push(() => {
+        if (docs.has(ref.path)) throw new Error(`create on existing ${ref.path}`);
+        docs.set(ref.path, { ...doc });
+      }),
+    set: (ref: { path: string }, data: Record<string, unknown>, opts?: { merge?: boolean }) =>
+      ops.push(() => {
+        const existing = (opts?.merge ? docs.get(ref.path) : undefined) ?? {};
+        const connections = {
+          ...(existing["connections"] as Record<string, unknown> | undefined),
+          ...(data["connections"] as Record<string, unknown> | undefined),
+        };
+        docs.set(ref.path, { ...existing, ...data, connections });
+      }),
+    delete: (ref: { path: string }) => ops.push(() => docs.delete(ref.path)),
+  };
+}
+
 const fakeDb = {
   collection: (name: string) => colRef(name),
-  batch: () => {
-    const ops: (() => void)[] = [];
-    return {
-      create: (ref: { path: string }, doc: Record<string, unknown>) =>
-        ops.push(() => {
-          if (docs.has(ref.path)) throw new Error(`create on existing ${ref.path}`);
-          docs.set(ref.path, { ...doc });
-        }),
-      set: (ref: { path: string }, data: Record<string, unknown>, opts?: { merge?: boolean }) =>
-        ops.push(() => {
-          const existing = (opts?.merge ? docs.get(ref.path) : undefined) ?? {};
-          const connections = {
-            ...(existing["connections"] as Record<string, unknown> | undefined),
-            ...(data["connections"] as Record<string, unknown> | undefined),
-          };
-          docs.set(ref.path, { ...existing, ...data, connections });
-        }),
-      delete: (ref: { path: string }) => ops.push(() => docs.delete(ref.path)),
-      commit: async () => {
-        for (const op of ops) op();
+  runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
+    const writes = writeOps();
+    const result = await fn({
+      ...writes,
+      get: async (ref: { path: string }) => {
+        const data = docs.get(ref.path);
+        return { exists: data !== undefined, data: () => (data === undefined ? undefined : { ...data }) };
       },
-    };
+    });
+    for (const op of writes.ops) op();
+    return result;
+  },
+  batch: () => {
+    const writes = writeOps();
+    return { ...writes, commit: async () => { for (const op of writes.ops) op(); } };
   },
 };
 

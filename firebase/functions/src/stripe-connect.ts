@@ -222,6 +222,17 @@ export async function stripeConnectHandler(
 
   // From here to the commit, a failure would strand the endpoint we just
   // registered in the artist's dashboard — so seal-and-store rolls it back.
+  //
+  // The commit is a TRANSACTION that re-reads the pointer, because `existing`
+  // was read before the Stripe round-trips above and the world may have moved
+  // since. Two concurrent connects for one band would otherwise both see the
+  // same `existing`, both register an endpoint, both write a connection doc,
+  // and let a last-write-wins pointer merge pick the winner — leaving the
+  // loser's doc orphaned FOREVER: a sealed key plus a live webhook endpoint on
+  // the artist's Stripe account that lookupConnection (which only follows the
+  // pointer) can never find and no sweep collects. So the loser must lose
+  // LOUDLY: the pointer moving under us aborts the commit and the endpoint we
+  // registered is rolled back, leaving exactly one connection behind.
   try {
     const doc: StripeConnectionDoc = {
       uid,
@@ -233,13 +244,26 @@ export async function stripeConnectHandler(
       paymentLinkId,
       createdAtMs: now,
     };
-    const batch = firestore.batch();
-    batch.create(stripeConnectionRef(firestore, connectionId), doc);
-    batch.set(stripePointerRef(firestore, uid), { connections: { [bandId]: connectionId } }, { merge: true });
-    if (existing) batch.delete(stripeConnectionRef(firestore, existing.connectionId));
-    await batch.commit();
+    // Sealed OUTSIDE the transaction on purpose: a transaction body may be
+    // retried, and KMS calls inside one would be paid for on every attempt.
+    await firestore.runTransaction(async (tx) => {
+      const pointerRef = stripePointerRef(firestore, uid);
+      const pointer = (await tx.get(pointerRef)).data() as StripePointerDoc | undefined;
+      const current = pointer?.connections?.[bandId];
+      if ((current ?? null) !== (existing?.connectionId ?? null)) {
+        throw new HttpsError(
+          "aborted", "this band was connected somewhere else just now — try again",
+        );
+      }
+      tx.create(stripeConnectionRef(firestore, connectionId), doc);
+      tx.set(pointerRef, { connections: { [bandId]: connectionId } }, { merge: true });
+      if (existing) tx.delete(stripeConnectionRef(firestore, existing.connectionId));
+    });
   } catch (e) {
     await tryDeleteEndpoint(api, endpointId, "stripeConnect(rollback)");
+    // The abort above is the one expected failure and says so honestly; any
+    // other is ours, and the caller learns only that nothing was kept.
+    if (e instanceof HttpsError) throw e;
     console.error("stripeConnect: seal/store failed after endpoint registration", e instanceof Error ? e.message : "");
     throw new HttpsError("internal", "could not store the connection, nothing was kept");
   }

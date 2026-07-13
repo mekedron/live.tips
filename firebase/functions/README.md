@@ -36,13 +36,6 @@ linkCodes/{codeId}               QR add-device handshake (top-level: the
                                  status pending→claimed→confirmed→used |
                                  expired, attempts, requester?, redeemNonceHash,
                                  expiresAt = createdAtMs + 2 min
-loginRequests/{requestId}        QR sign-in-on-a-shared-device handshake (the
-                                 mirror flow); status pending→approved→used |
-                                 expired, displayCode (8 chars), deviceName?,
-                                 devicePlatform?, approvedUid?, collectNonceHash,
-                                 attempts, expiresAt = createdAtMs + 60 s.
-                                 NO client read and NO client write — rules
-                                 grant this collection nothing at all
 stripeConnections/{connectionId} one connected band's Stripe custody doc:
                                  uid, bandId, key (ENVELOPE — see Cloud
                                  Stripe), livemode, webhookEndpointId,
@@ -76,14 +69,6 @@ users/{uid}/bands/{bandId}/      webhook-fed tip queue, doc id = the Stripe
   → `{nonce}`; `confirmLinkCode {code}` (auth, owner — the anti-phishing
   tap); `collectLinkToken {code, nonce}` (no auth, polled) → `{pending:true}`
   until confirmed, then `{token}` (single-use custom token).
-- Shared-device sign-in (the mirror QR handshake, see `src/loginrequests.ts`):
-  `createLoginRequest {deviceName, devicePlatform}` (NO auth, IP-limited) →
-  `{requestId, displayCode, collectNonce, expiresAtMs}`;
-  `describeLoginRequest {code}` (auth) → `{deviceName, devicePlatform,
-  expiresAtMs}`; `approveLoginRequest {code}` (auth, **anonymous allowed**);
-  `collectLoginToken {requestId, collectNonce}` (no auth, polled ~5 s) →
-  `{pending:true}` until approved, then `{token}` (single-use custom token).
-  `code` accepts the QR's `requestId` OR the typed `displayCode`.
 - Revocation: `revokeDevice {deviceId}` (cooperative flag only) and
   `revokeAllOtherDevices {currentDeviceId}` (NON-anonymous; watermark +
   device flags + `revokeRefreshTokens` — the caller must silently
@@ -95,48 +80,28 @@ users/{uid}/bands/{bandId}/      webhook-fed tip queue, doc id = the Stripe
 - Scheduled: `sweepPendingTips` (10 min — fan text at rest ≤ ~70 min; also
   sweeps the cloud accounts' expired `stripeTips`), `expireJars` (daily;
   unowned jars past expiresAt), `sweepRateLimits` (hourly), `sweepLinkCodes`
-  (hourly; link codes AND login requests past expiresAt).
+  (hourly; link codes past expiresAt).
 
-## The two QR flows, side by side
+## The QR flow
 
-They are mirror images, and confusing them is the only way to get either
-wrong. In BOTH, the QR carries an id and nothing else; the token is collectable
-only by the device holding a nonce that never appeared in the QR.
+One ceremony, and the venue tablet uses it too: the **signed-in** device shows
+the QR, the new device scans it, the signed-in device taps confirm. The QR
+carries the codeId and nothing else; the token is collectable only by the
+device holding the redeem nonce, which is minted at redeem time and never
+appeared in the QR.
 
-|                   | **Add a device** (`linkCodes`)          | **Sign in on a shared device** (`loginRequests`) |
-| ----------------- | --------------------------------------- | ------------------------------------------------ |
-| Use case          | "Put my account on my new phone."       | "Put my account on the bar's tablet."            |
-| Shows the QR      | the **signed-in** device                | the **unsigned** device (the tablet)             |
-| Scans the QR      | the new, unsigned device                | the artist's **signed-in** phone                 |
-| Who approves      | the signed-in device (`confirmLinkCode`)| the artist's phone (`approveLoginRequest`)       |
-| Who gets a token  | the scanner                             | the QR-shower (the tablet)                       |
-| Nonce minted at   | redeem (to the scanner)                 | create (to the tablet)                           |
-| Statuses          | pending→claimed→confirmed→used          | pending→approved→used                            |
-| TTL               | 2 min                                   | **60 s** (the tablet re-mints every ~45 s)       |
-| Anonymous callers | may NOT create (would strand a guest)   | **may approve** (a guest's only second screen)   |
-| Client reads      | owner may read its own `linkCodes` doc  | **none** — the collection is fully server-only   |
+So a photographed QR is useless twice over: redeeming it only parks the code in
+`claimed` until the owner taps confirm on the signed-in device, and collecting
+the token needs the nonce, which only the first redeemer ever saw. A caller
+holding the codeId alone cannot even tell how far the handshake has got —
+`collectLinkToken` checks the nonce BEFORE the status, so every nonce-less
+caller gets the same refusal (issue #19a). Five wrong nonces force-expire the
+code: a leaked codeId buys 5 guesses at a 128-bit secret.
 
-Why each is safe:
-
-- **Add a device.** A photographed QR is useless twice over: redeeming it only
-  parks the code in `claimed` until the owner taps confirm on the signed-in
-  device, and collecting the token needs the redeem nonce, which only the first
-  redeemer ever saw.
-- **Sign in on a shared device.** A photographed QR mints nothing: it becomes a
-  token only after an already-signed-in human approves it, and only for *that
-  human's* uid. So an attacker who scans the tablet's QR can only offer to sign
-  **themselves** in to that tablet — they cannot touch the artist's account.
-  And they cannot even collect that: `collectLoginToken` requires the
-  `collectNonce`, which was handed to the creating tablet alone and is never in
-  the QR. The residual risk is a **race**, not a theft (a stranger approving the
-  tablet before the artist does), so the tablet must always show *whose* account
-  it just signed in as, with a one-tap "not me". 60 s TTL + single use + a
-  5-attempt cap per request keeps that window tiny.
-
-The `displayCode` (typed fallback) is 8 characters from a 32-symbol alphabet
-with no `0/O/1/I` — 40 bits. `describe`/`approve` are auth-required and
-IP-quota'd at 120/h, so a guesser gets ~120 tries an hour against ~2^40 codes,
-and a hit buys them nothing but the race above.
+A `loginRequests` mirror flow (the tablet shows the QR, the artist's phone
+approves) once existed and was deleted in the #22 cleanup — it had no callers
+after the venue tablet was routed through `redeemLinkCode`. It is recoverable
+from git history if a guest-account second-screen route is ever wanted.
 
 ## Cloud Stripe (key custody, webhook tips, and the proxy)
 
@@ -350,8 +315,6 @@ gcloud firestore fields ttl-policies update expiresAt \
   --collection-group=rateLimits --project=livetips-app
 gcloud firestore fields ttl-policies update expiresAt \
   --collection-group=linkCodes --project=livetips-app
-gcloud firestore fields ttl-policies update expiresAt \
-  --collection-group=loginRequests --project=livetips-app
 gcloud firestore fields ttl-policies update expiresAt \
   --collection-group=stripeTips --project=livetips-app
 ```

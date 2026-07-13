@@ -133,6 +133,19 @@ export function decideConfirm(code: LinkCodeSnapshot, nowMs: number): LinkDecisi
  * an error, so the client needs no string matching to keep waiting. A wrong
  * nonce burns an attempt; the cap then force-expires the code, so even a
  * leaked codeId gives at most 5 guesses at a 128-bit nonce.
+ *
+ * The nonce is checked BEFORE the status, and that order is the security
+ * property, not a detail. A stranger who photographed the QR holds the codeId
+ * and nothing else; checking status first answered them "invalid nonce" for a
+ * claimed/confirmed code but "code is not collectable" for a pending/used/
+ * expired one — a handshake-progress oracle for the price of a photo, telling
+ * them whether the owner has scanned or tapped yet. Now every nonce-less
+ * caller is refused with the same message whatever the code is doing. (No
+ * token was ever mintable either way: that needs the 128-bit nonce. This is
+ * about what the failure LEAKS.)
+ *
+ * The side effects still respect the status machine: a terminal 'used' code is
+ * never rewritten to 'expired' by a stranger's bad guess.
  */
 export function decideCollect(
   code: LinkCodeSnapshot,
@@ -140,12 +153,17 @@ export function decideCollect(
   nonceMatches: boolean,
 ): LinkDecision {
   if (code.expiresAtMs <= nowMs) return reject("code expired", { expire: expirable(code.status) });
+  if (code.attempts >= MAX_LINK_ATTEMPTS) {
+    return reject("too many attempts", { expire: expirable(code.status) });
+  }
+  if (!nonceMatches) {
+    return reject("invalid nonce", {
+      countAttempt: true,
+      expire: expirable(code.status) && code.attempts + 1 >= MAX_LINK_ATTEMPTS,
+    });
+  }
   if (code.status !== "claimed" && code.status !== "confirmed") {
     return reject("code is not collectable");
-  }
-  if (code.attempts >= MAX_LINK_ATTEMPTS) return reject("too many attempts", { expire: true });
-  if (!nonceMatches) {
-    return reject("invalid nonce", { countAttempt: true, expire: code.attempts + 1 >= MAX_LINK_ATTEMPTS });
   }
   if (code.status === "claimed") return { ok: true, pending: true };
   return OK;
