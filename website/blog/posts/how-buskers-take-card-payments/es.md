@@ -165,7 +165,8 @@ desconfianza que toca.
 **live.tips** pone un QR en tu funda. Abre una página con los métodos de pago que
 *tú* has activado. Las propinas con tarjeta van directas a **tu propia cuenta de
 Stripe** — no a un saldo de live.tips, porque no existe un saldo de live.tips. Nos
-llevamos el **0 %**, no hay ninguna cuenta que abrir con nosotros, y todo está bajo
+llevamos el **0 %**, tener cuenta con nosotros es opcional — la app funciona con la
+sesión cerrada, solo en tu dispositivo — y todo está bajo
 licencia MIT en GitHub. La tablet que tienes al lado muestra cada propina en
 directo, con el nombre y el mensaje del fan y una barra de objetivo — esa es la
 parte que la sala ve. Un bote que la sala ve llenarse es la razón entera por la que

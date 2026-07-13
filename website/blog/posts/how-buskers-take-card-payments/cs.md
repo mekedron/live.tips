@@ -151,8 +151,9 @@ Tohle je naše kategorie, takže čti následující čtyři odstavce s patřič
 
 **live.tips** ti dá na pouzdro jeden QR kód. Otevře stránku s platebními metodami, které sis
 zapnul *ty*. Spropitné kartou jde rovnou na **tvůj vlastní účet Stripe** — ne na zůstatek u
-live.tips, protože žádný zůstatek live.tips neexistuje. Bereme si **0 %**, žádný účet si u nás
-zakládat nemusíš a celé je to pod licencí MIT na GitHubu. Tablet vedle tebe ukazuje každé
+live.tips, protože žádný zůstatek live.tips neexistuje. Bereme si **0 %**, účet u nás je
+nepovinný — aplikace běží i odhlášená, jen na tvém zařízení — a celé je to pod licencí MIT na
+GitHubu. Tablet vedle tebe ukazuje každé
 spropitné živě, se jménem a vzkazem fanouška a s ukazatelem cíle — a to je ta část, kterou vidí
 sál. Sklenice, kterou sál vidí plnit se, je celý důvod, proč klobouk na mince fungoval čtyři sta
 let. Cestu peněz jsme popsali v

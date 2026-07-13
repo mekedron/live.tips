@@ -140,7 +140,9 @@ Korttitipit ovat vahvistettu reitti, ja ne kulkevat Stripen kautta. Se tarkoitta
 Stripe-tiliä sinun nimissäsi — Stripe tekee oman henkilöllisyystarkistuksensa, kuten
 jokaisen säännellyn maksunvälittäjän on tehtävä. Mitä se ei tarkoita, on tiliä
 *meillä*: luot rajoitetun API-avaimen, liität sen, ja sovellus puhuu osoitteen
-`api.stripe.com` kanssa eikä minkään muun. Kirjoitimme koko rahan reitin auki
+`api.stripe.com` kanssa eikä minkään muun. Voit *halutessasi* kirjautua sisään, jos
+haluat bändiesi ja historiasi seuraavan sinua toiselle laitteelle — mutta mikään ei
+vaadi sitä, ja oletuksena olet kirjautumatta. Kirjoitimme koko rahan reitin auki
 artikkelissa [miten live.tips käsittelee rahaa](post:how-live-tips-handles-money).
 
 ## Kaikki yhdellä sivulla
@@ -154,7 +156,7 @@ artikkelissa [miten live.tips käsittelee rahaa](post:how-live-tips-handles-mone
 | **Kuka pitää rahojasi** | ei kukaan | ei kukaan | Buy Me a Coffee | TipTopJar |
 | **Milloin saat ne** | heti kun tippi menee läpi | heti kun tippi menee läpi | 10 $:n jälkeen, ensimmäinen tilitys 7–14 päivää | 3–5 arkipäivää, tai 9,99 $/kk samana päivänä |
 | **Aloituksen hinta** | ilmainen | ilmainen | ilmainen | 9,99 $:n käyttöönottomaksu |
-| **Tili työkalussa** | ei | vaaditaan | vaaditaan | vaaditaan, plus henkilöllisyystarkistus |
+| **Tili työkalussa** | valinnainen | vaaditaan | vaaditaan | vaaditaan, plus henkilöllisyystarkistus |
 | **Purkki, jonka yleisö näkee** | kyllä | ei | ei | ei |
 | **Revolut / MobilePay** | kyllä | ei | ei | ei |
 | **Avoin lähdekoodi** | MIT | ei | ei | ei |

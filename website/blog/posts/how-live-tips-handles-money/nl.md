@@ -35,20 +35,41 @@ kan je saldo niet lezen, geen uitbetalingen starten, geen terugbetalingen doen e
 geen klantgegevens aanraken. Als hij morgen zou uitlekken, reikt de schade niet
 verder dan een fooienlink.
 
-## De ene plek waar wél een server bestaat
+## De enige server in het betaalpad
 
 Revolut en MobilePay laten zich niet vanuit een browser aansturen zoals Stripe dat
-kan, dus het inschakelen ervan zet een minimale relay aan op `api.live.tips`. Het
-is de moeite waard om precies te zijn over wat die relay doet, want „we hebben een
+kan, dus het inschakelen ervan zet een minimale relay aan – een handvol
+Firebase-functies die je fooienpagina op `tip.live.tips` serveren. Het is de
+moeite waard om precies te zijn over wat die relay doet, want „we hebben een
 backend toegevoegd" is meestal het punt waarop deze verhalen misgaan.
 
 Het bewaart je openbare fooienpaginaprofiel – de weergavenaam en de betaal-handles
 die je hebt gekozen om te publiceren. Meer niet. Het houdt geen fooiengeschiedenis
 bij, ziet geen geld, bewaart geen sleutels en verwijdert zichzelf na 90 dagen
-inactiviteit. Het geld beweegt nog steeds rechtstreeks tussen de Revolut- of
-MobilePay-app van je fan en die van jou.
+inactiviteit. Een fooi via Revolut of MobilePay wacht daar alleen tot je
+podiumapparaat hem oppikt: zodra hij getoond wordt, wordt hij verwijderd, en alles
+waar niemand voor terugkomt, wordt binnen het uur opgeruimd. Het geld beweegt nog
+steeds rechtstreeks tussen de Revolut- of MobilePay-app van je fan en die van jou.
 
 Als je alleen Stripe gebruikt, wordt de relay helemaal nooit benaderd.
+
+## Het account dat je niet hoeft aan te maken
+
+De app start nog steeds op in een profiel dat alleen op je apparaat leeft, precies
+zoals het altijd was: je fooienpot, je sleutel en je fooiengeschiedenis staan op
+het apparaat en nergens anders. Er is nergens iets om je voor aan te melden.
+
+Inloggen – met Apple, met Google of als gast – kan nu wel, en dat bestaat om één
+reden: een tweede apparaat. Als de tablet op het podium en de telefoon in je zak
+dezelfde avond moeten tonen, moet er iets tussen zitten, en dat iets is Firestore,
+onder een gebruikers-id die alleen jij kunt lezen. Je bands, instellingen,
+beperkte sleutel en fooiengeschiedenis synchroniseren daarheen. Dat is een echte
+verandering in het privacyverhaal, en die verdient het om ronduit gezegd te worden
+in plaats van ontdekt: zonder account ziet geen enkele server ooit een fooi; met
+een account ziet jouw eigen hoekje van de onze er wel een. Dat is de prijs van het
+tweede apparaat, en het is aan jou om die te betalen of te weigeren. Wat het nooit
+raakt, is het geld – een account verplaatst je gegevens, niet je saldo, en er wordt
+nog altijd geen deel afgeroomd.
 
 ## Waarom je ons niet zomaar op ons woord moet geloven
 

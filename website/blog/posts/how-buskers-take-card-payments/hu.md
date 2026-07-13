@@ -156,8 +156,9 @@ Ez a mi kategóriánk, úgyhogy a következő négy bekezdést a megfelelő gyan
 
 A **live.tips** egy QR-kódot tesz a tokodra. Az egy oldalt nyit meg azokkal a fizetési módokkal,
 amiket *te* kapcsoltál be. A kártyás borravaló egyenesen a **saját Stripe-fiókodba** megy — nem
-egy live.tips-egyenlegre, mert live.tips-egyenleg nem létezik. Mi **0%-ot** viszünk, nálunk nincs
-fiók, amit létre kellene hozni, és az egész MIT-licenc alatt van a GitHubon. A melletted lévő
+egy live.tips-egyenlegre, mert live.tips-egyenleg nem létezik. Mi **0%-ot** viszünk, a nálunk
+vezetett fiók opcionális — az app kijelentkezve is fut, egyedül a te eszközödön —, és az egész
+MIT-licenc alatt van a GitHubon. A melletted lévő
 tablet élőben mutat minden borravalót, a rajongó nevével és üzenetével, meg egy célsávval — és ez
 az a rész, amit a terem lát. Egy befőttesüveg, amit a terem lát megtelni, az egész oka annak, hogy
 az érmés kalap négyszáz évig működött. A pénz útját a

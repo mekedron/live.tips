@@ -142,7 +142,9 @@ Le mance con carta sono la via verificata, e passano per Stripe. Questo signific
 account Stripe a tuo nome — Stripe fa il proprio controllo d'identità, come deve fare
 ogni processore regolamentato. Ciò che non significa è un account con *noi*: crei una
 chiave API con permessi limitati, la incolli, e l'app parla con `api.stripe.com` e
-con nient'altro. Abbiamo raccontato l'intero percorso del denaro in
+con nient'altro. *Puoi* accedere, se vuoi che le tue band e il tuo storico ti seguano
+su un secondo dispositivo — ma nulla te lo chiede, e restare senza accesso è
+l'impostazione predefinita. Abbiamo raccontato l'intero percorso del denaro in
 [come live.tips gestisce il denaro](post:how-live-tips-handles-money).
 
 ## Tutto in una pagina sola
@@ -156,7 +158,7 @@ con nient'altro. Abbiamo raccontato l'intero percorso del denaro in
 | **Chi trattiene i tuoi soldi** | nessuno | nessuno | Buy Me a Coffee | TipTopJar |
 | **Quando li ricevi** | appena la mancia è liquidata | appena la mancia è liquidata | dopo 10 $, primo prelievo in 7–14 giorni | 3–5 giorni lavorativi, o 9,99 $/mese per la giornata |
 | **Costo per iniziare** | gratis | gratis | gratis | 9,99 $ di attivazione |
-| **Account con lo strumento** | nessuno | obbligatorio | obbligatorio | obbligatorio, più un controllo d'identità |
+| **Account con lo strumento** | facoltativo | obbligatorio | obbligatorio | obbligatorio, più un controllo d'identità |
 | **Un barattolo che il pubblico vede** | sì | no | no | no |
 | **Revolut / MobilePay** | sì | no | no | no |
 | **Open source** | MIT | no | no | no |

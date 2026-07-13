@@ -139,7 +139,9 @@ Kortdricks är den bekräftade vägen, och de går genom Stripe. Det betyder ett
 Stripe-konto i ditt namn — Stripe gör sin egen identitetskontroll, som varje
 reglerad förmedlare måste. Vad det inte betyder är ett konto hos *oss*: du skapar
 en begränsad API-nyckel, klistrar in den, och appen pratar med `api.stripe.com`
-och ingen annanstans. Vi skrev ner hela pengavägen i
+och ingen annanstans. Du *kan* logga in, om du vill att dina band och din historik
+ska följa med dig till en andra enhet — men ingenting ber dig om det, och utloggad
+är standard. Vi skrev ner hela pengavägen i
 [hur live.tips hanterar pengar](post:how-live-tips-handles-money).
 
 ## Allt på en sida
@@ -153,7 +155,7 @@ och ingen annanstans. Vi skrev ner hela pengavägen i
 | **Vem som håller dina pengar** | ingen | ingen | Buy Me a Coffee | TipTopJar |
 | **När du får dem** | när dricksen går igenom | när dricksen går igenom | efter $10, första utbetalning 7–14 dagar | 3–5 arbetsdagar, eller $9.99/mån för samma dag |
 | **Kostnad att börja** | gratis | gratis | gratis | $9.99 uppsättningsavgift |
-| **Konto hos verktyget** | inget | krävs | krävs | krävs, plus en ID-kontroll |
+| **Konto hos verktyget** | frivilligt | krävs | krävs | krävs, plus en ID-kontroll |
 | **En burk publiken kan se** | ja | nej | nej | nej |
 | **Revolut / MobilePay** | ja | nej | nej | nej |
 | **Öppen källkod** | MIT | nej | nej | nej |

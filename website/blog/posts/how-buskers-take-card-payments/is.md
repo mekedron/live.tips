@@ -141,7 +141,8 @@ beint þér um ókeypis brautirnar: tveir menn sem greiða hvor öðrum beint er
 
 **live.tips** setur einn QR-kóða á kassann þinn. Hann opnar síðu með þeim greiðsluleiðum sem *þú* kveiktir á. Kortaþjórfé
 fer beint inn á **þinn eigin Stripe-reikning** — ekki inn á live.tips-inneign, því live.tips-inneign er ekki til. Við tökum
-**0%**, það er enginn reikningur að stofna hjá okkur, og allt saman er MIT-leyfisbundið á GitHub. Spjaldtölvan við hliðina á
+**0%**, reikningur hjá okkur er valfrjáls — forritið keyrir útskráð, á tækinu þínu einu — og allt saman er
+MIT-leyfisbundið á GitHub. Spjaldtölvan við hliðina á
 þér sýnir hvert þjórfé í rauntíma, með nafni og skilaboðum aðdáandans og markstiku — og það er hlutinn sem salurinn sér.
 Krukka sem salurinn sér fyllast er öll ástæðan fyrir því að myntkrukkan virkaði í fjögur hundruð ár. Leið peninganna lýstum við
 í [hvernig live.tips fer með peninga](post:how-live-tips-handles-money).

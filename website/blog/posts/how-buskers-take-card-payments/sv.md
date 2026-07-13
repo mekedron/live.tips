@@ -153,10 +153,11 @@ Det här är vår kategori, så läs de fyra följande styckena med lämplig mis
 
 **live.tips** sätter en QR-kod på ditt fodral. Den öppnar en sida med de betalsätt *du* slagit på.
 Kortdricks går rakt in på **ditt eget Stripe-konto** — inte till ett live.tips-saldo, för något
-live.tips-saldo finns inte. Vi tar **0 procent**, det finns inget konto att skapa hos oss, och alltihop
-ligger MIT-licensierat på GitHub. Plattan bredvid dig visar varje dricks live, med givarens namn och
-meddelande och en målstapel — och det är den delen rummet ser. En burk som rummet ser fyllas är hela
-skälet till att myntburken fungerade i fyrahundra år. Pengarnas väg beskrev vi i
+live.tips-saldo finns inte. Vi tar **0 procent**, ett konto hos oss är frivilligt — appen fungerar
+utloggad, ensam på din enhet — och alltihop ligger MIT-licensierat på GitHub. Plattan bredvid dig visar
+varje dricks live, med givarens namn och meddelande och en målstapel — och det är den delen rummet ser.
+En burk som rummet ser fyllas är hela skälet till att myntburken fungerade i fyrahundra år. Pengarnas
+väg beskrev vi i
 [hur live.tips hanterar pengar](post:how-live-tips-handles-money).
 
 Nu gränserna, i samma teckensnitt.

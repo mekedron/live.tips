@@ -160,8 +160,9 @@ sospetto che meritano.
 **live.tips** mette un QR code sulla tua custodia. Apre una pagina con i metodi di
 pagamento che *tu* hai attivato. Le mance con carta vanno dritte sul **tuo conto
 Stripe** — non su un saldo live.tips, perché un saldo live.tips non esiste. Noi
-prendiamo **0%**, non c'è nessun account da aprire con noi, e tutto è rilasciato con
-licenza MIT su GitHub. Il tablet accanto a te mostra ogni mancia in diretta, con nome
+prendiamo **0%**, un account con noi è facoltativo — l'app funziona senza aver
+effettuato l'accesso, solo sul tuo dispositivo — e tutto è rilasciato con licenza MIT
+su GitHub. Il tablet accanto a te mostra ogni mancia in diretta, con nome
 e messaggio del fan e una barra dell'obiettivo — ed è questa la parte che la sala
 vede. Un barattolo che la sala vede riempirsi è l'intera ragione per cui il barattolo
 delle monete ha funzionato per quattrocento anni. Il percorso del denaro è spiegato in

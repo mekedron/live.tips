@@ -146,10 +146,11 @@ Bu bizim kategorimiz, dolayısıyla sonraki dört paragrafı hak ettiği şüphe
 
 **live.tips** kılıfına tek bir QR kod koyuyor. O kod, *senin* açtığın ödeme yöntemlerinin olduğu bir
 sayfayı açıyor. Kartla verilen bahşişler doğrudan **kendi Stripe hesabına** gidiyor — live.tips
-bakiyesine değil, çünkü live.tips bakiyesi diye bir şey yok. Biz **%0** alıyoruz, bizde açılacak bir
-hesap yok ve her şey GitHub'da MIT lisansıyla açık. Yanındaki tablet her bahşişi canlı gösteriyor:
-hayranın adı, mesajı ve bir hedef çubuğu — ve salonun gördüğü kısım bu. Salonun dolduğunu gördüğü bir
-kavanoz, madeni para kavanozunun dört yüz yıl işlemesinin tüm sebebi. Paranın izlediği yolu
+bakiyesine değil, çünkü live.tips bakiyesi diye bir şey yok. Biz **%0** alıyoruz, bizde hesap açmak
+isteğe bağlı — uygulama oturum açmadan, yalnızca kendi cihazında çalışır — ve her şey GitHub'da MIT
+lisansıyla açık. Yanındaki tablet her bahşişi canlı gösteriyor: hayranın adı, mesajı ve bir hedef çubuğu
+— ve salonun gördüğü kısım bu. Salonun dolduğunu gördüğü bir kavanoz, madeni para kavanozunun dört yüz
+yıl işlemesinin tüm sebebi. Paranın izlediği yolu
 [live.tips parayı nasıl ele alıyor](post:how-live-tips-handles-money) yazısında anlattık.
 
 Şimdi sınırlar, aynı puntoyla.

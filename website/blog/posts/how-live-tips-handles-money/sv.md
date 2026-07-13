@@ -35,20 +35,40 @@ betala-vad-du-vill-drickslänken och se dricks komma in. Den kan inte läsa ditt
 saldo, utlösa utbetalningar, göra återbetalningar eller röra kunddata. Om den
 läckte i morgon når skadan inte längre än till en drickslänk.
 
-## Den enda plats där en server finns
+## Den enda servern i betalningsflödet
 
 Revolut och MobilePay kan inte styras från en webbläsare på samma sätt som Stripe,
-så att slå på dem aktiverar ett minimalt relä på `api.live.tips`. Det är värt att
-vara exakt med vad det reläet gör, för "vi lade till en backend" är oftast där de
-här berättelserna går fel.
+så att slå på dem aktiverar ett minimalt relä – en handfull Firebase-funktioner som
+serverar din dricks-sida på `tip.live.tips`. Det är värt att vara exakt med vad det
+reläet gör, för "vi lade till en backend" är oftast där de här berättelserna går
+fel.
 
 Det lagrar din offentliga dricksside-profil – visningsnamnet och de
 betalnings-handtag du valde att publicera. Mer är det inte. Det för ingen
 dricks-historik, ser inga pengar, håller inga nycklar och raderar sig självt
-efter 90 dagars inaktivitet. Pengarna rör sig fortfarande direkt mellan ditt fans
-Revolut- eller MobilePay-app och din.
+efter 90 dagars inaktivitet. En dricks via Revolut eller MobilePay väntar där bara
+tills din scenenhet hämtar den: att visa den raderar den, och det ingen kom
+tillbaka efter sopas bort inom en timme. Pengarna rör sig fortfarande direkt mellan
+ditt fans Revolut- eller MobilePay-app och din.
 
 Om du bara använder Stripe kontaktas reläet aldrig alls.
+
+## Kontot du inte behöver skapa
+
+Appen startar fortfarande upp i en enhetslokal profil, vilket är precis vad den
+alltid har varit: din dricksburk, din nyckel och din dricks-historik bor på enheten
+och ingen annanstans. Det finns inget att registrera sig för.
+
+Att logga in – med Apple, med Google eller som gäst – går nu, och det finns av ett
+enda skäl: en andra enhet. Ska plattan på scenen och telefonen i fickan visa samma
+kväll måste något sitta emellan dem, och det något är Firestore, under ett
+användar-id som bara du kan läsa. Dina band, inställningar, den begränsade nyckeln
+och dricks-historiken synkas dit. Det är en verklig förändring i
+integritetsberättelsen, och den förtjänar att sägas rakt ut i stället för att
+upptäckas i efterhand: utan konto ser ingen server någonsin en dricks; med konto
+gör din egen vrå av vår det. Det är priset för den andra enheten, och det är ditt
+att betala eller tacka nej till. Vad det aldrig rör är pengarna – ett konto flyttar
+dina data, inte ditt saldo, och vi tar fortfarande ingen andel.
 
 ## Varför du inte bör ta oss på orden
 

@@ -164,10 +164,11 @@ appropriate suspicion.
 **live.tips** puts one QR code on your case. It opens a page with the payment
 methods *you* enabled. Card tips go straight into **your own Stripe account** —
 not into a live.tips balance, because there is no live.tips balance. We take
-**0%**, there is no account to make with us, and the whole thing is MIT-licensed
-on GitHub. The tablet next to you shows each tip arriving, live, with the fan's
-name and message and a goal bar, which is the part the room can see — and a jar
-the room can see is the entire reason the cash jar worked for four hundred years.
+**0%**, an account with us is optional — the app runs signed out, on your device
+alone — and the whole thing is MIT-licensed on GitHub. The tablet next to you
+shows each tip arriving, live, with the fan's name and message and a goal bar,
+which is the part the room can see — and a jar the room can see is the entire
+reason the cash jar worked for four hundred years.
 The money path is written up in
 [how live.tips handles money](post:how-live-tips-handles-money).
 

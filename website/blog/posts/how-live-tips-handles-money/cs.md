@@ -34,20 +34,40 @@ chceš" a sledovat příchozí spropitné. Nemůže číst tvůj zůstatek, spou
 výplaty, vystavovat refundace ani se dotknout dat zákazníků. Kdyby zítra unikl,
 poloměr zásahu je jeden odkaz na spropitné.
 
-## Jediné místo, kde server existuje
+## Jediný server v platební cestě
 
 Revolut a MobilePay nejde z prohlížeče řídit tak jako Stripe, takže jejich
-zapnutí spustí minimální přenašeč na `api.live.tips`. Vyplatí se být přesný v
-tom, co ten přenašeč dělá, protože „přidali jsme backend" bývá obvykle místo, kde
-se tyhle příběhy zvrtnou.
+zapnutí spustí minimální přenašeč — hrstku funkcí Firebase, které obsluhují tvou
+stránku se spropitným na `tip.live.tips`. Vyplatí se být přesný v tom, co ten
+přenašeč dělá, protože „přidali jsme backend" bývá obvykle místo, kde se tyhle
+příběhy zvrtnou.
 
 Ukládá veřejný profil tvé stránky se spropitným — zobrazované jméno a platební
 identifikátory, které ses rozhodl zveřejnit. Nic víc. Nevede žádnou historii
 spropitného, nevidí žádné peníze, nedrží žádné klíče a po 90 dnech nečinnosti se sám
-smaže. Peníze se stále pohybují přímo mezi aplikací Revolut nebo MobilePay tvého
-fanouška a tou tvou.
+smaže. Spropitné přes Revolut nebo MobilePay tam čeká jen do chvíle, než si ho
+vyzvedne tvoje pódiové zařízení: jakmile se zobrazí, smaže se, a co si nikdo
+nevyzvedl, je do hodiny smeteno pryč. Peníze se stále pohybují přímo mezi aplikací
+Revolut nebo MobilePay tvého fanouška a tou tvou.
 
 Pokud používáš jen Stripe, přenašeč se nikdy vůbec nekontaktuje.
+
+## Účet, který si nemusíš zakládat
+
+Aplikace se pořád spouští do profilu uloženého v zařízení, což je přesně to, čím
+vždycky byla: tvoje kasička, tvůj klíč a tvoje historie spropitného žijí v zařízení
+a nikde jinde. Není se kam registrovat.
+
+Přihlásit se — přes Apple, přes Google nebo jako host — teď jde a existuje to z
+jediného důvodu: druhé zařízení. Má-li tablet na pódiu a telefon v tvojí kapse
+ukazovat tentýž večer, něco mezi nimi stát musí, a tím něčím je Firestore, pod
+uživatelským id, které si můžeš přečíst jen ty. Synchronizují se tam tvoje kapely,
+nastavení, omezený klíč i historie spropitného. To je skutečná změna v příběhu o
+soukromí a zaslouží si být řečena na rovinu, ne objevena: bez účtu žádný server
+spropitné nikdy nevidí; s účtem ho vidí tvůj vlastní kout toho našeho. To je cena
+za druhé zařízení a je jen na tobě, jestli ji zaplatíš, nebo odmítneš. Čeho se to
+nikdy nedotkne, jsou peníze — účet přesouvá tvoje data, ne tvůj zůstatek, a podíl
+si pořád nebereme.
 
 ## Proč bys nám neměl věřit na slovo
 

@@ -160,8 +160,9 @@ adequada.
 O **live.tips** põe um código QR no seu estojo. Abre uma página com os métodos de
 pagamento que *você* ativou. As gorjetas com cartão vão diretas para a **sua própria
 conta Stripe** — não para um saldo live.tips, porque não existe saldo live.tips. Nós
-levamos **0%**, não há nenhuma conta a criar connosco, e tudo está com licença MIT no
-GitHub. O tablet ao seu lado mostra cada gorjeta em direto, com o nome e a mensagem do
+levamos **0%**, uma conta connosco é opcional — a app funciona com a sessão terminada,
+apenas no seu dispositivo — e tudo está com licença MIT no GitHub. O tablet ao seu lado
+mostra cada gorjeta em direto, com o nome e a mensagem do
 fã e uma barra de objetivo — e é essa a parte que a sala vê. Um pote que a sala vê a
 encher-se é a razão inteira pela qual o pote de moedas funcionou durante quatrocentos
 anos. O caminho do dinheiro está descrito em

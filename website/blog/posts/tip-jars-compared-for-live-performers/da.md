@@ -141,7 +141,9 @@ Kort-tips er den bekræftede vej, og de går gennem Stripe. Det betyder en
 Stripe-konto i dit navn — Stripe laver sin egen identitetskontrol, som enhver
 reguleret betalingsudbyder må. Hvad det ikke betyder, er en konto hos *os*: du
 opretter en begrænset API-nøgle, indsætter den, og appen taler med
-`api.stripe.com` og intet andet sted. Vi har skrevet hele pengevejen op i
+`api.stripe.com` og intet andet sted. Du *kan* logge ind, hvis du vil have dine
+bands og din historik med over på en enhed nummer to — men intet beder dig om det,
+og logget ud er standard. Vi har skrevet hele pengevejen op i
 [hvordan live.tips håndterer penge](post:how-live-tips-handles-money).
 
 ## Alt på én side
@@ -155,7 +157,7 @@ opretter en begrænset API-nøgle, indsætter den, og appen taler med
 | **Hvem holder på dine penge** | ingen | ingen | Buy Me a Coffee | TipTopJar |
 | **Hvornår du får dem** | når tippet går igennem | når tippet går igennem | efter 10 $, første udbetaling 7–14 dage | 3–5 hverdage, eller 9,99 $/md for samme dag |
 | **Pris for at starte** | gratis | gratis | gratis | opstartsgebyr på 9,99 $ |
-| **Konto hos værktøjet** | ingen | påkrævet | påkrævet | påkrævet, plus en id-kontrol |
+| **Konto hos værktøjet** | valgfri | påkrævet | påkrævet | påkrævet, plus en id-kontrol |
 | **En krukke publikum kan se** | ja | nej | nej | nej |
 | **Revolut / MobilePay** | ja | nej | nej | nej |
 | **Open source** | MIT | nej | nej | nej |

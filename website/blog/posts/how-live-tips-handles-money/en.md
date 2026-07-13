@@ -32,19 +32,38 @@ Restricted means the key can do two things: create the pay-what-you-want tip lin
 and watch tips arrive. It cannot read your balance, trigger payouts, issue refunds,
 or touch customer data. If it leaked tomorrow, the blast radius is a tip link.
 
-## The one place a server exists
+## The one server in the payment path
 
 Revolut and MobilePay cannot be driven from a browser the way Stripe can, so
-enabling them turns on a minimal relay at `api.live.tips`. It is worth being
-precise about what that relay does, because "we added a backend" is usually where
-these stories go wrong.
+enabling them turns on a minimal relay — a handful of Firebase functions serving
+your tip page at `tip.live.tips`. It is worth being precise about what that relay
+does, because "we added a backend" is usually where these stories go wrong.
 
 It stores your public tip-page profile — the display name and the payment handles
 you chose to publish. That is all. It keeps no tip history, sees no money,
-holds no keys, and self-deletes after 90 days of inactivity. Money still moves
-directly between your fan's Revolut or MobilePay app and yours.
+holds no keys, and self-deletes after 90 days of inactivity. A Revolut or
+MobilePay tip waits there only until your stage device picks it up: showing it
+deletes it, and anything nobody came back for is swept within the hour. Money
+still moves directly between your fan's Revolut or MobilePay app and yours.
 
 If you only use Stripe, the relay is never contacted at all.
+
+## The account you do not have to make
+
+The app still boots into a device-local profile, which is what it always was: your
+tip jar, your key and your tip history live on the device and nowhere else. There
+is nothing to sign up for.
+
+Signing in — with Apple, with Google, or as a guest — is now possible, and it
+exists for one reason: a second device. If the tablet on stage and the phone in
+your pocket are to show the same night, something has to sit between them, and that
+something is Firestore, under a user id only you can read. Your bands, settings,
+restricted key and tip history sync there. That is a real change to the privacy
+story and it deserves saying plainly rather than being discovered: without an
+account, no server ever sees a tip; with one, your own corner of ours does. It is
+the price of the second device, and it is yours to pay or refuse. What it never
+touches is the money — an account moves your data, not your balance, and there is
+still no cut.
 
 ## Why you should not take our word for it
 

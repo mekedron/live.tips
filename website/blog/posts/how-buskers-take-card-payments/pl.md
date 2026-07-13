@@ -157,8 +157,9 @@ To nasza kategoria, więc czytaj następne cztery akapity z należną podejrzliw
 
 **live.tips** przykleja jeden kod QR na twój futerał. Otwiera stronę z metodami płatności,
 które *ty* włączyłeś. Napiwki kartą idą prosto na **twoje własne konto Stripe** — nie na
-saldo live.tips, bo salda live.tips nie ma. Bierzemy **0%**, nie ma u nas żadnego konta do
-założenia, a całość jest na licencji MIT na GitHubie. Tablet obok ciebie pokazuje każdy
+saldo live.tips, bo salda live.tips nie ma. Bierzemy **0%**, konto u nas jest opcjonalne
+— aplikacja działa bez logowania, wyłącznie na twoim urządzeniu — a całość jest na
+licencji MIT na GitHubie. Tablet obok ciebie pokazuje każdy
 napiwek na żywo, z imieniem i wiadomością fana oraz paskiem celu — i to jest ta część,
 którą widzi sala. Słoik, który sala widzi, jak się napełnia, to cały powód, dla którego
 kapelusz na monety działał przez czterysta lat. Drogę pieniędzy opisaliśmy w

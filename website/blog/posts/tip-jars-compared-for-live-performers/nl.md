@@ -140,7 +140,9 @@ Kaartfooien zijn het bevestigde pad, en ze lopen via Stripe. Dat betekent een
 Stripe-account op jouw naam — Stripe doet zijn eigen identiteitscontrole, zoals
 elke gereguleerde verwerker moet. Wat het niet betekent, is een account bij *ons*:
 je maakt een beperkte API-sleutel aan, plakt hem in, en de app praat met
-`api.stripe.com` en nergens anders. We schreven het hele geldpad uit in
+`api.stripe.com` en nergens anders. Je *kunt* inloggen, als je wilt dat je bands en
+je geschiedenis met je meegaan naar een tweede apparaat — maar niets vraagt je
+erom, en uitgelogd is de standaard. We schreven het hele geldpad uit in
 [hoe live.tips met geld omgaat](post:how-live-tips-handles-money).
 
 ## Alles op één pagina
@@ -154,7 +156,7 @@ je maakt een beperkte API-sleutel aan, plakt hem in, en de app praat met
 | **Wie je geld vasthoudt** | niemand | niemand | Buy Me a Coffee | TipTopJar |
 | **Wanneer je het krijgt** | zodra de fooi rond is | zodra de fooi rond is | na $10, eerste uitbetaling 7–14 dagen | 3–5 werkdagen, of $9.99/mnd voor dezelfde dag |
 | **Kosten om te starten** | gratis | gratis | gratis | $9.99 instelkost |
-| **Account bij de tool** | geen | vereist | vereist | vereist, plus een ID-controle |
+| **Account bij de tool** | optioneel | vereist | vereist | vereist, plus een ID-controle |
 | **Een pot die het publiek kan zien** | ja | nee | nee | nee |
 | **Revolut / MobilePay** | ja | nee | nee | nee |
 | **Open source** | MIT | nee | nee | nee |

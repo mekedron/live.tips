@@ -132,7 +132,9 @@ sem vytiskneme, než abychom to zametli pod koberec.
 Spropitné kartou je ověřená cesta a jde přes Stripe. To znamená účet Stripe na
 tvoje jméno — Stripe si dělá vlastní ověření totožnosti, jak každý regulovaný
 zpracovatel musí. Co to neznamená, je účet u *nás*: vytvoříš omezený API klíč,
-vložíš ho a aplikace komunikuje s `api.stripe.com` a s ničím jiným. Celou cestu
+vložíš ho a aplikace komunikuje s `api.stripe.com` a s ničím jiným. Přihlásit se
+*můžeš*, pokud chceš, aby tě tvoje kapely a tvoje historie následovaly i na druhé
+zařízení — ale nikdo tě k tomu nenutí a výchozí stav je odhlášený. Celou cestu
 peněz jsme sepsali v [jak live.tips zachází s penězi](post:how-live-tips-handles-money).
 
 ## Všechno na jedné stránce
@@ -146,7 +148,7 @@ peněz jsme sepsali v [jak live.tips zachází s penězi](post:how-live-tips-han
 | **Kdo drží tvoje peníze** | nikdo | nikdo | Buy Me a Coffee | TipTopJar |
 | **Kdy je dostaneš** | jakmile se spropitné zúčtuje | jakmile se spropitné zúčtuje | po $10, první výplata 7–14 dní | 3–5 pracovních dní, nebo $9.99/měs. za týž den |
 | **Náklady na start** | zdarma | zdarma | zdarma | zřizovací poplatek $9.99 |
-| **Účet u nástroje** | žádný | nutný | nutný | nutný, plus ověření totožnosti |
+| **Účet u nástroje** | volitelný | nutný | nutný | nutný, plus ověření totožnosti |
 | **Kasička, kterou vidí publikum** | ano | ne | ne | ne |
 | **Revolut / MobilePay** | ano | ne | ne | ne |
 | **Otevřený zdroj** | MIT | ne | ne | ne |

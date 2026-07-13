@@ -34,20 +34,41 @@ ja seurata tippien saapumista. Se ei voi lukea saldoasi, käynnistää maksatuks
 tehdä hyvityksiä eikä koskea asiakastietoihin. Jos se vuotaisi huomenna, vahinkosäde
 on yksi tippilinkki.
 
-## Ainoa paikka, jossa palvelin on olemassa
+## Ainoa palvelin maksun reitillä
 
 Revolutia ja MobilePayta ei voi ohjata selaimesta samalla tavalla kuin Stripeä,
-joten niiden käyttöönotto kytkee päälle minimaalisen välityspalvelimen osoitteessa
-`api.live.tips`. On syytä olla täsmällinen siitä, mitä tuo välityspalvelin tekee,
-koska ”lisäsimme taustapalvelun” on yleensä kohta, jossa nämä tarinat menevät pieleen.
+joten niiden käyttöönotto kytkee päälle minimaalisen välityspalvelimen — kourallisen
+Firebase-funktioita, jotka tarjoilevat tippisivusi osoitteessa `tip.live.tips`. On
+syytä olla täsmällinen siitä, mitä tuo välityspalvelin tekee, koska ”lisäsimme
+taustapalvelun” on yleensä kohta, jossa nämä tarinat menevät pieleen.
 
 Se tallentaa julkisen tippisivusi profiilin — näyttönimen ja ne maksutunnisteet,
 jotka valitsit julkaistavaksi. Siinä kaikki. Se ei pidä tippihistoriaa, ei näe
 rahaa, ei säilytä avaimia ja poistaa itsensä 90 päivän käyttämättömyyden jälkeen.
-Raha liikkuu edelleen suoraan fanisi Revolut- tai MobilePay-sovelluksen ja sinun
-sovelluksesi välillä.
+Revolut- tai MobilePay-tippi odottaa siellä vain siihen asti, kunnes lavalaitteesi
+noutaa sen: näyttäminen poistaa sen, ja se, mitä kukaan ei tullut hakemaan,
+pyyhitään pois tunnin sisällä. Raha liikkuu edelleen suoraan fanisi Revolut- tai
+MobilePay-sovelluksen ja sinun sovelluksesi välillä.
 
 Jos käytät vain Stripeä, välityspalvelimeen ei oteta koskaan yhteyttä.
+
+## Tili, jota sinun ei ole pakko tehdä
+
+Sovellus käynnistyy edelleen laitekohtaiseen profiiliin, aivan kuten ennenkin:
+tippipurkkisi, avaimesi ja tippihistoriasi elävät laitteellasi eivätkä missään
+muualla. Mihinkään ei tarvitse rekisteröityä.
+
+Sisäänkirjautuminen — Applella, Googlella tai vieraana — on nyt mahdollista, ja se
+on olemassa yhdestä syystä: toista laitetta varten. Jos lavalla olevan tabletin ja
+taskussasi olevan puhelimen pitää näyttää sama ilta, jonkin täytyy istua niiden
+välissä, ja se jokin on Firestore, sellaisen käyttäjätunnuksen alla, jota vain sinä
+voit lukea. Bändisi, asetuksesi, rajoitettu avaimesi ja tippihistoriasi
+synkronoituvat sinne. Se on todellinen muutos yksityisyystarinaan, ja se ansaitsee
+tulla sanotuksi suoraan sen sijaan, että sen löytäisi itse: ilman tiliä yksikään
+palvelin ei näe yhtäkään tippiä; tilin kanssa oma nurkkasi meidän palvelimellamme
+näkee. Se on toisen laitteen hinta, ja sinä päätät, maksatko sen vai et. Mihin se
+ei koskaan koske, on raha — tili siirtää tietosi, ei saldoasi, eikä osuutta oteta
+edelleenkään.
 
 ## Miksi et saisi uskoa pelkkää sanaamme
 

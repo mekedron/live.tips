@@ -141,7 +141,9 @@ Bacșișurile cu cardul sunt calea verificată și trec prin Stripe. Asta însea
 cont Stripe pe numele tău — Stripe își face propria verificare de identitate, așa
 cum orice procesator reglementat trebuie. Ce nu înseamnă e un cont la *noi*: creezi
 o cheie API restricționată, o lipești, iar aplicația vorbește cu `api.stripe.com` și
-cu nimic altceva. Am descris tot drumul banilor în [cum se descurcă live.tips cu
+cu nimic altceva. *Poți* să te autentifici, dacă vrei ca trupele și istoricul tău
+să te urmeze pe un al doilea dispozitiv — dar nimic nu ți-o cere, iar neautentificat
+e varianta implicită. Am descris tot drumul banilor în [cum se descurcă live.tips cu
 banii](post:how-live-tips-handles-money).
 
 ## Totul pe o singură pagină
@@ -155,7 +157,7 @@ banii](post:how-live-tips-handles-money).
 | **Cine îți ține banii** | nimeni | nimeni | Buy Me a Coffee | TipTopJar |
 | **Când îi primești** | pe măsură ce bacșișul se decontează | pe măsură ce bacșișul se decontează | după $10, prima retragere în 7–14 zile | 3–5 zile lucrătoare, sau $9.99/lună pentru aceeași zi |
 | **Cost de pornire** | gratuit | gratuit | gratuit | taxă de configurare $9.99 |
-| **Cont la unealtă** | niciunul | necesar | necesar | necesar, plus o verificare de identitate |
+| **Cont la unealtă** | opțional | necesar | necesar | necesar, plus o verificare de identitate |
 | **O cutie pe care publicul o vede** | da | nu | nu | nu |
 | **Revolut / MobilePay** | da | nu | nu | nu |
 | **Sursă deschisă** | MIT | nu | nu | nu |

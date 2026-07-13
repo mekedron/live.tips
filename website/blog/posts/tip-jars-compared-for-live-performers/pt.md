@@ -142,7 +142,10 @@ As gorjetas com cartão são o caminho verificado, e passam pelo Stripe. Isso si
 uma conta Stripe em teu nome — o Stripe faz a sua própria verificação de identidade,
 como qualquer processador regulado tem de fazer. O que não significa é uma conta
 connosco: crias uma chave de API restrita, colas-la, e a app fala com
-`api.stripe.com` e com mais nada. Escrevemos todo o percurso do dinheiro em
+`api.stripe.com` e com mais nada. *Podes* iniciar sessão, se quiseres que as tuas
+bandas e o teu histórico te sigam para um segundo dispositivo — mas nada te pede
+isso, e sem sessão iniciada é o predefinido. Escrevemos todo o percurso do dinheiro
+em
 [como o live.tips lida com o dinheiro](post:how-live-tips-handles-money).
 
 ## Tudo numa página só
@@ -156,7 +159,7 @@ connosco: crias uma chave de API restrita, colas-la, e a app fala com
 | **Quem retém o teu dinheiro** | ninguém | ninguém | Buy Me a Coffee | TipTopJar |
 | **Quando o recebes** | assim que a gorjeta é liquidada | assim que a gorjeta é liquidada | após 10 $, primeiro levantamento em 7–14 dias | 3–5 dias úteis, ou 9,99 $/mês para o próprio dia |
 | **Custo para começar** | grátis | grátis | grátis | 9,99 $ de configuração |
-| **Conta com a ferramenta** | nenhuma | obrigatória | obrigatória | obrigatória, mais verificação de identidade |
+| **Conta com a ferramenta** | opcional | obrigatória | obrigatória | obrigatória, mais verificação de identidade |
 | **Um pote que o público vê** | sim | não | não | não |
 | **Revolut / MobilePay** | sim | não | não | não |
 | **Código aberto** | MIT | não | não | não |

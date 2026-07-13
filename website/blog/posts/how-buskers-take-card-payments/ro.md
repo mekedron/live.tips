@@ -150,8 +150,9 @@ Asta e categoria noastră, deci citește următoarele patru paragrafe cu suspici
 
 **live.tips** îți pune un cod QR pe husă. El deschide o pagină cu metodele de plată pe care le-ai activat
 *tu*. Bacșișurile cu cardul intră direct în **propriul tău cont Stripe** — nu într-un sold live.tips,
-pentru că nu există un sold live.tips. Noi luăm **0%**, nu există niciun cont de făcut la noi, iar totul
-e sub licență MIT pe GitHub. Tableta de lângă tine arată fiecare bacșiș în direct, cu numele și mesajul
+pentru că nu există un sold live.tips. Noi luăm **0%**, un cont la noi e opțional — aplicația merge
+neautentificată, doar pe dispozitivul tău —, iar totul e sub licență MIT pe GitHub. Tableta de lângă tine
+arată fiecare bacșiș în direct, cu numele și mesajul
 fanului și cu o bară de obiectiv — și asta e partea pe care o vede sala. Un borcan pe care sala îl vede
 umplându-se este întregul motiv pentru care borcanul cu monede a funcționat patru sute de ani. Drumul
 banilor e descris în [cum se poartă live.tips cu banii](post:how-live-tips-handles-money).

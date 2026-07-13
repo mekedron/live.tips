@@ -149,7 +149,9 @@ Les pourboires par carte sont la voie vérifiée, et ils passent par Stripe. Cel
 suppose un compte Stripe à ton nom — Stripe fait sa propre vérification d'identité,
 comme tout processeur réglementé se doit de le faire. Ce que cela ne suppose pas,
 c'est un compte chez *nous* : tu crées une clé API restreinte, tu la colles, et
-l'app parle à `api.stripe.com` et à rien d'autre. Nous avons détaillé tout le
+l'app parle à `api.stripe.com` et à rien d'autre. Tu *peux* te connecter, si tu veux
+que tes groupes et ton historique te suivent sur un deuxième appareil — mais rien ne
+te le demande, et déconnecté reste le réglage par défaut. Nous avons détaillé tout le
 parcours de l'argent dans [comment live.tips gère l'argent](post:how-live-tips-handles-money).
 
 ## Tout sur une seule page
@@ -163,7 +165,7 @@ parcours de l'argent dans [comment live.tips gère l'argent](post:how-live-tips-
 | **Qui détient ton argent** | personne | personne | Buy Me a Coffee | TipTopJar |
 | **Quand tu le reçois** | dès que le pourboire est validé | dès que le pourboire est validé | après 10 $, premier virement sous 7–14 jours | 3–5 jours ouvrés, ou 9,99 $/mois pour le jour même |
 | **Coût de départ** | gratuit | gratuit | gratuit | 9,99 $ de frais d'installation |
-| **Compte chez l'outil** | aucun | obligatoire | obligatoire | obligatoire, plus une vérification d'identité |
+| **Compte chez l'outil** | facultatif | obligatoire | obligatoire | obligatoire, plus une vérification d'identité |
 | **Une cagnotte que le public voit** | oui | non | non | non |
 | **Revolut / MobilePay** | oui | non | non | non |
 | **Open source** | MIT | non | non | non |

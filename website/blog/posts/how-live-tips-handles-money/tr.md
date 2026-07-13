@@ -34,20 +34,40 @@ bahşiş bağlantısını oluşturmak ve bahşişlerin gelişini izlemek. Bakiye
 ödemeleri tetikleyemez, iade yapamaz ya da müşteri verilerine dokunamaz. Yarın
 sızsa, patlama yarıçapı bir bahşiş bağlantısıdır.
 
-## Bir sunucunun var olduğu tek yer
+## Ödeme yolundaki tek sunucu
 
 Revolut ve MobilePay, Stripe gibi bir tarayıcıdan sürülemez; bu yüzden bunları
-etkinleştirmek `api.live.tips` adresinde asgari bir aktarıcıyı devreye sokar. Bu
-aktarıcının ne yaptığı konusunda kesin olmakta fayda var, çünkü bu hikâyeler
-genellikle tam da "bir arka uç ekledik" noktasında yoldan çıkar.
+etkinleştirmek asgari bir aktarıcıyı devreye sokar — bahşiş sayfanı
+`tip.live.tips` adresinde sunan bir avuç Firebase fonksiyonu. Bu aktarıcının ne
+yaptığı konusunda kesin olmakta fayda var, çünkü bu hikâyeler genellikle tam da
+"bir arka uç ekledik" noktasında yoldan çıkar.
 
 Senin herkese açık bahşiş sayfası profilini saklar — yayımlamayı seçtiğin görünen
 adı ve ödeme tanıtıcılarını. Hepsi bu. Hiçbir bahşiş geçmişi tutmaz, hiç para görmez,
-hiç anahtar tutmaz ve 90 günlük hareketsizliğin ardından kendini siler. Para yine de
-doğrudan hayranının Revolut ya da MobilePay uygulamasıyla seninki arasında hareket
-eder.
+hiç anahtar tutmaz ve 90 günlük hareketsizliğin ardından kendini siler. Revolut ya
+da MobilePay'le verilen bir bahşiş orada yalnızca sahnedeki cihazın onu alana kadar
+bekler: gösterilmesi onu siler ve kimsenin dönüp almadığı her şey bir saat içinde
+süpürülür. Para yine de doğrudan hayranının Revolut ya da MobilePay uygulamasıyla
+seninki arasında hareket eder.
 
 Yalnızca Stripe kullanıyorsan, aktarıcıya hiçbir zaman başvurulmaz.
+
+## Açmak zorunda olmadığın hesap
+
+Uygulama hâlâ cihazın kendi yerel profiliyle açılıyor; her zaman olduğu gibi:
+bahşiş kavanozun, anahtarın ve bahşiş geçmişin cihazında yaşıyor, başka hiçbir
+yerde. Kaydolunacak bir şey yok.
+
+Oturum açmak — Apple ile, Google ile ya da misafir olarak — artık mümkün ve tek bir
+sebep için var: ikinci bir cihaz. Sahnedeki tablet ile cebindeki telefon aynı geceyi
+gösterecekse, aralarında bir şeyin durması gerekir; o şey de yalnızca senin
+okuyabildiğin bir kullanıcı kimliği altındaki Firestore. Grupların, ayarların,
+kısıtlı anahtarın ve bahşiş geçmişin oraya eşitlenir. Bu, gizlilik hikâyesinde
+gerçek bir değişiklik ve sonradan keşfedilmektense açıkça söylenmeyi hak ediyor:
+hesap olmadan hiçbir sunucu bir bahşişi görmez; hesapla birlikte bizim sunucumuzun
+sadece sana ait köşesi görür. Bu, ikinci cihazın bedeli ve ödemek ya da reddetmek
+sana kalmış. Asla dokunmadığı şey ise para: bir hesap verilerini taşır, bakiyeni
+değil ve hâlâ hiçbir pay almıyoruz.
 
 ## Neden bize öylece inanmamalısın
 

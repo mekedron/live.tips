@@ -135,7 +135,9 @@ Napiwki kartą to ścieżka zweryfikowana i przechodzą przez Stripe. To znaczy 
 Stripe na twoje nazwisko — Stripe robi własną weryfikację tożsamości, jak każdy
 regulowany operator musi. Nie znaczy to jednak konta u *nas*: tworzysz ograniczony
 klucz API, wklejasz go, a aplikacja rozmawia z `api.stripe.com` i z niczym więcej.
-Całą drogę pieniędzy opisaliśmy w
+*Możesz* się zalogować, jeśli chcesz, by twoje zespoły i twoja historia podążyły za
+tobą na drugie urządzenie — ale nic cię o to nie prosi, a domyślnie pozostajesz
+wylogowany. Całą drogę pieniędzy opisaliśmy w
 [jak live.tips obchodzi się z pieniędzmi](post:how-live-tips-handles-money).
 
 ## Wszystko na jednej stronie
@@ -149,7 +151,7 @@ Całą drogę pieniędzy opisaliśmy w
 | **Kto trzyma twoje pieniądze** | nikt | nikt | Buy Me a Coffee | TipTopJar |
 | **Kiedy je dostajesz** | gdy napiwek się rozliczy | gdy napiwek się rozliczy | po $10, pierwsza wypłata 7–14 dni | 3–5 dni roboczych albo $9.99/mies. za ten sam dzień |
 | **Koszt startu** | za darmo | za darmo | za darmo | opłata konfiguracyjna $9.99 |
-| **Konto w narzędziu** | brak | wymagane | wymagane | wymagane, plus weryfikacja tożsamości |
+| **Konto w narzędziu** | opcjonalne | wymagane | wymagane | wymagane, plus weryfikacja tożsamości |
 | **Puszka, którą widzi publiczność** | tak | nie | nie | nie |
 | **Revolut / MobilePay** | tak | nie | nie | nie |
 | **Otwarty kod** | MIT | nie | nie | nie |

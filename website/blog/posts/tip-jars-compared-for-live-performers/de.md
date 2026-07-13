@@ -146,8 +146,11 @@ Karten-Trinkgelder sind der bestätigte Weg, und sie laufen über Stripe. Das
 bedeutet ein Stripe-Konto auf deinen Namen — Stripe macht seine eigene
 Identitätsprüfung, wie es jeder regulierte Abwickler muss. Was es nicht bedeutet,
 ist ein Konto bei *uns*: Du erstellst einen eingeschränkten API-Schlüssel, fügst
-ihn ein, und die App spricht mit `api.stripe.com` und mit sonst nichts. Den ganzen
-Geldweg haben wir in [wie live.tips mit Geld umgeht](post:how-live-tips-handles-money)
+ihn ein, und die App spricht mit `api.stripe.com` und mit sonst nichts. Du *kannst*
+dich anmelden, wenn deine Bands und deine Historie dir auf ein zweites Gerät folgen
+sollen — aber nichts verlangt es von dir, und abgemeldet ist die Voreinstellung. Den
+ganzen Geldweg haben wir in
+[wie live.tips mit Geld umgeht](post:how-live-tips-handles-money)
 beschrieben.
 
 ## Alles auf einer Seite
@@ -161,7 +164,7 @@ beschrieben.
 | **Wer dein Geld hält** | niemand | niemand | Buy Me a Coffee | TipTopJar |
 | **Wann du es bekommst** | sobald das Trinkgeld durch ist | sobald das Trinkgeld durch ist | ab $10, erste Auszahlung 7–14 Tage | 3–5 Werktage, oder $9.99/Mon. für denselben Tag |
 | **Kosten für den Start** | kostenlos | kostenlos | kostenlos | $9.99 Einrichtungsgebühr |
-| **Konto beim Tool** | keins | erforderlich | erforderlich | erforderlich, plus Ausweisprüfung |
+| **Konto beim Tool** | optional | erforderlich | erforderlich | erforderlich, plus Ausweisprüfung |
 | **Ein Glas, das das Publikum sehen kann** | ja | nein | nein | nein |
 | **Revolut / MobilePay** | ja | nein | nein | nein |
 | **Open Source** | MIT | nein | nein | nein |

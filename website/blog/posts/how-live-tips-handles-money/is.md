@@ -34,19 +34,41 @@ borgaðu-það-sem-þú-vilt-þjórfétengil og fylgst með þjórfé berast. Ha
 lesið innistæðuna þína, ræst útborganir, gefið út endurgreiðslur eða snert
 viðskiptavinagögn. Ef hann læki á morgun er sprengjuradíusinn einn þjórfétengill.
 
-## Eini staðurinn þar sem þjónn er til
+## Eini þjónninn á greiðsluleiðinni
 
 Ekki er hægt að stýra Revolut og MobilePay úr vafra eins og Stripe, svo að með því að
-kveikja á þeim ræsist lágmarks-endurvarpi á `api.live.tips`. Það er þess virði að
-vera nákvæmur um hvað sá endurvarpi gerir, því „við bættum við bakenda“ er venjulega
-staðurinn þar sem þessar sögur fara úrskeiðis.
+kveikja á þeim ræsist lágmarks-endurvarpi — handfylli af Firebase-föllum sem þjóna
+þjórfésíðunni þinni á `tip.live.tips`. Það er þess virði að vera nákvæmur um hvað sá
+endurvarpi gerir, því „við bættum við bakenda“ er venjulega staðurinn þar sem þessar
+sögur fara úrskeiðis.
 
 Hann geymir opinbera þjórfésíðusniðið þitt — birtingarnafnið og greiðsluauðkennin sem
 þú kaust að birta. Það er allt og sumt. Hann heldur enga þjórfjársögu, sér enga peninga,
-geymir enga lykla og eyðir sjálfum sér eftir 90 daga aðgerðaleysi. Peningar færast
-enn beint milli Revolut- eða MobilePay-forrits aðdáandans þíns og þíns eigin.
+geymir enga lykla og eyðir sjálfum sér eftir 90 daga aðgerðaleysi. Revolut- eða
+MobilePay-þjórfé bíður þar aðeins þangað til sviðstækið þitt sækir það: að birta það
+eyðir því, og öllu sem enginn kom aftur eftir er sópað burt innan klukkustundar.
+Peningar færast enn beint milli Revolut- eða MobilePay-forrits aðdáandans þíns og
+þíns eigin.
 
 Ef þú notar aðeins Stripe er aldrei haft samband við endurvarpann.
+
+## Reikningurinn sem þú þarft ekki að stofna
+
+Forritið ræsist enn í tækisbundið snið, alveg eins og það hefur alltaf gert:
+þjórfékrukkan þín, lykillinn þinn og þjórfjársagan þín lifa í tækinu og hvergi
+annars staðar. Það er ekkert að skrá sig fyrir.
+
+Að skrá sig inn — með Apple, með Google eða sem gestur — er nú mögulegt, og það er
+til af einni ástæðu: annað tæki. Ef spjaldtölvan á sviðinu og síminn í vasanum þínum
+eiga að sýna sama kvöldið verður eitthvað að sitja á milli þeirra, og það eitthvað er
+Firestore, undir notandaauðkenni sem aðeins þú getur lesið. Hljómsveitirnar þínar,
+stillingarnar, takmarkaði lykillinn og þjórfjársagan samstillast þangað. Það er
+raunveruleg breyting á persónuverndarsögunni og hún á skilið að vera sögð
+umbúðalaust frekar en að uppgötvast: án reiknings sér enginn þjónn nokkurn tíma
+þjórfé; með reikningi sér þitt eigið horn af okkar það. Það er verðið fyrir annað
+tækið, og það er þitt að greiða það eða hafna því. Það sem það snertir aldrei eru
+peningarnir — reikningur færir gögnin þín, ekki innistæðuna þína, og enn er engin
+þóknun tekin.
 
 ## Af hverju þú ættir ekki að taka orð okkar trúanleg
 

@@ -148,7 +148,8 @@ Tämä on meidän kategoriamme, joten lue seuraavat neljä kappaletta asiaankuul
 
 **live.tips** laittaa yhden QR-koodin koteloosi. Se avaa sivun, jolla ovat ne maksutavat, jotka *sinä* kytkit
 päälle. Korttitipit menevät suoraan **omalle Stripe-tilillesi** — ei live.tipsin saldolle, koska live.tipsin saldoa
-ei ole olemassa. Me otamme **0 %**, meille ei tarvitse luoda tiliä, ja koko juttu on MIT-lisensoituna GitHubissa.
+ei ole olemassa. Me otamme **0 %**, tili meillä on valinnainen — sovellus toimii kirjautumatta, pelkästään sinun
+laitteellasi — ja koko juttu on MIT-lisensoituna GitHubissa.
 Vieressäsi oleva tabletti näyttää jokaisen tipin livenä, antajan nimen ja viestin sekä tavoitepalkin — ja juuri
 sen osan sali näkee. Purkki, jonka sali näkee täyttyvän, on koko syy siihen, että kolikkopurkki toimi neljäsataa
 vuotta. Rahan reitin kuvasimme jutussa

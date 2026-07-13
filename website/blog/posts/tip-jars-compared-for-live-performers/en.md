@@ -133,7 +133,9 @@ Card tips are the verified path, and they run through Stripe. That means a Strip
 account in your name — Stripe does its own identity check, as any regulated
 processor must. What it does not mean is an account with *us*: you create a
 restricted API key, paste it in, and the app talks to `api.stripe.com` and nowhere
-else. We wrote up the whole money path in
+else. You *can* sign in, if you want your bands and your history to follow you onto
+a second device — but nothing asks you to, and signed out is the default. We wrote
+up the whole money path in
 [how live.tips handles money](post:how-live-tips-handles-money).
 
 ## Everything on one page
@@ -147,7 +149,7 @@ else. We wrote up the whole money path in
 | **Who holds your money** | nobody | nobody | Buy Me a Coffee | TipTopJar |
 | **When you get it** | as the tip clears | as the tip clears | after $10, first payout 7–14 days | 3–5 business days, or $9.99/mo for same-day |
 | **Cost to start** | free | free | free | $9.99 setup fee |
-| **Account with the tool** | none | required | required | required, plus an ID check |
+| **Account with the tool** | optional | required | required | required, plus an ID check |
 | **A jar the audience can see** | yes | no | no | no |
 | **Revolut / MobilePay** | yes | no | no | no |
 | **Open source** | MIT | no | no | no |

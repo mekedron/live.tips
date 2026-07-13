@@ -35,20 +35,41 @@ prix libre et surveiller l'arrivée des pourboires. Elle ne peut pas lire ton so
 déclencher des versements, émettre des remboursements ni toucher aux données clients.
 Si elle fuitait demain, le rayon de l'explosion serait un lien de pourboire.
 
-## Le seul endroit où un serveur existe
+## Le seul serveur sur le chemin du paiement
 
 Revolut et MobilePay ne peuvent pas être pilotés depuis un navigateur comme Stripe,
-donc les activer met en marche un relais minimal à `api.live.tips`. Il vaut la peine
-d'être précis sur ce que fait ce relais, car « nous avons ajouté un backend » est en
-général le moment où ces histoires tournent mal.
+donc les activer met en marche un relais minimal — une poignée de fonctions Firebase
+qui servent ta page de pourboires à `tip.live.tips`. Il vaut la peine d'être précis
+sur ce que fait ce relais, car « nous avons ajouté un backend » est en général le
+moment où ces histoires tournent mal.
 
 Il stocke le profil public de ta page de pourboires — le nom affiché et les
 identifiants de paiement que tu as choisi de publier. C'est tout. Il ne conserve aucun
 historique de pourboires, ne voit aucun argent, ne détient aucune clé et s'autodétruit après
-90 jours d'inactivité. L'argent circule toujours directement entre l'application
-Revolut ou MobilePay de ton fan et la tienne.
+90 jours d'inactivité. Un pourboire Revolut ou MobilePay n'y attend que le temps que
+ton appareil de scène vienne le chercher : l'afficher le supprime, et tout ce que
+personne n'est venu récupérer est balayé dans l'heure. L'argent circule toujours
+directement entre l'application Revolut ou MobilePay de ton fan et la tienne.
 
 Si tu n'utilises que Stripe, le relais n'est jamais contacté du tout.
+
+## Le compte que tu n'es pas obligé de créer
+
+L'application démarre toujours sur un profil local à l'appareil, ce qu'elle a toujours
+été : ta cagnotte, ta clé et ton historique de pourboires vivent sur l'appareil et
+nulle part ailleurs. Il n'y a rien à créer.
+
+Se connecter — avec Apple, avec Google ou en tant qu'invité — est désormais possible,
+et cela n'existe que pour une seule raison : un deuxième appareil. Si la tablette sur
+scène et le téléphone dans ta poche doivent afficher la même soirée, il faut bien que
+quelque chose se place entre les deux, et ce quelque chose est Firestore, sous un
+identifiant d'utilisateur que toi seul peux lire. Tes groupes, tes réglages, ta clé
+restreinte et ton historique de pourboires s'y synchronisent. C'est un vrai changement
+dans l'histoire de la confidentialité, et cela mérite d'être dit franchement plutôt que
+découvert : sans compte, aucun serveur ne voit jamais un pourboire ; avec un compte,
+ton propre coin du nôtre le voit. C'est le prix du deuxième appareil, et c'est à toi de
+le payer ou de le refuser. Ce à quoi cela ne touche jamais, c'est l'argent — un compte
+déplace tes données, pas ton solde, et il n'y a toujours aucune commission.
 
 ## Pourquoi tu ne devrais pas nous croire sur parole
 

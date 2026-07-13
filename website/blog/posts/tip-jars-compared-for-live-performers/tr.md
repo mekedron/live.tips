@@ -132,9 +132,11 @@ Kartla verilen bahşişler doğrulanmış yoldur, ve Stripe üzerinden geçer. B
 adına bir Stripe hesabı demek — Stripe kendi kimlik kontrolünü yapar, tıpkı
 düzenlenmiş her işlemcinin yapması gerektiği gibi. Ne demek olmadığı ise *bizde* bir
 hesap: kısıtlı bir API anahtarı oluşturursun, yapıştırırsın ve uygulama
-`api.stripe.com` ile konuşur, başka hiçbir yerle değil. Paranın bütün yolunu
-[live.tips parayı nasıl yönetiyor](post:how-live-tips-handles-money) yazısında
-anlattık.
+`api.stripe.com` ile konuşur, başka hiçbir yerle değil. Gruplarının ve geçmişinin
+ikinci bir cihaza da seninle gelmesini istiyorsan oturum *açabilirsin* — ama kimse
+bunu senden istemiyor ve varsayılan, oturum açmamış olmak. Paranın bütün
+yolunu [live.tips parayı nasıl yönetiyor](post:how-live-tips-handles-money)
+yazısında anlattık.
 
 ## Her şey tek sayfada
 
@@ -147,7 +149,7 @@ anlattık.
 | **Paranı kim tutar** | hiç kimse | hiç kimse | Buy Me a Coffee | TipTopJar |
 | **Ne zaman alırsın** | bahşiş geçtiği anda | bahşiş geçtiği anda | $10'dan sonra, ilk ödeme 7–14 gün | 3–5 iş günü, ya da aynı gün için $9.99/ay |
 | **Başlama maliyeti** | ücretsiz | ücretsiz | ücretsiz | $9.99 kurulum ücreti |
-| **Araçta hesap** | yok | gerekli | gerekli | gerekli, üstüne kimlik kontrolü |
+| **Araçta hesap** | isteğe bağlı | gerekli | gerekli | gerekli, üstüne kimlik kontrolü |
 | **Seyircinin görebileceği kavanoz** | evet | hayır | hayır | hayır |
 | **Revolut / MobilePay** | evet | hayır | hayır | hayır |
 | **Açık kaynak** | MIT | hayır | hayır | hayır |

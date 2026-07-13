@@ -174,8 +174,9 @@ Misstrauen.
 **live.tips** klebt einen QR-Code auf deinen Koffer. Er öffnet eine Seite mit den
 Zahlungsmethoden, die *du* aktiviert hast. Karten-Trinkgelder gehen direkt in
 **dein eigenes Stripe-Konto** — nicht in ein live.tips-Guthaben, denn ein
-live.tips-Guthaben gibt es nicht. Wir nehmen **0%**, es gibt kein Konto, das du bei
-uns anlegen müsstest, und das Ganze ist MIT-lizenziert auf GitHub. Das Tablet neben
+live.tips-Guthaben gibt es nicht. Wir nehmen **0%**, ein Konto bei uns ist optional —
+die App läuft abgemeldet, allein auf deinem Gerät — und das Ganze ist MIT-lizenziert
+auf GitHub. Das Tablet neben
 dir zeigt jedes Trinkgeld live, mit Namen und Nachricht des Fans und einem
 Zielbalken — und das ist der Teil, den der Raum sehen kann. Ein Glas, das der Raum
 sich füllen sieht, ist der ganze Grund, warum das Bargeldglas vierhundert Jahre

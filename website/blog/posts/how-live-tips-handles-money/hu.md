@@ -36,19 +36,40 @@ Nem tudja elolvasni az egyenlegedet, nem indíthat kifizetést, nem állíthat k
 visszatérítést, és nem férhet hozzá az ügyféladatokhoz. Ha holnap kiszivárogna, a
 robbanás sugara egyetlen borravalós link.
 
-## Az egyetlen hely, ahol létezik szerver
+## Az egyetlen szerver a fizetés útvonalán
 
 A Revolut és a MobilePay nem vezérelhető böngészőből úgy, ahogy a Stripe, ezért a
-bekapcsolásuk elindít egy minimális továbbítót az `api.live.tips` címen. Érdemes
-pontosnak lenni abban, mit csinál ez a továbbító, mert a „hozzáadtunk egy
-backendet" általában az a pont, ahol az ilyen történetek félresiklanak.
+bekapcsolásuk elindít egy minimális továbbítót — néhány Firebase-függvényt, amelyek
+a `tip.live.tips` címen szolgálják ki a borravalós oldaladat. Érdemes pontosnak
+lenni abban, mit csinál ez a továbbító, mert a „hozzáadtunk egy backendet"
+általában az a pont, ahol az ilyen történetek félresiklanak.
 
 A borravalós oldalad nyilvános profilját tárolja — a megjelenített nevet és az
 általad közzétenni választott fizetési azonosítókat. Ennyi. Nem őriz borravaló-előzményeket, nem lát pénzt, nem tart kulcsot, és 90 nap inaktivitás után magától
-törlődik. A pénz továbbra is közvetlenül a rajongód Revolut- vagy MobilePay-appja
-és a tiéd között mozog.
+törlődik. Egy Revolut- vagy MobilePay-borravaló csak addig vár ott, amíg a színpadi
+eszközöd le nem szedi: a megjelenítés törli, és amiért senki nem jött vissza, azt egy
+órán belül elsöpörjük. A pénz továbbra is közvetlenül a rajongód Revolut- vagy
+MobilePay-appja és a tiéd között mozog.
 
 Ha csak a Stripe-ot használod, a továbbítóval soha semmi nem lép kapcsolatba.
+
+## A fiók, amelyet nem kötelező létrehoznod
+
+Az app továbbra is egy eszközhelyi profillal indul, ugyanúgy, ahogy mindig is: a
+borravalós perselyed, a kulcsod és a borravaló-előzményeid az eszközön élnek, és
+sehol máshol. Nincs mire regisztrálni.
+
+A bejelentkezés — Apple-lel, Google-lel vagy vendégként — most már lehetséges, és
+egyetlen okból létezik: a második eszköz miatt. Ha a színpadon lévő tabletnek és a
+zsebedben lévő telefonnak ugyanazt az estét kell mutatnia, valaminek ülnie kell
+kettejük között, és ez a valami a Firestore, egy olyan felhasználói azonosító alatt,
+amelyet csak te olvashatsz. A zenekaraid, a beállításaid, a korlátozott kulcsod és a
+borravaló-előzményeid oda szinkronizálódnak. Ez valódi változás az adatvédelmi
+történetben, és megérdemli, hogy kimondjuk, ahelyett hogy magadtól fedeznéd fel:
+fiók nélkül egyetlen szerver sem lát soha egyetlen borravalót sem; fiókkal a miénk
+egy sarka — a te sarkod — igen. Ez a második eszköz ára, és rajtad áll, hogy
+megfizeted-e vagy visszautasítod. Amihez sosem nyúl, az a pénz: a fiók az adataidat
+mozgatja, nem az egyenlegedet, és jutalék továbbra sincs.
 
 ## Miért ne hidd el nekünk csak úgy
 

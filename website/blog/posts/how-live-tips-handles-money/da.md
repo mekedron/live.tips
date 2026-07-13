@@ -33,20 +33,40 @@ betal-hvad-du-vil-drikkepengelinket og se drikkepenge komme ind. Den kan ikke l�
 din saldo, udløse udbetalinger, foretage refusioner eller røre kundedata. Hvis den
 lækkede i morgen, når skaden ikke længere end til et drikkepengelink.
 
-## Det ene sted, hvor der findes en server
+## Den ene server i betalingsvejen
 
 Revolut og MobilePay kan ikke styres fra en browser på samme måde som Stripe, så
-det at slå dem til aktiverer et minimalt relæ på `api.live.tips`. Det er værd at
-være præcis om, hvad det relæ gør, for „vi tilføjede en backend" er som regel dér,
-disse historier går galt.
+det at slå dem til aktiverer et minimalt relæ – en håndfuld Firebase-funktioner,
+der serverer din drikkepengeside på `tip.live.tips`. Det er værd at være præcis om,
+hvad det relæ gør, for „vi tilføjede en backend" er som regel dér, disse historier
+går galt.
 
 Det gemmer din offentlige drikkepengesideprofil – visningsnavnet og de
 betalings-handles, du valgte at offentliggøre. Mere er det ikke. Det fører ingen
 drikkepengehistorik, ser ingen penge, holder ingen nøgler og sletter sig selv efter
-90 dages inaktivitet. Pengene bevæger sig stadig direkte mellem dit fans Revolut-
-eller MobilePay-app og din.
+90 dages inaktivitet. Et Revolut- eller MobilePay-tip venter der kun, indtil din
+sceneenhed henter det: at vise det sletter det, og alt, som ingen kom tilbage efter,
+fejes væk inden for en time. Pengene bevæger sig stadig direkte mellem dit fans
+Revolut- eller MobilePay-app og din.
 
 Hvis du kun bruger Stripe, kontaktes relæet aldrig overhovedet.
+
+## Kontoen, du ikke behøver at oprette
+
+Appen starter stadig op i en enhedslokal profil, hvilket er, hvad den altid har
+været: din drikkepengekrukke, din nøgle og din drikkepengehistorik lever på enheden
+og ingen andre steder. Der er ikke noget at melde sig til.
+
+At logge ind – med Apple, med Google eller som gæst – er nu muligt, og det findes af
+én grund: en enhed nummer to. Hvis tabletten på scenen og telefonen i din lomme skal
+vise den samme aften, må noget sidde mellem dem, og det noget er Firestore, under et
+bruger-id, som kun du kan læse. Dine bands, indstillinger, begrænsede nøgle og
+drikkepengehistorik synkroniseres dertil. Det er en reel ændring af
+privatlivsfortællingen, og den fortjener at blive sagt lige ud frem for at blive
+opdaget: uden en konto ser ingen server nogensinde et tip; med en konto gør dit eget
+hjørne af vores. Det er prisen for enhed nummer to, og det er dig, der vælger at
+betale den eller lade være. Det, den aldrig rører, er pengene – en konto flytter
+dine data, ikke din saldo, og der er stadig ingen andel.
 
 ## Hvorfor du ikke bare skal tage os på ordet
 

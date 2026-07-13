@@ -143,8 +143,10 @@ A kártyás borravaló a megerősített út, és a Stripe-on keresztül fut. Ez 
 Stripe-fiókot jelent a te nevedben — a Stripe elvégzi a saját
 személyazonosság-ellenőrzését, ahogy minden szabályozott feldolgozónak kell. Amit
 viszont nem jelent, az egy fiók *nálunk*: létrehozol egy korlátozott API-kulcsot,
-beilleszted, és az alkalmazás az `api.stripe.com`-mal beszél, mással semmivel. A
-pénz teljes útját megírtuk itt: [hogyan bánik a pénzzel a
+beilleszted, és az alkalmazás az `api.stripe.com`-mal beszél, mással semmivel.
+Bejelentkezni *lehet*, ha azt szeretnéd, hogy a zenekaraid és az előzményeid egy
+második eszközre is elkísérjenek — de semmi nem kéri ezt tőled, és az alapértelmezett
+a kijelentkezett állapot. A pénz teljes útját megírtuk itt: [hogyan bánik a pénzzel a
 live.tips](post:how-live-tips-handles-money).
 
 ## Minden egy oldalon
@@ -158,7 +160,7 @@ live.tips](post:how-live-tips-handles-money).
 | **Ki tartja a pénzedet** | senki | senki | Buy Me a Coffee | TipTopJar |
 | **Mikor kapod meg** | ahogy a borravaló elszámolódik | ahogy a borravaló elszámolódik | $10 után, első kifizetés 7–14 nap | 3–5 munkanap, vagy $9.99/hó az aznapiért |
 | **Indulási költség** | ingyenes | ingyenes | ingyenes | $9.99 beállítási díj |
-| **Fiók az eszköznél** | semmi | kötelező | kötelező | kötelező, plusz egy személyazonosság-ellenőrzés |
+| **Fiók az eszköznél** | opcionális | kötelező | kötelező | kötelező, plusz egy személyazonosság-ellenőrzés |
 | **Persely, amit lát a közönség** | igen | nem | nem | nem |
 | **Revolut / MobilePay** | igen | nem | nem | nem |
 | **Nyílt forráskód** | MIT | nem | nem | nem |

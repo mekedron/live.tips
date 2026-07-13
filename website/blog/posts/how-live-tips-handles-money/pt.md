@@ -34,20 +34,40 @@ paga-o-que-quiseres e observar as gorjetas a chegar. Não consegue ler o teu
 saldo, despoletar pagamentos, emitir reembolsos nem tocar em dados de clientes.
 Se vazasse amanhã, o raio da explosão é um link de gorjeta.
 
-## O único sítio onde existe um servidor
+## O único servidor no caminho do pagamento
 
 A Revolut e a MobilePay não podem ser conduzidas a partir de um navegador da
-forma como a Stripe pode, por isso ativá-las liga um relé mínimo em
-`api.live.tips`. Vale a pena ser preciso sobre o que esse relé faz, porque
-«acrescentámos um backend» é normalmente onde estas histórias correm mal.
+forma como a Stripe pode, por isso ativá-las liga um relé mínimo — um punhado de
+funções Firebase que servem a tua página de gorjetas em `tip.live.tips`. Vale a
+pena ser preciso sobre o que esse relé faz, porque «acrescentámos um backend» é
+normalmente onde estas histórias correm mal.
 
 Guarda o perfil público da tua página de gorjetas — o nome de apresentação e os
 identificadores de pagamento que escolheste publicar. É tudo. Não mantém
 histórico de gorjetas, não vê dinheiro, não guarda chaves e autoelimina-se após
-90 dias de inatividade. O dinheiro continua a mover-se diretamente entre a app
-Revolut ou MobilePay do teu fã e a tua.
+90 dias de inatividade. Uma gorjeta por Revolut ou MobilePay espera ali apenas
+até o teu dispositivo de palco a receber: mostrá-la apaga-a, e tudo aquilo por
+que ninguém voltou é varrido dentro da hora. O dinheiro continua a mover-se
+diretamente entre a app Revolut ou MobilePay do teu fã e a tua.
 
 Se usares apenas a Stripe, o relé nunca chega a ser contactado.
+
+## A conta que não tens de criar
+
+A app continua a arrancar num perfil que vive apenas no dispositivo, tal como
+sempre foi: o teu mealheiro, a tua chave e o teu histórico de gorjetas estão no
+dispositivo e em mais lado nenhum. Não há nada para subscrever.
+
+Iniciar sessão — com a Apple, com a Google ou como convidado — é agora possível, e
+existe por uma única razão: um segundo dispositivo. Se o tablet no palco e o
+telemóvel no teu bolso têm de mostrar a mesma noite, algo tem de ficar entre eles,
+e esse algo é o Firestore, sob um id de utilizador que só tu podes ler. As tuas
+bandas, definições, chave restrita e histórico de gorjetas sincronizam-se lá. É uma
+mudança real na história da privacidade e merece ser dita às claras em vez de
+descoberta: sem conta, nenhum servidor vê alguma vez uma gorjeta; com conta, o teu
+próprio canto do nosso vê. É o preço do segundo dispositivo, e cabe-te a ti pagá-lo
+ou recusá-lo. Aquilo em que nunca toca é o dinheiro — uma conta move os teus dados,
+não o teu saldo, e continua a não haver comissão.
 
 ## Porque não deves acreditar na nossa palavra
 

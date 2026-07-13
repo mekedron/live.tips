@@ -159,9 +159,10 @@ Dit is onze categorie, dus lees de volgende vier alinea's met het passende wantr
 **live.tips** plakt één QR-code op je koffer. Die opent een pagina met de
 betaalmethoden die *jij* hebt aangezet. Kaartfooien gaan rechtstreeks naar **je eigen
 Stripe-account** — niet naar een live.tips-saldo, want een live.tips-saldo bestaat niet.
-Wij nemen **0%**, er is geen account bij ons aan te maken, en het geheel staat onder
-MIT-licentie op GitHub. De tablet naast je toont elke fooi live, met de naam en het
-bericht van de fan en een doelbalk — en dat is het deel dat de zaal ziet. Een pot die de
+Wij nemen **0%**, een account bij ons is optioneel — de app draait uitgelogd, alleen op
+je eigen apparaat — en het geheel staat onder MIT-licentie op GitHub. De tablet naast je
+toont elke fooi live, met de naam en het bericht
+van de fan en een doelbalk — en dat is het deel dat de zaal ziet. Een pot die de
 zaal zich ziet vullen is de hele reden dat de muntenpot vierhonderd jaar werkte. Het
 geldpad staat beschreven in
 [hoe live.tips met geld omgaat](post:how-live-tips-handles-money).

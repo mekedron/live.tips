@@ -33,20 +33,39 @@ betal-hva-du-vil-tipslenken og se tips komme inn. Den kan ikke lese saldoen din,
 utløse utbetalinger, foreta refusjoner eller røre kundedata. Hvis den lekket i
 morgen, når skaden ikke lenger enn til en tipslenke.
 
-## Det ene stedet der en server finnes
+## Den eneste serveren i betalingsflyten
 
 Revolut og MobilePay kan ikke styres fra en nettleser slik Stripe kan, så det å slå
-dem på aktiverer et minimalt relé på `api.live.tips`. Det er verdt å være presis på
-hva det reléet gjør, for «vi la til en backend» er som regel der disse historiene
-går galt.
+dem på aktiverer et minimalt relé – en håndfull Firebase-funksjoner som serverer
+tipssiden din på `tip.live.tips`. Det er verdt å være presis på hva det reléet
+gjør, for «vi la til en backend» er som regel der disse historiene går galt.
 
 Det lagrer den offentlige tipsside-profilen din – visningsnavnet og
 betalings-håndtakene du valgte å publisere. Mer er det ikke. Det fører ingen
 tipshistorikk, ser ingen penger, holder ingen nøkler og sletter seg selv etter
-90 dager uten aktivitet. Pengene beveger seg fortsatt direkte mellom Revolut- eller
-MobilePay-appen til fanet ditt og din egen.
+90 dager uten aktivitet. Et tips via Revolut eller MobilePay venter der bare til
+scene-enheten din henter det: å vise det sletter det, og alt ingen kom tilbake
+etter, feies bort innen timen. Pengene beveger seg fortsatt direkte mellom Revolut-
+eller MobilePay-appen til fanet ditt og din egen.
 
 Hvis du bare bruker Stripe, kontaktes reléet aldri i det hele tatt.
+
+## Kontoen du ikke trenger å opprette
+
+Appen starter fortsatt opp i en profil som bare finnes på enheten, slik den alltid
+har vært: tipskrukka di, nøkkelen din og tipshistorikken din ligger på enheten og
+ingen andre steder. Det er ingenting å registrere seg for.
+
+Å logge inn – med Apple, med Google eller som gjest – er nå mulig, og det finnes av
+én grunn: en enhet nummer to. Skal nettbrettet på scenen og telefonen i lomma vise
+den samme kvelden, må noe sitte mellom dem, og det noe er Firestore, under en
+bruker-id bare du kan lese. Bandene dine, innstillingene, den begrensede nøkkelen
+og tipshistorikken synkroniseres dit. Det er en reell endring i personvernhistorien,
+og den fortjener å bli sagt rett ut heller enn å bli oppdaget: uten konto ser ingen
+server noen gang et tips; med konto gjør din egen krok av vår det. Det er prisen for
+enhet nummer to, og det er din å betale eller avslå. Det den aldri rører, er
+pengene – en konto flytter dataene dine, ikke saldoen din, og det tas fortsatt
+ingen andel.
 
 ## Hvorfor du ikke bør ta oss på ordet
 

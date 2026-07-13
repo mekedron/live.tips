@@ -171,8 +171,9 @@ qui convient.
 **live.tips** met un QR code sur votre étui. Il ouvre une page avec les moyens de
 paiement que *vous* avez activés. Les pourboires par carte vont directement sur
 **votre propre compte Stripe** — pas sur un solde live.tips, parce qu'il n'existe
-pas de solde live.tips. Nous prenons **0 %**, il n'y a pas de compte à créer chez
-nous, et le tout est publié sous licence MIT sur GitHub. La tablette posée à côté de
+pas de solde live.tips. Nous prenons **0 %**, un compte chez nous est facultatif —
+l'application fonctionne déconnectée, sur votre seul appareil — et le tout est publié
+sous licence MIT sur GitHub. La tablette posée à côté de
 vous affiche chaque pourboire en direct, avec le nom et le message du fan et une
 barre d'objectif — c'est la partie que la salle voit. Un pot que la salle voit se
 remplir, c'est toute la raison pour laquelle le chapeau a marché pendant quatre

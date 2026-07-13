@@ -34,20 +34,40 @@ offerta libera e osservare l'arrivo delle mance. Non può leggere il tuo saldo, 
 versamenti, emettere rimborsi né toccare i dati dei clienti. Se trapelasse domani, il
 raggio dell'esplosione è un link delle mance.
 
-## L'unico punto in cui esiste un server
+## L'unico server nel percorso del pagamento
 
 Revolut e MobilePay non si possono pilotare da un browser come si fa con Stripe, quindi
-attivarli accende un relay minimo su `api.live.tips`. Vale la pena essere precisi su
-cosa fa quel relay, perché «abbiamo aggiunto un backend» è di solito il punto in cui
-queste storie prendono una brutta piega.
+attivarli accende un relay minimo — una manciata di funzioni Firebase che servono la
+tua pagina delle mance su `tip.live.tips`. Vale la pena essere precisi su cosa fa quel
+relay, perché «abbiamo aggiunto un backend» è di solito il punto in cui queste storie
+prendono una brutta piega.
 
 Conserva il profilo pubblico della tua pagina delle mance: il nome visualizzato e gli
 identificativi di pagamento che hai scelto di pubblicare. Tutto qui. Non tiene alcuno
 storico delle mance, non vede denaro, non custodisce chiavi e si autoelimina dopo
-90 giorni di inattività. Il denaro continua a spostarsi direttamente tra l'app Revolut
-o MobilePay del tuo fan e la tua.
+90 giorni di inattività. Una mancia Revolut o MobilePay resta lì in attesa soltanto
+finché il dispositivo sul palco non la raccoglie: mostrarla la cancella, e tutto ciò
+che nessuno è tornato a prendere viene spazzato via entro un'ora. Il denaro continua
+a spostarsi direttamente tra l'app Revolut o MobilePay del tuo fan e la tua.
 
 Se usi solo Stripe, il relay non viene mai contattato affatto.
+
+## L'account che non sei obbligato a creare
+
+L'app si avvia ancora su un profilo locale al dispositivo, esattamente com'è sempre
+stato: il tuo barattolo delle mance, la tua chiave e il tuo storico delle mance vivono
+sul dispositivo e da nessun'altra parte. Non c'è niente a cui iscriversi.
+
+Accedere — con Apple, con Google o come ospite — ora è possibile, ed esiste per un
+motivo soltanto: un secondo dispositivo. Se il tablet sul palco e il telefono che hai
+in tasca devono mostrare la stessa serata, qualcosa deve pur stare in mezzo, e quel
+qualcosa è Firestore, sotto un id utente che solo tu puoi leggere. Le tue band, le tue
+impostazioni, la chiave con restrizioni e lo storico delle mance si sincronizzano lì.
+È un cambiamento reale nella storia della privacy e merita di essere detto chiaramente
+anziché scoperto per caso: senza un account nessun server vede mai una mancia; con un
+account il tuo angolo del nostro la vede. È il prezzo del secondo dispositivo, e sta a
+te pagarlo o rifiutarlo. Ciò che non tocca mai è il denaro: un account sposta i tuoi
+dati, non il tuo saldo, e non c'è comunque nessuna trattenuta.
 
 ## Perché non dovresti crederci sulla parola
 

@@ -143,8 +143,9 @@ Dette er vår kategori, så les de neste fire avsnittene med passende mistenksom
 
 **live.tips** setter én QR-kode på kassa di. Den åpner en side med betalingsmåtene *du* har slått på. Korttips går rett
 inn på **din egen Stripe-konto** — ikke til en live.tips-saldo, for noen live.tips-saldo finnes ikke. Vi tar **0 prosent**,
-det er ingen konto å opprette hos oss, og alt ligger MIT-lisensiert på GitHub. Nettbrettet ved siden av deg viser hvert
-tips live, med navnet og meldingen til giveren og en målstolpe — og det er den delen rommet ser. En krukke rommet ser
+en konto hos oss er valgfri — appen kjører utlogget, på enheten din alene — og alt ligger MIT-lisensiert på GitHub.
+Nettbrettet ved siden av deg viser hvert tips live, med navnet og meldingen til giveren og en målstolpe — og det er den
+delen rommet ser. En krukke rommet ser
 fylles er hele grunnen til at myntkrukka virket i fire hundre år. Pengenes vei beskrev vi i
 [hvordan live.tips håndterer penger](post:how-live-tips-handles-money).
 

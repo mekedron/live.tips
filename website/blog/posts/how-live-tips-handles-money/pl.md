@@ -34,20 +34,42 @@ Ograniczony oznacza, że klucz może robić dwie rzeczy: utworzyć link do napiw
 salda, uruchomić wypłat, wystawić zwrotów ani dotknąć danych klientów. Gdyby
 jutro wyciekł, promień rażenia to link do napiwków.
 
-## Jedyne miejsce, w którym istnieje serwer
+## Jedyny serwer na drodze płatności
 
 Revolutem i MobilePay nie da się sterować z przeglądarki tak jak Stripe, więc ich
-włączenie uruchamia minimalny przekaźnik pod adresem `api.live.tips`. Warto być
-precyzyjnym co do tego, co ten przekaźnik robi, bo „dodaliśmy backend" to zwykle
-moment, w którym takie historie idą źle.
+włączenie uruchamia minimalny przekaźnik — garstkę funkcji Firebase serwujących
+twoją stronę napiwków pod adresem `tip.live.tips`. Warto być precyzyjnym co do
+tego, co ten przekaźnik robi, bo „dodaliśmy backend" to zwykle moment, w którym
+takie historie idą źle.
 
 Przechowuje publiczny profil twojej strony napiwków — wyświetlaną nazwę i
 identyfikatory płatności, które zdecydowałeś się opublikować. To wszystko. Nie
 prowadzi historii napiwków, nie widzi pieniędzy, nie trzyma kluczy i samoczynnie
-usuwa się po 90 dniach bezczynności. Pieniądze nadal przepływają bezpośrednio
-między aplikacją Revolut lub MobilePay twojego fana a twoją.
+usuwa się po 90 dniach bezczynności. Napiwek z Revoluta czy MobilePay czeka tam
+tylko do chwili, aż odbierze go twoje sceniczne urządzenie: wyświetlenie powoduje
+jego usunięcie, a to, po co nikt nie wrócił, zostaje sprzątnięte w ciągu godziny.
+Pieniądze nadal przepływają bezpośrednio między aplikacją Revolut lub MobilePay
+twojego fana a twoją.
 
 Jeśli używasz tylko Stripe, przekaźnik nigdy nie zostaje w ogóle wywołany.
+
+## Konto, którego nie musisz zakładać
+
+Aplikacja nadal startuje w profilu żyjącym wyłącznie na urządzeniu, tak jak było
+zawsze: twój słoik na napiwki, twój klucz i twoja historia napiwków są na
+urządzeniu i nigdzie indziej. Nie ma się do czego zapisywać.
+
+Zalogowanie się — przez Apple, przez Google albo jako gość — jest teraz możliwe i
+istnieje z jednego powodu: drugie urządzenie. Jeśli tablet na scenie i telefon w
+twojej kieszeni mają pokazywać ten sam wieczór, coś musi znaleźć się między nimi, a
+tym czymś jest Firestore, pod identyfikatorem użytkownika, który tylko ty możesz
+odczytać. Twoje zespoły, ustawienia, ograniczony klucz i historia napiwków
+synchronizują się właśnie tam. To realna zmiana w opowieści o prywatności i
+zasługuje na to, by powiedzieć ją wprost, a nie zostawić do odkrycia: bez konta
+żaden serwer nigdy nie widzi napiwku; z kontem widzi go twój własny kąt naszego. To
+cena drugiego urządzenia i tylko od ciebie zależy, czy ją zapłacisz, czy odmówisz.
+Czego to nigdy nie dotyka, to pieniądze — konto przenosi twoje dane, a nie twoje
+saldo, i nadal nie pobieramy żadnej prowizji.
 
 ## Dlaczego nie powinieneś wierzyć nam na słowo
 

@@ -143,7 +143,9 @@ Las propinas con tarjeta son la vía verificada, y pasan por Stripe. Eso signifi
 cuenta de Stripe a tu nombre — Stripe hace su propia verificación de identidad, como
 debe hacer cualquier procesador regulado. Lo que no significa es una cuenta con
 *nosotros*: creas una clave de API restringida, la pegas, y la app habla con
-`api.stripe.com` y con ningún otro sitio. Escribimos todo el recorrido del dinero en
+`api.stripe.com` y con ningún otro sitio. *Puedes* iniciar sesión si quieres que tus
+grupos y tu historial te sigan a un segundo dispositivo — pero nada te lo pide, y la
+sesión cerrada es lo predeterminado. Escribimos todo el recorrido del dinero en
 [cómo live.tips gestiona el dinero](post:how-live-tips-handles-money).
 
 ## Todo en una sola página
@@ -157,7 +159,7 @@ debe hacer cualquier procesador regulado. Lo que no significa es una cuenta con
 | **Quién retiene tu dinero** | nadie | nadie | Buy Me a Coffee | TipTopJar |
 | **Cuándo lo recibes** | en cuanto se valida la propina | en cuanto se valida la propina | tras 10 $, primera retirada en 7–14 días | 3–5 días hábiles, o 9,99 $/mes para el mismo día |
 | **Coste de empezar** | gratis | gratis | gratis | 9,99 $ de cuota de configuración |
-| **Cuenta con la herramienta** | ninguna | obligatoria | obligatoria | obligatoria, más verificación de identidad |
+| **Cuenta con la herramienta** | opcional | obligatoria | obligatoria | obligatoria, más verificación de identidad |
 | **Un bote que el público ve** | sí | no | no | no |
 | **Revolut / MobilePay** | sí | no | no | no |
 | **Código abierto** | MIT | no | no | no |
