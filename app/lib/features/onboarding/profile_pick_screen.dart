@@ -11,13 +11,17 @@ import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/lt_ui.dart';
+import '../settings/account_switch_screen.dart';
 import 'onboarding_flow.dart';
 
-/// The fork right after an onboarding sign-in: does this account already
-/// have profiles? Signing in to an existing account on a new device used to
-/// march straight into band creation — every re-onboarding minted yet
-/// another profile. Now the existing profiles are offered first, with
-/// "create a new one" as the explicit alternative.
+/// The profile question of a cloud account, in its two forms — and the app
+/// answers neither of them itself.
+///
+/// PUSHED (the default), it is the fork right after an onboarding sign-in:
+/// does this account already have profiles? Signing in to an existing account
+/// on a new device used to march straight into band creation — every
+/// re-onboarding minted yet another profile. Now the existing profiles are
+/// offered first, with "create a new one" as the explicit alternative.
 ///
 /// The answer has to be WAITED for: the cloud mirror is silent until its
 /// first snapshot, and an empty cold mirror says nothing about the profiles
@@ -28,8 +32,27 @@ import 'onboarding_flow.dart';
 /// the sign-in just crossed the network, so a snapshot is close — and if it
 /// still never lands, the deadline falls through to the band setup rather
 /// than trapping onboarding.
+///
+/// [asRoot], it is RootGate's landing for a cloud account whose band question
+/// is open — no navigation stack under it, nothing pushed on top:
+///
+/// * SEVERAL profiles and nobody has said which (a sign-in, an account
+///   switch, a boot): the app used to pick one — the id this device last used,
+///   else simply the first band — and drop the artist into somebody else's
+///   gig. Here the list is the question. The last-used profile pre-selects a
+///   row; a pre-selection is not an answer, and it never skips the tap.
+/// * NO profile at all: the account genuinely has none, which is a state, not
+///   an accident to repair. The create card is the only card, and no band doc
+///   is written until the artist walks through the setup that names it.
+///
+/// As the root there is nothing to forward TO (a pushReplacement would bury
+/// RootGate itself), so the deadline and the auto-forward are the pushed
+/// form's alone — and there is a door out to the other accounts instead.
 class ProfilePickScreen extends ConsumerStatefulWidget {
-  const ProfilePickScreen({super.key});
+  const ProfilePickScreen({super.key, this.asRoot = false});
+
+  /// RootGate's landing rather than a step pushed on top of onboarding.
+  final bool asRoot;
 
   @override
   ConsumerState<ProfilePickScreen> createState() => _ProfilePickScreenState();
@@ -44,7 +67,7 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer(_deadline, _forward);
+    if (!widget.asRoot) _timer = Timer(_deadline, _forward);
   }
 
   @override
@@ -95,14 +118,24 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     navigator.popUntil((route) => route.isFirst);
   }
 
+  /// The other door of the root form: an account with no profile the artist
+  /// wants (or with none at all) is not a trap — the accounts this device
+  /// knows, and a fresh sign-in, are one tap away.
+  void _switchAccount() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AccountSwitchScreen()),
+    );
+  }
+
   Future<void> _createNew() async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final addFailed = context.s.t('widgets.profile_switcher.add_failed');
     // The band setup's details step renames the ACTIVE band — which right
-    // now is one of the account's real profiles. A new empty one has to be
-    // created and activated first, exactly like the switcher's "Add a
-    // profile" row.
+    // now is one of the account's real profiles (or nothing at all). A new
+    // empty one has to be created and activated first, exactly like the
+    // switcher's "Add a profile" row. This tap is the artist asking for a
+    // profile, which is the only thing that may ever write a band entry.
     final account = await ref.read(appStateProvider.notifier).addAccount();
     if (!mounted) return;
     if (account == null) {
@@ -124,16 +157,25 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     ref.watch(repoRevisionProvider);
     final app = ref.watch(appStateProvider);
     final repo = ref.watch(accountDataRepositoryProvider);
+    final asRoot = widget.asRoot;
+    // As the root, the question is about the account's profiles as they ARE:
+    // an unnamed, unfinished one is still a profile the artist can go back
+    // into, and hiding it would leave the app asking about a list nobody can
+    // see. The onboarding fork asks the narrower question — "is there
+    // anything here worth re-entering?" — and ignores the placeholders.
     final existing = repo.isWarm
-        ? repo.listBands().where((b) => _real(repo, b)).toList()
+        ? [
+            for (final band in repo.listBands())
+              if (asRoot || _real(repo, band)) band,
+          ]
         : null;
 
-    if (existing != null && existing.isEmpty && !_forwarded) {
+    if (!asRoot && existing != null && existing.isEmpty && !_forwarded) {
       // A warm answer with nothing in it — a genuinely fresh account walks
       // on to the band setup without ever seeing this screen.
       WidgetsBinding.instance.addPostFrameCallback((_) => _forward());
     }
-    if (existing == null || existing.isEmpty) {
+    if (existing == null || (existing.isEmpty && !asRoot)) {
       return Scaffold(
         appBar: AppBar(title: Text(s.t('onboarding.profile_pick.title'))),
         body: Center(
@@ -161,8 +203,25 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     }
 
     _timer?.cancel(); // the mirror spoke — the deadline has done its job
+    // The band this device last had open in this account. It says which row
+    // to mark, and nothing more: the app opening it unasked is the bug this
+    // screen exists for.
+    final lastUsed = repo.readActiveBandId();
+    final empty = existing.isEmpty;
     return Scaffold(
-      appBar: AppBar(title: Text(s.t('onboarding.profile_pick.title'))),
+      appBar: AppBar(
+        title: Text(s.t('onboarding.profile_pick.title')),
+        actions: [
+          if (asRoot)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton(
+                onPressed: _switchAccount,
+                child: Text(s.t('settings.account.switch_title')),
+              ),
+            ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -170,12 +229,16 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
               Text(
-                s.t('onboarding.profile_pick.heading'),
+                s.t(empty
+                    ? 'onboarding.profile_pick.empty_heading'
+                    : 'onboarding.profile_pick.heading'),
                 style: outfitStyle(22, c.text, weight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
               Text(
-                s.t('onboarding.profile_pick.subtitle'),
+                s.t(empty
+                    ? 'onboarding.profile_pick.empty_subtitle'
+                    : 'onboarding.profile_pick.subtitle'),
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 14,
@@ -188,6 +251,7 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
                 _ProfileCard(
                   band: band,
                   enabled: !app.switching,
+                  lastUsed: band.id == lastUsed,
                   onTap: () => unawaited(_pick(band)),
                 ),
                 const SizedBox(height: 12),
@@ -205,17 +269,21 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
 }
 
 /// One existing profile, styled like the switcher's rows but as an
-/// onboarding card: avatar, name, which methods it already has.
+/// onboarding card: avatar, name, which methods it already has — and, for the
+/// one this device last used, a pill saying so. The pill is the whole extent
+/// of "remembering": it points at a row, it does not open it.
 class _ProfileCard extends ConsumerWidget {
   const _ProfileCard({
     required this.band,
     required this.enabled,
     required this.onTap,
+    this.lastUsed = false,
   });
 
   final BandAccount band;
   final bool enabled;
   final VoidCallback onTap;
+  final bool lastUsed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -243,8 +311,26 @@ class _ProfileCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: outfitStyle(15, c.text,
-                        weight: FontWeight.w600)),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: outfitStyle(15, c.text,
+                                weight: FontWeight.w600),
+                          ),
+                        ),
+                        if (lastUsed) ...[
+                          const SizedBox(width: 8),
+                          LtPill(
+                            label:
+                                context.s.t('onboarding.profile_pick.last_used'),
+                          ),
+                        ],
+                      ],
+                    ),
                     Text(
                       bandMethodsSummary(context, ref, band.id),
                       style: TextStyle(

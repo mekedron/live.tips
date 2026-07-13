@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/app.dart';
+import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/features/onboarding/onboarding_details_screen.dart';
 import 'package:live_tips/features/onboarding/profile_pick_screen.dart';
 import 'package:live_tips/features/shell/app_shell.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers.dart';
 
@@ -54,6 +57,58 @@ Future<LocalStore> _signInFromWelcome(
   await tester.tap(find.text('Sign in with Google'));
   await tester.pumpAndSettle();
   return store;
+}
+
+/// A device already signed into the cloud account, with no local profile of
+/// its own — the state every boot, account switch and Settings sign-in lands
+/// in. (No local registry, so the upload offer has nothing to ask about.)
+Future<LocalStore> _signedInStore() async {
+  SharedPreferences.setMockInitialValues({});
+  final store = LocalStore(await SharedPreferences.getInstance());
+  await store.saveAccountsDirectory(
+    AccountsDirectory.initial()
+        .withAccount(const AppAccount(
+          id: _uid,
+          name: 'Casey',
+          kind: AccountKind.google,
+        ))
+        .withActive(_uid),
+  );
+  return store;
+}
+
+/// Boots the whole app on [store] with [db] behind the signed-in account, and
+/// hands back the container so the tests can ask what is ACTIVE — the picker
+/// is only half the fix; the other half is that nothing was activated.
+Future<ProviderContainer> _bootApp(
+  WidgetTester tester,
+  LocalStore store,
+  FakeFirebaseFirestore db,
+) async {
+  await tester.binding.setSurfaceSize(const Size(600, 1600));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        localStoreProvider.overrideWithValue(store),
+        secureStoreProvider.overrideWithValue(FakeSecureStore()),
+        initialApiKeyProvider.overrideWithValue(null),
+        firestoreProvider.overrideWithValue(db),
+        authServiceProvider.overrideWithValue(FakeAuthService(
+          user: const AuthUser(
+            uid: _uid,
+            kind: AccountKind.google,
+            displayName: 'Casey',
+          ),
+        )),
+      ],
+      child: const LiveTipsApp(),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return ProviderScope.containerOf(
+      tester.element(find.byType(LiveTipsApp)),
+      listen: false);
 }
 
 void main() {
@@ -109,5 +164,85 @@ void main() {
     expect(find.byType(OnboardingDetailsScreen), findsOneWidget);
     expect(find.text('Welcome back'), findsNothing);
     expect(find.text('Create a new profile'), findsNothing);
+    // …and it is still an account with no band doc in it: the profile is
+    // written when the artist NAMES it, one screen from here, and not before.
+    expect((await _bands(db).get()).docs, isEmpty);
+
+    await tester.enterText(
+        find.byType(TextField).first, 'The Foxes');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    final docs = (await _bands(db).get()).docs;
+    expect(docs, hasLength(1), reason: 'the named profile — and only it');
+    expect(docs.first.data()['name'], 'The Foxes');
+  });
+
+  // ——— The root form: entering an account whose profile question is open ———
+
+  group('the root picker', () {
+    testWidgets('an account with several profiles ASKS — and activates '
+        'nothing until the artist answers', (tester) async {
+      final db = FakeFirebaseFirestore();
+      await _bands(db).doc(_bandId).set({'name': 'The Foxes', 'createdAtMs': 1});
+      await _bands(db)
+          .doc('acc_duo')
+          .set({'name': 'Duo Sundays', 'createdAtMs': 2});
+      final store = await _signedInStore();
+      // The band this device last had open. It may point at a row; it may not
+      // answer for the artist.
+      await store.saveActiveCloudBand(_uid, 'acc_duo');
+
+      final container = await _bootApp(tester, store, db);
+
+      expect(find.byType(ProfilePickScreen), findsOneWidget);
+      expect(find.byType(AppShell), findsNothing);
+      expect(find.text('The Foxes'), findsOneWidget);
+      expect(find.text('Duo Sundays'), findsOneWidget);
+      expect(find.text('Last used'), findsOneWidget,
+          reason: 'the remembered profile pre-selects a row');
+      expect(container.read(appStateProvider).accountId, isEmpty,
+          reason: 'no gig is opened before the artist says which');
+
+      // The artist picks the OTHER one — the app must open exactly that.
+      await tester.tap(find.text('The Foxes'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppShell), findsOneWidget);
+      expect(container.read(appStateProvider).accountId, _bandId);
+      expect(store.readActiveCloudBand(_uid), _bandId);
+    });
+
+    testWidgets('an account with exactly one profile opens it — nothing to ask',
+        (tester) async {
+      final db = FakeFirebaseFirestore();
+      await _bands(db).doc(_bandId).set({'name': 'The Foxes', 'createdAtMs': 1});
+
+      final container = await _bootApp(tester, await _signedInStore(), db);
+
+      expect(find.byType(ProfilePickScreen), findsNothing);
+      expect(find.byType(AppShell), findsOneWidget);
+      expect(container.read(appStateProvider).accountId, _bandId);
+    });
+
+    testWidgets('an account with no profile at all offers to create one, and '
+        'writes nothing until it is created', (tester) async {
+      final db = FakeFirebaseFirestore();
+
+      final container = await _bootApp(tester, await _signedInStore(), db);
+
+      expect(find.byType(ProfilePickScreen), findsOneWidget);
+      expect(find.text('No profile in this account yet'), findsOneWidget);
+      expect(container.read(appStateProvider).accounts, isEmpty);
+      expect((await _bands(db).get()).docs, isEmpty,
+          reason: 'a warm empty account must not be "repaired" with a band');
+
+      await tester.tap(find.text('Create a new profile'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingDetailsScreen), findsOneWidget);
+      expect((await _bands(db).get()).docs, hasLength(1),
+          reason: 'the artist asked for it — that is what may write a band');
+    });
   });
 }

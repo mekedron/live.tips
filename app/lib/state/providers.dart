@@ -248,20 +248,19 @@ class AppStateNotifier extends Notifier<AppState> {
     });
     ref.listen(repoRevisionProvider, (previous, next) => _onRemoteChange());
     final repo = ref.read(accountDataRepositoryProvider);
-    // main() migrates/creates the registry before runApp; the seeding here
-    // covers a genuinely fresh cloud account (and tests that wire a bare
-    // store straight into the ProviderScope). A DELIBERATELY emptied local
-    // registry is not repaired — see _maySeedFirstBand.
-    var accounts = _bandsOf(repo);
-    if (repo.isWarm && accounts.isEmpty && _maySeedFirstBand) {
-      accounts = [_seedFirstBand(repo)];
-    }
-    final accountId = _pickActive(accounts, repo.readActiveBandId());
+    // Nothing is created here, ever: an account with no bands has no bands,
+    // and RootGate routes that state to the artist's own create-a-profile
+    // step (see [ProfileRender]). The old seeding conjured a band on every
+    // warm, empty read — and synced it, which undid a deletion made on
+    // another device.
+    final isLocal = ref.read(accountsDirectoryProvider).active.isLocal;
+    final accounts = _bandsOf(repo);
+    final accountId =
+        _pickActive(accounts, repo.readActiveBandId(), ask: !isLocal);
     // Booting straight into a cloud profile: main() read the keychain for
     // the LOCAL registry's band, not this one — fetch the right secrets as
     // soon as the first frame is out.
-    if (accountId.isNotEmpty &&
-        !ref.read(accountsDirectoryProvider).active.isLocal) {
+    if (accountId.isNotEmpty && !isLocal) {
       unawaited(_refreshSecrets(accountId));
     }
     return AppState(
@@ -282,39 +281,38 @@ class AppStateNotifier extends Notifier<AppState> {
   static List<BandAccount> _bandsOf(AccountDataRepository repo) =>
       repo.isWarm ? repo.listBands() : const [];
 
-  /// Whether an empty band list may be repaired by seeding one. A fresh
-  /// CLOUD account with no bands gets its first one; the LOCAL profile only
-  /// when its registry was never created at all (bare test containers —
-  /// main() seeds every real install before runApp). An EXISTING empty
-  /// registry is an answer, not an accident: the artist removed the last
-  /// profile (see [removeAccount]), and conjuring a band back is the trap
-  /// that made that profile impossible to delete.
-  bool get _maySeedFirstBand =>
-      !ref.read(accountsDirectoryProvider).active.isLocal ||
-      ref.read(localStoreProvider).readAccountsRegistry() == null;
-
-  /// The first profile of an account that genuinely has none. Only ever
-  /// called on a WARM repository: conjuring one on a cold mirror's silence
-  /// minted a new empty profile — and synced it — on every cloud boot.
-  static BandAccount _seedFirstBand(AccountDataRepository repo) {
-    final account = BandAccount(
-      id: BandAccount.newId(),
-      name: '',
-      createdAtMs: DateTime.now().millisecondsSinceEpoch,
-    );
-    unawaited(repo.upsertBandEntry(account));
-    return account;
-  }
-
-  /// The band to open on: the stored one when it is really in the list, else
-  /// the first REAL profile — never an id that names nothing. Empty means
-  /// "no profile yet", which is what a cold mirror honestly has.
-  static String _pickActive(List<BandAccount> accounts, String? storedId) {
+  /// The band to open on — or NOTHING to open on, which is a real answer:
+  /// empty means "nobody has said which band, and the app will not decide".
+  ///
+  /// One profile is not a choice, so it opens. Several are: [storedId] is
+  /// only what THIS DEVICE last did with this profile, and "the first band"
+  /// is arbitrary. On the artist's own device (the local profile) the stored
+  /// id stands — the device IS the profile, and it has always been the one
+  /// band the artist left open. A CLOUD account carries a whole shelf of
+  /// gigs, and guessing among them opened the wrong QR, the wrong goal, and
+  /// took tips into another band's history — so [ask] holds the answer open
+  /// and RootGate lands on the picker, where the stored id merely
+  /// PRE-SELECTS a row (see [ProfilePickScreen]).
+  ///
+  /// Empty is also what a cold mirror honestly has, and what an account with
+  /// no profile yet has — neither is repaired with an invented band.
+  static String _pickActive(
+    List<BandAccount> accounts,
+    String? storedId, {
+    required bool ask,
+  }) {
     if (accounts.isEmpty) return '';
+    if (accounts.length == 1) return accounts.first.id;
+    if (ask) return '';
     return accounts.any((a) => a.id == storedId)
         ? storedId!
         : accounts.first.id;
   }
+
+  /// Whether the active profile's band question is the artist's to answer —
+  /// true for every cloud account, false for the device's own local profile.
+  bool get _askForBand =>
+      !ref.read(accountsDirectoryProvider).active.isLocal;
 
   /// Reloads everything for the (already switched) active profile — the
   /// directory listener calls this after a sign-in or a profile switch.
@@ -330,15 +328,13 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(switching: true);
     ref.read(onboardingDraftProvider.notifier).clear();
     final repo = ref.read(accountDataRepositoryProvider);
+    final ask = _askForBand;
     var accounts = _bandsOf(repo);
-    // A warm profile with no bands is a fresh account: it gets its first,
-    // empty band. A cold one gets nothing until its snapshot speaks — and
-    // the local profile's deliberately emptied registry is real (see
-    // _maySeedFirstBand), so it stays empty and RootGate routes it.
-    if (repo.isWarm && accounts.isEmpty && _maySeedFirstBand) {
-      accounts = [_seedFirstBand(repo)];
-    }
-    var accountId = _pickActive(accounts, repo.readActiveBandId());
+    // A profile with no bands has no bands — a fresh cloud account, or one
+    // whose last profile was removed. Nothing is minted for it: RootGate
+    // sends that state to the create-a-profile step. Several bands and no
+    // stored answer is the OTHER open question — the picker asks it.
+    var accountId = _pickActive(accounts, repo.readActiveBandId(), ask: ask);
     String? apiKey;
     String? relaySecret;
     if (accountId.isNotEmpty) {
@@ -353,14 +349,16 @@ class AppStateNotifier extends Notifier<AppState> {
       final fresh = _bandsOf(repo);
       if (fresh.isNotEmpty) {
         accounts = fresh;
-        final landed = _pickActive(accounts, accountId);
+        final landed = _pickActive(accounts, accountId, ask: ask);
         if (landed != accountId) {
           // Different band than the secrets above belong to — nobody must
           // ever see band A's key on band B; _refreshSecrets fetches B's.
+          // Or no band at all: the snapshot brought several, the question is
+          // the artist's, and a screen with no band holds no secrets either.
           accountId = landed;
           apiKey = null;
           relaySecret = null;
-          unawaited(_refreshSecrets(landed));
+          if (landed.isNotEmpty) unawaited(_refreshSecrets(landed));
         }
       }
     }
@@ -400,16 +398,14 @@ class AppStateNotifier extends Notifier<AppState> {
     if (ref.read(liveSessionProvider) != null) return;
     final repo = ref.read(accountDataRepositoryProvider);
     if (!repo.isWarm) return; // silence — it says nothing about the bands
-    var accounts = repo.listBands();
-    if (accounts.isEmpty) {
-      // The account has spoken and it really has no profiles — a brand new
-      // cloud account. This is the ONE moment creating one is right.
-      accounts = [_seedFirstBand(repo)];
-    }
+    final accounts = repo.listBands();
     final accountId = state.accountId;
     if (!accounts.any((a) => a.id == accountId)) {
-      // The bands we were waiting for arrived (cold boot), or the active one
-      // was deleted on another device — land on a real band.
+      // The bands we were waiting for arrived (cold boot), the active one was
+      // deleted on another device, or the account has none at all — reload
+      // and land on whatever is really there, which may be nothing. Minting a
+      // band here was the resurrection bug: the deletion the artist made on
+      // their phone came straight back from the tablet's mirror.
       unawaited(_reloadForProfile());
       return;
     }
@@ -706,10 +702,12 @@ class AppStateNotifier extends Notifier<AppState> {
     return true;
   }
 
-  /// Creates a fresh unnamed band and makes it active — the caller sends the
-  /// user into onboarding (method select). Returns null when refused.
-  Future<BandAccount?> addAccount() async {
-    if (accountActionsBlocked) return null;
+  /// Writes a fresh unnamed band and makes it active. The ONE place a band
+  /// entry is born, and both its callers are the artist asking for a profile
+  /// — a tap on "Add a profile" / "Create a new profile" ([addAccount]), or
+  /// the name they just typed into the first step ([createFirstBand]). An
+  /// empty band list is never "repaired" by calling this.
+  Future<BandAccount> _mintBand() async {
     final account = BandAccount(
       id: BandAccount.newId(),
       name: '',
@@ -718,13 +716,40 @@ class AppStateNotifier extends Notifier<AppState> {
     final repo = ref.read(accountDataRepositoryProvider);
     await repo.upsertBandEntry(account);
     await repo.saveActiveBandId(account.id);
+    return account;
+  }
+
+  /// Creates a fresh unnamed band and makes it active — the caller sends the
+  /// user into onboarding (method select). Returns null when refused.
+  Future<BandAccount?> addAccount() async {
+    if (accountActionsBlocked) return null;
     ref.read(onboardingDraftProvider.notifier).clear();
     // A fresh band's onboarding has no account steps — step 1 is details.
     ref.read(onboardingPreludeProvider.notifier).reset();
+    final account = await _mintBand();
     state = AppState(
       accountId: account.id,
       accounts: [...state.accounts, account],
       settings: state.settings,
+    );
+    return account;
+  }
+
+  /// The first band of an account that has none — created as the artist NAMES
+  /// it (onboarding's details step), and at no other moment. The app used to
+  /// mint it the instant a warm account read back empty, which invented a
+  /// nameless profile nobody asked for and synced it over a deletion made on
+  /// another device.
+  ///
+  /// Unlike [addAccount] it leaves the onboarding draft and the step counter
+  /// alone: this is the run already in progress, not a new one. Returns null
+  /// when refused (a live session).
+  Future<BandAccount?> createFirstBand() async {
+    if (accountActionsBlocked) return null;
+    final account = await _mintBand();
+    state = state.copyWith(
+      accountId: account.id,
+      accounts: [...state.accounts, account],
     );
     return account;
   }
@@ -923,8 +948,8 @@ final appStateProvider =
 /// must land in the shell where the switcher, Settings and sign-out live —
 /// never on a marketing page with no chrome.
 ///
-/// Deliberately NOT "whether there is a profile to put on screen" — that is
-/// [activeProfileHasBandsProvider]'s question. Conflating the two is how
+/// Deliberately NOT "what there is to put on screen" — that is
+/// [activeProfileRenderProvider]'s question. Conflating the two is how
 /// removing the last local profile used to render AppShell around a band
 /// that didn't exist, just because a cloud account was in the directory.
 ///
@@ -947,21 +972,52 @@ final deviceIsSetUpProvider = Provider<bool>((ref) {
       repo.readTipJar(a.id) != null || repo.readRelayJar(a.id) != null);
 });
 
-/// Whether the ACTIVE profile has a band to put on screen — the other half
-/// of the question [deviceIsSetUpProvider] used to answer alone: "this
-/// device has an account somewhere" and "this profile has a band to render"
-/// are two different questions, and they get two answers.
-///
-/// False only for the local profile over an empty registry — the artist
-/// removed (or moved out) every local band, and RootGate sends that state
-/// to the account picker instead of the shell. A cloud profile always
-/// renders: a cold mirror's silence is still the shell, and a genuinely
-/// empty account seeds its first band the moment its snapshot says so.
-final activeProfileHasBandsProvider = Provider<bool>((ref) {
+/// What the ACTIVE profile has to put on screen — the other half of the
+/// question [deviceIsSetUpProvider] used to answer alone: "this device has an
+/// account somewhere" and "this profile has a band to render" are two
+/// different questions, and they get two answers.
+enum ProfileRender {
+  /// A band is active — the shell (or jar setup) builds around it. A cloud
+  /// mirror that has not spoken yet counts too: its silence is not "no
+  /// bands", and the empty-state home it lands on has all the doors.
+  band,
+
+  /// The account has several profiles and nobody has said which one is
+  /// tonight's. The app used to answer for the artist — the stored id, else
+  /// the first band — and opened the wrong gig: wrong QR on the merch table,
+  /// wrong goal on the stage, tips against another band's history. It asks.
+  pick,
+
+  /// A warm account with no profile at all. Not a hole to be plugged with a
+  /// fabricated band — that band was written back to the cloud and undid
+  /// deletions made on other devices. The artist creates the first profile,
+  /// and nothing is written to the account until they do.
+  create,
+
+  /// The local profile over an empty registry: no band to build a shell
+  /// around, and no account behind it to create one in. The accounts this
+  /// device knows (plus a fresh sign-in) are the honest ways forward.
+  accounts,
+}
+
+final activeProfileRenderProvider = Provider<ProfileRender>((ref) {
+  final app = ref.watch(appStateProvider);
+  if (app.accountId.isNotEmpty) return ProfileRender.band;
   final activeIsLocal =
       ref.watch(accountsDirectoryProvider.select((d) => d.active.isLocal));
-  if (!activeIsLocal) return true;
-  return ref.watch(appStateProvider.select((s) => s.accounts.isNotEmpty));
+  if (activeIsLocal) {
+    // The local profile never withholds a band it has: the device IS the
+    // profile, and its emptiness is the removal of the last one.
+    return app.accounts.isEmpty ? ProfileRender.accounts : ProfileRender.band;
+  }
+  if (app.accounts.isNotEmpty) return ProfileRender.pick;
+  // No bands and no answer yet — but "no bands" only means something once the
+  // mirror has spoken. A cold snapshot can bring them in after the first
+  // frame, so watch the revision and keep the shell until it does.
+  ref.watch(repoRevisionProvider);
+  return ref.watch(accountDataRepositoryProvider).isWarm
+      ? ProfileRender.create
+      : ProfileRender.band;
 });
 
 /// Builds the tip feed for a session — a seam so controller tests can

@@ -77,6 +77,22 @@ class _OnboardingDetailsScreenState
       setState(() => _error = context.s.t('onboarding.details.name_required'));
       return;
     }
+    // A fresh cloud account walks in here with no profile at all: the app no
+    // longer mints one the moment the account reads back empty (it wrote the
+    // fabrication to the cloud, where it undid deletions made on other
+    // devices). THIS is the moment the artist asks for a profile — a name
+    // they just typed — so the band is created now, and everything below
+    // works on it.
+    if (ref.read(appStateProvider).activeAccount == null) {
+      final created =
+          await ref.read(appStateProvider.notifier).createFirstBand();
+      if (!mounted) return;
+      if (created == null) {
+        setState(() => _error =
+            context.s.t('widgets.profile_switcher.add_failed'));
+        return;
+      }
+    }
     final thankYou = _thanksController.text.trim();
     // Preserve any methods already picked (back-navigation), just refresh the
     // details.

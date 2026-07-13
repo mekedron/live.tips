@@ -148,7 +148,14 @@ void main() {
     final container = _container(local, db);
     container.read(appStateProvider);
     await pumpEventQueue();
-    expect(container.read(appStateProvider).accountId, 'acc_new');
+    // Two profiles and no answer: the account waits to be asked (#28), and
+    // the artist picks the one they were on.
+    expect(container.read(appStateProvider).accountId, isEmpty);
+    expect(
+        await container
+            .read(appStateProvider.notifier)
+            .switchAccount('acc_new'),
+        isTrue);
 
     final ok = await container
         .read(appStateProvider.notifier)
@@ -178,8 +185,8 @@ void main() {
     expect((await _bands(db).get()).docs, hasLength(1));
   });
 
-  test('a cloud account that genuinely has no profiles gets exactly one',
-      () async {
+  test('a cloud account that genuinely has no profiles gets NONE — and the '
+      'account is not written to', () async {
     final empty = FakeFirebaseFirestore();
     final local = await _guestStore();
     final container = _container(local, empty);
@@ -187,18 +194,56 @@ void main() {
     expect(container.read(appStateProvider).accounts, isEmpty);
     await pumpEventQueue();
 
+    // A warm, truly empty account is not a fresh one to be filled in for the
+    // artist: it is an account with no profile, which RootGate renders as the
+    // create-a-profile step. The app's job here is to write NOTHING.
     final app = container.read(appStateProvider);
-    expect(app.accounts, hasLength(1),
-        reason: 'a warm, truly empty account is where a first profile belongs');
-    expect(app.accountId, app.accounts.first.id);
+    expect(app.accounts, isEmpty,
+        reason: 'no profile may be minted behind the artist\'s back');
+    expect(app.accountId, isEmpty);
     expect(app.connected, isFalse);
+    expect(container.read(activeProfileRenderProvider), ProfileRender.create);
     final docs = (await empty
             .collection('users')
             .doc(_uid)
             .collection('bands')
             .get())
         .docs;
-    expect(docs, hasLength(1), reason: 'and it is written once, not per boot');
+    expect(docs, isEmpty,
+        reason: 'a warm, empty account writes nothing to Firestore');
+  });
+
+  test('a band deleted on one device is NOT resurrected by a second device '
+      'whose mirror goes warm-empty', () async {
+    // Two devices, one account, one Firestore. The phone removes the last
+    // band; the tablet's mirror goes empty — and used to conclude "fresh
+    // account", mint a replacement and sync it, so the deletion could never
+    // stick while a second device was online.
+    final phoneStore = await _guestStore();
+    await phoneStore.saveActiveCloudBand(_uid, _bandId);
+    final phone = _container(phoneStore, db);
+    final tabletStore = await _guestStore();
+    await tabletStore.saveActiveCloudBand(_uid, _bandId);
+    final tablet = _container(tabletStore, db);
+    phone.read(appStateProvider);
+    tablet.read(appStateProvider);
+    await pumpEventQueue();
+    expect(phone.read(appStateProvider).accountId, _bandId);
+    expect(tablet.read(appStateProvider).accountId, _bandId);
+
+    expect(await phone.read(appStateProvider.notifier).removeAccount(_bandId),
+        isTrue);
+    await pumpEventQueue();
+
+    // The tablet saw the deletion and left it deleted.
+    expect(tablet.read(appStateProvider).accounts, isEmpty,
+        reason: 'the tablet must not conjure a band back');
+    expect(tablet.read(appStateProvider).accountId, isEmpty);
+    expect(tablet.read(activeProfileRenderProvider), ProfileRender.create);
+    expect((await _bands(db).get()).docs, isEmpty,
+        reason: 'the removal must stay removed in the cloud');
+    // …and the phone, which is still listening too.
+    expect(phone.read(appStateProvider).accounts, isEmpty);
   });
 
   test('guest → local → guest round-trips: the session survives and the '

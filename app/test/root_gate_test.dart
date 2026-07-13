@@ -8,6 +8,7 @@ import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/features/home/setup_home_screen.dart';
+import 'package:live_tips/features/onboarding/profile_pick_screen.dart';
 import 'package:live_tips/features/onboarding/welcome_screen.dart';
 import 'package:live_tips/features/settings/account_switch_screen.dart';
 import 'package:live_tips/features/shell/app_shell.dart';
@@ -69,8 +70,9 @@ void main() {
     expect(find.byType(AppShell), findsNothing);
   });
 
-  testWidgets('signed in with no band at all: the shell, not Welcome',
-      (tester) async {
+  testWidgets(
+      'signed in with no band at all: the create-a-profile step, not Welcome '
+      'and not an invented band', (tester) async {
     final local = await _store();
     const user = AuthUser(
       uid: 'uid_cloud',
@@ -90,13 +92,18 @@ void main() {
     );
     await _pumpApp(tester, local, auth: FakeAuthService(user: user));
 
-    // Reachable: the empty-state home, the switcher, and Settings — the way
-    // back out of a profile that has nothing in it.
+    // "This account has no profile" is a state the app renders — not a hole
+    // plugged with a nameless band nobody asked for (#26). The way on is the
+    // artist's own tap, and the way out (other accounts) is right there.
     expect(find.byType(WelcomeScreen), findsNothing);
-    expect(find.byType(AppShell), findsOneWidget);
-    expect(find.byType(SetupHomeScreen), findsOneWidget);
-    expect(find.text('This profile has no payment method yet'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.byType(ProfilePickScreen), findsOneWidget);
+    expect(find.text('No profile in this account yet'), findsOneWidget);
+    expect(find.text('Create a new profile'), findsOneWidget);
+    expect(find.text('Switch account'), findsOneWidget);
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(ProfilePickScreen)));
+    expect(container.read(appStateProvider).accounts, isEmpty,
+        reason: 'nothing may be minted for an account that has no profile');
   });
 
   testWidgets('an unconfigured band next to a configured one: the shell',
@@ -120,8 +127,14 @@ void main() {
   testWidgets('a signed-out device that knows a cloud account: the shell',
       (tester) async {
     // Signed out of a cloud account this device has used. Welcome would hide
-    // Settings — and with it the only way back into that account.
+    // Settings — and with it the only way back into that account. The local
+    // registry is the one every real install has (main() creates it before
+    // runApp); the local profile's band is what the shell renders.
     final local = await _store();
+    await local.saveAccountsRegistry(const AccountsRegistry(
+      accounts: [BandAccount(id: 'acc_local', name: '', createdAtMs: 0)],
+      activeId: 'acc_local',
+    ));
     await local.saveAccountsDirectory(
       AccountsDirectory.initial().withAccount(const AppAccount(
         id: 'uid_cloud',

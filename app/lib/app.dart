@@ -12,6 +12,7 @@ import 'features/account/deep_link_gate.dart';
 import 'features/account/device_session_guard.dart';
 import 'features/account/redirect_sign_in_gate.dart';
 import 'features/live/stage/stage_overlay.dart';
+import 'features/onboarding/profile_pick_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/settings/account_switch_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
@@ -106,11 +107,16 @@ class LiveTipsApp extends ConsumerWidget {
 /// half-made band used to be a room with no door: welcome had no chrome, the
 /// shell was unreachable, and the user's other bands were invisible.
 ///
-/// One state has no band to build the shell AROUND: the local profile after
-/// its last band was removed ([activeProfileHasBandsProvider]). That routes
-/// to the account PICKER — the accounts this device still knows, plus a
-/// fresh sign-in — never to AppShell over a band that doesn't exist, and
-/// never to a fabricated replacement profile.
+/// Three states have no band to build the shell AROUND, and none of them is
+/// answered by inventing one ([activeProfileRenderProvider]):
+///
+/// * The local profile after its last band was removed → the account PICKER,
+///   the accounts this device still knows plus a fresh sign-in.
+/// * A cloud account with no profile yet → ProfilePickScreen's create step.
+///   Nothing is written to the account until the artist finishes it (#26).
+/// * A cloud account with several profiles and no answer → ProfilePickScreen
+///   asking WHICH one. The app used to pick (the stored id, else the first
+///   band) and open the wrong gig (#28).
 ///
 /// The Stripe-key-without-a-jar case still gets its own screen: that band is
 /// mid-setup with a key already in the keychain, and JarSetupScreen is what
@@ -134,11 +140,13 @@ class RootGate extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final setUp = ref.watch(deviceIsSetUpProvider);
-    final hasProfile = ref.watch(activeProfileHasBandsProvider);
+    final render = ref.watch(activeProfileRenderProvider);
     final screen = !setUp
         ? const WelcomeScreen()
-        : !hasProfile
+        : render == ProfileRender.accounts
         ? const AccountSwitchScreen()
+        : render == ProfileRender.pick || render == ProfileRender.create
+        ? const ProfilePickScreen(asRoot: true)
         : (app.hasStripe && app.effectiveTipJar == null)
         ? const JarSetupScreen()
         : const AppShell();
