@@ -6,7 +6,7 @@
 /// Log hygiene: nothing here logs names, messages, secrets, or headers.
 
 import { isAdmin, renderAdminPage, adminPageCsp } from "./admin";
-import { newJarId, newSecret, sha256Hex } from "./auth";
+import { ipQuotaKey, newJarId, newSecret, sha256Hex } from "./auth";
 import { tipPageCsp, renderTipPage, renderNotFoundPage } from "./tip-page";
 import { verifyTurnstile } from "./turnstile";
 import { isValidJarId, readJsonBody, validateProfile, validateTip } from "./validate";
@@ -190,7 +190,11 @@ export default {
         const { success } = await env.CREATE_LIMITER.limit({ key: ip });
         if (!success) return json({ error: "too many requests" }, 429, { "Retry-After": "60", ...cors });
       }
-      const allowed = await registryStub(env).checkCreateAllowed(await sha256Hex(`create:${ip}`));
+      // Fails closed on a missing salt, like a missing Turnstile secret does:
+      // the quota key is a salted hash of the IP, and an unsalted one would be
+      // the IP itself in all but name. No default salt, no jar.
+      if (!env.IP_HASH_SALT) return json({ error: "server misconfigured" }, 500, cors);
+      const allowed = await registryStub(env).checkCreateAllowed(await ipQuotaKey(ip, env.IP_HASH_SALT));
       if (!allowed) return json({ error: "creation limit reached, try later" }, 429, { "Retry-After": "3600", ...cors });
 
       const body = await readJsonBody(request);

@@ -3,3 +3,6 @@
 TURNSTILE_SECRET=1x0000000000000000000000000000000AA
 # Any string works locally; production uses a long random value.
 ADMIN_TOKEN=dev-admin-token
+# Salt for the per-IP jar-creation quota hash. Required — jar creation returns
+# 500 without it. Production: `openssl rand -base64 32`.
+IP_HASH_SALT=dev-ip-hash-salt

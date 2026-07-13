@@ -11,6 +11,7 @@ export default defineWorkersConfig({
             // Cloudflare's always-passing Turnstile test secret.
             TURNSTILE_SECRET: "1x0000000000000000000000000000000AA",
             ADMIN_TOKEN: "test-admin-token",
+            IP_HASH_SALT: "test-ip-hash-salt",
           },
         },
       },

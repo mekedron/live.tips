@@ -93,7 +93,12 @@ enter. Do them once; afterwards CI redeploys automatically.
    ```sh
    wrangler secret put TURNSTILE_SECRET   # the widget's secret key
    wrangler secret put ADMIN_TOKEN        # a long random string, e.g. `openssl rand -base64 32`
+   openssl rand -base64 32 | wrangler secret put IP_HASH_SALT   # salt for the creation-quota IP hash
    ```
+   `IP_HASH_SALT` is **required**: the jar-creation quota keys on
+   `sha256(salt:create:ip)`, and an unsalted hash of an IP is brute-forceable
+   back to the IP. With the secret unset, `POST /v1/jars` answers `500` rather
+   than storing a reversible digest.
 3. **First deploy** (creates the script, DO migrations, the `live.tips/t/*`
    route, and the `api.live.tips` custom domain):
    ```sh

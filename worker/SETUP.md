@@ -39,7 +39,7 @@ verified).
 If it asks about a registered `workers.dev` subdomain — decline/skip;
 `workers_dev` is disabled in the config.
 
-## Step 2 — Set the two production secrets
+## Step 2 — Set the three production secrets
 
 ```sh
 cd worker
@@ -49,6 +49,12 @@ npx wrangler secret put TURNSTILE_SECRET
 openssl rand -base64 32 | tee /dev/tty | npx wrangler secret put ADMIN_TOKEN
 # → prints the admin token AND stores it. Save the printed value in 1Password —
 #   it's what you'll paste at https://api.live.tips/admin to see all jars.
+
+openssl rand -base64 32 | npx wrangler secret put IP_HASH_SALT
+# → salt for the per-IP jar-creation quota. The quota stores sha256(salt:create:ip),
+#   never the IP; unsalted, that digest would be brute-forceable back to the IP in
+#   seconds. Never print or commit it — nothing ever needs to read it back.
+#   Without it, POST /v1/jars answers 500 "server misconfigured".
 ```
 
 ## Step 3 — API token for GitHub Actions

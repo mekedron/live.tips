@@ -99,7 +99,12 @@ export class RegistryDO extends DurableObject<Env> {
 
   /**
    * Jar-creation quota: max 20/hour per IP hash. Old buckets are pruned
-   * lazily; only salted-hashed IPs are stored, and only for ~2 hours.
+   * lazily, so a key lives ~2 hours at most.
+   *
+   * `ipHash` must be the salted digest from `ipQuotaKey` (salt = the
+   * IP_HASH_SALT secret). Unsalted it would not be a hash in any useful sense:
+   * the whole IPv4 space can be enumerated against a SHA-256 in seconds, so
+   * anyone reading this table would be reading visitors' IP addresses.
    */
   async checkCreateAllowed(ipHash: string): Promise<boolean> {
     const bucket = Math.floor(Date.now() / 3_600_000);

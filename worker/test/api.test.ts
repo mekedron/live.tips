@@ -1,8 +1,10 @@
 /// End-to-end route tests through SELF. Turnstile's siteverify is mocked with
 /// fetchMock so tests run offline and deterministically.
 
-import { SELF, fetchMock } from "cloudflare:test";
+import { SELF, createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import worker from "../src/index";
+import { ipQuotaKey, sha256Hex } from "../src/auth";
 import { createJar, uniqueIp } from "./helpers";
 
 beforeAll(() => {
@@ -277,6 +279,39 @@ describe("tips endpoint", () => {
     const seventh = await postTip(jarId, { amountMinor: 700 });
     expect(seventh.status).toBe(429);
     expect(seventh.headers.get("Retry-After")).toBe("30");
+  });
+});
+
+describe("creation-quota IP hash", () => {
+  it("salts the quota key — the digest is not the unsalted hash of the IP", async () => {
+    const ip = "203.0.113.7";
+    const key = await ipQuotaKey(ip, "some-salt");
+    expect(key).not.toBe(await sha256Hex(`create:${ip}`));
+    expect(key).not.toBe(await sha256Hex(ip));
+    // Deterministic per (salt, ip) — otherwise the quota could not count.
+    expect(await ipQuotaKey(ip, "some-salt")).toBe(key);
+    expect(await ipQuotaKey(ip, "other-salt")).not.toBe(key);
+  });
+
+  it("refuses to derive a key without a salt, instead of degrading to an unsalted hash", async () => {
+    await expect(ipQuotaKey("203.0.113.7", "")).rejects.toThrow();
+  });
+
+  it("fails closed: no IP_HASH_SALT, no jar creation", async () => {
+    const request = new Request("https://api.live.tips/v1/jars", {
+      method: "POST",
+      headers: { "content-type": "application/json", "CF-Connecting-IP": uniqueIp() },
+      body: JSON.stringify({
+        artistName: "Ada Lovelace",
+        message: "",
+        currency: "eur",
+        methods: { revolutUsername: "mekedron" },
+      }),
+    });
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(request, { ...env, IP_HASH_SALT: "" }, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(res.status).toBe(500);
   });
 });
 

@@ -35,6 +35,18 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 
 /**
+ * Key for the per-IP jar-creation quota. The salt is what makes this a hash
+ * rather than an encoding: IPv4 is only 2^32 values, so an unsalted SHA-256 of
+ * an IP is reversed by brute force in seconds. The salt is a Worker secret
+ * (`IP_HASH_SALT`); with no salt we derive nothing and the caller must refuse
+ * the request — falling back to an unsalted digest would store the IP.
+ */
+export async function ipQuotaKey(ip: string, salt: string): Promise<string> {
+  if (!salt) throw new Error("IP_HASH_SALT is not configured");
+  return sha256Hex(`${salt}:create:${ip}`);
+}
+
+/**
  * Compares a presented secret against the stored SHA-256 hex digest without
  * a timing oracle: both sides are hashed, then compared with the runtime's
  * constant-time primitive.

@@ -1,6 +1,8 @@
 // live.tips relay — profile store + tip event pipe. No tip history, ever.
 //
-// Secrets (never here): TURNSTILE_SECRET, ADMIN_TOKEN — set via `wrangler secret put`.
+// Secrets (never here): TURNSTILE_SECRET, ADMIN_TOKEN, IP_HASH_SALT — set via
+// `wrangler secret put`. IP_HASH_SALT is required: it salts the creation-quota
+// IP hash; unset, POST /v1/jars refuses rather than store a reversible digest.
 // Local dev: copy .dev.vars.example to .dev.vars.
 //
 // NOTE for future hardening: do NOT enable Bot Fight Mode on the zone — it

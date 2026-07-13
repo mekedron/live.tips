@@ -7,6 +7,12 @@ export interface Env {
   TURNSTILE_SITE_KEY: string;
   TURNSTILE_SECRET: string;
   ADMIN_TOKEN: string;
+  /**
+   * Secret salt for the per-IP jar-creation quota key. Required: without it
+   * the stored digest of a visitor's IP would be brute-forceable, and the
+   * worker refuses to create jars rather than store one. `wrangler secret put`.
+   */
+  IP_HASH_SALT: string;
   // Beta bindings — treated as optional so tests and a binding outage
   // degrade to the Durable Object quotas instead of failing open/closed.
   CREATE_LIMITER?: RateLimit;
