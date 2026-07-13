@@ -6,11 +6,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/firebase/account_sessions.dart';
+import '../data/firebase/auth_bridge.dart';
+import '../data/firebase/auth_domain.dart';
 import '../data/firebase/auth_service.dart';
 import '../domain/app_account.dart';
 import '../domain/pending_redirect.dart';
 import 'onboarding_draft.dart';
 import 'providers.dart';
+
+/// Where the app's Cloud Functions live (see firebase/functions).
+const _kFunctionsRegion = 'europe-west1';
 
 /// The per-account Firebase stacks, overridden in main() on platforms that
 /// have Firebase. The default refuses everything — tests and the platforms
@@ -68,11 +73,50 @@ final authServiceProvider =
 final slotAuthServiceFactoryProvider =
     Provider<AuthService Function(FirebaseAuth)>((ref) => AuthService.new);
 
-/// Whether an Apple/Google sign-in leaves the page (redirect) instead of
-/// opening a popup. TRUE ON ALL OF THE WEB, and there is no popup path left at
-/// all — see the note on [AuthController.signInWithGoogle]. A provider only so
-/// tests can drive the redirect machinery without a browser under them.
+/// Whether an Apple/Google sign-in leaves the page (for the auth bridge)
+/// instead of opening a popup. TRUE ON ALL OF THE WEB, and there is no popup
+/// path left at all — see the note on [AuthController.signInWithGoogle]. A
+/// provider only so tests can drive the redirect machinery without a browser
+/// under them.
 final webRedirectSignInProvider = Provider<bool>((ref) => kIsWeb);
+
+/// The bridge's answer, if this boot came back from one — parsed out of the
+/// boot URL in main(), BEFORE Flutter's URL strategy scrubs the fragment
+/// (exactly like the add-device `#c=` link). Null on every ordinary boot.
+final bridgeResponseProvider = Provider<BridgeResponse?>((ref) => null);
+
+/// Hands the browser to the bridge. A seam: the real thing navigates the page
+/// away and cannot run under a test.
+final bridgeLauncherProvider =
+    Provider<Future<void> Function(Uri)>((ref) => launchAuthBridge);
+
+/// Mints the custom token a LINK carries to the bridge — the guest's own
+/// session, riding along so `linkWithRedirect` upgrades that uid instead of
+/// signing somebody new in. A seam so tests can script it without Cloud
+/// Functions underneath.
+final linkTokenMinterProvider = Provider<Future<String> Function()>((ref) {
+  return () async {
+    final sessions = ref.read(accountSessionsProvider);
+    final uid = ref.read(authControllerProvider).user?.uid;
+    final functions = (uid == null
+            ? null
+            : sessions.sessionFor(uid)?.functions(_kFunctionsRegion)) ??
+        sessions.defaultFunctions(_kFunctionsRegion);
+    if (functions == null) {
+      throw const AuthUnavailableException(
+          'Cloud accounts are not available on this platform.');
+    }
+    final result =
+        await functions.httpsCallable('mintSessionToken').call<dynamic>();
+    final data = result.data;
+    final token = data is Map ? data['token'] as String? : null;
+    if (token == null || token.isEmpty) {
+      throw const AuthUnavailableException(
+          'Sign-in is unavailable right now. Try again in a moment.');
+    }
+    return token;
+  };
+});
 
 /// Every profile this device knows (the local one plus signed-in Firebase
 /// accounts) and which is active. Persisted device-wide in prefs.
@@ -275,9 +319,11 @@ class AuthController extends Notifier<AuthState> {
   }
 
   /// The web half of [_run]: opens the slot, writes down everything the return
-  /// leg will need, and hands the browser to the provider. Nothing after the
-  /// navigation runs — this whole app instance is about to be destroyed — so
-  /// the record MUST be persisted before the redirect starts, not after.
+  /// leg will need, and hands the browser to the auth bridge (never to the
+  /// in-page SDK redirect — see auth_bridge.dart for why that flow can only
+  /// lose in Safari). Nothing after the navigation runs — this whole app
+  /// instance is about to be destroyed — so the record MUST be persisted
+  /// before the navigation starts, not after.
   ///
   /// Returns null: on the web a sign-in has no synchronous result. Callers
   /// treat that exactly as they treat a cancellation (stay put), and the page
@@ -294,22 +340,24 @@ class AuthController extends Notifier<AuthState> {
     final store = ref.read(localStoreProvider);
     PendingSession? pending;
     try {
-      final AuthService service;
       final String appName;
+      String? linkToken;
       if (!link && sessions.available) {
-        // A fresh sign-in gets its OWN app, same as the native path: the
-        // accounts already signed in on this device must not be disturbed, and
-        // the web SDK will file the redirect's result under this app's name.
+        // A fresh sign-in gets its OWN app, same as the native path — and
+        // begin() enforces the account cap HERE, before the page leaves, so
+        // "this device is full" is an error on the button and not a surprise
+        // after the whole Google round trip.
         pending = await sessions.begin();
-        service = ref.read(slotAuthServiceFactoryProvider)(pending.auth);
         appName = pending.appName;
       } else {
-        // A link upgrades the CURRENT user, so it runs on that account's own
-        // instance — the one authServiceProvider already fronts.
-        service = ref.read(authServiceProvider);
+        // A link upgrades the CURRENT user in place. Its session travels to
+        // the bridge as a custom token, so linkWithRedirect over there runs
+        // as this uid — and everything the guest owns stays on it.
         appName = (link ? sessions.appNameFor(state.user?.uid ?? '') : null) ??
             AccountSessions.defaultSlot;
+        if (link) linkToken = await ref.read(linkTokenMinterProvider)();
       }
+      final nonce = newBridgeNonce();
       await store.savePendingRedirect(PendingRedirect(
         appName: appName,
         provider: kind.name,
@@ -319,11 +367,18 @@ class AuthController extends Notifier<AuthState> {
         prelude: ref.read(onboardingPreludeProvider),
         draft: ref.read(onboardingDraftProvider)?.toJson(),
         startedAtMs: DateTime.now().millisecondsSinceEpoch,
+        nonce: nonce,
       ));
-      await service.beginRedirectSignIn(kind, link: link);
+      await ref.read(bridgeLauncherProvider)(bridgeSignInUri(
+        bridgeUrl: kAuthBridgeUrl,
+        provider: kind.name,
+        returnUrl: Uri.base.removeFragment(),
+        nonce: nonce,
+        linkToken: linkToken,
+      ));
       // The page is on its way out; the spinner rides along with it. If the
       // navigation somehow never happens, the record is still on disk and the
-      // next boot clears it (a redirect with no result is "nothing happened").
+      // next boot clears it (a redirect with no response is "nothing happened").
       return null;
     } catch (e) {
       if (pending != null) unawaited(sessions.abandon(pending));
@@ -337,9 +392,17 @@ class AuthController extends Notifier<AuthState> {
   }
 
   /// The return leg of a web sign-in, consumed ONCE, early in startup (see
-  /// RedirectSignInGate). Everything a popup sign-in does — slot commit,
+  /// RedirectSignInGate). Everything a native sign-in does — slot commit,
   /// directory adopt, profile doc, the cloud-upload offer downstream of
   /// [AuthState.user] — happens here too, from the other side of a page reload.
+  ///
+  /// The bridge's answer arrives in the boot URL's fragment (parsed in main(),
+  /// [bridgeResponseProvider]) and is believed only when it echoes the nonce
+  /// the departing record wrote down. A custom token is then redeemed with
+  /// [AuthService.signInWithCustomToken] — a plain API call on OUR origin, no
+  /// iframes, no partitioned storage, nothing left for WebKit to lose. That
+  /// determinism is the fix: the old getRedirectResult path completed
+  /// sign-ins that no one ever heard about.
   ///
   /// Null when there was nothing pending: the overwhelmingly common boot.
   Future<RedirectResume?> consumePendingRedirect() async {
@@ -357,6 +420,24 @@ class AuthController extends Notifier<AuthState> {
     final sessions = ref.read(accountSessionsProvider);
     PendingSession? pending;
     try {
+      await store.clearPendingRedirect();
+      final response = ref.read(bridgeResponseProvider);
+      // No response (backed out of the whole trip, or a record a crash left
+      // behind), a response for some OTHER attempt (nonce mismatch), or an
+      // explicit back-out on the provider's page: all "nothing happened".
+      if (response == null ||
+          response.nonce != record.nonce ||
+          record.nonce.isEmpty ||
+          response.cancelled) {
+        state = state.copyWith(busy: false);
+        return RedirectResume(record: record, user: null);
+      }
+      final failure = response.error;
+      if (failure != null) {
+        final message = friendlyBridgeError(failure);
+        state = state.copyWith(busy: false, error: message);
+        return RedirectResume(record: record, user: null, error: message);
+      }
       final AuthService service;
       if (!record.link && sessions.available) {
         pending = await sessions.reopen(record.appName);
@@ -371,22 +452,25 @@ class AuthController extends Notifier<AuthState> {
         service = ref.read(authServiceProvider);
       }
       // A hard ceiling on the one await that stands between the user and the
-      // app: whatever happens to the SDK, the boot spinner ends.
+      // app: whatever happens to the network, the boot spinner ends.
       final user = await service
-          .completeRedirectSignIn(
-            kind: OAuthProviderKind.values
-                .where((k) => k.name == record.provider)
-                .firstOrNull,
-            link: record.link,
-          )
+          .signInWithCustomToken(response.token!)
           .timeout(const Duration(seconds: 30));
-      await store.clearPendingRedirect();
       if (user == null) {
-        // The user backed out of the provider's page, or the record was stale.
-        // Not an error — but the empty slot goes back on the shelf.
         if (pending != null) await sessions.abandon(pending);
         state = state.copyWith(busy: false);
         return RedirectResume(record: record, user: null);
+      }
+      if (record.link) {
+        // Honesty checks on an upgrade: the token must resolve to the SAME
+        // guest uid, now actually carrying the provider. Claiming success on
+        // anything less would tell someone their guest account became a
+        // Google/Apple account when it did not.
+        final sameUid = record.uid == null || user.uid == record.uid;
+        if (!sameUid || user.kind.name != record.provider) {
+          state = state.copyWith(busy: false);
+          return RedirectResume(record: record, user: null);
+        }
       }
       if (pending != null) await sessions.commit(pending, user.uid);
       state = state.copyWith(user: user, busy: false);
@@ -504,6 +588,20 @@ class RedirectResume {
 
 final authControllerProvider =
     NotifierProvider<AuthController, AuthState>(AuthController.new);
+
+/// Reduces a bridge error code (`auth/...`, the only thing a URL fragment can
+/// carry across origins) to something worth showing on a button.
+String friendlyBridgeError(String code) => switch (code) {
+      'auth/account-exists-with-different-credential' =>
+        'That email already belongs to an account with a different sign-in '
+            'method.',
+      'auth/credential-already-in-use' || 'auth/email-already-in-use' =>
+        'That account is already in use.',
+      'auth/user-disabled' => 'This account has been disabled.',
+      'auth/network-request-failed' =>
+        'The network dropped mid sign-in. Try again.',
+      _ => 'Sign-in failed ($code). Try again.',
+    };
 
 /// Reduces provider/SDK exceptions to something worth showing on a button.
 String friendlyAuthError(Object e) {

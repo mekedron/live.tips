@@ -1,13 +1,15 @@
-/// A sign-in that handed the browser to Apple/Google and expects to come back.
-///
-/// On the web the app does NOT open a popup (see AuthService): it navigates
-/// away with `signInWithRedirect`/`linkWithRedirect`, which tears the whole
-/// Flutter app down. Everything the return leg needs — which Firebase app the
-/// flow was started on, whether it was a LINK (an anonymous account upgrading
-/// itself, not a new account), where the user was, and the onboarding work in
-/// progress — must therefore survive a full page reload, so it is written to
-/// local storage BEFORE the navigation and consumed exactly once on the way
+/// A sign-in that handed the browser to the auth bridge and expects to come
 /// back.
+///
+/// On the web the app does NOT open a popup, and it does not run the Firebase
+/// redirect flow on its own origin either (Safari partitions the storage that
+/// flow needs — see auth_bridge.dart). It navigates away to the bridge page on
+/// auth.live.tips, which tears the whole Flutter app down. Everything the
+/// return leg needs — whether it was a LINK (an anonymous account upgrading
+/// itself, not a new account), where the user was, the nonce that pairs the
+/// bridge's answer with this attempt, and the onboarding work in progress —
+/// must therefore survive a full page reload, so it is written to local
+/// storage BEFORE the navigation and consumed exactly once on the way back.
 class PendingRedirect {
   const PendingRedirect({
     required this.appName,
@@ -18,12 +20,13 @@ class PendingRedirect {
     this.draft,
     this.uid,
     this.startedAtMs = 0,
+    this.nonce = '',
   });
 
-  /// The [FirebaseApp] name the redirect was started on — a fresh slot for a
-  /// new account, the account's own app for a link. The web SDK keys its
-  /// pending-redirect state by app, so the result can only be picked up on
-  /// this same one.
+  /// The [FirebaseApp] name the sign-in was started on — a fresh slot for a
+  /// new account, the account's own app for a link. The custom token the
+  /// bridge brings back is redeemed on this same app, so the new session lands
+  /// in the slot that was reserved for it.
   final String appName;
 
   /// 'google' | 'apple' — kept for diagnostics and for a retry.
@@ -52,6 +55,11 @@ class PendingRedirect {
 
   final int startedAtMs;
 
+  /// The `state` the bridge request carried (see auth_bridge.dart). Only a
+  /// response echoing this exact value answers THIS attempt; anything else —
+  /// a stale fragment, a crafted one — is ignored.
+  final String nonce;
+
   Map<String, dynamic> toJson() => {
         'appName': appName,
         'provider': provider,
@@ -61,6 +69,7 @@ class PendingRedirect {
         'prelude': prelude,
         if (draft != null) 'draft': draft,
         'startedAtMs': startedAtMs,
+        'nonce': nonce,
       };
 
   static PendingRedirect fromJson(Map<String, dynamic> json) => PendingRedirect(
@@ -77,6 +86,7 @@ class PendingRedirect {
             ? null
             : Map<String, dynamic>.from(json['draft'] as Map),
         startedAtMs: (json['startedAtMs'] as num?)?.toInt() ?? 0,
+        nonce: json['nonce'] as String? ?? '',
       );
 }
 

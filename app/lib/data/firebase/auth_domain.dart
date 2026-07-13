@@ -16,6 +16,13 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 /// is layered onto the generated options at startup, below.
 const kFirebaseAuthDomain = 'auth.live.tips';
 
+/// The web sign-in bridge page on that same domain (see
+/// firebase/hosting-public/signin.html and data/firebase/auth_bridge.dart).
+/// Same-origin with the `/__/auth/*` handler above — which is the point: the
+/// redirect flow only survives Safari's storage partitioning when it starts
+/// and finishes on the handler's own origin.
+const kAuthBridgeUrl = 'https://$kFirebaseAuthDomain/signin';
+
 /// The generated options with our own auth domain on top.
 ///
 /// The web SDK reads the handler domain from `FirebaseOptions.authDomain`, and

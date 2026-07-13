@@ -164,66 +164,14 @@ class FakeAuthService extends AuthService {
   @override
   Future<AuthUser?> signInWithGoogle({bool link = false}) => _signIn();
 
-  @override
-  Future<AuthUser?> signInWithCustomToken(String token) => _signIn();
-
-  // --- Web redirect sign-in (see AuthService.beginRedirectSignIn) ---
-
-  /// What [completeRedirectSignIn] resolves to — null models "no redirect was
-  /// pending" (a normal boot) or a user who backed out of the provider page.
-  AuthUser? redirectResult;
-
-  /// Thrown by [completeRedirectSignIn]: a failed/expired redirect.
-  Object? redirectError;
-
-  /// The user the SDK is holding even though [redirectResult] came back EMPTY —
-  /// WebKit's habit of losing the sessionStorage marker that says "a redirect
-  /// is in flight" while completing the sign-in anyway. The real service falls
-  /// back to the instance's own user for exactly this; the fake must be able to
-  /// pose the question, or the bug (a completed Google sign-in that produced no
-  /// account at all) goes right back to being invisible here.
-  AuthUser? restoredAfterRedirect;
-
-  /// Providers already on [restoredAfterRedirect] — a LINK may only be called
-  /// successful when the provider actually attached.
-  final linkedProviders = <OAuthProviderKind>{};
-
-  /// Thrown by [beginRedirectSignIn]: the redirect could not even start.
-  Object? redirectStartError;
-
-  /// Every redirect this service was asked to start.
-  final redirectStarts = <({OAuthProviderKind kind, bool link})>[];
+  /// Every custom token redeemed on this service — the bridge return leg
+  /// (see AuthController.consumePendingRedirect) signs in with exactly one.
+  final redeemedTokens = <String>[];
 
   @override
-  Future<void> beginRedirectSignIn(
-    OAuthProviderKind kind, {
-    bool link = false,
-  }) async {
-    final error = redirectStartError;
-    if (error != null) throw error;
-    redirectStarts.add((kind: kind, link: link));
-  }
-
-  @override
-  Future<AuthUser?> completeRedirectSignIn({
-    OAuthProviderKind? kind,
-    bool link = false,
-  }) async {
-    final error = redirectError;
-    if (error != null) throw error;
-    var result = redirectResult;
-    if (result == null) {
-      // The empty-result-but-signed-in case. A link is only honest when the
-      // provider is really on the account: a guest's currentUser is non-null
-      // whether or not the upgrade landed.
-      final restored = restoredAfterRedirect;
-      if (restored != null &&
-          (!link || (kind != null && linkedProviders.contains(kind)))) {
-        result = restored;
-      }
-    }
-    if (result != null) user = result;
-    return result;
+  Future<AuthUser?> signInWithCustomToken(String token) {
+    redeemedTokens.add(token);
+    return _signIn();
   }
 
   @override

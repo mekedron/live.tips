@@ -25,6 +25,7 @@ import {
   revokeDeviceHandler,
 } from "./devices";
 import { IP_HASH_SALT, TURNSTILE_SECRET } from "./params";
+import { mintSessionTokenHandler } from "./session-token";
 import {
   expireJarsHandler,
   sweepLinkCodesHandler,
@@ -66,6 +67,14 @@ export const collectLinkToken = onCall({ cors: true, secrets: [IP_HASH_SALT] }, 
 // Revocation: cooperative per-device flag, and the real (token) kill switch.
 export const revokeDevice = onCall({ cors: true }, revokeDeviceHandler);
 export const revokeAllOtherDevices = onCall({ cors: true }, revokeAllOtherDevicesHandler);
+
+// ----------------------------------------------- web sign-in bridge (Safari)
+
+// The auth.live.tips bridge page (hosting-public/signin.html) finishes a
+// redirect sign-in on its own origin — the only one where Firebase's redirect
+// flow survives Safari's storage partitioning — and carries the session back
+// to the app as a custom token. A caller mints only for the uid it already is.
+export const mintSessionToken = onCall({ cors: true }, mintSessionTokenHandler);
 
 // -------------------------- QR sign-in on a shared device (the bar's tablet)
 //

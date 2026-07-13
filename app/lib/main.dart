@@ -12,6 +12,7 @@ import 'app.dart';
 import 'core/platform_support.dart';
 import 'data/cloud_migrator.dart';
 import 'data/firebase/account_sessions.dart';
+import 'data/firebase/auth_bridge.dart';
 import 'data/firebase/auth_domain.dart';
 import 'data/local_store.dart';
 import 'data/migrations.dart';
@@ -39,6 +40,10 @@ Future<void> main() async {
   // fragment an add-device QR carries is simply gone afterwards. Read it now
   // and hand it to the deep-link provider below.
   final bootUrl = kIsWeb ? Uri.base.toString() : null;
+  // The auth bridge's `#signin=…` answer rides the same fragment (see
+  // auth_bridge.dart) — parsed now for the same reason, and the scrub is
+  // welcome: the custom token must not outlive this read in the address bar.
+  final bridgeResponse = bootUrl == null ? null : parseBridgeResponse(bootUrl);
 
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -237,6 +242,7 @@ Future<void> main() async {
         initialRelaySecretProvider.overrideWithValue(relaySecret),
         accountSessionsProvider.overrideWithValue(sessions),
         bootLinkUrlProvider.overrideWithValue(bootUrl),
+        bridgeResponseProvider.overrideWithValue(bridgeResponse),
       ],
       child: const LiveTipsApp(),
     ),

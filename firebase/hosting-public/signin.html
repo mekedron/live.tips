@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>live.tips — signing in</title>
+<!--
+  The sign-in bridge. The app (live.tips, or localhost during development)
+  cannot run Firebase's redirect sign-in itself: the SDK delivers the result
+  through an iframe on the authDomain origin, and Safari hands a cross-origin
+  iframe partitioned (empty) storage — even for a same-site subdomain. The
+  sign-in completes on Google's side and the app never hears about it.
+
+  So the whole redirect flow runs HERE, on auth.live.tips — the same origin
+  as the /__/auth/* handler, where the SDK's storage hand-offs are all
+  first-party and work in every browser, Safari and iOS PWAs included. The
+  session is then carried back to the app's origin as a Firebase custom
+  token (minted by the mintSessionToken callable) in a URL fragment, and the
+  app signs in with signInWithCustomToken. Fragments never reach a server,
+  and the token grants only what the freshly signed-in user already holds.
+
+  Outbound leg:  #req={provider, return, state, linkToken?}
+    - provider   'google' | 'apple'
+    - return     where to land afterwards — allowlisted origins only
+    - state      opaque nonce, echoed back verbatim; the app drops any
+                 response whose state does not match what it wrote down
+    - linkToken  custom token of the guest account being UPGRADED in place
+                 (linkWithRedirect), so the uid keeps everything it owns
+  Return leg (no fragment; the request is stashed in sessionStorage, which
+  is first-party here and survives the provider round trip):
+    #signin={v, state, token?, error?} appended to `return` —
+    token = signed in, error = failed, neither = backed out on the
+    provider's page.
+-->
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: grid; place-items: center;
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #111; color: #eee;
+  }
+  main { text-align: center; padding: 24px; }
+  a { color: #7fb4ff; }
+  .spinner {
+    width: 28px; height: 28px; margin: 0 auto 16px;
+    border: 3px solid #444; border-top-color: #eee; border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main>
+  <div class="spinner" id="spinner"></div>
+  <p id="msg">Signing you in…</p>
+</main>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import {
+  GoogleAuthProvider,
+  OAuthProvider,
+  browserSessionPersistence,
+  getAuth,
+  getRedirectResult,
+  linkWithRedirect,
+  setPersistence,
+  signInWithCustomToken,
+  signInWithRedirect,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-functions.js";
+
+// The web app's public config (see app/lib/firebase_options.dart), with the
+// authDomain pinned to THIS origin — that same-origin-ness is the fix.
+const CONFIG = {
+  apiKey: "AIzaSyDVUnIyZuFhetEDRmAK_Cw9VBK_r3adExA",
+  appId: "1:623278585949:web:c2da5d70dea2854ea4b5b4",
+  projectId: "livetips-app",
+  authDomain: "auth.live.tips",
+};
+const REGION = "europe-west1";
+const STASH = "livetips:signin:req";
+
+// Where a finished sign-in may be sent. Anything else could be a phishing
+// page trying to harvest the session token from the fragment — refuse.
+function allowedReturn(value) {
+  let url;
+  try { url = new URL(value); } catch { return null; }
+  url.hash = ""; // the response fragment is appended to a clean URL
+  const local = /^(localhost|127\.0\.0\.1)$/.test(url.hostname);
+  if (url.protocol === "https:" && url.hostname === "live.tips") return url;
+  if (url.protocol === "http:" && local) return url;
+  return null;
+}
+
+function show(text, backTo) {
+  document.getElementById("spinner").style.display = "none";
+  const msg = document.getElementById("msg");
+  msg.textContent = text;
+  if (backTo) {
+    const a = document.createElement("a");
+    a.href = backTo;
+    a.textContent = "Back to live.tips";
+    msg.insertAdjacentElement("afterend", a);
+  }
+}
+
+function parseRequest() {
+  const frag = new URLSearchParams(location.hash.slice(1));
+  const raw = frag.get("req");
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+async function freshAuth() {
+  const auth = getAuth(initializeApp(CONFIG));
+  // Session persistence: survives the provider round trip in THIS tab, and
+  // no signed-in residue outlives the tab on what may be a shared machine.
+  await setPersistence(auth, browserSessionPersistence);
+  return auth;
+}
+
+function providerFor(name) {
+  if (name === "apple") {
+    const p = new OAuthProvider("apple.com");
+    p.addScope("email");
+    return p;
+  }
+  return new GoogleAuthProvider();
+}
+
+async function outbound(req) {
+  const back = allowedReturn(req.return);
+  if (!back || typeof req.state !== "string" || !req.state ||
+      !["google", "apple"].includes(req.provider)) {
+    show("This sign-in link is not valid.", "https://live.tips/app/");
+    return;
+  }
+  sessionStorage.setItem(STASH, JSON.stringify(req));
+  // Strip the fragment BEFORE leaving: the handler bounces back to the
+  // current URL, and returning with #req still attached would loop forever.
+  history.replaceState(null, "", location.pathname);
+  const auth = await freshAuth();
+  try {
+    if (req.linkToken) {
+      // Upgrading a guest in place: the guest's own session comes along as a
+      // custom token, so linkWithRedirect keeps the uid — and everything the
+      // guest owns hangs off that uid.
+      const guest = await signInWithCustomToken(auth, req.linkToken);
+      await linkWithRedirect(guest.user, providerFor(req.provider));
+    } else {
+      await signInWithRedirect(auth, providerFor(req.provider));
+    }
+  } catch (e) {
+    finish(req, { error: e?.code || "auth/internal-error" });
+  }
+}
+
+function finish(req, extra) {
+  sessionStorage.removeItem(STASH);
+  const payload = encodeURIComponent(JSON.stringify({ v: 1, state: req.state, ...extra }));
+  // replace(), not assign(): the bridge must not linger in history holding
+  // a token in its past.
+  location.replace(allowedReturn(req.return).href + "#signin=" + payload);
+}
+
+async function returnLeg(req) {
+  const auth = await freshAuth();
+  try {
+    const result = await getRedirectResult(auth);
+    if (!result || !result.user) {
+      finish(req, {}); // backed out on the provider's page — not an error
+      return;
+    }
+    const mint = httpsCallable(getFunctions(auth.app, REGION), "mintSessionToken");
+    const res = await mint();
+    const token = res?.data?.token;
+    await signOut(auth);
+    finish(req, token ? { token } : { error: "auth/internal-error" });
+  } catch (e) {
+    try { await signOut(auth); } catch {}
+    finish(req, { error: e?.code || "auth/internal-error" });
+  }
+}
+
+const req = parseRequest();
+if (req) {
+  outbound(req);
+} else {
+  const stashed = sessionStorage.getItem(STASH);
+  if (!stashed) {
+    // Opened directly, or reloaded after the flow already finished.
+    show("Nothing is waiting to sign in.", "https://live.tips/app/");
+  } else {
+    let parsed = null;
+    try { parsed = JSON.parse(stashed); } catch {}
+    if (parsed && allowedReturn(parsed.return)) {
+      returnLeg(parsed);
+    } else {
+      sessionStorage.removeItem(STASH);
+      show("Nothing is waiting to sign in.", "https://live.tips/app/");
+    }
+  }
+}
+</script>
+</body>
+</html>
