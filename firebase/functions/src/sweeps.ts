@@ -27,6 +27,11 @@ async function deleteByQuery(firestore: Firestore, query: Query): Promise<number
  * NO-account artist, so every 10 minutes + the 1h TTL keeps it at rest
  * ≤ ~70 minutes — and the cloud accounts' stripeTips (stripe-store.ts),
  * same TTL, where a swept QR tip is still recoverable through History.
+ *
+ * Riding along: the webhook's processedEvents dedupe tombstones
+ * (stripe-webhook.ts). Their TTL is days, not an hour — a tombstone must
+ * outlive Stripe's retry window, or a redelivery re-stages a collected tip —
+ * but once it passes they are garbage by the same expiresAt query.
  */
 export async function sweepPendingTipsHandler(): Promise<void> {
   const firestore = db();
@@ -40,6 +45,11 @@ export async function sweepPendingTipsHandler(): Promise<void> {
     firestore.collectionGroup("stripeTips").where("expiresAt", "<", Timestamp.now()),
   );
   if (stripeSwept > 0) console.log(`sweepPendingTips: deleted ${stripeSwept} expired stripe tips`);
+  const tombstones = await deleteByQuery(
+    firestore,
+    firestore.collection("processedEvents").where("expiresAt", "<", Timestamp.now()),
+  );
+  if (tombstones > 0) console.log(`sweepPendingTips: deleted ${tombstones} expired event tombstones`);
 }
 
 /**

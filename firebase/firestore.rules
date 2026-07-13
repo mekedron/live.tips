@@ -154,6 +154,11 @@ service cloud.firestore {
     // the default deny, so nobody "opens it up" without meeting this comment.
     match /stripeConnections/{connectionId} { allow read, write: if false; }
 
+    // The webhook's dedupe tombstones (functions/src/stripe-webhook.ts):
+    // they outlive delivered tips so a Stripe redelivery cannot re-stage a
+    // collected tip. Server-only, like every other rate/dedupe record.
+    match /processedEvents/{objectId} { allow read, write: if false; }
+
     // Everything else is closed until a later phase opens it explicitly.
     match /{document=**} {
       allow read, write: if false;

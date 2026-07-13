@@ -18,7 +18,10 @@
 /// Stripe times out at 20 s and retries non-2xx for days: the work here is a
 /// signature check, one mapping, and one small transaction-free batch —
 /// milliseconds — and duplicates are welcome because the write is idempotent
-/// (doc id = the Stripe object id; ALREADY_EXISTS is a no-op 200).
+/// twice over. While the tip doc lives, its id IS the Stripe object id and
+/// create() refuses to overwrite; after it is delivered (deleted — the
+/// queue's contract), the processedEvents tombstone written beside it still
+/// answers for the id until Stripe's retry window is safely over.
 
 import type { Request } from "firebase-functions/v2/https";
 import type { Response } from "express";
@@ -29,7 +32,9 @@ import { tipFromEvent, verifyStripeSignature } from "./stripe-events";
 import {
   MAX_STRIPE_PENDING,
   STRIPE_PENDING_TTL_MS,
+  STRIPE_PROCESSED_TTL_MS,
   STRIPE_TIPS_PER_UID_PER_HOUR,
+  processedEventRef,
   stripeConnectionRef,
   stripeTipsCol,
   type StripeConnectionDoc,
@@ -123,6 +128,20 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
     return;
   }
 
+  // The dedupe that OUTLIVES the queue entry. The create() below refuses to
+  // overwrite a live tip doc, but the queue's contract is delivery-is-
+  // deletion, and Stripe delivers at-least-once: an event already answered
+  // 200 can be redelivered days later, AFTER the tip was collected — and
+  // would sail through create() onto the stage a second time. The tombstone
+  // written beside every tip answers for the id until Stripe's retry window
+  // is safely over. Checked before the quota so a redelivery is a cheap
+  // duplicate 200, never a 429 that keeps Stripe re-sending it.
+  const tombstoneRef = processedEventRef(firestore, mapped.id);
+  if ((await tombstoneRef.get()).exists) {
+    send(res, 200, { received: true, duplicate: true });
+    return;
+  }
+
   // The flood valve. 429 (not 200) on purpose: Stripe retries with backoff
   // for days, so a legitimate burst lands in a later bucket instead of
   // vanishing, while a flood stays out of Firestore.
@@ -161,6 +180,15 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
     // Undelivered tips age out on schedule, whether or not a device ever
     // comes back — same sweep as the relay queue.
     expiresAt: Timestamp.fromMillis(now + STRIPE_PENDING_TTL_MS),
+  });
+
+  // The other half of the tombstone check above: written in the SAME batch
+  // as the tip, so either both land or neither. set(), not create() — when
+  // two deliveries race past the check, the tip's create() is the arbiter
+  // and the loser's whole batch no-ops as ALREADY_EXISTS. The same sweep
+  // reclaims it once Stripe cannot redeliver anymore.
+  batch.set(tombstoneRef, {
+    expiresAt: Timestamp.fromMillis(now + STRIPE_PROCESSED_TTL_MS),
   });
 
   try {

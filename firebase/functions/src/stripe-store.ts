@@ -1,5 +1,5 @@
-/// Firestore layout for cloud Stripe connections. Three places, three trust
-/// levels, and the rules pin each one:
+/// Firestore layout for cloud Stripe connections. Four places, and the rules
+/// pin each one:
 ///
 ///   stripeConnections/{connectionId}        server-only, ALWAYS. Holds the
 ///                                            envelope-encrypted restricted
@@ -18,6 +18,12 @@
 ///                                            same delivery-is-deletion
 ///                                            contract, doc id = the Stripe
 ///                                            object id (cs_…/ch_…).
+///   processedEvents/{objectId}               server-only dedupe tombstones:
+///                                            the tip doc above dies on
+///                                            delivery, so this is the record
+///                                            that still answers a Stripe
+///                                            redelivery afterwards (see
+///                                            stripe-webhook.ts).
 
 import type { DocumentReference, Firestore, CollectionReference } from "firebase-admin/firestore";
 import type { Envelope } from "./stripe-crypto";
@@ -58,6 +64,15 @@ export const MAX_STRIPE_PENDING = 60;
  * short enough that the queue never becomes a second tip history (History
  * is the proxy's job). */
 export const STRIPE_PENDING_TTL_MS = 60 * 60_000;
+
+/**
+ * How long a processed-event tombstone (processedEvents/{objectId}) outlives
+ * its tip. Stripe delivers at-least-once and retries for up to 3 days, so an
+ * event already answered 200 can arrive again long after the tip was
+ * collected and its doc deleted; 4 days keeps the dedupe alive comfortably
+ * past the whole retry window before the sweep reclaims the tombstone.
+ */
+export const STRIPE_PROCESSED_TTL_MS = 4 * 24 * 3_600_000;
 
 // ---------------------------------------------------------------------------
 // Ids
@@ -119,4 +134,11 @@ export function stripeTipsCol(firestore: Firestore, uid: string, bandId: string)
     .collection("users").doc(uid)
     .collection("bands").doc(bandId)
     .collection("stripeTips");
+}
+
+/** processedEvents/{objectId} — the webhook's dedupe tombstone, keyed like
+ * the tip doc by the Stripe OBJECT id (cs_…/ch_…) so the completed/
+ * async_payment_succeeded pair stays collapsed even after delivery. */
+export function processedEventRef(firestore: Firestore, objectId: string): DocumentReference {
+  return firestore.collection("processedEvents").doc(objectId);
 }
