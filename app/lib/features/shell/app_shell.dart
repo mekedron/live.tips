@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/band_switcher.dart';
+import '../../widgets/live_session_banner.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../poster/poster_screen.dart';
@@ -124,7 +125,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.read(shellTabRequestProvider.notifier).clear();
       }
     });
-    final body = IndexedStack(
+    final stack = IndexedStack(
       index: _tab.index,
       children: [
         for (final t in ShellTab.values)
@@ -137,6 +138,14 @@ class _AppShellState extends ConsumerState<AppShell> {
             }
           else
             const SizedBox.shrink(),
+      ],
+    );
+    // The account-is-live-elsewhere banner sits above every tab: whatever
+    // the artist is doing here, the running session is one tap away.
+    final body = Column(
+      children: [
+        const LiveSessionBanner(),
+        Expanded(child: stack),
       ],
     );
 

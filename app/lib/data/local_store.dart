@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -133,6 +134,26 @@ class LocalStore {
     } else {
       await _prefs.setStringList(_kPendingSecretWipes, wipes);
     }
+  }
+
+  // --- Device identity ---
+
+  static const _kDeviceId = 'device_id_v1';
+
+  /// Stable per-device id, minted on first ask and never rotated — how the
+  /// multi-device session coordination tells "my lease" from "someone
+  /// else's". setString updates the in-memory cache synchronously, so the
+  /// read-back is immediate; only the disk write is deferred.
+  String deviceId() {
+    final existing = _prefs.getString(_kDeviceId);
+    if (existing != null) return existing;
+    final random = Random.secure();
+    final id = 'dev_${List.generate(
+      20,
+      (_) => random.nextInt(16).toRadixString(16),
+    ).join()}';
+    _prefs.setString(_kDeviceId, id);
+    return id;
   }
 
   // --- Cloud profile: device-local prefs ---

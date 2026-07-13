@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/tip_source.dart';
 import '../data/tip_channel.dart';
 import '../data/stripe/stripe_client.dart';
 import '../domain/tip.dart';
@@ -11,6 +10,7 @@ import '../domain/fx_rates.dart';
 import '../domain/live_session.dart';
 import '../domain/rollover_math.dart';
 import 'providers.dart';
+import 'session_coordinator.dart';
 
 enum PollHealth { connecting, ok, error }
 
@@ -72,17 +72,14 @@ class LiveState {
       );
 }
 
-/// Owns the active session: the polling timer, incoming tips, the goal,
-/// stage lock, and persistence so a crash or restart never loses a set.
+/// Owns the active session's STATE: incoming-tip attribution, the goal,
+/// stage lock, celebration serial, and error wording. Everything transport
+/// — where tips come from, crash snapshots, the archive, other devices —
+/// lives behind [SessionCoordinator], created per session through
+/// [sessionCoordinatorFactoryProvider].
 class LiveSessionController extends Notifier<LiveState?> {
-  Timer? _timer;
-  TipSource? _source;
-  TipChannel? _relay;
-  StreamSubscription<Tip>? _relayTipsSub;
+  SessionCoordinator? _coordinator;
   ProviderSubscription<FxRates?>? _fxSub;
-  StreamSubscription<RelayHealth>? _relayStatusSub;
-  bool _polling = false;
-  int _skipTicks = 0;
 
   /// The band this session belongs to, snapshotted at [_begin] alongside its
   /// key and jars — every persistence write goes to this band's slots, so a
@@ -95,6 +92,9 @@ class LiveSessionController extends Notifier<LiveState?> {
     return null;
   }
 
+  /// Starts a brand-new session. Throws [SessionAlreadyActiveException]
+  /// when the account already runs one on another device (cloud profiles) —
+  /// the caller points the artist at the Join banner.
   Future<void> start({required int goalMinor}) async {
     final app = ref.read(appStateProvider);
     // Demo, Stripe, or a relay jar — any of them can host a session; only a
@@ -111,20 +111,36 @@ class LiveSessionController extends Notifier<LiveState?> {
     unawaited(ref
         .read(appStateProvider.notifier)
         .updateBand(app.band.copyWith(lastGoalMinor: goalMinor)));
-    await _begin(session);
+    await _begin(session, mode: SessionStartMode.fresh);
   }
 
   /// Restores the session persisted before a crash/app restart. The stored
-  /// event cursor means tips made while the app was dead still count.
+  /// event cursor means tips made while the app was dead still count. On a
+  /// cloud profile the coordinator reconciles with `live/current` first —
+  /// a session stopped elsewhere meanwhile resumes as nothing.
   Future<bool> resumeStored() async {
     final app = ref.read(appStateProvider);
     if (app.switching) return false;
     final repo = ref.read(accountDataRepositoryProvider);
     final stored = repo.readActiveSession(app.accountId);
     if (stored == null) return false;
-    await _begin(stored,
-        resumeCursor: repo.readActiveCursor(app.accountId), resumed: true);
-    return true;
+    return _begin(stored,
+        resumeCursor: repo.readActiveCursor(app.accountId),
+        mode: SessionStartMode.resume);
+  }
+
+  /// Attaches to the session another device is running (cloud profiles) —
+  /// a follower: no poll, no relay channel, tips arrive over the listener.
+  Future<bool> join(ActiveSessionInfo info) async {
+    final app = ref.read(appStateProvider);
+    if (app.switching) return false;
+    final session = LiveSession(
+      id: info.sessionId,
+      startedAt: DateTime.fromMillisecondsSinceEpoch(info.startedAtMs),
+      currency: info.currency,
+      goalMinor: info.goalMinor,
+    );
+    return _begin(session, mode: SessionStartMode.join);
   }
 
   Future<void> discardStored() async {
@@ -134,8 +150,8 @@ class LiveSessionController extends Notifier<LiveState?> {
     ref.read(storedSessionProvider.notifier).refresh();
   }
 
-  Future<void> _begin(LiveSession session,
-      {String? resumeCursor, bool resumed = false}) async {
+  Future<bool> _begin(LiveSession session,
+      {String? resumeCursor, required SessionStartMode mode}) async {
     _teardown();
     final app = ref.read(appStateProvider);
     _accountId = app.accountId;
@@ -152,77 +168,47 @@ class LiveSessionController extends Notifier<LiveState?> {
       current.session.applyRollovers();
       state = current.copyWith();
     });
-    // No tip jar is fine (relay-only): the factory returns a silent source.
-    _source = ref.read(tipSourceFactoryProvider)(
-        demo: app.demo, apiKey: app.apiKey, jar: app.effectiveTipJar);
     // A restored session may owe rollovers (goal edits, older builds).
     session.applyRollovers();
 
-    // The relay tip feed (MobilePay/Revolut fan page) — null when this
-    // session has none (demo, or no connected-mode jar).
-    _relay = ref.read(relayChannelFactoryProvider)(
-        demo: app.demo, jar: app.effectiveRelayJar, secret: app.relaySecret);
-
-    state = LiveState(
-      session: session,
-      relay: _relay == null ? null : RelayHealth.connecting,
+    final coordinator = ref.read(sessionCoordinatorFactoryProvider)(
+      SessionEvents(
+        onTips: _ingest,
+        onPollOk: _markPollOk,
+        onPollError: _reportError,
+        onRelayHealth: (health) => state = state?.copyWith(relay: health),
+        onRemoteGoal: _applyRemoteGoal,
+        onRemoteEnded: _onRemoteEnded,
+      ),
     );
-    await ref
-        .read(accountDataRepositoryProvider)
-        .saveActiveSession(_accountId, session, resumeCursor);
+    _coordinator = coordinator;
+
+    state = LiveState(session: session, relay: coordinator.relayHealthSeed);
+    try {
+      await coordinator.start(session,
+          resumeCursor: resumeCursor, mode: mode);
+    } on SessionAlreadyActiveException {
+      _teardown();
+      state = null;
+      rethrow; // the caller shows "already running in <band>"
+    } on SessionSupersededException {
+      // The stored session was stopped on another device while we were
+      // away; the coordinator already archived what the snapshot held.
+      _teardown();
+      state = null;
+      ref.read(storedSessionProvider.notifier).refresh();
+      return false;
+    }
     ref.read(storedSessionProvider.notifier).refresh();
-
-    // Subscribe BEFORE start(): broadcast streams don't replay, and the
-    // first status transition arrives as soon as the socket opens.
-    final relay = _relay;
-    if (relay != null) {
-      _relayTipsSub = relay.tips.listen((tip) => _ingest([tip]));
-      _relayStatusSub = relay.status
-          .listen((health) => state = state?.copyWith(relay: health));
-      relay.start();
-    }
-
-    try {
-      await _source!.prime(session.startedAt,
-          resumeCursor: resumeCursor, backfill: resumed);
-      state = state?.copyWith(health: PollHealth.ok, clearError: true);
-    } catch (e) {
-      _reportError(e);
-    }
-
-    final seconds = app.settings.pollIntervalSec.clamp(2, 60);
-    _timer = Timer.periodic(Duration(seconds: seconds), (_) => _tick());
-    unawaited(_tick());
+    return true;
   }
 
-  Future<void> _tick() async {
-    if (_polling || state == null || _source == null) return;
-    if (_skipTicks > 0) {
-      _skipTicks--;
-      return;
-    }
-    _polling = true;
-    try {
-      final fresh = await _source!.pollNew();
-      final current = state;
-      if (current == null) return;
-      if (current.health != PollHealth.ok) {
-        state = current.copyWith(health: PollHealth.ok, clearError: true);
-      }
-      _ingest(fresh);
-    } catch (e) {
-      if (e is StripeApiException && e.isRateLimited) _skipTicks = 3;
-      _reportError(e);
-    } finally {
-      _polling = false;
-    }
-  }
-
-  /// Applies freshly arrived tips — from the Stripe poll OR the relay
-  /// channel — to the session: attribution (fill deltas, rollovers), the
-  /// newTips batch + confettiTick celebration serial, and the crash-recovery
-  /// snapshot. Duplicates (same tip id) are dropped by the session, so
-  /// at-least-once feeds are safe to replay through here.
+  /// Applies freshly arrived tips — from the Stripe poll, the relay
+  /// channel, or the cloud tips listener — to the session: attribution
+  /// (fill deltas, rollovers), the newTips batch + confettiTick celebration
+  /// serial, and the crash-recovery snapshot (via the coordinator).
+  /// Duplicates (same tip id) are dropped by the session, so at-least-once
+  /// feeds are safe to replay through here.
   void _ingest(List<Tip> fresh) {
     final current = state;
     if (current == null || fresh.isEmpty) return;
@@ -239,9 +225,8 @@ class LiveSessionController extends Notifier<LiveState?> {
       confettiTick: current.confettiTick + tips.length,
       newTips: tips,
     );
-    unawaited(ref
-        .read(accountDataRepositoryProvider)
-        .saveActiveSession(_accountId, current.session, _source?.cursor));
+    _coordinator?.onTipsIngested(
+        current.session, [for (final t in tips) t.tip]);
     // Tip-page (relay) tips exist nowhere but this device — archive them so
     // History still has them after the session ends. Real money only: demo
     // relay tips (livemode:false) must never enter the archive. Replays
@@ -252,7 +237,7 @@ class LiveSessionController extends Notifier<LiveState?> {
         if (!tip.tip.verified && tip.tip.livemode) tip.tip,
     ];
     if (relayTips.isNotEmpty) {
-      // Fire-and-forget like saveActiveSession above. setString updates the
+      // Fire-and-forget like the snapshot above. setString updates the
       // SharedPreferences in-memory cache synchronously, so the refresh
       // below already sees the new tips — only the disk write is deferred.
       unawaited(ref
@@ -260,6 +245,12 @@ class LiveSessionController extends Notifier<LiveState?> {
           .appendRelayHistory(_accountId, relayTips));
       ref.read(relayHistoryProvider.notifier).refresh();
     }
+  }
+
+  void _markPollOk() {
+    final current = state;
+    if (current == null || current.health == PollHealth.ok) return;
+    state = current.copyWith(health: PollHealth.ok, clearError: true);
   }
 
   void _reportError(Object e) {
@@ -275,7 +266,7 @@ class LiveSessionController extends Notifier<LiveState?> {
   /// The app is on screen again — redial the relay feed rather than wait for
   /// the OS to surface a socket that died while we were suspended. No-op for
   /// sessions without a relay jar.
-  void relayReconnectNow() => _relay?.reconnectNow();
+  void relayReconnectNow() => _coordinator?.reconnectNow();
 
   void editGoal(int goalMinor) {
     final current = state;
@@ -284,13 +275,23 @@ class LiveSessionController extends Notifier<LiveState?> {
     // Lowering the goal can instantly owe rollovers (total ≥ 2× new goal).
     current.session.applyRollovers();
     state = current.copyWith(session: current.session);
-    unawaited(ref
-        .read(accountDataRepositoryProvider)
-        .saveActiveSession(_accountId, current.session, _source?.cursor));
+    _coordinator?.onGoalEdited(current.session);
     final app = ref.read(appStateProvider);
     unawaited(ref
         .read(appStateProvider.notifier)
         .updateBand(app.band.copyWith(lastGoalMinor: goalMinor)));
+  }
+
+  /// A goal edit landed from another device (last-write-wins through the
+  /// coordination doc). Echoes of our own edits arrive here too — equal
+  /// values are dropped so nothing loops.
+  void _applyRemoteGoal(int goalMinor) {
+    final current = state;
+    if (current == null || goalMinor <= 0) return;
+    if (current.session.goalMinor == goalMinor) return;
+    current.session.goalMinor = goalMinor;
+    current.session.applyRollovers();
+    state = current.copyWith(session: current.session);
   }
 
   void setLocked(bool locked) {
@@ -301,11 +302,12 @@ class LiveSessionController extends Notifier<LiveState?> {
   Future<LiveSession?> stop() async {
     final current = state;
     if (current == null) return null;
-    _teardown();
+    final coordinator = _coordinator;
+    _coordinator = null;
+    _fxSub?.close();
+    _fxSub = null;
     final session = current.session..endedAt = DateTime.now();
-    final repo = ref.read(accountDataRepositoryProvider);
-    await repo.appendSessionToHistory(_accountId, session);
-    await repo.clearActiveSession(_accountId);
+    if (coordinator != null) await coordinator.stop(session);
     state = null;
     ref.read(storedSessionProvider.notifier).refresh();
     // Tips that arrived during the set aren't in the home preview's cached
@@ -314,22 +316,23 @@ class LiveSessionController extends Notifier<LiveState?> {
     return session;
   }
 
+  /// The session was stopped on another device: tear down to "no session"
+  /// WITHOUT the summary — only the stopping device gets the return value,
+  /// and the archive is already its doing.
+  void _onRemoteEnded() {
+    if (state == null) return;
+    _teardown();
+    state = null;
+    ref.read(storedSessionProvider.notifier).refresh();
+    ref.invalidate(recentTipsProvider);
+  }
+
   void _teardown() {
-    _timer?.cancel();
-    _timer = null;
     _fxSub?.close();
     _fxSub = null;
-    _source?.dispose();
-    _source = null;
-    _relayTipsSub?.cancel();
-    _relayTipsSub = null;
-    _relayStatusSub?.cancel();
-    _relayStatusSub = null;
-    final relay = _relay;
-    _relay = null;
-    if (relay != null) unawaited(relay.dispose());
-    _polling = false;
-    _skipTicks = 0;
+    final coordinator = _coordinator;
+    _coordinator = null;
+    if (coordinator != null) unawaited(coordinator.dispose());
   }
 }
 
@@ -348,6 +351,9 @@ class StoredSessionNotifier extends Notifier<LiveSession?> {
   LiveSession? build() {
     final accountId =
         ref.watch(appStateProvider.select((s) => s.accountId));
+    // The snapshot is device-local, but a band switch inside a cloud
+    // profile arrives as a revision bump rather than a new account id.
+    ref.watch(repoRevisionProvider);
     return ref
         .read(accountDataRepositoryProvider)
         .readActiveSession(accountId);

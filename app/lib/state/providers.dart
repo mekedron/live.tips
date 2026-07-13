@@ -22,8 +22,10 @@ import '../domain/tip.dart';
 import '../domain/fx_rates.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
+import 'cloud_session_coordinator.dart';
 import 'live_session_controller.dart';
 import 'onboarding_draft.dart';
+import 'session_coordinator.dart';
 
 /// Overridden in main() with initialized instances.
 final localStoreProvider =
@@ -297,17 +299,15 @@ class AppStateNotifier extends Notifier<AppState> {
       settings: repo.readSettings(),
       band: repo.readBandSettings(accountId),
     );
-    ref.read(relayHistoryProvider.notifier).refresh();
-    ref.read(storedSessionProvider.notifier).refresh();
+    // The history/stored-session notifiers watch the band id and the cloud
+    // revision themselves — pushing refreshes at them from here would make
+    // them depend on this notifier that already depends on them.
   }
 
   /// A cloud snapshot moved a mirror: fold the fresh reads into state.
   void _onRemoteChange() {
-    if (ref.read(liveSessionProvider) != null) {
-      // Mid-set the session owns the stage; only the archives refresh.
-      ref.read(relayHistoryProvider.notifier).refresh();
-      return;
-    }
+    // Mid-set the session owns the stage; the archives refresh on their own.
+    if (ref.read(liveSessionProvider) != null) return;
     final repo = ref.read(accountDataRepositoryProvider);
     final accounts = repo.listBands();
     if (accounts.isEmpty) return; // mirror not warm yet
@@ -325,8 +325,6 @@ class AppStateNotifier extends Notifier<AppState> {
       band: repo.readBandSettings(accountId),
       settings: repo.readSettings(),
     );
-    ref.read(relayHistoryProvider.notifier).refresh();
-    ref.read(storedSessionProvider.notifier).refresh();
     // A key synced from another device shows up without a re-entry.
     unawaited(_refreshSecrets(accountId));
   }
@@ -501,9 +499,19 @@ class AppStateNotifier extends Notifier<AppState> {
 
   /// Whether bands can be switched/added/removed right now. A running
   /// session is bound to its band's key, payment link, and relay socket —
-  /// the app must never show band B around band A's live numbers.
-  bool get accountActionsBlocked =>
-      state.switching || ref.read(liveSessionProvider) != null;
+  /// the app must never show band B around band A's live numbers. On a
+  /// cloud profile a session running on ANY device blocks too: the account
+  /// is live somewhere, and reshuffling bands under it invites exactly the
+  /// cross-band leaks the local guard exists to prevent.
+  bool get accountActionsBlocked {
+    if (state.switching || ref.read(liveSessionProvider) != null) return true;
+    try {
+      return ref.read(activeSessionProvider).value?.active ?? false;
+    } catch (_) {
+      // Unwired in tests / provider errored — the local guards stand alone.
+      return false;
+    }
+  }
 
   /// Makes [id] the active band. Returns false when refused (unknown id,
   /// mid-switch, or a live session running). Exits demo mode — switching is
@@ -795,6 +803,77 @@ final relayChannelFactoryProvider = Provider<RelayChannelFactory>(
   },
 );
 
+/// Stable per-device id for multi-device session coordination (who leads,
+/// whose lease it is). A provider so two "devices" in one test process can
+/// disagree; the default persists once in prefs.
+final deviceIdProvider =
+    Provider<String>((ref) => ref.watch(localStoreProvider).deviceId());
+
+/// Builds the coordination/transport layer for one session — a seam
+/// mirroring [tipSourceFactoryProvider] so tests can hand in a fake. The
+/// default picks the cloud coordinator when the active profile is a
+/// signed-in cloud account with Firestore wired, else the local one —
+/// exactly today's single-device behavior.
+typedef SessionCoordinatorFactory = SessionCoordinator Function(
+    SessionEvents events);
+
+final sessionCoordinatorFactoryProvider =
+    Provider<SessionCoordinatorFactory>((ref) => (events) {
+      final app = ref.read(appStateProvider);
+      final repo = ref.read(accountDataRepositoryProvider);
+      // No tip jar is fine (relay-only): the factory returns a silent
+      // source. Null relay means "this session has no push feed".
+      final source = ref.read(tipSourceFactoryProvider)(
+          demo: app.demo, apiKey: app.apiKey, jar: app.effectiveTipJar);
+      final relay = ref.read(relayChannelFactoryProvider)(
+          demo: app.demo, jar: app.effectiveRelayJar, secret: app.relaySecret);
+      final profile = ref.read(accountsDirectoryProvider).active;
+      final db = ref.read(firestoreProvider);
+      final uid = ref.read(authControllerProvider).user?.uid;
+      if (!profile.isLocal && db != null && uid == profile.id) {
+        return CloudSessionCoordinator(
+          db: db,
+          uid: uid!,
+          bandId: app.accountId,
+          deviceId: ref.read(deviceIdProvider),
+          repository: repo,
+          source: source,
+          relay: relay,
+          // Leadership needs the band's Stripe key to poll with; without
+          // one this device can only ever follow.
+          canLead: app.apiKey != null,
+          pollIntervalSec: app.settings.pollIntervalSec,
+          events: events,
+        );
+      }
+      return LocalSessionCoordinator(
+        accountId: app.accountId,
+        repository: repo,
+        source: source,
+        relay: relay,
+        pollIntervalSec: app.settings.pollIntervalSec,
+        events: events,
+      );
+    });
+
+/// The account's `users/{uid}/live/current` coordination doc, live — what
+/// the Join banner and the account-action guards watch. Null in local mode
+/// (no Firestore snapshots are ever requested for the local profile), when
+/// signed out, or while the doc doesn't exist.
+final activeSessionProvider = StreamProvider<ActiveSessionInfo?>((ref) {
+  final profileId = ref
+      .watch(accountsDirectoryProvider.select((d) => d.activeAccountId));
+  final db = ref.watch(firestoreProvider);
+  final uid = ref.watch(authControllerProvider.select((s) => s.user?.uid));
+  if (profileId == kLocalAccountId || db == null || uid != profileId) {
+    return Stream<ActiveSessionInfo?>.value(null);
+  }
+  return db
+      .doc('users/$profileId/live/current')
+      .snapshots()
+      .map((snap) => ActiveSessionInfo.fromData(snap.data()));
+});
+
 /// Live Stripe API surface for one-off calls (recent tips, jar setup), or
 /// null when in demo mode / signed out. Depends ONLY on the key — settings
 /// or jar changes must not tear down a client somebody may be awaiting.
@@ -828,6 +907,8 @@ class RelayHistoryNotifier extends Notifier<List<Tip>> {
   List<Tip> build() {
     final accountId =
         ref.watch(appStateProvider.select((s) => s.accountId));
+    // A cloud snapshot (another device's tip) lands as a revision bump.
+    ref.watch(repoRevisionProvider);
     return ref.read(accountDataRepositoryProvider).readRelayHistory(accountId);
   }
 

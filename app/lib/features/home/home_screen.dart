@@ -13,6 +13,7 @@ import '../onboarding/relay_setup_screen.dart'
     show confirmAndRegenerateRelayJar;
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
+import '../../state/session_coordinator.dart';
 import '../../widgets/band_switcher.dart';
 import '../../widgets/tip_tile.dart';
 import '../../widgets/goal_editor.dart';
@@ -78,7 +79,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _startSession() async {
-    await ref.read(liveSessionProvider.notifier).start(goalMinor: _goalMinor);
+    try {
+      await ref
+          .read(liveSessionProvider.notifier)
+          .start(goalMinor: _goalMinor);
+    } on SessionAlreadyActiveException catch (e) {
+      // The account is already live on another device — point at the Join
+      // banner instead of forking the night into two sessions.
+      if (!mounted) return;
+      final accounts = ref.read(appStateProvider).accounts;
+      final bandName = accounts
+              .where((a) => a.id == e.bandId)
+              .map((a) => a.name.trim())
+              .firstOrNull ??
+          '';
+      final band = bandName.isEmpty
+          ? context.s.t('widgets.band_switcher.unnamed_account')
+          : bandName;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(context.s.t('home.already_live', {'band': band})),
+      ));
+      return;
+    }
     // start() refuses quietly in edge states (mid band switch, nothing
     // configured) — never open the stage over a session that isn't there.
     if (mounted && ref.read(liveSessionProvider) != null) _openLive();
