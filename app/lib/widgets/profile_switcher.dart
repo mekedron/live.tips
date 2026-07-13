@@ -132,7 +132,7 @@ class BandNameButton extends ConsumerWidget {
       widthFactor: 1,
       heightFactor: 1,
       child: InkWell(
-        onTap: () => showSwitcherSheet(context, ref),
+        onTap: () => showProfileSheet(context, ref),
         borderRadius: BorderRadius.circular(8),
         child: Text.rich(
           TextSpan(
@@ -175,7 +175,7 @@ class BandChip extends ConsumerWidget {
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => showSwitcherSheet(context, ref),
+        onTap: () => showProfileSheet(context, ref),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           child: Row(
@@ -205,57 +205,81 @@ class BandChip extends ConsumerWidget {
   }
 }
 
-/// THE switcher — one surface for one question: *which of my things am I
-/// working in right now?*
+/// TWO sheets, ONE design — and each door opens the one it names.
 ///
-/// There used to be two. Picking tonight's band was a sheet from the header;
-/// picking the cloud account those bands live under was a full screen in
-/// Settings. Two shapes, two vocabularies, two sets of rules — and the rules
-/// diverged every time one of them was fixed: the account screen let a switch
-/// land under a live set while the band sheet refused (#2), the discard prompt
-/// existed in only one of them (#6), and a cross-account move meant finding the
-/// other switcher first (#25/#28). The distinction between "account" and
-/// "profile" is in our code, not in the artist's head.
+/// The two nouns of this app are the cloud **account** you are signed into and
+/// the **profile** (the band) you perform as, and they are the two most
+/// confusable ideas in it. #29 was asked to bring their two switchers to a
+/// common FORM — the account's was a full screen in Settings, the profile's a
+/// sheet from the header — and instead it merged them into one list: a device
+/// mode, some profiles, an account with a Google pill, "Add a profile" and
+/// "Sign in to another account", four kinds of thing under the single heading
+/// "Your profiles". The artist who wanted to change account had to find it among
+/// the profiles; the entry point labelled "Switch account" opened it (#49).
 ///
-/// A SHEET, not a screen, and that is the shape decision: switching is the most
+/// What #29 got right is kept whole, and it is the expensive half: ONE guard
+/// ([accountActionAllowed]), ONE switch ([switchTo]), ONE birthplace of a
+/// profile ([addProfile], which writes nothing on the tap — #44), ONE sign-out
+/// ([confirmSignOut]), one [ProfileRow], one chrome. The sheets differ in the
+/// QUESTION they ask, not in the rules they obey.
+///
+/// A SHEET, both of them, and that is the shape decision: switching is the most
 /// frequent, least destructive thing the artist does — mid-gig, one thumb, over
 /// whatever they were looking at — and a sheet is the one form that can open
 /// above ANY surface, including RootGate's own root picker, without a route to
-/// push. The account switcher was a screen only because it was born in
-/// Settings. (A modal also has no route identity to collide with the root it
-/// just flipped, which is the whole of #38.)
+/// push. (A modal also has no route identity to collide with the root it just
+/// flipped, which is the whole of #38.)
 ///
-/// What it lists, in one list:
+/// The PROFILE sheet — *which profile am I performing as?* The profiles of the
+/// account currently in use, and "Add a profile" under them (adding into an
+/// account you are not in means going there first, which is a different
+/// decision). Nothing about accounts, except the one door that names the one you
+/// are in — [_AccountDoorRow] — because an artist who opened the wrong sheet
+/// must not have to guess which of two words we chose for the other one.
+///
+/// On a VENUE device that door is absent: the ways in and out of an account
+/// there run through the banner's approve-and-wipe ceremony, and a switcher that
+/// skipped it would be the hole that ceremony exists to close.
+Future<void> showProfileSheet(BuildContext context, WidgetRef ref) async {
+  // The door out is a RESULT, not a nested sheet: this sheet closes, and the
+  // account sheet opens from the surface that opened this one — still standing,
+  // because a modal moves no route.
+  final toAccounts = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => const _ProfileSheet(),
+  );
+  if (toAccounts == true && context.mounted) {
+    await showAccountSheet(context, ref);
+  }
+}
+
+/// The ACCOUNT sheet — *whose profiles am I looking at?*
 ///
 /// * **On this device** — a MODE, not an account: the profiles that never leave
-///   this phone. It carries no account chrome (no provider pill, no sign-out, no
-///   delete) because there is nothing there to sign out of or delete — it is
-///   permanent by construction (AccountsDirectory.withoutAccount) and a row
-///   offering either would be a button that cannot work.
-/// * **Each cloud account** this device knows. The ACTIVE one is expanded into
-///   its profiles; the others are one row each — this device holds no list of
-///   another account's profiles (the repository mirrors the account it is in),
-///   and inventing one out of a stale cache is the cache-first lie this codebase
-///   keeps paying for. Choosing one is a SINGLE act: the flip, and then that
-///   account's own profile question, asked by RootGate's picker once the artist
-///   has landed.
-/// * **Add a profile**, under the account it would be added to — the active one.
-///   Adding into an account you are not in means switching to it first, which is
-///   a different decision, made by tapping it.
-/// * **Sign in to another account**, at the foot of the list: the door to an
-///   account this device has never seen.
+///   this phone. It belongs HERE and not among the profiles, because it is an
+///   answer to whose-profiles, not to which-profile. It carries no account
+///   chrome (no provider pill, no sign-out, no delete): there is nothing there
+///   to sign out of or delete — it is permanent by construction
+///   (AccountsDirectory.withoutAccount) — and a row offering either would be a
+///   button that cannot work.
+/// * **Each cloud account** this device knows, one row each. This device holds
+///   no list of another account's profiles (the repository mirrors the account
+///   it is in), and inventing one out of a stale cache is the cache-first lie
+///   this codebase keeps paying for. So an account is a single act: the flip,
+///   and then that account's own profile question, asked by RootGate's picker
+///   once the artist has landed — the same for the local mode as for a cloud
+///   account.
+/// * **Sign in to another account**, at the foot: the door to an account this
+///   device has never seen.
 ///
-/// A live session refuses every one of those, with one guard and one sentence
-/// ([accountActionAllowed]).
-///
-/// On a VENUE device the account half is absent: the ways in and out of an
-/// account there run through the banner's approve-and-wipe ceremony, and a
-/// switcher that skipped it would be the hole that ceremony exists to close.
-Future<void> showSwitcherSheet(BuildContext context, WidgetRef ref) {
+/// A live session refuses every one of those, with the same guard and the same
+/// sentence the profile sheet uses ([accountActionAllowed]).
+Future<void> showAccountSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (sheetContext) => const _SwitcherSheet(),
+    builder: (sheetContext) => const _AccountSheet(),
   );
 }
 
@@ -518,8 +542,151 @@ Future<void> confirmSignOut(BuildContext context, WidgetRef ref) async {
 /// offering the link there.
 enum _SignOutChoice { cancel, signOut, linkApple, linkGoogle }
 
-class _SwitcherSheet extends ConsumerWidget {
-  const _SwitcherSheet();
+/// A row was tapped: the switch runs, and the sheet closes over whatever the
+/// artist landed on. Only if it is still up — they may have swiped it away
+/// during the keychain read, and popping then would eat the route underneath.
+Future<void> _switchAndClose(
+  BuildContext context,
+  WidgetRef ref,
+  AppAccount account, [
+  BandAccount? band,
+]) async {
+  final sheet = Navigator.of(context);
+  if (!await switchTo(context, ref, account: account, band: band)) return;
+  if (sheet.canPop()) sheet.pop();
+}
+
+/// Whether this device can reach an account at all: not a venue tablet (the
+/// banner's ceremony owns that door), on a platform with cloud accounts, with a
+/// provider to run. It gates the sign-in row, and the profile sheet's door to
+/// the account sheet — a door to a sheet that could hold nothing but a mode is
+/// no door at all.
+bool _accountsReachable(BuildContext context, WidgetRef ref) =>
+    !ref.watch(venueModeActiveProvider) &&
+    platformSupportsCloudAccounts &&
+    ref.read(authControllerProvider.notifier).available;
+
+/// The chrome both sheets wear: a heading that says which question is being
+/// asked, the one hint a blocked state gets, the rows, and a foot. Written once
+/// — the sheets differ in what they ASK, and in nothing else.
+class _SheetFrame extends ConsumerWidget {
+  const _SheetFrame({required this.title, required this.rows, this.footer});
+
+  final String title;
+  final List<Widget> rows;
+  final Widget? footer;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.lt;
+    final s = context.s;
+    final live = ref.watch(liveSessionProvider);
+    final switching = ref.watch(appStateProvider.select((a) => a.switching));
+    final blocked = live != null || switching;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              child: Text(
+                title,
+                style: outfitStyle(18, c.text, weight: FontWeight.w700),
+              ),
+            ),
+            if (blocked)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+                child: Text(
+                  live != null
+                      ? s.t('widgets.profile_switcher.live_running_hint')
+                      : s.t('widgets.band_switcher.switching'),
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 12.5,
+                    color: c.textMuted,
+                  ),
+                ),
+              ),
+            Flexible(child: ListView(shrinkWrap: true, children: rows)),
+            ?footer,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// *Which profile am I performing as?* — the profiles of the account in use,
+/// and the one way to make another. See [showProfileSheet].
+class _ProfileSheet extends ConsumerWidget {
+  const _ProfileSheet();
+
+  Future<void> _addProfile(BuildContext context, WidgetRef ref) async {
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    final sheet = Navigator.of(context);
+    if (!await addProfile(context, ref)) return;
+    if (sheet.canPop()) sheet.pop();
+    // The setup starts by naming the profile — and naming it is what creates
+    // it. Backing out of that form leaves the artist where they were, on the
+    // profile they were already in, with nothing new written anywhere.
+    rootNavigator.push(
+      MaterialPageRoute(
+        builder: (_) => firstBandSetupScreen(createsProfile: true),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = context.s;
+    final app = ref.watch(appStateProvider);
+    final account = ref.watch(accountsDirectoryProvider).active;
+    return _SheetFrame(
+      title: s.t('widgets.profile_switcher.title'),
+      rows: [
+        // The profiles of the account in use — the only ones this device can
+        // enumerate for the account it is standing in, and the only ones this
+        // question is about.
+        for (final band in app.accounts)
+          ProfileRow(
+            band: band,
+            active: !app.demo && band.id == app.accountId,
+            // Every row stays tappable, blocked or not: a refusal must be able
+            // to SAY why. The old band sheet greyed its rows out mid-session and
+            // left a hint at the top — which an artist tapping the row they want
+            // never reads, and a dead button is indistinguishable from a broken
+            // one.
+            enabled: true,
+            onTap: () => _switchAndClose(context, ref, account, band),
+          ),
+        AddProfileRow(
+          title: s.t('widgets.profile_switcher.add'),
+          enabled: true,
+          onTap: () => _addProfile(context, ref),
+        ),
+      ],
+      // The one account thing in a sheet about profiles, and it is a DOOR, not
+      // a row in the list: it names the account these profiles belong to, and
+      // opening it is how an artist who wanted the other question gets there
+      // (#49).
+      footer: _accountsReachable(context, ref)
+          ? _AccountDoorRow(
+              account: account,
+              onTap: () => Navigator.of(context).pop(true),
+            )
+          : null,
+    );
+  }
+}
+
+/// *Whose profiles am I looking at?* — the accounts on this device, the local
+/// mode, and the door to an account it has never seen. See [showAccountSheet].
+class _AccountSheet extends ConsumerWidget {
+  const _AccountSheet();
 
   /// Drops a guest account whose session is gone. There is nothing to recover
   /// and nothing to sign back into — the only honest choices are a dead row
@@ -555,35 +722,6 @@ class _SwitcherSheet extends ConsumerWidget {
     await ref.read(accountsDirectoryProvider.notifier).remove(account.id);
   }
 
-  /// A row was tapped: the switch runs, and the sheet closes over whatever the
-  /// artist landed on. Only if it is still up — they may have swiped it away
-  /// during the keychain read, and popping then would eat the route underneath.
-  Future<void> _switch(
-    BuildContext context,
-    WidgetRef ref,
-    AppAccount account, [
-    BandAccount? band,
-  ]) async {
-    final sheet = Navigator.of(context);
-    if (!await switchTo(context, ref, account: account, band: band)) return;
-    if (sheet.canPop()) sheet.pop();
-  }
-
-  Future<void> _addProfile(BuildContext context, WidgetRef ref) async {
-    final rootNavigator = Navigator.of(context, rootNavigator: true);
-    final sheet = Navigator.of(context);
-    if (!await addProfile(context, ref)) return;
-    if (sheet.canPop()) sheet.pop();
-    // The setup starts by naming the profile — and naming it is what creates
-    // it. Backing out of that form leaves the artist where they were, on the
-    // profile they were already in, with nothing new written anywhere.
-    rootNavigator.push(
-      MaterialPageRoute(
-        builder: (_) => firstBandSetupScreen(createsProfile: true),
-      ),
-    );
-  }
-
   Future<void> _signInAnother(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
     // A sign-in lands on a fresh account's profile question — the same flip
@@ -597,206 +735,251 @@ class _SwitcherSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.lt;
     final s = context.s;
-    final app = ref.watch(appStateProvider);
-    final live = ref.watch(liveSessionProvider);
     final directory = ref.watch(accountsDirectoryProvider);
     final auth = ref.watch(authControllerProvider);
     // Sessions live in their own FirebaseApp instances — every one of them
     // stays reachable without a re-auth, not just the one in the foreground.
     final sessions = ref.watch(accountSessionsProvider);
     ref.watch(accountSessionsChangesProvider);
-    // A public device shows profiles and nothing else: accounts are entered and
-    // left through the banner's approve-and-wipe ceremony.
-    final venue = ref.watch(venueModeActiveProvider);
-    final blocked = live != null || app.switching;
+    final canSignIn = _accountsReachable(context, ref);
     final liveUid = auth.user?.uid;
     final activeId = directory.activeAccountId;
-    final canSignIn = !venue &&
-        platformSupportsCloudAccounts &&
-        ref.read(authControllerProvider.notifier).available;
+    // Whether the local mode has anything under it — the caption says so, and
+    // an empty one lands on the create step rather than nowhere (#38).
+    final localBands =
+        ref.watch(localStoreProvider).readAccountsRegistry()?.accounts ??
+            const <BandAccount>[];
 
-    final rows = <Widget>[];
-    for (final account in directory.accounts) {
-      final active = account.id == activeId;
-      if (venue && !active) continue;
-      // The profiles of an account this device is not IN are unknown to it —
-      // only the local mode keeps its list in prefs, readable from anywhere.
-      final bands = active
-          ? app.accounts
-          : account.isLocal
-              ? (ref
-                      .watch(localStoreProvider)
-                      .readAccountsRegistry()
-                      ?.accounts ??
-                  const <BandAccount>[])
-              : const <BandAccount>[];
-      if (!venue) {
-        rows.add(account.isLocal
-            ? _LocalHeader(
-                // With no profiles under it there is nothing to tap, and the
-                // mode would be unreachable — so the label itself becomes the
-                // door (it lands on the create step, and mints nothing on the
-                // way there).
-                onTap: bands.isEmpty && !active
-                    ? () => _switch(context, ref, account)
-                    : null,
-              )
-            : _AccountHeader(
-                account: account,
-                active: active,
-                // A live session is re-entered by a directory flip, whatever
-                // the provider. Without one, Apple/Google sign in again — and a
-                // guest account, having no credential, cannot.
-                sessionAlive:
-                    account.id == liveUid || sessions.isAlive(account.id),
-                enabled: !auth.busy &&
-                    (account.id == liveUid ||
-                        sessions.isAlive(account.id) ||
-                        (canSignIn && account.kind != AccountKind.anonymous)),
-                // The only unreachable account there is: a guest whose session
-                // is gone. Offer to forget it rather than keep a dead row around
-                // forever.
-                onForget: account.kind == AccountKind.anonymous &&
-                        account.id != liveUid &&
-                        !sessions.isAlive(account.id)
-                    ? () => _confirmForget(context, ref, account)
-                    : null,
-                onSignOut:
-                    active ? () => confirmSignOut(context, ref) : null,
-                onTap: () => _switch(context, ref, account),
-              ));
-      }
-      for (final band in bands) {
-        rows.add(ProfileRow(
-          band: band,
-          active: active && !app.demo && band.id == app.accountId,
-          // Every row stays tappable, blocked or not: a refusal must be able to
-          // SAY why. The band sheet greyed its rows out mid-session and left a
-          // hint at the top — which an artist tapping the row they want never
-          // reads, and a dead button is indistinguishable from a broken one.
-          enabled: true,
-          onTap: () => _switch(context, ref, account, band),
-        ));
-      }
-      if (active) {
-        rows.add(AddProfileRow(
-          title: s.t('widgets.profile_switcher.add'),
-          enabled: true,
-          onTap: () => _addProfile(context, ref),
-        ));
-      }
-    }
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return _SheetFrame(
+      title: s.t('widgets.account_switcher.title'),
+      rows: [
+        for (final account in directory.accounts)
+          if (account.isLocal)
+            _LocalHeader(
+              active: account.id == activeId,
+              empty: localBands.isEmpty,
+              // Always the door in, whatever is under it: the merged sheet made
+              // this label tappable only when the mode was EMPTY (its profiles
+              // were the way in), and in a sheet that lists no profiles that
+              // would leave the mode unreachable.
+              onTap: account.id == activeId
+                  ? null
+                  : () => _switchAndClose(context, ref, account),
+            )
+          else
+            _AccountHeader(
+              account: account,
+              active: account.id == activeId,
+              // A live session is re-entered by a directory flip, whatever the
+              // provider. Without one, Apple/Google sign in again — and a guest
+              // account, having no credential, cannot.
+              sessionAlive:
+                  account.id == liveUid || sessions.isAlive(account.id),
+              enabled: !auth.busy &&
+                  (account.id == liveUid ||
+                      sessions.isAlive(account.id) ||
+                      (canSignIn && account.kind != AccountKind.anonymous)),
+              // The only unreachable account there is: a guest whose session is
+              // gone. Offer to forget it rather than keep a dead row around
+              // forever.
+              onForget: account.kind == AccountKind.anonymous &&
+                      account.id != liveUid &&
+                      !sessions.isAlive(account.id)
+                  ? () => _confirmForget(context, ref, account)
+                  : null,
+              onSignOut: account.id == activeId
+                  ? () => confirmSignOut(context, ref)
+                  : null,
+              onTap: () => _switchAndClose(context, ref, account),
+            ),
+      ],
+      footer: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (auth.error != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: Text(
-                s.t('widgets.profile_switcher.title'),
-                style: outfitStyle(18, c.text, weight: FontWeight.w700),
+                auth.error!,
+                style: TextStyle(
+                  fontFamily: kFontBody,
+                  fontSize: 12.5,
+                  height: 1.45,
+                  color: c.danger,
+                ),
               ),
             ),
-            if (blocked)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                child: Text(
-                  live != null
-                      ? s.t('widgets.profile_switcher.live_running_hint')
-                      : s.t('widgets.band_switcher.switching'),
-                  style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 12.5,
-                    color: c.textMuted,
-                  ),
-                ),
-              ),
-            Flexible(child: ListView(shrinkWrap: true, children: rows)),
-            if (auth.error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                child: Text(
-                  auth.error!,
-                  style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 12.5,
-                    height: 1.45,
-                    color: c.danger,
-                  ),
-                ),
-              ),
-            if (canSignIn) ...[
-              Divider(height: 16, color: c.divider),
-              _SignInAnotherRow(
-                enabled: !auth.busy,
-                onTap: () => _signInAnother(context, ref),
-              ),
-            ],
+          if (canSignIn) ...[
+            Divider(height: 16, color: c.divider),
+            _SignInAnotherRow(
+              enabled: !auth.busy,
+              onTap: () => _signInAnother(context, ref),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
-/// "On this device" — a MODE, and it must not read as an account. No provider
-/// pill, no chevron, no menu: there is no signing out of this device and no
-/// deleting it (AccountsDirectory.withoutAccount refuses to remove it — it is
-/// permanent by construction), and a row offering either would be a promise the
-/// model cannot keep. It is a section label with one job: saying what the
-/// profiles under it are.
-class _LocalHeader extends StatelessWidget {
-  const _LocalHeader({this.onTap});
+/// The profile sheet's one account row — a DOOR, at the foot, named for what it
+/// opens ("Switch account") and captioned with the account whose profiles are
+/// listed above it. It is the answer to the question the split creates: from the
+/// profiles, how does the artist reach the accounts? One door, named — and it
+/// says which account they are in, which the band-less root never did either
+/// (#51).
+class _AccountDoorRow extends StatelessWidget {
+  const _AccountDoorRow({required this.account, required this.onTap});
 
-  /// Only when the mode has no profiles to tap: then the label itself is the
-  /// way in, and RootGate lands the empty profile set on the create step (#38).
+  final AppAccount account;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    final s = context.s;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Divider(height: 16, color: c.divider),
+        Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: c.accentSoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.swap_horiz_rounded,
+                        size: 20, color: c.accent),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.t('settings.account.switch_title'),
+                          style:
+                              outfitStyle(15, c.text, weight: FontWeight.w600),
+                        ),
+                        Text(
+                          // The local mode is not an account, and saying
+                          // "signed in as On this device" would be the same
+                          // muddle in one line.
+                          account.isLocal
+                              ? s.t('widgets.switcher.local_caption')
+                              : s.t('widgets.profile_switcher.signed_in_as',
+                                  {'account': accountDisplayName(context, account)}),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: kFontBody,
+                            fontSize: 12.5,
+                            color: c.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded,
+                      size: 22, color: c.textMuted),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "On this device" — a MODE, and it must not read as an account. No provider
+/// pill, no menu: there is no signing out of this device and no deleting it
+/// (AccountsDirectory.withoutAccount refuses to remove it — it is permanent by
+/// construction), and a row offering either would be a promise the model cannot
+/// keep. It answers *whose profiles am I looking at* with "nobody's — they never
+/// leave this phone", which is why it stands among the accounts and not among
+/// the profiles (#49).
+class _LocalHeader extends StatelessWidget {
+  const _LocalHeader({
+    required this.active,
+    required this.empty,
+    this.onTap,
+  });
+
+  /// The mode this device is in right now — the profiles behind the sheet are
+  /// its profiles.
+  final bool active;
+
+  /// Nothing under it yet: the caption says so, and choosing it lands the empty
+  /// profile set on the create step rather than on nothing (#38).
+  final bool empty;
+
+  /// Null only when it is already the mode in use — there is nowhere to go.
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
     final s = context.s;
-    final label = Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-      child: Row(
-        children: [
-          Icon(Icons.smartphone_rounded, size: 16, color: c.textMuted),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  s.t('widgets.account_switcher.on_this_device'),
-                  style: outfitStyle(13.5, c.textSecondary,
-                      weight: FontWeight.w700),
-                ),
-                Text(
-                  s.t(onTap == null
-                      ? 'widgets.switcher.local_caption'
-                      : 'widgets.switcher.local_empty'),
-                  style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 12,
-                    color: c.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-    if (onTap == null) return label;
     return Material(
-      color: Colors.transparent,
+      color: active ? c.accentSoft : Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(onTap: onTap, child: label),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          child: Row(
+            children: [
+              Icon(Icons.smartphone_rounded, size: 20, color: c.textSecondary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.t('widgets.account_switcher.on_this_device'),
+                      style: outfitStyle(
+                        14.5,
+                        c.text,
+                        weight: active ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      s.t(empty && !active
+                          ? 'widgets.switcher.local_empty'
+                          : 'widgets.switcher.local_caption'),
+                      style: TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 12,
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (active)
+                Icon(Icons.check_circle_rounded, size: 22, color: c.accent)
+              else
+                Icon(Icons.chevron_right_rounded, size: 22, color: c.textMuted),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

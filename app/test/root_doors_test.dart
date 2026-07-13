@@ -159,8 +159,8 @@ void main() {
       expect(find.byType(ProfilePickScreen), findsNothing);
     });
 
-    testWidgets('opens THE switcher over itself — accounts, profiles, sign in',
-        (tester) async {
+    testWidgets('"Switch account" opens the ACCOUNT sheet — the label and the '
+        'sheet finally agree (#49)', (tester) async {
       final local = await _store();
       await local.saveAccountsDirectory(_signedIn());
       await _pumpApp(tester, local,
@@ -169,7 +169,19 @@ void main() {
       await tester.tap(find.text('Switch account'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Your profiles'), findsWidgets);
+      // This test used to tap "Switch account" and assert "Your profiles" —
+      // green, and the bug: the only control in the app that said "account"
+      // opened the profile sheet, and there was no account picker anywhere. (It
+      // was vacuous twice over: "Your profiles" is also this screen's OWN app-bar
+      // title, so the assertion could not tell the sheet from the room it opened
+      // over. The account sheet's heading names only itself.)
+      expect(find.text('Your accounts'), findsOneWidget);
+      expect(find.text('Add a profile'), findsNothing,
+          reason: 'the profile sheet is not what this label promises');
+      // The accounts this device knows, the mode that is not one, and the door
+      // to an account it has never seen.
+      expect(find.text('Casey'), findsOneWidget);
+      expect(find.text('On this device'), findsOneWidget);
       expect(find.text('Sign in to another account'), findsOneWidget);
       // A sheet, not a route: the screen that opened it is still standing.
       expect(find.byType(ProfilePickScreen), findsOneWidget);
@@ -206,7 +218,10 @@ void main() {
     expect(find.byType(SettingsRouteScreen), findsOneWidget);
     // The way back INTO the account the device remembers…
     expect(find.text('Sign in / Create account'), findsOneWidget);
-    // …the switcher, which lists it…
+    // …the account sheet, which lists it (its session is gone, not the account
+    // — one tap signs it back in)…
+    expect(find.text('Switch account'), findsOneWidget);
+    // …the profile sheet, for the profiles of whatever it lands in…
     expect(find.text('Switch profile'), findsOneWidget);
     // …and the device kind, which is how a device becomes a venue tablet or a
     // demo again.

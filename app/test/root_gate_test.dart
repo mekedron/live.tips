@@ -214,7 +214,7 @@ void main() {
 
   testWidgets(
       'the empty "On this device" mode is not a dead end: picking it from the '
-      'switcher lands on the create step, never back on the switcher (#38)',
+      'account sheet lands on the create step, never back on the sheet (#38)',
       (tester) async {
     // The state the artist is really in after the upload flow moved their
     // local profiles into an account (#25/#30), or after deleting the last
@@ -248,16 +248,23 @@ void main() {
     );
     expect(find.byType(AppShell), findsOneWidget);
 
-    // Settings is a TAB of the shell, so the switcher opens straight over the
+    // Settings is a TAB of the shell, so the sheet opens straight over the
     // root — which is what made the old pushed screen's pop land on the screen
     // it came from. A sheet has no route identity to collide with.
+    //
+    // The mode is an ACCOUNT-sheet row (#49): "whose profiles am I looking at"
+    // is the question it answers, and Settings' account group is where the door
+    // to that question lives.
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Switch profile'));
+    await tester.tap(find.text('Switch account'));
     await tester.pumpAndSettle();
+    expect(find.text('Your accounts'), findsOneWidget);
     expect(find.text('On this device'), findsOneWidget);
 
-    // With no profiles under it, the mode's own label is the door in.
+    // One tap on the mode itself — the merged sheet only let it be tapped when
+    // it was empty, because otherwise its profiles were the way in. There are no
+    // profiles in this sheet, so the row is always the door.
     await tester.tap(find.text('On this device'));
     await tester.pumpAndSettle();
 

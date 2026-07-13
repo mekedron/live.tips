@@ -18,13 +18,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers.dart';
 
-/// ONE switcher (#29). Switching the account and switching the profile were two
-/// surfaces, two shapes and two rule sets for one question — "which of my things
-/// am I working in right now?" — and every bug in that family came out of the
-/// split. These tests pin the rules that are now written once: a live session
-/// refuses BOTH kinds with one sentence, a profile under another account is one
-/// action, the destructive acts are reachable here and guarded, and the device's
-/// own profiles are a MODE, not an account.
+/// TWO switchers, ONE design (#49). #29 brought the account screen and the band
+/// sheet into one shape — and merged the two questions while it was there: a
+/// device mode, some profiles, an account and two doors, one flat list, one
+/// heading. These tests pin the split that undoes that and keeps everything
+/// else: the profile sheet asks *which profile am I performing as*, the account
+/// sheet asks *whose profiles am I looking at*, and the rules they obey — one
+/// guard, one switch, one mint point, one sign-out — are still written once.
 
 const _casey = AuthUser(
   uid: 'uid_1',
@@ -50,9 +50,12 @@ class _IdleSource extends TipSource {
 }
 
 /// Two profiles on the device itself. [cloud] signs an account in beside them
-/// and gives it its own Firestore — the state the switcher must render as one
-/// list: a mode, an account, and the profiles under each.
-Future<ProviderContainer> _pumpSheet(
+/// and gives it its own Firestore, with two profiles of its own — the state in
+/// which "which profile" and "which account" are two visibly different lists.
+///
+/// Neither sheet is opened here: the surface carries a door to each, because
+/// what a door opens is the thing under test.
+Future<ProviderContainer> _pumpDoors(
   WidgetTester tester, {
   bool cloud = false,
   bool live = false,
@@ -116,9 +119,18 @@ Future<ProviderContainer> _pumpSheet(
         home: Scaffold(
           body: Center(
             child: Consumer(
-              builder: (context, ref, _) => TextButton(
-                onPressed: () => showSwitcherSheet(context, ref),
-                child: const Text('open'),
+              builder: (context, ref, _) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: () => showProfileSheet(context, ref),
+                    child: const Text('profiles'),
+                  ),
+                  TextButton(
+                    onPressed: () => showAccountSheet(context, ref),
+                    child: const Text('accounts'),
+                  ),
+                ],
               ),
             ),
           ),
@@ -137,9 +149,12 @@ Future<ProviderContainer> _pumpSheet(
     expect(container.read(liveSessionProvider), isNotNull);
     await tester.pumpAndSettle();
   }
-  await tester.tap(find.text('open'));
-  await tester.pumpAndSettle();
   return container;
+}
+
+Future<void> _open(WidgetTester tester, String door) async {
+  await tester.tap(find.text(door));
+  await tester.pumpAndSettle();
 }
 
 /// Lets a live session's poll timer (and a snackbar's) drain before teardown.
@@ -150,25 +165,75 @@ Future<void> _drain(WidgetTester tester, ProviderContainer container) async {
 }
 
 void main() {
-  testWidgets('one list: the device\'s profiles, the accounts, and both doors',
-      (tester) async {
-    await _pumpSheet(tester, cloud: true);
+  testWidgets('the PROFILE sheet asks one question: the profiles of the '
+      'account in use, and how to add one', (tester) async {
+    await _pumpDoors(tester, cloud: true);
+    await _open(tester, 'profiles');
 
-    // The mode, its profiles, the account, ITS profile — one sheet.
-    expect(find.text('On this device'), findsOneWidget);
-    expect(find.text('Solo Act'), findsOneWidget);
-    expect(find.text('The Midnight Foxes'), findsOneWidget);
-    expect(find.text('Casey'), findsOneWidget);
+    expect(find.text('Your profiles'), findsOneWidget);
+    // The profiles of the account the artist is IN — those, and the way to make
+    // another.
     expect(find.text('Duo Sundays'), findsOneWidget);
     expect(find.text('Night Shift'), findsOneWidget);
-    // …and the two doors that used to live on two different screens.
     expect(find.text('Add a profile'), findsOneWidget);
+
+    // …and nothing that is not a profile. The merged sheet stood a device MODE,
+    // an ACCOUNT with a provider pill and a sign-in door in this same column,
+    // and the artist had to know which of the four kinds each row was (#49).
+    expect(find.text('On this device'), findsNothing);
+    expect(find.text('Google'), findsNothing);
+    expect(find.text('Sign in to another account'), findsNothing);
+    // Nor the profiles of an account the artist is not in — the device's own
+    // local ones belong to the local MODE, which is a different answer to a
+    // different question.
+    expect(find.text('Solo Act'), findsNothing);
+    expect(find.text('The Midnight Foxes'), findsNothing);
+
+    // One door out, at the foot, named for what it opens — and it says which
+    // account these profiles are in.
+    expect(find.text('Switch account'), findsOneWidget);
+    expect(find.text('Signed in as Casey'), findsOneWidget);
+  });
+
+  testWidgets('the ACCOUNT sheet asks the other one: the accounts, the device '
+      'mode, and the door to a new sign-in', (tester) async {
+    await _pumpDoors(tester, cloud: true);
+    await _open(tester, 'accounts');
+
+    expect(find.text('Your accounts'), findsOneWidget);
+    expect(find.text('Casey'), findsOneWidget);
+    expect(find.text('Google'), findsOneWidget);
+    // The local mode is an answer to "whose profiles am I looking at" — it
+    // stands here, among the accounts, and not among the profiles.
+    expect(find.text('On this device'), findsOneWidget);
     expect(find.text('Sign in to another account'), findsOneWidget);
+
+    // And not one profile: this device holds no list of another account's
+    // profiles, and the ones it does hold answer the other question.
+    expect(find.text('Duo Sundays'), findsNothing);
+    expect(find.text('Solo Act'), findsNothing);
+    expect(find.text('Add a profile'), findsNothing);
+  });
+
+  testWidgets('the profile sheet\'s door opens the ACCOUNT sheet — the label '
+      'and the sheet agree', (tester) async {
+    await _pumpDoors(tester, cloud: true);
+    await _open(tester, 'profiles');
+
+    await tester.tap(find.text('Switch account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your accounts'), findsOneWidget);
+    expect(find.text('Casey'), findsOneWidget);
+    expect(find.text('Sign in to another account'), findsOneWidget);
+    // One sheet at a time: the profile sheet closed on its way out.
+    expect(find.text('Your profiles'), findsNothing);
   });
 
   testWidgets('"On this device" is a mode, not an account: nothing to sign out '
       'of and nothing to delete', (tester) async {
-    await _pumpSheet(tester);
+    await _pumpDoors(tester);
+    await _open(tester, 'accounts');
 
     expect(find.text('On this device'), findsOneWidget);
     expect(find.text('Not an account — these stay on this device'),
@@ -182,40 +247,49 @@ void main() {
     expect(find.byIcon(Icons.delete_outline_rounded), findsNothing);
   });
 
-  testWidgets('a profile under ANOTHER account is ONE action: the flip and the '
-      'choice together', (tester) async {
-    final container = await _pumpSheet(tester, cloud: true);
+  testWidgets('leaving a cloud account for the device mode is one flip — and '
+      'the profile question that follows is the mode\'s own', (tester) async {
+    final container = await _pumpDoors(tester, cloud: true);
     expect(container.read(accountsDirectoryProvider).activeAccountId, 'uid_1');
+    await _open(tester, 'accounts');
 
-    // One tap on a profile that lives under a different account. The artist
-    // never says "switch account" first, and is never dropped on a picker to
-    // answer the question they have just answered (#25/#28).
-    await tester.tap(find.text('The Midnight Foxes'));
+    await tester.tap(find.text('On this device'));
     await tester.pumpAndSettle();
 
     expect(container.read(accountsDirectoryProvider).activeAccountId,
         kLocalAccountId);
-    expect(container.read(appStateProvider).accountId, 'acc_b',
-        reason: 'exactly the profile that was tapped — not the one this device '
-            'last had open over there');
+    expect(container.read(appStateProvider).accountId, 'acc_a',
+        reason: 'the mode opens on the profile this device last had in it — '
+            'the artist is not asked a question they already answered');
+    // The sheet closed over what the flip landed on (#38).
+    expect(find.text('Your accounts'), findsNothing);
   });
 
-  testWidgets('a live session refuses BOTH kinds of switch, in one sentence',
+  testWidgets('a live session refuses a PROFILE switch, and says why',
       (tester) async {
-    final container = await _pumpSheet(tester, cloud: true, live: true);
+    final container = await _pumpDoors(tester, cloud: true, live: true);
+    await _open(tester, 'profiles');
 
-    // A profile of the account in use — the switch the band sheet always
-    // refused.
     await tester.tap(find.text('Night Shift'));
     await tester.pumpAndSettle();
+
     expect(
         find.text('Stop the live session before switching.'), findsOneWidget);
     expect(container.read(appStateProvider).accountId, isNot('acc_cloud2'));
 
-    // And a whole account — the switch the ACCOUNT screen used to allow (#2),
-    // which is how a flip landed under a live set. Same guard, same words.
+    await _drain(tester, container);
+  });
+
+  testWidgets('a live session refuses an ACCOUNT flip too — the same guard, '
+      'the same sentence', (tester) async {
+    // The switch the old account SCREEN used to allow (#2), which is how a flip
+    // landed under a live set. Two sheets, and still one guard.
+    final container = await _pumpDoors(tester, cloud: true, live: true);
+    await _open(tester, 'accounts');
+
     await tester.tap(find.text('On this device'));
     await tester.pumpAndSettle();
+
     expect(
         find.text('Stop the live session before switching.'), findsOneWidget);
     expect(container.read(accountsDirectoryProvider).activeAccountId, 'uid_1',
@@ -225,9 +299,10 @@ void main() {
     await _drain(tester, container);
   });
 
-  testWidgets('sign out is here, looks destructive, and is guarded',
-      (tester) async {
-    final container = await _pumpSheet(tester, cloud: true, live: true);
+  testWidgets('sign out is in the account sheet, looks destructive, and is '
+      'guarded', (tester) async {
+    final container = await _pumpDoors(tester, cloud: true, live: true);
+    await _open(tester, 'accounts');
 
     // Guarded first: an account cannot be dropped out from under a live set,
     // and the refusal is the one every other act here gives.
@@ -262,7 +337,8 @@ void main() {
 
   testWidgets('adding a profile is refused mid-session, and says why',
       (tester) async {
-    final container = await _pumpSheet(tester, live: true);
+    final container = await _pumpDoors(tester, live: true);
+    await _open(tester, 'profiles');
 
     await tester.tap(find.text('Add a profile'));
     await tester.pumpAndSettle();
@@ -304,8 +380,8 @@ void main() {
             body: Center(
               child: Consumer(
                 builder: (context, ref, _) => TextButton(
-                  onPressed: () => showSwitcherSheet(context, ref),
-                  child: const Text('open'),
+                  onPressed: () => showProfileSheet(context, ref),
+                  child: const Text('profiles'),
                 ),
               ),
             ),
@@ -314,13 +390,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('open'));
-    await tester.pumpAndSettle();
+    await _open(tester, 'profiles');
 
     // The tablet's profiles, and nothing that skips the banner's
-    // approve-and-wipe ceremony: no other accounts, no sign-in door, not even
-    // the local mode.
+    // approve-and-wipe ceremony: no door to the account sheet at all, so no
+    // sign-in and no other account — the ways in and out of an account on a
+    // public device run through the banner.
     expect(find.text('Solo Act'), findsOneWidget);
+    expect(find.text('Switch account'), findsNothing);
     expect(find.text('Sign in to another account'), findsNothing);
     expect(find.text('On this device'), findsNothing);
 

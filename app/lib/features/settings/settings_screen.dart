@@ -380,12 +380,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onTap: () => confirmSignOut(context, ref),
                 ),
             ],
-            // "Switch account" used to sit here, a second door to a second
-            // switcher — one that knew about accounts and nothing about the
-            // profiles inside them. There is one switcher now (#29), it is in
-            // the profile group below where the artist looks for it, and it
-            // lists both. The row is gone rather than aliased: two rows opening
-            // the same sheet is the same split, redrawn.
+            // The account door — in the ACCOUNT group, opening the ACCOUNT
+            // sheet (#49). It stands beside "Switch profile" below, and the two
+            // are not a redrawn split: they open two sheets that ask two
+            // different questions, in the same shape, under the same rules. Only
+            // where there is another account to reach, though: with none, the
+            // sheet would hold this device and a sign-in offer the row above it
+            // already makes.
+            if (!venueMode && directory.accounts.any((a) => !a.isLocal))
+              LtRow(
+                icon: Icons.switch_account_rounded,
+                title: s.t('settings.account.switch_title'),
+                subtitle: s.t('settings.account.switch_subtitle'),
+                chevron: true,
+                onTap: () => showAccountSheet(context, ref),
+              ),
           ],
         ),
       // ------------------------------------------------ account details ---
@@ -424,14 +433,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
-            // THE switcher — profiles and the accounts they live under, one
-            // list, one set of rules (#29).
+            // The PROFILE switcher: the profiles of the account in use, and the
+            // one way to make another. The accounts are the row in the account
+            // group above, and the door at the foot of this sheet — a control
+            // never carries a word for a thing it does not do (#49).
             LtRow(
               icon: Icons.swap_horiz_rounded,
               title: s.t('settings.main.switch_profile'),
               subtitle: s.t('settings.main.switch_profile_subtitle'),
               chevron: true,
-              onTap: () => showSwitcherSheet(context, ref),
+              onTap: () => showProfileSheet(context, ref),
             ),
             // ONE removal, and it is account-wide (#37). "Remove from this
             // device" sat here for a few hours and had to go with the model it

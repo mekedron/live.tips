@@ -128,13 +128,17 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     navigator.popUntil((route) => route.isFirst);
   }
 
-  /// The other door of the root form: an account with no profile the artist
-  /// wants (or with none at all) is not a trap — THE switcher, with every
-  /// account this device knows and a fresh sign-in in it, is one tap away.
-  /// A sheet, so this screen is still standing under it when the artist
-  /// changes their mind (and so the flip cannot land on a rebuild of the very
-  /// route it was tapped on — #38).
-  void _switchAccount() => unawaited(showSwitcherSheet(context, ref));
+  /// The other door of the root form, and it opens what its label says (#49):
+  /// this screen IS the profile question of the account in use, so the only
+  /// switcher that has anything to offer an artist standing on it is the
+  /// ACCOUNT one — every account this device knows, the local mode, and a fresh
+  /// sign-in. (It used to open the profile sheet, under the words "Switch
+  /// account", and there was no account picker in the app at all.)
+  ///
+  /// A sheet, so this screen is still standing under it when the artist changes
+  /// their mind (and so the flip cannot land on a rebuild of the very route it
+  /// was tapped on — #38).
+  void _switchAccount() => unawaited(showAccountSheet(context, ref));
 
   /// And the door the shell has always had, which this root did not: Settings.
   /// Sign out, the sign-in methods, delete account, what this device is, the

@@ -31,8 +31,10 @@ const _lockedSubtitle =
 
 final _navigator = GlobalKey<NavigatorState>();
 
-/// The switcher as it is really reached: a sheet over whatever the artist was
-/// looking at, which closes over what they picked.
+/// The ACCOUNT sheet as it is really reached: a sheet over whatever the artist
+/// was looking at, which closes over what they picked. Leaving a guest account
+/// is an ACCOUNT act, so it is asked here — the merged sheet let it be done by
+/// tapping a local profile, which is exactly the muddle #49 undoes.
 Future<ProviderContainer> _pumpSwitcher(
   WidgetTester tester, {
   required AuthUser? session,
@@ -74,7 +76,7 @@ Future<ProviderContainer> _pumpSwitcher(
           body: Center(
             child: Consumer(
               builder: (context, ref, _) => TextButton(
-                onPressed: () => showSwitcherSheet(context, ref),
+                onPressed: () => showAccountSheet(context, ref),
                 child: const Text('open'),
               ),
             ),
@@ -98,15 +100,16 @@ void main() {
     final container =
         await _pumpSwitcher(tester, session: _guest, activeId: 'uid_guest');
 
-    // Leave for a profile of the device itself — under the "On this device"
-    // mode, one tap, no "switch account" step in between.
+    // Leave for the device's own mode — one tap on the row that says so.
     expect(find.text('On this device'), findsOneWidget);
-    await tester.tap(find.text('Home Sessions'));
+    await tester.tap(find.text('On this device'));
     await tester.pumpAndSettle();
     expect(container.read(accountsDirectoryProvider).activeAccountId,
         kLocalAccountId);
+    expect(container.read(appStateProvider).accountId, kTestAccountId,
+        reason: 'and it opens on the profile this device last had in that mode');
     expect(container.read(authControllerProvider).user?.uid, 'uid_guest',
-        reason: 'switching profiles must not end the guest\'s session');
+        reason: 'leaving a guest account must not end its session');
 
     // Come back to the switcher: the guest row is live, not a tombstone.
     await _openSwitcher(tester);

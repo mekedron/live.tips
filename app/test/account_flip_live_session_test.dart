@@ -161,7 +161,8 @@ void main() {
     expect(secure.values, isEmpty);
   });
 
-  testWidgets('the switcher refuses an account flip mid-session, and says why',
+  testWidgets(
+      'the account sheet refuses an account flip mid-session, and says why',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(600, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -204,7 +205,7 @@ void main() {
           body: Center(
             child: Consumer(
               builder: (context, ref, _) => TextButton(
-                onPressed: () => showSwitcherSheet(context, ref),
+                onPressed: () => showAccountSheet(context, ref),
                 child: const Text('open'),
               ),
             ),
@@ -216,12 +217,18 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    // A profile of the device itself is one tap away — the tap that used to
-    // flip the directory under the running set. (The BAND switcher always
-    // refused this; the ACCOUNT switcher did not. One switcher, one guard, one
-    // sentence — whichever of the two things moved.)
+    // Leaving this account for the device's own mode is one tap — the tap that
+    // used to flip the directory under the running set. (The old BAND sheet
+    // always refused it; the old ACCOUNT screen did not. Two sheets again (#49),
+    // and still ONE guard and one sentence — whichever of the two things moved.
+    // The account flip is asked HERE, on the sheet whose label says account: the
+    // merged sheet made it by tapping a profile of the local mode, which is the
+    // confusion this split ends.)
     expect(find.text('On this device'), findsOneWidget);
-    await tester.tap(find.text('Home Sessions'));
+    expect(find.text('Home Sessions'), findsNothing,
+        reason: 'a profile of a mode this device is not in is not this sheet\'s '
+            'business');
+    await tester.tap(find.text('On this device'));
     await tester.pumpAndSettle();
 
     expect(find.text('Stop the live session before switching.'),

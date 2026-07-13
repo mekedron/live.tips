@@ -11,12 +11,17 @@ import 'package:live_tips/state/providers.dart';
 
 import 'helpers.dart';
 
-/// Settings has ONE door to the switcher now (#29): "Switch profile" opens the
-/// one surface, and it lists the accounts too. The "Switch account" row — the
-/// second door, to the second switcher — is gone; two rows opening the same
-/// sheet would be the same split, redrawn. And the account can be NAMED here:
-/// the sign-up step always promised "you can name the account later in
-/// Settings", and until then there was no such thing.
+/// Settings has TWO doors, and each opens the sheet its label names (#49).
+/// "Switch profile", in the profile group, opens the profiles of the account in
+/// use. "Switch account", in the account group, opens the accounts. #29 deleted
+/// the second row on the grounds that two rows opening the same sheet would be
+/// the split redrawn — which was true of the sheet it left behind, one list
+/// holding a mode, some profiles, an account and both doors. Two rows opening
+/// two sheets that ask two different questions are not a split: they are the
+/// two questions, asked apart, in one shape.
+///
+/// And the account can be NAMED here: the sign-up step always promised "you can
+/// name the account later in Settings", and until then there was no such thing.
 
 /// [user] is signed in and active. [known] is an account the DIRECTORY knows
 /// while nothing is signed in — a session that died on its own, which is a
@@ -72,23 +77,41 @@ const _casey = AuthUser(
 );
 
 void main() {
-  testWidgets('one switcher, one row: Switch profile opens the accounts too',
+  testWidgets('Switch profile opens the PROFILES — and nothing else',
       (tester) async {
     await _pumpSettings(tester, user: _casey);
 
     expect(find.text('Switch profile'), findsOneWidget);
-    expect(find.text('Switch account'), findsNothing,
-        reason: 'the second door to the second switcher is gone (#29)');
 
     await tester.tap(find.text('Switch profile'));
     await tester.pumpAndSettle();
 
-    // The one surface: the device's own profiles, the accounts this device
-    // knows, and the door to a new sign-in — all of it in the sheet the header
-    // tap opens too.
-    expect(find.text('On this device'), findsOneWidget);
+    // The profiles of the account in use, and the way to make another. Not the
+    // device mode, not the account rows, not the sign-in door — every one of
+    // which the merged sheet stood in this same column (#49).
+    expect(find.text('Your profiles'), findsOneWidget);
+    expect(find.text('Add a profile'), findsOneWidget);
+    expect(find.text('On this device'), findsNothing);
+    expect(find.text('Sign in to another account'), findsNothing);
+  });
+
+  testWidgets('Switch account opens the ACCOUNTS — the row #29 deleted, back '
+      'because there is now a sheet for it to open', (tester) async {
+    await _pumpSettings(tester, user: _casey);
+
+    expect(find.text('Switch account'), findsOneWidget);
+
+    await tester.tap(find.text('Switch account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your accounts'), findsOneWidget);
+    // The accounts this device knows, the mode that is not one, and the door to
+    // an account it has never seen.
     expect(find.text('Casey'), findsWidgets);
+    expect(find.text('On this device'), findsOneWidget);
     expect(find.text('Sign in to another account'), findsOneWidget);
+    // Not one profile: this sheet answers "whose profiles", not "which".
+    expect(find.text('Add a profile'), findsNothing);
   });
 
   testWidgets('the identity row opens the account rename screen',
@@ -122,15 +145,25 @@ void main() {
     expect(find.text('Use without sign-in'), findsOneWidget);
   });
 
-  testWidgets('signed out: the sign-in row, and the switcher still opens',
-      (tester) async {
+  testWidgets('signed out: no account row to switch between — and the profile '
+      'sheet\'s own door still reaches a sign-in', (tester) async {
     await _pumpSettings(tester, user: null);
 
     expect(find.text('Sign in / Create account'), findsOneWidget);
-    // The switcher is never a door to an empty room: with no account at all it
-    // still holds this device's profiles, and the way into an account.
+    // Nothing to switch BETWEEN: the account sheet would hold this device and
+    // the sign-in offer the row above already makes, so the row stands aside
+    // rather than promising a choice that does not exist.
+    expect(find.text('Switch account'), findsNothing);
+
+    // The way into an account is still one tap from the profiles — the door at
+    // the foot of the sheet, which says what it opens.
     await tester.tap(find.text('Switch profile'));
     await tester.pumpAndSettle();
+    expect(find.text('Your profiles'), findsOneWidget);
+
+    await tester.tap(find.text('Switch account'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your accounts'), findsOneWidget);
     expect(find.text('On this device'), findsOneWidget);
     expect(find.text('Sign in to another account'), findsOneWidget);
   });
@@ -140,11 +173,13 @@ void main() {
     // The row a deliberate sign-out no longer leaves behind (#31) is still
     // exactly right for the other thing: an expired slot, a revoked token, a
     // restart the session did not survive. The account is still this device's;
-    // only its session is gone, and re-authenticating is the way back.
+    // only its session is gone, and re-authenticating is the way back. It is an
+    // ACCOUNT row, so it is in the account sheet (#49) — the rule is unchanged,
+    // only the surface it is read on.
     final auth = FakeAuthService(nextUser: _casey);
     await _pumpSettings(tester, user: null, known: _casey, auth: auth);
 
-    await tester.tap(find.text('Switch profile'));
+    await tester.tap(find.text('Switch account'));
     await tester.pumpAndSettle();
 
     expect(find.text('Casey'), findsOneWidget);
