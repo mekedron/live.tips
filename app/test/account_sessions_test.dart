@@ -75,14 +75,22 @@ void main() {
     expect(sessions.liveUids, ['uid_a']);
   });
 
-  test('a cancelled sign-in returns its slot to the shelf', () async {
+  test('a closed slot is never re-opened in the same run — a deleted app is '
+      'not a free one', () async {
     final sessions = build();
     final pending = await sessions.begin();
     await sessions.abandon(pending);
     expect(closed, [pending.appName]);
-    // The next sign-in reuses the freed slot name.
+
+    // This test used to assert the opposite — that the next sign-in reuses the
+    // freed slot name — and the fake is why it could: `openApp` hands back a
+    // brand-new handle for a name that Firebase itself would hand back DEAD.
+    // Deleting a FirebaseApp does not remove it from the SDK's registry:
+    // `Firebase.app('acct_slot_0')` returns the corpse, and the first query on
+    // its Firestore throws `[core/app-deleted]`. Signing out and signing back in
+    // — one tap of "Not this account" (#41) — red-screened the whole app.
     final next = await sessions.begin();
-    expect(next.appName, pending.appName);
+    expect(next.appName, isNot(pending.appName));
   });
 
   test('restore revives live slots and scrubs dead ones', () async {

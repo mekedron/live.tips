@@ -118,6 +118,16 @@ class AccountSessions {
   bool disableFirestorePersistence = false;
 
   final Map<String, AccountSession> _sessions = {};
+
+  /// App names closed during THIS run. A deleted FirebaseApp is not gone from
+  /// the SDK's registry: `Firebase.app(name)` hands the dead instance straight
+  /// back, and the first query on its Firestore throws
+  /// `[core/app-deleted] Firebase App named 'acct_slot_0' already deleted`.
+  /// So a slot is never re-used within a run — signing out and signing back in
+  /// (which is exactly what "Not this account" does) opened `acct_slot_0` on a
+  /// corpse and red-screened the app. A fresh process starts with an empty
+  /// registry and an empty set, so slot names do not creep across launches.
+  final Set<String> _retired = {};
   final _changes = StreamController<void>.broadcast();
 
   /// Fires on every add/remove — the providers deriving the active account's
@@ -185,6 +195,7 @@ class AccountSessions {
     // The default app hosts the relay transport and must outlive any one
     // account; a legacy session there is dropped by sign-out alone.
     if (appName == _defaultSlot) return;
+    _retired.add(appName);
     final custom = _closeApp;
     if (custom != null) return custom(appName);
     try {
@@ -251,15 +262,21 @@ class AccountSessions {
     if (_sessions.length >= maxAccounts) {
       throw AccountLimitException(maxAccounts);
     }
-    final used = _sessions.values.map((s) => s.appName).toSet();
+    // Never a name this run has already closed: the SDK keeps deleted apps in
+    // its registry and hands them back, dead ([_retired]).
+    final used = {
+      ..._sessions.values.map((s) => s.appName),
+      ..._retired,
+    };
     var k = 0;
     while (used.contains('$_slotPrefix$k')) {
       k++;
     }
     final appName = '$_slotPrefix$k';
     final handles = await _open(appName);
-    // A recycled slot may still hold the session of an account that was
-    // restored dead (or a crashed half sign-in) — scrub before reuse.
+    // A slot restored from a previous run may still hold the session of an
+    // account that was restored dead (or a crashed half sign-in) — scrub
+    // before use.
     if (handles.auth.currentUser != null) {
       await handles.auth.signOut();
     }
