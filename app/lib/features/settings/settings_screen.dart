@@ -38,6 +38,15 @@ import 'stripe_key_screen.dart';
 /// with no profile came to have no Settings at all, and no way back to
 /// onboarding (#40). They push this instead: the same screen, over a root that
 /// is not going anywhere, so its Back arrow means what it says.
+///
+/// "Not going anywhere" is true until the artist uses one of the doors in here
+/// — sign out is one — and then the root DOES move. Those pushes are
+/// [RootBoundRoute]s for exactly that reason: this screen describes the world it
+/// was pushed over, so it comes down with it rather than re-rendering against
+/// whatever profile the flip left active (#48). The guard below
+/// (`app.accountId.isEmpty`) is not that rule and must not be widened into it:
+/// after a sign-out the LOCAL profile is active and its id is not empty, which
+/// is a perfectly true state — just not the artist's.
 class SettingsRouteScreen extends StatelessWidget {
   const SettingsRouteScreen({super.key});
 

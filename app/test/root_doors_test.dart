@@ -152,11 +152,84 @@ void main() {
 
       // The root under the Settings route rebuilt — and the pitch, the demo and
       // the device-kind link are back. "Welcome is unreachable forever" was the
-      // sharpest edge of this room.
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      // sharpest edge of this room. This test used to press Back to see it,
+      // which was the whole of #48: it asked what the root had become and never
+      // what was still standing on top of it. Nothing is: the route came down
+      // with the world it described.
       expect(find.byType(WelcomeScreen), findsOneWidget);
       expect(find.byType(ProfilePickScreen), findsNothing);
+    });
+
+    testWidgets(
+        'signing out takes the Settings route down with the root it described '
+        '(#48)', (tester) async {
+      final local = await _store();
+      await local.saveAccountsDirectory(_signedIn());
+      final container = await _pumpApp(tester, local,
+          auth: _casey(), db: FakeFirebaseFirestore());
+
+      await tester.tap(find.byIcon(Icons.settings_outlined));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsRouteScreen), findsOneWidget);
+
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out').last);
+      await tester.pumpAndSettle();
+
+      // The route is GONE — not merely wrong, gone. Route membership, because a
+      // widget that is still mounted under an opaque screen proves nothing
+      // either way.
+      expect(find.byType(SettingsRouteScreen), findsNothing,
+          reason: 'the root flipped; the route standing on it flips with it');
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      expect(navigator.canPop(), isFalse,
+          reason: 'nothing is left over the root to come back from');
+
+      // What the artist is actually LOOKING at. `find.text` alone would have
+      // been satisfied by a Welcome buried under the Settings route — the trap
+      // #53 documented — so ask what can be touched.
+      expect(find.byType(WelcomeScreen).hitTestable(), findsOneWidget);
+      expect(find.text('Get started').hitTestable(), findsOneWidget);
+
+      // And the button that had no business existing: after the sign-out the
+      // LOCAL profile is active, its id is not empty, and Settings' own guard
+      // (app.accountId.isEmpty) is therefore silent — it is right about the
+      // state it was written for and this is not that state. The route being
+      // gone is what makes the delete gone.
+      expect(find.text('Delete this profile').hitTestable(), findsNothing,
+          reason: 'a destructive act on a profile the artist never opened');
+      expect(container.read(appStateProvider).accountId, isEmpty,
+          reason: 'nothing minted a profile on the way out (#50)');
+    });
+
+    testWidgets(
+        'the rule is the root flip, not the sign-out: switching profile from '
+        'inside the pushed Settings unwinds it too (#48)', (tester) async {
+      // The same class from the other side — the world under the route moves
+      // because the artist chose a profile in the sheet Settings opened. The
+      // root becomes the shell; a Settings route left standing on it would be
+      // describing (and offering to delete) the profile the flip landed on.
+      final db = FakeFirebaseFirestore();
+      final bands = db.collection('users').doc(_uid).collection('bands');
+      await bands.doc('acc_a').set({'name': 'The Foxes', 'createdAtMs': 1});
+      await bands.doc('acc_b').set({'name': 'Duo Sundays', 'createdAtMs': 2});
+      final local = await _store();
+      await local.saveAccountsDirectory(_signedIn());
+      final container = await _pumpApp(tester, local, auth: _casey(), db: db);
+
+      await tester.tap(find.byIcon(Icons.settings_outlined));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsRouteScreen), findsOneWidget);
+
+      await tester.tap(find.text('Switch profile'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('The Foxes'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(appStateProvider).accountId, 'acc_a');
+      expect(find.byType(SettingsRouteScreen), findsNothing);
+      expect(find.byType(AppShell).hitTestable(), findsOneWidget);
     });
 
     testWidgets('"Switch account" opens the ACCOUNT sheet — the label and the '

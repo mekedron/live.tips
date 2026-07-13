@@ -10,6 +10,7 @@ import '../../domain/band_account.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
+import '../../state/root_world.dart';
 import '../../state/venue_providers.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/profile_switcher.dart';
@@ -147,8 +148,15 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
   /// demo — every exit from a state lives in there, and a root with no tab bar
   /// used to reach none of them (#40). A pushed route over a root that is not
   /// moving: its Back arrow comes back here, which is where the artist is.
+  ///
+  /// [RootBoundRoute], because the root under it CAN move — and the doors that
+  /// move it are the ones behind this very screen. A sign-out taken in there
+  /// rebuilt the root into Welcome and left Settings standing on top of it,
+  /// re-rendered against the local profile, offering to delete a profile the
+  /// artist had never opened (#48). The route describes this world; when the
+  /// world goes, it goes.
   void _settings() => unawaited(Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const SettingsRouteScreen()),
+        RootBoundRoute(builder: (_) => const SettingsRouteScreen()),
       ));
 
   /// "Add a profile" by another name — the same call, the same rule: the tap

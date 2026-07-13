@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../state/auth_providers.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
+import '../../state/root_world.dart';
 import '../../state/venue_providers.dart';
 import '../onboarding/account_name_screen.dart';
 import '../onboarding/profile_pick_screen.dart';
@@ -109,8 +110,11 @@ class _RedirectSignInGateState extends ConsumerState<RedirectSignInGate> {
         final render = ref.read(activeProfileRenderProvider);
         if (ref.read(deviceKindProvider) != DeviceKind.venue &&
             (render == ProfileRender.pick || render == ProfileRender.create)) {
+          // Bound to the root it lands over, exactly as the picker's own
+          // Settings icon is: a sign-out taken in there must take this route
+          // down with the root it describes (#48).
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SettingsRouteScreen()),
+            RootBoundRoute(builder: (_) => const SettingsRouteScreen()),
           );
         } else {
           ref.read(shellTabRequestProvider.notifier).request(ShellTab.settings);
