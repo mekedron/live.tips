@@ -176,7 +176,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     ref.watch(repoRevisionProvider);
     final sessions = ref
         .watch(accountDataRepositoryProvider)
-        .readSessionHistory(app.accountId)
+        .readSessionHistory(app.storageId)
         .reversed
         .toList();
     final jar = app.effectiveTipJar;

@@ -164,7 +164,11 @@ void main() {
     final container =
         await pumpGuard(tester, initialDb: db, tipSource: source);
 
-    container.read(appStateProvider.notifier).enterDemo();
+    // A REAL set, on a real key — not demo. This test is about an artist's
+    // night being archived as their device is revoked out from under them,
+    // and a demo set is now archived where demo's data lives, not the band's
+    // (#52). Demo was only ever standing in here for "connected".
+    await container.read(appStateProvider.notifier).connect('rk_test_key');
     await container.read(liveSessionProvider.notifier).start(goalMinor: 1000);
     await tester.pumpAndSettle();
     expect(container.read(liveSessionProvider), isNotNull);

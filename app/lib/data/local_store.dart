@@ -102,6 +102,28 @@ class LocalStore {
   static const kRelayLinkReplacedBase = 'relay_link_replaced_v1';
   static const kBandSettingsBase = 'band_settings_v1';
 
+  /// The namespace demo play owns. Demo is not a band, and it must not write
+  /// into one: its "Go live" persists a crash snapshot, a goal, a QR mode, a
+  /// poster and — on Stop — a whole session, and every one of those used to
+  /// land under whatever band the app happened to have open (on a fresh
+  /// install, the very band the details step then names as the artist's first
+  /// profile) or under no band at all (the empty suffix, on a device whose
+  /// last profile was removed). See #52. Demo keeps all of it — a demo that
+  /// forgets the night it just played is a worse demo — but it keeps it HERE,
+  /// and [DeviceKindNotifier.clearDemo] wipes exactly this namespace when the
+  /// artist leaves, so a device that only tried the demo is left as it was
+  /// found. Not in `acc_*` shape ([BandAccount.newId]), so it can never
+  /// collide with a real band's id.
+  static const kDemoAccountId = 'demo';
+
+  /// An empty account id is not an account id: every per-band read and write
+  /// below refuses one. With no band there is nobody to own the data, and
+  /// `<base>_` is a namespace belonging to nobody — nothing reads it once a
+  /// real band exists, no wipe can name it, no switcher can show it. A caller
+  /// with an empty id is asking about a band that does not exist, and the
+  /// honest answer is "nothing stored" (#52).
+  static bool _owned(String accountId) => accountId.isNotEmpty;
+
   /// Every per-band key base — the definition of "a band's local data" for
   /// wipes, emptiness checks, and the migration.
   static const accountKeyBases = [
@@ -163,11 +185,14 @@ class LocalStore {
   /// garbage collection of abandoned, never-configured bands. Deliberately
   /// checks every per-band key (including the relay-tip archive, which is
   /// the only record of those tips anywhere) so "empty" can never eat data.
-  bool accountHasData(String accountId) => accountKeyBases
-      .any((base) => _prefs.containsKey(accountKey(base, accountId)));
+  bool accountHasData(String accountId) =>
+      _owned(accountId) &&
+      accountKeyBases
+          .any((base) => _prefs.containsKey(accountKey(base, accountId)));
 
   /// Removes every local blob belonging to [accountId].
   Future<void> wipeAccount(String accountId) async {
+    if (!_owned(accountId)) return;
     for (final base in accountKeyBases) {
       await _prefs.remove(accountKey(base, accountId));
     }
@@ -316,6 +341,7 @@ class LocalStore {
   // --- Tip jar ---
 
   TipJar? readTipJar(String accountId) {
+    if (!_owned(accountId)) return null;
     final raw = _getString(accountKey(kTipJarBase, accountId));
     if (raw == null) return null;
     try {
@@ -325,16 +351,21 @@ class LocalStore {
     }
   }
 
-  Future<void> saveTipJar(String accountId, TipJar jar) => _setString(
-      accountKey(kTipJarBase, accountId), jsonEncode(jar.toJson()));
+  Future<void> saveTipJar(String accountId, TipJar jar) async {
+    if (!_owned(accountId)) return;
+    await _setString(
+        accountKey(kTipJarBase, accountId), jsonEncode(jar.toJson()));
+  }
 
   Future<void> clearTipJar(String accountId) async {
+    if (!_owned(accountId)) return;
     await _prefs.remove(accountKey(kTipJarBase, accountId));
   }
 
   // --- Relay jar (connected mode) ---
 
   RelayJar? readRelayJar(String accountId) {
+    if (!_owned(accountId)) return null;
     final raw = _getString(accountKey(kRelayJarBase, accountId));
     if (raw == null) return null;
     try {
@@ -344,35 +375,47 @@ class LocalStore {
     }
   }
 
-  Future<void> saveRelayJar(String accountId, RelayJar jar) =>
-      _setString(
-          accountKey(kRelayJarBase, accountId), jsonEncode(jar.toJson()));
+  Future<void> saveRelayJar(String accountId, RelayJar jar) async {
+    if (!_owned(accountId)) return;
+    await _setString(
+        accountKey(kRelayJarBase, accountId), jsonEncode(jar.toJson()));
+  }
 
   Future<void> clearRelayJar(String accountId) async {
+    if (!_owned(accountId)) return;
     await _prefs.remove(accountKey(kRelayJarBase, accountId));
     await _prefs.remove(accountKey(kRelaySeenAtBase, accountId));
   }
 
   /// When (ms since epoch) the relay was last told the artist had seen
   /// everything — the keep-alive/seen marker for this band's jar.
-  int? readRelaySeenAt(String accountId) =>
-      _prefs.getInt(accountKey(kRelaySeenAtBase, accountId));
+  int? readRelaySeenAt(String accountId) => _owned(accountId)
+      ? _prefs.getInt(accountKey(kRelaySeenAtBase, accountId))
+      : null;
 
-  Future<void> writeRelaySeenAt(String accountId, int ms) =>
-      _prefs.setInt(accountKey(kRelaySeenAtBase, accountId), ms);
+  Future<void> writeRelaySeenAt(String accountId, int ms) async {
+    if (!_owned(accountId)) return;
+    await _prefs.setInt(accountKey(kRelaySeenAtBase, accountId), ms);
+  }
 
   /// The tip URL of a jar that stopped working and was auto-replaced, kept
   /// until the artist dismisses the "please reprint" notice. Null when there
   /// is nothing to warn about.
-  String? readRelayLinkReplaced(String accountId) =>
-      _getString(accountKey(kRelayLinkReplacedBase, accountId));
+  String? readRelayLinkReplaced(String accountId) => _owned(accountId)
+      ? _getString(accountKey(kRelayLinkReplacedBase, accountId))
+      : null;
 
-  Future<void> writeRelayLinkReplaced(String accountId, String oldTipUrl) =>
-      _setString(
-          accountKey(kRelayLinkReplacedBase, accountId), oldTipUrl);
+  Future<void> writeRelayLinkReplaced(
+      String accountId, String oldTipUrl) async {
+    if (!_owned(accountId)) return;
+    await _setString(
+        accountKey(kRelayLinkReplacedBase, accountId), oldTipUrl);
+  }
 
-  Future<void> clearRelayLinkReplaced(String accountId) =>
-      _prefs.remove(accountKey(kRelayLinkReplacedBase, accountId));
+  Future<void> clearRelayLinkReplaced(String accountId) async {
+    if (!_owned(accountId)) return;
+    await _prefs.remove(accountKey(kRelayLinkReplacedBase, accountId));
+  }
 
   // --- Relay tip history (device-local tip-page archive) ---
 
@@ -383,6 +426,7 @@ class LocalStore {
   /// session controller filters demo tips out at the write site), so there
   /// is nothing simulated to purge.
   List<Tip> readRelayHistory(String accountId) {
+    if (!_owned(accountId)) return [];
     final raw = _getString(accountKey(kRelayHistoryBase, accountId));
     if (raw == null) return [];
     try {
@@ -399,7 +443,7 @@ class LocalStore {
   /// capped at [relayHistoryCap] with the oldest dropped beyond it.
   Future<void> appendRelayHistory(
       String accountId, List<Tip> tips) async {
-    if (tips.isEmpty) return;
+    if (!_owned(accountId) || tips.isEmpty) return;
     final existing = readRelayHistory(accountId);
     final ids = existing.map((d) => d.id).toSet();
     final fresh = [
@@ -463,6 +507,7 @@ class LocalStore {
   /// `const BandSettings()` then would overwrite the settings the crashed run
   /// had already committed to the cloud.
   BandSettings? readBandSettingsOrNull(String accountId) {
+    if (!_owned(accountId)) return null;
     final raw = _getString(accountKey(kBandSettingsBase, accountId));
     if (raw == null) return null;
     try {
@@ -472,13 +517,16 @@ class LocalStore {
     }
   }
 
-  Future<void> saveBandSettings(String accountId, BandSettings band) =>
-      _setString(
-          accountKey(kBandSettingsBase, accountId), jsonEncode(band.toJson()));
+  Future<void> saveBandSettings(String accountId, BandSettings band) async {
+    if (!_owned(accountId)) return;
+    await _setString(
+        accountKey(kBandSettingsBase, accountId), jsonEncode(band.toJson()));
+  }
 
   // --- Session history ---
 
   List<LiveSession> readSessionHistory(String accountId) {
+    if (!_owned(accountId)) return [];
     final raw = _getString(accountKey(kHistoryBase, accountId));
     if (raw == null) return [];
     try {
@@ -492,6 +540,7 @@ class LocalStore {
 
   Future<void> appendSessionToHistory(
       String accountId, LiveSession session) async {
+    if (!_owned(accountId)) return;
     final history = readSessionHistory(accountId)..add(session);
     await _setString(
       accountKey(kHistoryBase, accountId),
@@ -502,6 +551,7 @@ class LocalStore {
   // --- Active session (crash recovery) ---
 
   LiveSession? readActiveSession(String accountId) {
+    if (!_owned(accountId)) return null;
     final raw = _getString(accountKey(kActiveSessionBase, accountId));
     if (raw == null) return null;
     try {
@@ -511,11 +561,13 @@ class LocalStore {
     }
   }
 
-  String? readActiveCursor(String accountId) =>
-      _getString(accountKey(kActiveCursorBase, accountId));
+  String? readActiveCursor(String accountId) => _owned(accountId)
+      ? _getString(accountKey(kActiveCursorBase, accountId))
+      : null;
 
   Future<void> saveActiveSession(
       String accountId, LiveSession session, String? cursor) async {
+    if (!_owned(accountId)) return;
     await _setString(
       accountKey(kActiveSessionBase, accountId),
       jsonEncode(session.toJson()),
@@ -526,6 +578,7 @@ class LocalStore {
   }
 
   Future<void> clearActiveSession(String accountId) async {
+    if (!_owned(accountId)) return;
     await _prefs.remove(accountKey(kActiveSessionBase, accountId));
     await _prefs.remove(accountKey(kActiveCursorBase, accountId));
   }
@@ -542,6 +595,7 @@ class LocalStore {
   /// never shows tips that weren't real money. Called when a real account
   /// connects, and once at startup for an already-connected live account.
   Future<void> purgeSimulatedData(String accountId) async {
+    if (!_owned(accountId)) return;
     final all = readSessionHistory(accountId);
     final real = all.where((s) => !_isSimulated(s)).toList();
     // Write only when something actually changes: materializing an empty

@@ -99,8 +99,9 @@ class AppState {
     this.switching = false,
   });
 
-  /// The active band — every jar/secret below belongs to it, and every
-  /// per-band storage read/write is keyed by it.
+  /// The active band — every jar/secret below belongs to it. Empty means
+  /// there is no band: a cloud account with no profile yet, the picker's open
+  /// question, a demo. It is NOT a storage key; [storageId] is (#52).
   final String accountId;
 
   /// All local bands, creation order (the switcher lists them as-is).
@@ -125,6 +126,22 @@ class AppState {
   /// True while a band switch is loading its keychain secrets — sessions
   /// must not start and further switches are refused until it commits.
   final bool switching;
+
+  /// WHERE this app state's per-band data is stored — the band's own slots,
+  /// or demo's ([LocalStore.kDemoAccountId]) while demo is on.
+  ///
+  /// Demo renders the whole shell with no band of its own (#47), and it can
+  /// go live: a demo set persists a snapshot, a goal, a QR mode, a poster and
+  /// an archived session. Keyed by [accountId] those writes landed in the
+  /// band that happened to be open — on a fresh install, the very band the
+  /// artist is about to name as their first profile, which then showed a
+  /// night that never happened in its History — or, with no band at all,
+  /// under the empty suffix `<base>_`, a namespace owned by nobody (#52).
+  ///
+  /// Demo owns its data and [DeviceKindNotifier.clearDemo] wipes it, so a
+  /// device that only tried the demo is left exactly as it was found. An
+  /// empty id reaches storage from nowhere else: [LocalStore] refuses it.
+  String get storageId => demo ? LocalStore.kDemoAccountId : accountId;
 
   bool get hasStripe => apiKey != null;
   bool get hasRelay => relayJar != null;
@@ -449,12 +466,27 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(apiKey: trimmed, demo: false);
   }
 
+  /// Demo play begins. The band settings come from demo's OWN namespace
+  /// ([AppState.storageId]) — the goal and stage look a previous demo left,
+  /// never the artist's band's (#52).
   void enterDemo() {
-    state = state.copyWith(demo: true);
+    final repo = ref.read(accountDataRepositoryProvider);
+    state = state.copyWith(
+      demo: true,
+      band: repo.readBandSettings(LocalStore.kDemoAccountId),
+    );
   }
 
+  /// Demo play ends. The band settings go back to the real band's — or to the
+  /// defaults when there is no band, which is the honest answer for a device
+  /// that has none. The demo's own data is wiped by [DeviceKindNotifier
+  /// .clearDemo], which the exit path awaits BEFORE dropping this flag (#45).
   void exitDemo() {
-    state = state.copyWith(demo: false);
+    final repo = ref.read(accountDataRepositoryProvider);
+    state = state.copyWith(
+      demo: false,
+      band: repo.readBandSettings(state.accountId),
+    );
   }
 
   Future<void> setTipJar(TipJar jar) async {
@@ -543,13 +575,15 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(settings: settings);
   }
 
-  /// Persists the active band's own preferences (QR mode, goal, poster).
+  /// Persists the active band's own preferences (QR mode, goal, poster) —
+  /// under [AppState.storageId], so a demo's goal and stage look are the
+  /// demo's, not the band the demo happens to be standing in front of (#52).
   Future<void> updateBand(BandSettings band) async {
-    final accountId = state.accountId;
+    final storageId = state.storageId;
     await ref
         .read(accountDataRepositoryProvider)
-        .saveBandSettings(accountId, band);
-    if (state.accountId != accountId) return;
+        .saveBandSettings(storageId, band);
+    if (state.storageId != storageId) return;
     state = state.copyWith(band: band);
   }
 
@@ -1162,7 +1196,13 @@ final sessionCoordinatorFactoryProvider =
         );
       }
       return LocalSessionCoordinator(
-        accountId: app.accountId,
+        // storageId: the snapshot and the archive this coordinator writes
+        // belong to demo when the set is a demo's, and to the band otherwise.
+        // A demo night written under the active band is a night that never
+        // happened in the artist's own History (#52). The cloud coordinator
+        // above needs no such care — a demo device has no cloud profile to
+        // reach it through (demo is chosen at onboarding, before any account).
+        accountId: app.storageId,
         repository: repo,
         source: source,
         relay: relay,
@@ -1220,16 +1260,16 @@ final recentTipsProvider =
 class RelayHistoryNotifier extends Notifier<List<Tip>> {
   @override
   List<Tip> build() {
-    final accountId =
-        ref.watch(appStateProvider.select((s) => s.accountId));
+    final storageId =
+        ref.watch(appStateProvider.select((s) => s.storageId));
     // A cloud snapshot (another device's tip) lands as a revision bump.
     ref.watch(repoRevisionProvider);
-    return ref.read(accountDataRepositoryProvider).readRelayHistory(accountId);
+    return ref.read(accountDataRepositoryProvider).readRelayHistory(storageId);
   }
 
   void refresh() => state = ref
       .read(accountDataRepositoryProvider)
-      .readRelayHistory(ref.read(appStateProvider).accountId);
+      .readRelayHistory(ref.read(appStateProvider).storageId);
 }
 
 final relayHistoryProvider =

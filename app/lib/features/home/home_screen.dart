@@ -298,7 +298,7 @@ class _DesktopHome extends ConsumerWidget {
     ref.watch(repoRevisionProvider);
     final sessions = ref
         .read(accountDataRepositoryProvider)
-        .readSessionHistory(app.accountId);
+        .readSessionHistory(app.storageId);
     final last = sessions.isEmpty ? null : sessions.last;
 
     return SingleChildScrollView(

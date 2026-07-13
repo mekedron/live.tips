@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/local_store.dart';
 import '../data/venue_boot.dart';
 import '../domain/device_kind.dart';
 import 'auth_providers.dart';
@@ -35,11 +36,22 @@ class DeviceKindNotifier extends Notifier<DeviceKind?> {
     state = kind;
   }
 
-  /// Backing out of demo play — the one kind change that doesn't wipe,
-  /// because demo mode never wrote anything real to protect.
+  /// Backing out of demo play — the one kind change that doesn't wipe the
+  /// DEVICE, because demo never held anything real to protect. It does wipe
+  /// DEMO: a demo "Go live" persists a goal, a QR mode, a poster, a crash
+  /// snapshot and an archived session, all of it in demo's own namespace
+  /// ([LocalStore.kDemoAccountId], #52), and a device that only tried the
+  /// demo must be left exactly as it was found.
+  ///
+  /// The wipe goes FIRST, and the kind is still cleared with an await before
+  /// the caller drops the in-memory flag — RootGate re-enters demo on "the
+  /// install says demo, the flag is off", so that order is #45's fix and it
+  /// stays.
   Future<void> clearDemo() async {
     if (state != DeviceKind.demo) return;
-    await ref.read(localStoreProvider).clearDeviceKind();
+    final local = ref.read(localStoreProvider);
+    await local.wipeAccount(LocalStore.kDemoAccountId);
+    await local.clearDeviceKind();
     state = null;
   }
 

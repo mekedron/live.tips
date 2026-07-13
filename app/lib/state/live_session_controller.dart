@@ -81,9 +81,12 @@ class LiveSessionController extends Notifier<LiveState?> {
   SessionCoordinator? _coordinator;
   ProviderSubscription<FxRates?>? _fxSub;
 
-  /// The band this session belongs to, snapshotted at [_begin] alongside its
-  /// key and jars — every persistence write goes to this band's slots, so a
-  /// session can never leak data into another band's history.
+  /// WHERE this session persists, snapshotted at [_begin] alongside its key
+  /// and jars — every persistence write goes to these slots, so a session can
+  /// never leak data into another band's history. [AppState.storageId], not
+  /// the band id: a demo set belongs to demo's namespace, and writing it
+  /// under the active band put a night that never happened into the artist's
+  /// own History (#52).
   String _accountId = '';
 
   @override
@@ -122,10 +125,10 @@ class LiveSessionController extends Notifier<LiveState?> {
     final app = ref.read(appStateProvider);
     if (app.switching) return false;
     final repo = ref.read(accountDataRepositoryProvider);
-    final stored = repo.readActiveSession(app.accountId);
+    final stored = repo.readActiveSession(app.storageId);
     if (stored == null) return false;
     return _begin(stored,
-        resumeCursor: repo.readActiveCursor(app.accountId),
+        resumeCursor: repo.readActiveCursor(app.storageId),
         mode: SessionStartMode.resume);
   }
 
@@ -146,7 +149,7 @@ class LiveSessionController extends Notifier<LiveState?> {
   Future<void> discardStored() async {
     await ref
         .read(accountDataRepositoryProvider)
-        .clearActiveSession(ref.read(appStateProvider).accountId);
+        .clearActiveSession(ref.read(appStateProvider).storageId);
     ref.read(storedSessionProvider.notifier).refresh();
   }
 
@@ -154,7 +157,7 @@ class LiveSessionController extends Notifier<LiveState?> {
       {String? resumeCursor, required SessionStartMode mode}) async {
     _teardown();
     final app = ref.read(appStateProvider);
-    _accountId = app.accountId;
+    _accountId = app.storageId;
     // Rates for the goal bar when a set mixes currencies (a £5 Monzo tip in a
     // EUR session). Whatever is cached right now — the stage never waits on the
     // network — and the listener below swaps in a fresher table if one lands
@@ -375,19 +378,22 @@ final liveSessionProvider =
 class StoredSessionNotifier extends Notifier<LiveSession?> {
   @override
   LiveSession? build() {
-    final accountId =
-        ref.watch(appStateProvider.select((s) => s.accountId));
+    // storageId, not accountId: entering and leaving demo changes WHERE the
+    // snapshot lives without changing the band, and the two must not be able
+    // to see each other's unfinished sets (#52).
+    final storageId =
+        ref.watch(appStateProvider.select((s) => s.storageId));
     // The snapshot is device-local, but a band switch inside a cloud
     // profile arrives as a revision bump rather than a new account id.
     ref.watch(repoRevisionProvider);
     return ref
         .read(accountDataRepositoryProvider)
-        .readActiveSession(accountId);
+        .readActiveSession(storageId);
   }
 
   void refresh() => state = ref
       .read(accountDataRepositoryProvider)
-      .readActiveSession(ref.read(appStateProvider).accountId);
+      .readActiveSession(ref.read(appStateProvider).storageId);
 }
 
 final storedSessionProvider =

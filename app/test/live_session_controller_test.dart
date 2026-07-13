@@ -131,9 +131,13 @@ void main() {
     expect(state.session.bankedMinor, 20000);
     expect(state.session.currentJarMinor, 1000);
 
-    // the crash-recovery snapshot carries the banked fields
-    final stored =
-        container.read(localStoreProvider).readActiveSession(kTestAccountId)!;
+    // The crash-recovery snapshot carries the banked fields — under DEMO's
+    // namespace, because this set is a demo's (setUpContainer enters demo to
+    // get a connected app). A demo's snapshot in the band's slot is a demo's
+    // night in the artist's History (#52); the band's slot stays untouched.
+    final store = container.read(localStoreProvider);
+    expect(store.readActiveSession(kTestAccountId), isNull);
+    final stored = store.readActiveSession(LocalStore.kDemoAccountId)!;
     expect(stored.bankedJars, 1);
     expect(stored.bankedMinor, 20000);
   });
