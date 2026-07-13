@@ -702,11 +702,16 @@ class AppStateNotifier extends Notifier<AppState> {
   }
 
   /// Writes a fresh unnamed band and makes it active. The ONE place a band
-  /// entry is born, and its callers are the artist asking for a profile — the
-  /// name they just typed into the first step ([createFirstBand], which is now
-  /// every "Add a profile" / "Create a new profile" too), or Welcome seeding the
-  /// device's first local band as onboarding begins ([addAccount]). An empty
-  /// band list is never "repaired" by calling this.
+  /// entry is born, and it has exactly ONE caller: [createFirstBand], the name
+  /// the artist just typed into the first step (which is now every "Add a
+  /// profile" / "Create a new profile" too). An empty band list is never
+  /// "repaired" by calling this.
+  ///
+  /// Welcome used to be the other caller — it seeded the device's first local
+  /// band as onboarding began, which on an empty registry (an artist who deleted
+  /// their last profile) was the deletion undone by a tap (#47). There is no
+  /// "mint a band without a name" entry point left, and that is the point: a
+  /// name is the ask.
   Future<BandAccount> _mintBand() async {
     final account = BandAccount(
       id: BandAccount.newId(),
@@ -719,37 +724,20 @@ class AppStateNotifier extends Notifier<AppState> {
     return account;
   }
 
-  /// Creates a fresh unnamed band and makes it active — Welcome's seed for the
-  /// device's first local profile, as onboarding begins. Returns null when
-  /// refused.
-  ///
-  /// NOT the way a profile is added any more: "Add a profile" and "Create a new
-  /// profile" go through the details step, which mints as it names ([addProfile]
-  /// → [createFirstBand]). A tap is not an ask (#44).
-  Future<BandAccount?> addAccount() async {
-    if (accountActionsBlocked) return null;
-    ref.read(onboardingDraftProvider.notifier).clear();
-    final account = await _mintBand();
-    state = AppState(
-      accountId: account.id,
-      accounts: [...state.accounts, account],
-      settings: state.settings,
-    );
-    return account;
-  }
-
   /// A band, created as the artist NAMES it (onboarding's details step) and at
   /// no other moment — the account's first, or another one they asked for on
   /// "Add a profile". The app used to mint the first the instant a warm account
   /// read back empty, which invented a nameless profile nobody asked for and
   /// synced it over a deletion made on another device (#26); and it used to mint
   /// the others on the tap that opened the form, which left a phantom behind on
-  /// every device whenever the form was abandoned (#44). Both are the same rule:
-  /// a name is the ask.
+  /// every device whenever the form was abandoned (#44); and Welcome used to
+  /// seed one on "Get started" before a character was typed, which undid the
+  /// deletion of the last local profile (#47). All the same rule: a name is the
+  /// ask. This is now the only way a band is ever born.
   ///
-  /// Unlike [addAccount] it leaves the onboarding draft and the step counter
-  /// alone: this is the run already in progress, not a new one. Returns null
-  /// when refused (a live session).
+  /// It leaves the onboarding draft and the step counter alone: this is the run
+  /// already in progress, not a new one. Returns null when refused (a live
+  /// session).
   Future<BandAccount?> createFirstBand() async {
     if (accountActionsBlocked) return null;
     final account = await _mintBand();
@@ -1033,6 +1021,16 @@ enum ProfileRender {
 
 final activeProfileRenderProvider = Provider<ProfileRender>((ref) {
   final app = ref.watch(appStateProvider);
+  // Demo always has something to show, whatever the profile set holds: the jar
+  // is TipJar.demo, the relay jar is RelayJar.demo, the feed is scripted and
+  // the name on screen is the demo jar's — none of it is read off the active
+  // band ([AppState.effectiveTipJar], [AppState.displayName]). Welcome's demo
+  // button used to seed a nameless profile purely so this check would say
+  // "band", which wrote a profile the artist never asked for onto a device that
+  // had just deleted its last one (#47). Demo is not the artist's profile: it
+  // renders on its own, and a device that plays with it and leaves is exactly
+  // as it was.
+  if (app.demo) return ProfileRender.band;
   if (app.accountId.isNotEmpty) return ProfileRender.band;
   if (app.accounts.isNotEmpty) return ProfileRender.pick;
   // No bands and no answer yet — but "no bands" only means something once the

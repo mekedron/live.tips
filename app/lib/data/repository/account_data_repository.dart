@@ -43,8 +43,9 @@ abstract interface class AccountDataRepository {
   Future<void> saveActiveBandId(String bandId);
 
   /// THE INVARIANT: this is called only as the direct result of the artist
-  /// creating (or renaming) a profile — [AppStateNotifier.addAccount] behind
-  /// a tap, and the rename that names one. Never to repair an empty list.
+  /// creating (or renaming) a profile — [AppStateNotifier.createFirstBand], out
+  /// of the name they typed, and the rename that names one. Never behind a bare
+  /// tap (#44, #47), and never to repair an empty list.
   /// "This account has no profile" is a state the app renders (see
   /// [ProfileRender]), not a hole to be plugged: the fabricated band was
   /// written back to the cloud, and a deletion made on one device came back

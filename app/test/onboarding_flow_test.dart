@@ -46,8 +46,13 @@ void main() {
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
-    // Step 2: method select. The band name was saved to the registry.
+    // Step 2: method select. The band name was saved to the registry — on the
+    // ONE band, the one main() seeded for this fresh install. The details step
+    // names it; it does not mint a second one beside it. (Sending the local
+    // path down `createsProfile: true` — the tempting fix for #47 — is exactly
+    // how a fresh install ends up with an unnamed duplicate.)
     expect(find.text('How do you want to get tipped?'), findsOneWidget);
+    expect(store.readAccountsRegistry()!.accounts, hasLength(1));
     expect(store.readAccountsRegistry()!.accounts.first.name,
         'The Midnight Foxes');
     await tester.tap(find.text('Revolut'));

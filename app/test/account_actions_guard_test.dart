@@ -56,7 +56,7 @@ void main() {
     final notifier = container.read(appStateProvider.notifier);
 
     expect(notifier.accountActionBlock, AccountActionBlock.remoteSession);
-    expect(await notifier.addAccount(), isNull);
+    expect(await notifier.createFirstBand(), isNull);
     expect(await notifier.removeAccount('acc_test'), isFalse);
   });
 
@@ -71,7 +71,7 @@ void main() {
 
     expect(notifier.accountActionBlock, isNull);
     expect(notifier.accountActionsBlocked, isFalse);
-    final added = await notifier.addAccount();
+    final added = await notifier.createFirstBand();
     expect(added, isNotNull);
     expect(container.read(appStateProvider).accounts, hasLength(2));
   });
@@ -102,7 +102,7 @@ void main() {
     );
     final notifier = container.read(appStateProvider.notifier);
     // Two bands, so there is somewhere to switch TO.
-    final other = await notifier.addAccount(); // refused (blocked)
+    final other = await notifier.createFirstBand(); // refused (blocked)
     expect(other, isNull);
 
     // The switch refuses for the same reason add and remove did — the three

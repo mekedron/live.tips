@@ -152,7 +152,7 @@ void main() {
 
     expect(await notifier.switchAccount('acc_b'), isFalse);
     expect(container.read(appStateProvider).accountId, 'acc_a');
-    expect(await notifier.addAccount(), isNull);
+    expect(await notifier.createFirstBand(), isNull);
     expect(await notifier.removeAccount('acc_b'), isFalse);
 
     await container.read(liveSessionProvider.notifier).stop();
@@ -173,7 +173,13 @@ void main() {
     expect(local.readSessionHistory('acc_b'), isEmpty);
   });
 
-  test('addAccount creates an empty active band and clears the draft',
+  // Was 'addAccount creates an empty active band and clears the draft'.
+  // addAccount is gone with Welcome's seed (#47): the ONE way a band is born is
+  // createFirstBand, called from the details step out of the name the artist
+  // typed. It deliberately does NOT clear the onboarding draft — it runs INSIDE
+  // the run the draft describes, and clearing it there would wipe the step
+  // counter's own source mid-flow.
+  test('createFirstBand creates an empty active band and activates it',
       () async {
     final (local, secure) = await _twoBands();
     final container = _container(local, secure, initialApiKey: 'rk_live_a');
@@ -182,13 +188,14 @@ void main() {
         .set(const OnboardingDraft());
 
     final account =
-        await container.read(appStateProvider.notifier).addAccount();
+        await container.read(appStateProvider.notifier).createFirstBand();
     expect(account, isNotNull);
     final app = container.read(appStateProvider);
     expect(app.accountId, account!.id);
     expect(app.connected, isFalse, reason: 'nothing configured yet');
     expect(app.accounts, hasLength(3));
-    expect(container.read(onboardingDraftProvider), isNull);
+    expect(container.read(onboardingDraftProvider), isNotNull,
+        reason: 'the run in progress keeps its draft');
     expect(local.readAccountsRegistry()?.activeId, account.id);
   });
 
@@ -197,7 +204,7 @@ void main() {
     final container = _container(local, secure, initialApiKey: 'rk_live_a');
     final notifier = container.read(appStateProvider.notifier);
 
-    final ghost = await notifier.addAccount();
+    final ghost = await notifier.createFirstBand();
     expect(container.read(appStateProvider).accounts, hasLength(3));
 
     await notifier.switchAccount('acc_a');
@@ -212,7 +219,7 @@ void main() {
     final container = _container(local, secure, initialApiKey: 'rk_live_a');
     final notifier = container.read(appStateProvider.notifier);
 
-    final fresh = await notifier.addAccount();
+    final fresh = await notifier.createFirstBand();
     // The user got as far as saving a goal — that's data.
     await notifier.updateBand(const BandSettings(lastGoalMinor: 123));
     await notifier.switchAccount('acc_a');
@@ -229,7 +236,7 @@ void main() {
     final container = _container(local, secure, initialApiKey: 'rk_live_a');
     final notifier = container.read(appStateProvider.notifier);
 
-    final ghost = await notifier.addAccount();
+    final ghost = await notifier.createFirstBand();
     secure.failing = true;
     await notifier.switchAccount('acc_a');
     expect(

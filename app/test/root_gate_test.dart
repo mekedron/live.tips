@@ -301,10 +301,73 @@ void main() {
     expect(find.byType(AppShell), findsNothing);
     expect(container.read(appStateProvider).accounts, isEmpty);
 
-    // And Welcome is not a dead end: walking into onboarding mints the
-    // first band again, so setup has something to configure.
+    // And Welcome is not a dead end — but it is not a mint either (#47). This
+    // assertion used to read "walking into onboarding mints the first band
+    // again, so setup has something to configure", and it was true when setup
+    // could only configure the ACTIVE band. #44 retired that: the details step
+    // mints out of the name the artist types, and a tap that merely opens a
+    // form writes nothing. So the tap re-opens onboarding and the registry
+    // stays exactly as the deletion left it — empty.
     await tester.tap(find.text('Get started'));
     await tester.pumpAndSettle();
+    expect(container.read(appStateProvider).accounts, isEmpty,
+        reason: 'a tap is not an ask: no profile before a name (#26, #44)');
+    expect(find.text('Let\'s set up your tip jar'), findsOneWidget);
+
+    // The profile appears when the artist names it — one profile, carrying the
+    // name they typed, and never "Unnamed".
+    await tester.enterText(find.byType(TextField).first, 'Second Act');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    final accounts = container.read(appStateProvider).accounts;
+    expect(accounts, hasLength(1));
+    expect(accounts.single.name, 'Second Act');
+    expect(local.readAccountsRegistry()?.accounts.single.name, 'Second Act');
+  });
+
+  testWidgets(
+      'Try the demo with no profile at all: the demo shell, and still no '
+      'profile written (#47)', (tester) async {
+    final local = await _store();
+    // The registry the artist's own deletion leaves behind: honestly empty.
+    await local.saveAccountsRegistry(
+        const AccountsRegistry(accounts: [], activeId: ''));
+    await _pumpApp(tester, local);
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+
+    await tester.tap(find.text('Try the demo'));
+    await tester.pumpAndSettle();
+
+    // Demo has everything it needs to render without a band: the jar, the name
+    // and the feed are all TipJar.demo. It used to seed a nameless profile to
+    // get a shell built around, which is the deletion undone by a tap.
+    expect(find.byType(AppShell), findsOneWidget);
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(AppShell)));
+    expect(container.read(appStateProvider).demo, isTrue);
+    expect(container.read(appStateProvider).accounts, isEmpty,
+        reason: 'demo is not the artist\'s profile — it writes none');
+    expect(local.readAccountsRegistry()?.accounts, isEmpty);
+  });
+
+  testWidgets('Try the demo on a fresh install plays demo against the band '
+      'main() already seeded — no second one (#47)', (tester) async {
+    final local = await _store();
+    // What main()'s ensureAccountsRegistry leaves on a fresh install.
+    await local.saveAccountsRegistry(const AccountsRegistry(
+      accounts: [BandAccount(id: 'acc_seed', name: '', createdAtMs: 0)],
+      activeId: 'acc_seed',
+    ));
+    await _pumpApp(tester, local);
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+
+    await tester.tap(find.text('Try the demo'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppShell), findsOneWidget);
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(AppShell)));
+    expect(container.read(appStateProvider).demo, isTrue);
     expect(container.read(appStateProvider).accounts, hasLength(1));
   });
 }

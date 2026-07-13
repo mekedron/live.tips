@@ -24,24 +24,28 @@ import 'onboarding_flow.dart';
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
-  /// A device that removed its last profile arrives here with an EMPTY
-  /// registry (see AppStateNotifier.removeAccount) — everything past this
-  /// screen configures the ACTIVE band, so walking in mints the first one.
-  /// A fresh install already got its band from main() and this is a no-op.
-  static Future<void> _ensureFirstBand(WidgetRef ref) async {
-    if (ref.read(appStateProvider).accounts.isEmpty) {
-      await ref.read(appStateProvider.notifier).addAccount();
-    }
-  }
-
   /// "Get started" — the performer path. This device is the performer's own
   /// (the overwhelmingly common case), so the old "What is this device?"
   /// question is answered here implicitly and onboarding continues with the
   /// account question (when on offer) or the first band step.
+  ///
+  /// It writes NO profile. The tap opens a form; the profile is born on the
+  /// details step, out of the name the artist types there (#44's one
+  /// birthplace, [AppStateNotifier.createFirstBand]). This used to seed a
+  /// nameless band whenever the registry was empty — which is exactly the state
+  /// an artist reaches by deleting their last local profile, so the next tap on
+  /// this button quietly undid the deletion #23/#26/#37 fought to make possible,
+  /// and the orphan it left behind travels nowhere and cleans itself up never
+  /// (#47). Both starting states are already handled without it: a fresh install
+  /// walks in with main()'s band active and the details step names it, and an
+  /// empty registry walks in with no active band and the details step mints as
+  /// it names ([OnboardingDetailsScreen], `activeAccount == null`).
+  ///
+  /// [firstBandSetupScreen] is deliberately NOT given `createsProfile: true`
+  /// here: on a fresh install that band already exists, and asking for a new one
+  /// would leave an unnamed duplicate behind on every install.
   Future<void> _getStarted(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
-    // A fresh run: the step counter starts clean.
-    await _ensureFirstBand(ref);
     await ref.read(deviceKindProvider.notifier).choose(DeviceKind.performer);
     if (!context.mounted) return;
     final offerSignIn = platformSupportsCloudAccounts &&
@@ -183,11 +187,19 @@ class WelcomeScreen extends ConsumerWidget {
                             // Demo from Welcome is the same choice as the
                             // demo card on the kind step — record it so the
                             // Settings row can say what this device is.
-                            onPressed: () async {
-                              await _ensureFirstBand(ref);
-                              ref
+                            //
+                            // Demo writes no profile either. It used to seed one
+                            // so the shell had a band to build around; it does
+                            // not need one — the jar, the name and the feed are
+                            // all TipJar.demo whatever the registry holds, and
+                            // activeProfileRenderProvider says so now (#47).
+                            // Demo is not the artist's profile, and a device
+                            // that played with it and left must be exactly as it
+                            // was: on an empty registry, that means empty.
+                            onPressed: () {
+                              unawaited(ref
                                   .read(deviceKindProvider.notifier)
-                                  .choose(DeviceKind.demo);
+                                  .choose(DeviceKind.demo));
                               ref.read(appStateProvider.notifier).enterDemo();
                             },
                             icon: Icon(
