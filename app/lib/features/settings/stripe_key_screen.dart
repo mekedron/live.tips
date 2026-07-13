@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/external_link.dart';
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
-import '../../data/relay/relay_client.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../data/stripe/stripe_requests.dart';
 import '../../l10n/app_localizations.dart';
@@ -168,19 +167,16 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       final relayJar = app.relayJar;
       final secret = app.relaySecret;
       if (relayJar != null && secret != null) {
-        final client = RelayClient();
         try {
-          await client.updateJar(
-            jar: relayJar,
-            secret: secret,
-            artistName: jar.displayName,
-            message: relayJar.message,
-            stripeUrl: jar.url,
-          );
+          await ref.read(relayClientProvider).updateJar(
+                jar: relayJar,
+                secret: secret,
+                artistName: jar.displayName,
+                message: relayJar.message,
+                stripeUrl: jar.url,
+              );
         } catch (_) {
           // Best effort — the page keeps the old URL until the next sync.
-        } finally {
-          client.close();
         }
       }
 
@@ -255,18 +251,16 @@ class _StripeKeyScreenState extends ConsumerState<StripeKeyScreen> {
       }
       // Drop the card button from the connected-mode fan page.
       if (relayJar != null && relaySecret != null) {
-        final client = RelayClient();
         try {
-          await client.updateJar(
-            jar: relayJar,
-            secret: relaySecret,
-            artistName: relayJar.artistName,
-            message: relayJar.message,
-            stripeUrl: null,
-          );
+          await ref.read(relayClientProvider).updateJar(
+                jar: relayJar,
+                secret: relaySecret,
+                artistName: relayJar.artistName,
+                message: relayJar.message,
+                stripeUrl: null,
+              );
         } catch (_) {
-        } finally {
-          client.close();
+          // Best effort — the card button goes on the next sync otherwise.
         }
       }
       await ref.read(appStateProvider.notifier).disconnectStripe();

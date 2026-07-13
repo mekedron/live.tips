@@ -8,7 +8,6 @@ import '../../core/external_link.dart';
 import '../../core/currencies.dart';
 import '../../core/stripe_onboarding.dart';
 import '../../core/theme.dart';
-import '../../data/relay/relay_client.dart';
 import '../../data/stripe/stripe_client.dart';
 import '../../domain/relay_jar.dart';
 import '../../domain/tip_jar.dart';
@@ -180,24 +179,21 @@ class _JarSetupScreenState extends ConsumerState<JarSetupScreen> {
   /// Tells the relay about the (re)created Stripe link so the fan page's
   /// card button never points at a retired payment link. Silent on failure:
   /// the page just keeps the old link until the next successful update.
-  static Future<void> _syncRelayStripeUrl(
+  Future<void> _syncRelayStripeUrl(
     RelayJar relayJar,
     String secret,
     TipJar jar,
   ) async {
-    final client = RelayClient();
     try {
-      await client.updateJar(
-        jar: relayJar,
-        secret: secret,
-        artistName: jar.displayName,
-        message: relayJar.message,
-        stripeUrl: jar.url,
-      );
+      await ref.read(relayClientProvider).updateJar(
+            jar: relayJar,
+            secret: secret,
+            artistName: jar.displayName,
+            message: relayJar.message,
+            stripeUrl: jar.url,
+          );
     } catch (_) {
       // Best effort only.
-    } finally {
-      client.close();
     }
   }
 

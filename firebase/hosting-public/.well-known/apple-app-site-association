@@ -2,7 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["A4HHRH8Y9M.tips.live.liveTips"],
+        "appIDs": ["A4HHRH8Y9M.com.mekedron.LiveTips"],
         "components": [
           {
             "/": "/link*",
@@ -13,6 +13,6 @@
     ]
   },
   "webcredentials": {
-    "apps": ["A4HHRH8Y9M.tips.live.liveTips"]
+    "apps": ["A4HHRH8Y9M.com.mekedron.LiveTips"]
   }
 }

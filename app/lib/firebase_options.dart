@@ -54,7 +54,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDhLRImKreMz3FAGpiTPnY0qWbHVowb1FM',
-    appId: '1:623278585949:android:d00e52f17a5c5a29a4b5b4',
+    appId: '1:623278585949:android:a06c7b108ab6aa18a4b5b4',
     messagingSenderId: '623278585949',
     projectId: 'livetips-app',
     storageBucket: 'livetips-app.firebasestorage.app',
@@ -62,24 +62,24 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDfL3nmowibt-FefYeIsuTZsmlaBOyLXbY',
-    appId: '1:623278585949:ios:e041c5c70f3ba100a4b5b4',
+    appId: '1:623278585949:ios:c73a48a4b09f7eaba4b5b4',
     messagingSenderId: '623278585949',
     projectId: 'livetips-app',
     storageBucket: 'livetips-app.firebasestorage.app',
     androidClientId: '623278585949-3p9pa5g2d4tpshm03vt92bjma7min498.apps.googleusercontent.com',
-    iosClientId: '623278585949-1cranfn8aua4u43kn66n9c2n8mlptl45.apps.googleusercontent.com',
-    iosBundleId: 'tips.live.liveTips',
+    iosClientId: '623278585949-pgjt0cu5dpo4nlomoujunmlcrn954av7.apps.googleusercontent.com',
+    iosBundleId: 'com.mekedron.LiveTips',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyDfL3nmowibt-FefYeIsuTZsmlaBOyLXbY',
-    appId: '1:623278585949:ios:e041c5c70f3ba100a4b5b4',
+    appId: '1:623278585949:ios:c73a48a4b09f7eaba4b5b4',
     messagingSenderId: '623278585949',
     projectId: 'livetips-app',
     storageBucket: 'livetips-app.firebasestorage.app',
     androidClientId: '623278585949-3p9pa5g2d4tpshm03vt92bjma7min498.apps.googleusercontent.com',
-    iosClientId: '623278585949-1cranfn8aua4u43kn66n9c2n8mlptl45.apps.googleusercontent.com',
-    iosBundleId: 'tips.live.liveTips',
+    iosClientId: '623278585949-pgjt0cu5dpo4nlomoujunmlcrn954av7.apps.googleusercontent.com',
+    iosBundleId: 'com.mekedron.LiveTips',
   );
 
 }

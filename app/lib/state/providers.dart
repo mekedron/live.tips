@@ -5,9 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/tip_source.dart';
 import '../data/fx_source.dart';
 import '../data/local_store.dart';
+import '../data/relay/firestore_tip_channel.dart';
+import '../data/relay/relay_auth.dart';
 import '../data/relay/relay_client.dart';
-import '../data/relay/relay_config.dart';
-import '../data/relay/relay_tip_channel.dart';
+import '../data/tip_channel.dart';
 import '../data/repository/account_data_repository.dart';
 import '../data/repository/firestore_repository.dart';
 import '../data/secure_store.dart';
@@ -23,6 +24,7 @@ import '../domain/fx_rates.dart';
 import '../domain/relay_jar.dart';
 import '../domain/tip_jar.dart';
 import 'cloud_session_coordinator.dart';
+import 'device_providers.dart';
 import 'live_session_controller.dart';
 import 'onboarding_draft.dart';
 import 'session_coordinator.dart';
@@ -614,13 +616,12 @@ class AppStateNotifier extends Notifier<AppState> {
       } catch (_) {}
     }
     if (jar != null && secret != null) {
-      final client = RelayClient();
       try {
-        await client.deleteJar(jarId: jar.jarId, secret: secret);
+        await ref
+            .read(relayClientProvider)
+            .deleteJar(jarId: jar.jarId, secret: secret);
       } catch (_) {
         // Offline, already gone, or a rotated secret — nothing more to do.
-      } finally {
-        client.close();
       }
     }
 
@@ -785,11 +786,27 @@ final tipSourceFactoryProvider = Provider<TipSourceFactory>(
   },
 );
 
+/// The relay's transport identity. Anonymous sign-in happens HERE, out of
+/// band from [AuthController] — a local-profile artist gets a uid to talk to
+/// the relay with, and nothing else: no directory entry, no switcher row, no
+/// change of active profile.
+final relayAuthProvider =
+    Provider<RelayAuth>((ref) => RelayAuth(ref.watch(authServiceProvider)));
+
+/// The jar callables. Long-lived: it holds no socket and no connection, so
+/// there is nothing to close.
+final relayClientProvider = Provider<RelayClient>(
+  (ref) => RelayClient(
+    auth: ref.watch(relayAuthProvider),
+    functions: ref.watch(functionsProvider),
+  ),
+);
+
 /// Builds the relay push tip feed for a session — a seam mirroring
 /// [tipSourceFactoryProvider] so controller tests can hand in a fake
 /// channel. Null means "this session has no relay feed": demo sessions
-/// synthesize their tips, and without a jar + secret there is nothing to
-/// authenticate against.
+/// synthesize their tips, and without a jar + secret (or without Firebase)
+/// there is nothing to listen to.
 typedef RelayChannelFactory = TipChannel? Function({
   required bool demo,
   required RelayJar? jar,
@@ -799,7 +816,17 @@ typedef RelayChannelFactory = TipChannel? Function({
 final relayChannelFactoryProvider = Provider<RelayChannelFactory>(
   (ref) => ({required demo, required jar, required secret}) {
     if (demo || jar == null || secret == null) return null;
-    return RelayTipChannel(wsUri: relayWsUri(jar.jarId), secret: secret);
+    // No Firestore, no feed — the app runs relay-less, as it does on the
+    // platforms without Firebase.
+    final db = ref.read(firestoreProvider);
+    if (db == null) return null;
+    return FirestoreTipChannel(
+      db: db,
+      auth: ref.read(relayAuthProvider),
+      client: ref.read(relayClientProvider),
+      jarId: jar.jarId,
+      secret: secret,
+    );
   },
 );
 

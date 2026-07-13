@@ -57,6 +57,14 @@ Future<RecordingLinkCodeService> _pump(
   await tester.binding.setSurfaceSize(const Size(600, 1200));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   final localStore = await seededStore();
+  // An anonymous uid only counts as an ACCOUNT once the directory says so —
+  // the relay's transport sign-in is anonymous too, and must never surface
+  // here. An explicit sign-in is adopted, so the fixture records it.
+  await localStore.saveAccountsDirectory(
+    AccountsDirectory.initial().withAccount(
+      AppAccount(id: 'uid_1', name: 'Casey', kind: kind),
+    ),
+  );
   final service = RecordingLinkCodeService();
   await tester.pumpWidget(
     ProviderScope(

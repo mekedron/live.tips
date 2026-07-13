@@ -104,7 +104,7 @@ Future<void> confirmAndRegenerateRelayJar(
   final successMessage = context.s.t(
     'onboarding.relay_setup.regenerate_success',
   );
-  final client = RelayClient();
+  final client = ref.read(relayClientProvider);
   try {
     // Best effort: the old jar should die, but a fresh link matters more.
     try {
@@ -127,7 +127,5 @@ Future<void> confirmAndRegenerateRelayJar(
     messenger.showSnackBar(SnackBar(content: Text(e.friendlyMessage)));
   } on RelayNetworkException catch (e) {
     messenger.showSnackBar(SnackBar(content: Text(e.message)));
-  } finally {
-    client.close();
   }
 }

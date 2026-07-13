@@ -162,18 +162,13 @@ class _AccountDetailsScreenState extends ConsumerState<AccountDetailsScreen> {
           message: thankYou,
         );
         if (secret != null) {
-          final client = RelayClient();
-          try {
-            await client.updateJar(
-              jar: updated,
-              secret: secret,
-              artistName: name,
-              message: thankYou,
-              stripeUrl: newTipJar?.url ?? app.tipJar?.url,
-            );
-          } finally {
-            client.close();
-          }
+          await ref.read(relayClientProvider).updateJar(
+                jar: updated,
+                secret: secret,
+                artistName: name,
+                message: thankYou,
+                stripeUrl: newTipJar?.url ?? app.tipJar?.url,
+              );
         }
         await notifier.updateRelayJarLocal(updated);
       }

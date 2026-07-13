@@ -85,15 +85,41 @@ class AuthState {
 class AuthController extends Notifier<AuthState> {
   StreamSubscription<AuthUser?>? _sub;
 
+  /// True while [_run] owns [AuthState.user]. The userChanges stream fires in
+  /// the middle of a sign-in, before [_adopt] has put the new account in the
+  /// directory — and [_asAccount] would read that half-finished moment as
+  /// "not an account" and wipe the user out from under us.
+  bool _signingIn = false;
+
   @override
   AuthState build() {
     ref.onDispose(() => _sub?.cancel());
     final service = ref.watch(authServiceProvider);
     _sub?.cancel();
     _sub = service.userChanges().listen((user) {
-      state = state.copyWith(user: user, clearUser: user == null);
+      if (_signingIn) return;
+      final account = _asAccount(user);
+      state = state.copyWith(user: account, clearUser: account == null);
     });
-    return AuthState(user: service.currentUser);
+    return AuthState(user: _asAccount(service.currentUser));
+  }
+
+  /// The Firebase user, IF it is an account this app should present as one.
+  ///
+  /// The relay signs in anonymously out of band, purely as a transport
+  /// credential for the jar callables and the tip listener (see [RelayAuth]) —
+  /// a local-profile artist has no account and must not acquire one by using
+  /// the relay. That uid is a Firebase user like any other, so it surfaces on
+  /// [AuthService.userChanges]; everything downstream of [AuthState.user] (the
+  /// signed-in row in Settings, the switcher, the cloud-upload offer, the
+  /// device registry) must not see it.
+  ///
+  /// The directory is the discriminator, not the kind: an *explicit*
+  /// anonymous sign-in is a real account here (the "continue without an
+  /// account" path), and [_adopt] records it. A transport uid never is.
+  AuthUser? _asAccount(AuthUser? user) {
+    if (user == null || user.kind != AccountKind.anonymous) return user;
+    return ref.read(accountsDirectoryProvider).contains(user.uid) ? user : null;
   }
 
   bool get available => ref.read(authServiceProvider).available;
@@ -110,10 +136,13 @@ class AuthController extends Notifier<AuthState> {
   Future<AuthUser?> signInWithCustomToken(String token) =>
       _run((s) => s.signInWithCustomToken(token));
 
+  /// The ONLY door into an account: every sign-in the artist actually asked
+  /// for comes through here, and only what comes through here is adopted.
   Future<AuthUser?> _run(
       Future<AuthUser?> Function(AuthService) attempt) async {
     if (state.busy) return null;
     state = state.copyWith(busy: true, clearError: true);
+    _signingIn = true;
     try {
       final user = await attempt(ref.read(authServiceProvider));
       // Publish the user BEFORE flipping the directory: the repository
@@ -126,6 +155,8 @@ class AuthController extends Notifier<AuthState> {
       debugPrint('sign-in failed: $e');
       state = state.copyWith(busy: false, error: friendlyAuthError(e));
       return null;
+    } finally {
+      _signingIn = false;
     }
   }
 

@@ -146,7 +146,7 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
       _removing = removing;
       _error = null;
     });
-    final client = RelayClient();
+    final client = ref.read(relayClientProvider);
     try {
       if (jar == null) {
         // First tip-page method for this band: register a fresh jar. Name,
@@ -210,7 +210,6 @@ class _RelayMethodScreenState extends ConsumerState<RelayMethodScreen> {
     } on RelayNetworkException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
-      client.close();
       if (mounted) {
         setState(() {
           _busy = false;

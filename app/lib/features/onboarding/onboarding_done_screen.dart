@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme.dart';
-import '../../data/relay/relay_client.dart';
 import '../../domain/app_settings.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/onboarding_draft.dart';
@@ -55,9 +54,8 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
     final wantsRelay = revolut != null || mobilepay != null || monzo != null;
 
     if (wantsRelay && app.relayJar == null) {
-      final client = RelayClient();
       try {
-        final result = await client.createJar(
+        final result = await ref.read(relayClientProvider).createJar(
           artistName: draft!.name.isNotEmpty ? draft.name : app.displayName,
           message: draft.thankYouMessage.isEmpty ? null : draft.thankYouMessage,
           currency: draft.currency,
@@ -80,8 +78,6 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
         // Fall back to the Stripe link (or nothing) below.
         if (!mounted) return;
         setState(() => _relayFailed = true);
-      } finally {
-        client.close();
       }
     }
 

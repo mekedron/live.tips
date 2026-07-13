@@ -1,14 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/local_store.dart';
-import 'package:live_tips/data/relay/relay_tip_channel.dart';
+import 'package:live_tips/data/tip_channel.dart';
 import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/domain/tip_method.dart';
+import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
 
@@ -35,14 +37,12 @@ class ScriptedSource extends TipSource {
 
 /// A relay channel the test drives by hand: push tips/health through
 /// the controllers, observe start/dispose through the flags.
-class FakeRelayChannel extends RelayTipChannel {
-  FakeRelayChannel()
-      : super(wsUri: Uri.parse('wss://fake.invalid/ws'), secret: 'sec_fake');
-
+class FakeRelayChannel implements TipChannel {
   final tipsCtrl = StreamController<Tip>.broadcast();
   final statusCtrl = StreamController<RelayHealth>.broadcast();
   var started = false;
   var disposed = false;
+  var reconnects = 0;
 
   @override
   Stream<Tip> get tips => tipsCtrl.stream;
@@ -52,6 +52,9 @@ class FakeRelayChannel extends RelayTipChannel {
 
   @override
   void start() => started = true;
+
+  @override
+  void reconnectNow() => reconnects++;
 
   @override
   Future<void> dispose() async => disposed = true;
@@ -311,8 +314,11 @@ void main() {
       'the DEFAULT factory returns null for demo or missing jar/secret and '
       'a real channel otherwise', () async {
     await setUpContainer();
-    // Read the default (un-overridden) implementation from a fresh container.
-    final defaults = ProviderContainer();
+    // Read the default (un-overridden) implementation from a fresh container,
+    // with Firestore present — that is what a device with the relay looks like.
+    final defaults = ProviderContainer(overrides: [
+      firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
+    ]);
     addTearDown(defaults.dispose);
     final factory = defaults.read(relayChannelFactoryProvider);
 
@@ -323,5 +329,19 @@ void main() {
     final real = factory(demo: false, jar: relayJar, secret: 's');
     expect(real, isNotNull);
     await real!.dispose(); // never started — nothing to tear down but streams
+  });
+
+  test('without Firebase there is no relay feed at all', () async {
+    await setUpContainer();
+    // firestoreProvider defaults to null: Windows/Linux, a failed Firebase
+    // boot, tests. The session simply runs without a push feed.
+    final defaults = ProviderContainer();
+    addTearDown(defaults.dispose);
+
+    expect(
+      defaults.read(relayChannelFactoryProvider)(
+          demo: false, jar: relayJar, secret: 's'),
+      isNull,
+    );
   });
 }

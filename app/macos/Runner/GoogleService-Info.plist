@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>623278585949-1cranfn8aua4u43kn66n9c2n8mlptl45.apps.googleusercontent.com</string>
+	<string>623278585949-pgjt0cu5dpo4nlomoujunmlcrn954av7.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.623278585949-1cranfn8aua4u43kn66n9c2n8mlptl45</string>
+	<string>com.googleusercontent.apps.623278585949-pgjt0cu5dpo4nlomoujunmlcrn954av7</string>
 	<key>ANDROID_CLIENT_ID</key>
 	<string>623278585949-3p9pa5g2d4tpshm03vt92bjma7min498.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>tips.live.liveTips</string>
+	<string>com.mekedron.LiveTips</string>
 	<key>PROJECT_ID</key>
 	<string>livetips-app</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:623278585949:ios:e041c5c70f3ba100a4b5b4</string>
+	<string>1:623278585949:ios:c73a48a4b09f7eaba4b5b4</string>
 </dict>
 </plist>

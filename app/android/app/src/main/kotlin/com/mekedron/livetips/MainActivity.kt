@@ -1,4 +1,4 @@
-package tips.live.live_tips
+package com.mekedron.livetips
 
 // FlutterFragmentActivity (not FlutterActivity) is required by local_auth
 // for the biometric prompt.

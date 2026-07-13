@@ -1,7 +1,10 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/data/relay/relay_auth.dart';
+import 'package:live_tips/data/relay/relay_client.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/domain/band_account.dart';
@@ -190,4 +193,56 @@ Future<LocalStore> seededStore({
   // the current schema even if the literal above drifts.
   await store.saveAccountsRegistry(registry);
   return store;
+}
+
+/// A [RelayAuth] that is already "signed in", with no Firebase behind it —
+/// the transport identity every relay call needs, minus the plugin. A null
+/// [uid] models a device with no relay at all (no Firebase, or the anonymous
+/// sign-in failed).
+class FakeRelayAuth extends RelayAuth {
+  FakeRelayAuth({this.uid = 'uid_relay', this.owned = false})
+      : super(AuthService(null));
+
+  final String? uid;
+  final bool owned;
+
+  @override
+  Future<String?> ensureRelayUid() async => uid;
+
+  @override
+  bool get ownsJars => owned;
+}
+
+/// One recorded callable invocation.
+typedef RelayCall = ({String name, Map<String, dynamic> args});
+
+/// Stands in for the jar callables: records every call, answers each by name
+/// from [routes] (a route may throw), and returns `{}` for anything unrouted.
+class FakeCallables {
+  FakeCallables([this.routes = const {}]);
+
+  final Map<String, Map<String, dynamic> Function(Map<String, dynamic>)> routes;
+  final calls = <RelayCall>[];
+
+  Future<Map<String, dynamic>> call(
+      String name, Map<String, dynamic> args) async {
+    calls.add((name: name, args: args));
+    final route = routes[name];
+    return route == null ? const {} : route(args);
+  }
+
+  List<String> get names => [for (final call in calls) call.name];
+
+  Map<String, dynamic> argsFor(String name) =>
+      calls.firstWhere((call) => call.name == name).args;
+}
+
+RelayClient fakeRelayClient(FakeCallables backend, {RelayAuth? auth}) =>
+    RelayClient(auth: auth ?? FakeRelayAuth(), invoke: backend.call);
+
+/// The only way to build a [FirebaseFunctionsException] outside the plugin:
+/// its constructor is `@protected`, so a subclass is the sanctioned door.
+class FakeFunctionsException extends FirebaseFunctionsException {
+  FakeFunctionsException(String code, [String message = 'refused'])
+      : super(code: code, message: message);
 }

@@ -34,7 +34,8 @@ class SeenPingService {
   ///
   /// Every failure is swallowed and leaves the timestamp untouched, so the
   /// next launch/resume simply retries. When the relay reports the jar is
-  /// gone (404) or the secret is stale (401) and [onRelinked] is supplied,
+  /// gone (`not-found`) or the secret is dead (`unauthenticated` /
+  /// `permission-denied`) and [onRelinked] is supplied,
   /// a replacement jar is created from the same profile and handed back so
   /// the caller can persist it and warn the artist to reprint.
   Future<void> maybePing({
@@ -60,9 +61,10 @@ class SeenPingService {
       );
       await store.writeRelaySeenAt(accountId, nowMs);
     } on RelayApiException catch (e) {
-      // A gone jar or dead secret is the only thing worth recreating — a 422
-      // (rejected profile) or 429 (rate limit) must NEVER trigger a recreate,
-      // or a transient server rule would silently churn everyone's links.
+      // A gone jar or dead secret is the only thing worth recreating — an
+      // `invalid-argument` (rejected profile) or `resource-exhausted` (rate
+      // limit) must NEVER trigger a recreate, or a transient server rule
+      // would silently churn everyone's links.
       if (onRelinked != null && (e.isNotFound || e.isAuthError)) {
         await _relink(store, accountId, jar, client, stripeUrl, onRelinked,
             nowMs);
@@ -145,38 +147,31 @@ class _RelayKeepaliveState extends ConsumerState<RelayKeepalive>
     // keychain is the one store that prompts and fails transiently). Each
     // band gets its own try/catch — one locked read must not starve the
     // rest, or their public pages quietly expire at 90 days.
-    RelayClient? client;
-    try {
-      for (final account in app.accounts) {
-        try {
-          final jar = store.readRelayJar(account.id);
-          if (jar == null) continue;
-          if (!_service.isDue(store: store, accountId: account.id)) continue;
-          final secret = account.id == app.accountId
-              ? app.relaySecret
-              : await ref
-                  .read(secureStoreProvider)
-                  .readRelaySecret(account.id);
-          if (secret == null) continue;
-          client ??= RelayClient();
-          await _service.maybePing(
-            store: store,
-            accountId: account.id,
-            jar: jar,
-            secret: secret,
-            client: client,
-            stripeUrl: store.readTipJar(account.id)?.url,
-            onRelinked: (newJar, newSecret, oldUrl) => ref
-                .read(appStateProvider.notifier)
-                .adoptRelinkedJar(account.id, newJar, newSecret, oldUrl),
-          );
-        } catch (_) {
-          // Keychain hiccup or network failure — this band retries on the
-          // next launch/resume.
-        }
+    final client = ref.read(relayClientProvider);
+    for (final account in app.accounts) {
+      try {
+        final jar = store.readRelayJar(account.id);
+        if (jar == null) continue;
+        if (!_service.isDue(store: store, accountId: account.id)) continue;
+        final secret = account.id == app.accountId
+            ? app.relaySecret
+            : await ref.read(secureStoreProvider).readRelaySecret(account.id);
+        if (secret == null) continue;
+        await _service.maybePing(
+          store: store,
+          accountId: account.id,
+          jar: jar,
+          secret: secret,
+          client: client,
+          stripeUrl: store.readTipJar(account.id)?.url,
+          onRelinked: (newJar, newSecret, oldUrl) => ref
+              .read(appStateProvider.notifier)
+              .adoptRelinkedJar(account.id, newJar, newSecret, oldUrl),
+        );
+      } catch (_) {
+        // Keychain hiccup or network failure — this band retries on the
+        // next launch/resume.
       }
-    } finally {
-      client?.close();
     }
   }
 

@@ -17,6 +17,21 @@ Future<void> _pumpSettings(WidgetTester tester, {AuthService? auth}) async {
   await tester.binding.setSurfaceSize(const Size(600, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   final localStore = await seededStore();
+  // An anonymous uid is an account only when the directory knows it (the
+  // relay's transport sign-in is anonymous too, and stays invisible).
+  final user = auth?.currentUser;
+  if (user != null) {
+    await localStore.saveAccountsDirectory(
+      AccountsDirectory.initial().withAccount(
+        AppAccount(
+          id: user.uid,
+          name: user.displayName ?? '',
+          kind: user.kind,
+          email: user.email,
+        ),
+      ),
+    );
+  }
   await tester.pumpWidget(
     ProviderScope(
       overrides: [

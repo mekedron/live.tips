@@ -12,7 +12,7 @@ import '../../core/fullscreen.dart';
 import '../../core/money.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme.dart';
-import '../../data/relay/relay_tip_channel.dart';
+import '../../data/tip_channel.dart';
 import '../../domain/live_session.dart';
 import '../../domain/stage_settings.dart';
 import '../../state/live_session_controller.dart';
