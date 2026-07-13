@@ -5,21 +5,33 @@ import '../../core/theme.dart';
 import '../../data/firebase/custom_token.dart';
 import '../../domain/device_kind.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/providers.dart';
 import '../../state/venue_providers.dart';
 import 'venue_code_entry.dart';
 
 /// The owner's rule: touching profiles ON the venue device needs a fresh
 /// nod from the personal device — so this gate runs one more add-device
-/// confirm cycle before the band switcher does anything.
+/// confirm cycle before the switcher does anything.
 ///
 /// Returns true only when the SAME account approved: the collected token's
 /// uid claim is compared against the account on the tablet, and a different
 /// approver is refused with a clear message (nothing is signed in with that
 /// token; the sign-in is where Firebase would verify it, and it never runs).
+///
+/// What it guards is a CHANGE to what the tablet is showing. The stint's first
+/// profile choice is not one: with no profile open ([ProfileRender.pick] /
+/// [ProfileRender.create] — the picker VenueGate lands on), the artist is
+/// finishing the ceremony they just walked through on their phone, not
+/// altering it. Demanding a second code to answer the question the session
+/// itself asks is how the venue path ended up inviting the artist to mint a
+/// third profile instead (#43) — and it protects nothing: whoever holds the
+/// tablet already holds the signed-in account, which is precisely what the
+/// intro's warning says out loud.
 Future<bool> ensureVenueReapproval(BuildContext context, WidgetRef ref) async {
   if (ref.read(deviceKindProvider) != DeviceKind.venue) return true;
   final session = ref.read(venueSessionProvider);
   if (session == null) return true; // nobody's data on the device to protect
+  if (ref.read(activeProfileRenderProvider) != ProfileRender.band) return true;
   final approved = await Navigator.of(context, rootNavigator: true).push<bool>(
     MaterialPageRoute(
       fullscreenDialog: true,

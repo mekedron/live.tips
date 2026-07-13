@@ -9,6 +9,7 @@ import '../../domain/band_account.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
+import '../../state/venue_providers.dart';
 import '../../widgets/profile_switcher.dart';
 import '../settings/settings_screen.dart';
 import 'onboarding_flow.dart';
@@ -225,15 +226,22 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     // honest heading.
     final local =
         ref.watch(accountsDirectoryProvider.select((d) => d.active.isLocal));
+    // A venue tablet has no account door at all: accounts are entered and left
+    // through the banner's approve-and-wipe ceremony, and the switcher hides
+    // its account half there anyway — so an action that says "Switch account"
+    // on a public device would open a sheet listing the profiles this screen is
+    // already asking about, under a name for something it cannot do (#43).
+    final venue = ref.watch(venueModeActiveProvider);
     return Scaffold(
       appBar: AppBar(
         title: Text(s.t('onboarding.profile_pick.title')),
         actions: [
           if (asRoot) ...[
-            TextButton(
-              onPressed: _switchAccount,
-              child: Text(s.t('settings.account.switch_title')),
-            ),
+            if (!venue)
+              TextButton(
+                onPressed: _switchAccount,
+                child: Text(s.t('settings.account.switch_title')),
+              ),
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: IconButton(
