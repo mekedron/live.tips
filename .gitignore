@@ -7,6 +7,9 @@ __pycache__/
 .env
 .env.*
 !.env.example
+# …except the functions params file, which holds only the PUBLIC Turnstile
+# sitekey (real secrets are in Secret Manager).
+!firebase/functions/.env
 
 # LinkedIn kit working files (final assets live in marketing/linkedin/)
 .li-post-tmp/
