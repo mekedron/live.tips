@@ -64,6 +64,17 @@ export const LINK_COLLECTS_PER_IP_PER_HOUR = 600;
 
 let cached: Firestore | null = null;
 
+/// The Admin SDK is initialized HERE, at module load, and unconditionally —
+/// `getApps()` proved not to be a reliable guard in the deployed runtime
+/// (every Firestore call came back `app/no-app`, which took the whole relay
+/// down: no jar could be created, no tip delivered). Initializing eagerly and
+/// tolerating the duplicate-app error is the only form that cannot fail.
+try {
+  initializeApp();
+} catch (_) {
+  // Already initialized (warm instance, or a second module copy) — fine.
+}
+
 export function db(): Firestore {
   if (cached === null) {
     if (getApps().length === 0) initializeApp();
