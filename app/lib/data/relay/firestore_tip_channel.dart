@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/tip.dart';
 import '../../domain/tip_method.dart';
@@ -71,9 +72,9 @@ class FirestoreTipChannel implements TipChannel {
   bool _started = false;
   bool _disposed = false;
 
-  /// True once the relay has said "never come back" — a dead jar or a dead
-  /// secret. Mirrors the WS relay's 4401/4410: no retry can fix it, the artist
-  /// must re-link in Settings.
+  /// True once the relay has said "never come back" — a dead jar, a dead
+  /// secret, or a full reader list. Mirrors the WS relay's 4401/4410: no retry
+  /// can fix it, the artist must re-link.
   bool _terminal = false;
 
   @override
@@ -146,7 +147,16 @@ class FirestoreTipChannel implements TipChannel {
       // A gone jar or a dead secret: terminal, exactly like the WS relay's
       // 4410/4401 close codes.
       if (e.isNotFound || e.isAuthError) {
-        _goTerminal();
+        _goTerminal(RelayHealth.unauthorized);
+      } else if (e.code == 'resource-exhausted') {
+        // The jar's reader list is full (MAX_READER_UIDS on the server) and
+        // nothing prunes it except a new link, so the claim will fail the
+        // same way forever — retrying would hammer the callable all night
+        // while showing the artist a "reconnecting" feed that never comes
+        // back. Terminal, under its own health so the message can name the
+        // actual way out. Only the claim reads the code this way: the other
+        // callables use it for genuine rate limits.
+        _goTerminal(RelayHealth.deviceLimit);
       } else {
         _fail(generation);
       }
@@ -172,17 +182,39 @@ class FirestoreTipChannel implements TipChannel {
     QuerySnapshot<Map<String, dynamic>> snapshot,
   ) {
     if (_disposed || generation != _generation) return;
-    // The listener is alive and the rules let us read: that IS the feed being
-    // up, tips or no tips.
-    _attempt = 0; // a good attach earns a fresh backoff ladder
-    _setStatus(RelayHealth.ok);
-
     // Only additions are tips: a doc we already emitted comes back as a
     // `removed` change once our own delete lands, and nothing ever edits one
     // in place (the rules forbid it).
-    for (final change in snapshot.docChanges) {
-      if (change.type != DocumentChangeType.added) continue;
-      final doc = change.doc;
+    applySnapshot(
+      [
+        for (final change in snapshot.docChanges)
+          if (change.type == DocumentChangeType.added) change.doc,
+      ],
+      fromCache: snapshot.metadata.isFromCache,
+    );
+  }
+
+  /// The listener's body, split from the [QuerySnapshot] so tests can feed it
+  /// the one snapshot fake_cloud_firestore can never raise: a FROM-CACHE one
+  /// (the same trap, and the same seam, as the cloud mirrors' apply-snapshot
+  /// methods).
+  @visibleForTesting
+  void applySnapshot(
+    List<DocumentSnapshot<Map<String, dynamic>>> added, {
+    required bool fromCache,
+  }) {
+    // The listener being alive and readable IS the feed being up — but only
+    // when the SERVER said so. A from-cache snapshot means "nothing new from
+    // the server": on an offline device that is the opposite of healthy, and
+    // calling it ok kept the "can't reach live.tips" warning away from an
+    // artist on stage with a dead feed. The cached tips themselves still
+    // flow below — they are real, and their acks queue for the reconnect.
+    if (!fromCache) {
+      _attempt = 0; // a good attach earns a fresh backoff ladder
+      _setStatus(RelayHealth.ok);
+    }
+
+    for (final doc in added) {
       final tip = _tipFromDoc(doc.id, doc.data());
       // Emit first, ack second. A malformed doc emits nothing but is still
       // deleted — otherwise it would jam the queue forever.
@@ -206,19 +238,19 @@ class FirestoreTipChannel implements TipChannel {
     // dropped this uid from readerUids and our secret can no longer buy it
     // back — the same terminal verdict the claim would give us.
     if (error is FirebaseException && error.code == 'permission-denied') {
-      _goTerminal();
+      _goTerminal(RelayHealth.unauthorized);
       return;
     }
     _fail(generation);
   }
 
-  void _goTerminal() {
+  void _goTerminal(RelayHealth health) {
     _terminal = true;
     _retryTimer?.cancel();
     _retryTimer = null;
     unawaited(_sub?.cancel());
     _sub = null;
-    _setStatus(RelayHealth.unauthorized);
+    _setStatus(health);
   }
 
   void _fail(int generation) {

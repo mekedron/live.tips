@@ -663,6 +663,10 @@ class _RelayPill extends StatelessWidget {
         const Color(0xFFFF6B5E),
         context.s.t('live.tip_page_unauthorized'),
       ),
+      RelayHealth.deviceLimit => (
+        const Color(0xFFFF6B5E),
+        context.s.t('live.tip_page_device_limit'),
+      ),
     };
     return _StatusPill(color: color, label: label, dotOnly: dotOnly);
   }

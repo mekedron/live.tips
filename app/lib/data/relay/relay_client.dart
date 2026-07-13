@@ -35,6 +35,12 @@ class RelayApiException implements Exception {
           'or been deleted. Recreate it to reconnect.';
     }
     if (code == 'resource-exhausted') {
+      // Honest only where this message is shown — the create/update flows,
+      // where the code IS a transient rate limit. The claim path never
+      // surfaces it: there the same code means the jar's reader list is
+      // full, a PERMANENT verdict the tip channel maps to
+      // [RelayHealth.deviceLimit] instead, because "try again" would be
+      // a lie.
       return 'The relay is rate-limiting requests — wait a minute and '
           'try again.';
     }

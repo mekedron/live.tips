@@ -192,6 +192,7 @@ const Map<String, String> kEnStrings = {
   "live.summary_jars_value": "🏆 {count} · {amount} banked",
   "live.summary_tips": "Tips",
   "live.tip_page_connecting": "Tip page connecting…",
+  "live.tip_page_device_limit": "Tip page linked to too many devices — create a new tip page link to reset them",
   "live.tip_page_live": "Tip page live",
   "live.tip_page_offline_retry": "Tip page offline — retrying…",
   "live.tip_page_offline_stripe": "Tip page offline — card tips still tracked",

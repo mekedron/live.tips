@@ -216,6 +216,77 @@ void main() {
     });
   }
 
+  test('a claim refused with resource-exhausted is terminal: the reader list '
+      'is full and no amount of retrying can drain it', () async {
+    final db = FakeFirebaseFirestore();
+    var listens = 0;
+    final (channel: channel, backend: backend) = _channel(
+      db,
+      backend: FakeCallables({
+        'claimJar': (_) => throw FakeFunctionsException('resource-exhausted'),
+      }),
+      watch: () {
+        listens++;
+        return const Stream<QuerySnapshot<Map<String, dynamic>>>.empty();
+      },
+    );
+    addTearDown(channel.dispose);
+
+    final statuses = <RelayHealth>[];
+    channel.status.listen(statuses.add);
+    channel.start();
+    await pumpEventQueue();
+
+    expect(statuses, [RelayHealth.connecting, RelayHealth.deviceLimit],
+        reason: 'a full reader list is a permanent verdict, not "down"');
+    expect(listens, 0, reason: 'a jar we cannot claim is never listened to');
+
+    // No re-attach loop: even a deliberate redial must not hammer the claim
+    // — the answer would be the same all night.
+    channel.reconnectNow();
+    await pumpEventQueue();
+    expect(backend.names, ['claimJar']);
+    expect(statuses.last, RelayHealth.deviceLimit);
+  });
+
+  test('a from-cache snapshot does not report the feed healthy — an offline '
+      'device replaying its cache is not "live"', () async {
+    final db = FakeFirebaseFirestore();
+    final controller =
+        StreamController<QuerySnapshot<Map<String, dynamic>>>.broadcast();
+    addTearDown(controller.close);
+    final (channel: channel, backend: _) =
+        _channel(db, watch: () => controller.stream);
+    addTearDown(channel.dispose);
+
+    final statuses = <RelayHealth>[];
+    final tips = <Tip>[];
+    channel.status.listen(statuses.add);
+    channel.tips.listen(tips.add);
+    channel.start();
+    await pumpEventQueue();
+
+    // fake_cloud_firestore never raises a from-cache snapshot, so feed the
+    // listener's body directly — the same seam the cloud mirrors use.
+    await db.collection(_path).add(_pendingTip(name: 'Cached'));
+    channel.applySnapshot(
+      (await db.collection(_path).get()).docs,
+      fromCache: true,
+    );
+    await pumpEventQueue();
+
+    expect(statuses, [RelayHealth.connecting],
+        reason: 'a cached snapshot is silence from the server, not health');
+    // The cached tip itself is real and still delivered (its ack queues up
+    // for the reconnect).
+    expect(tips.map((t) => t.name), ['Cached']);
+
+    // The server speaking — even with nothing to say — IS the feed being up.
+    channel.applySnapshot(const [], fromCache: false);
+    await pumpEventQueue();
+    expect(statuses, [RelayHealth.connecting, RelayHealth.ok]);
+  });
+
   test('an unreachable relay is down, and retried', () async {
     final db = FakeFirebaseFirestore();
     final (channel: channel, backend: _) = _channel(

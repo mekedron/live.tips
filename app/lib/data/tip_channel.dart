@@ -17,6 +17,12 @@ enum RelayHealth {
   /// The feed rejected our credential or its jar is gone. Terminal: no
   /// reconnect will fix it, the artist must re-link in Settings.
   unauthorized,
+
+  /// The jar refused this device: its reader list is full (the relay caps
+  /// how many device identities may claim one jar, and nothing prunes the
+  /// list except a new link). Terminal like [unauthorized] — waiting fixes
+  /// nothing, the artist must create a new tip page link.
+  deviceLimit,
 }
 
 /// A live push feed of tips for one session — today the relay WebSocket,
