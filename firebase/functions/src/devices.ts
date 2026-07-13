@@ -31,6 +31,7 @@ import { getAuth } from "firebase-admin/auth";
 import { Timestamp } from "firebase-admin/firestore";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { ipQuotaKey, sha256Hex, verifySecret } from "./auth";
+import { DIRECT_HOPS, clientIp } from "./client-ip";
 import { dataObject, requireUid } from "./jars";
 import {
   isAnonymousProvider,
@@ -149,7 +150,9 @@ async function bumpIpQuota(
 ): Promise<void> {
   const salt = IP_HASH_SALT.value();
   if (!salt) throw new HttpsError("internal", "server misconfigured");
-  const ip = request.rawRequest.ip ?? "unknown";
+  // NOT rawRequest.ip: the platform-appended header entry is the only
+  // address a caller cannot write (see client-ip.ts).
+  const ip = clientIp(request.rawRequest, DIRECT_HOPS);
   const now = Date.now();
   const allowed = await bumpQuota(
     firestore, ipQuotaKey(ip, salt, scope), Math.floor(now / 3_600_000), limit, 2 * 3_600_000,

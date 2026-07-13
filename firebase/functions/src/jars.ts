@@ -6,6 +6,7 @@
 
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { ipQuotaKey, newJarId, newSecret, sha256Hex, verifySecret } from "./auth";
+import { DIRECT_HOPS, clientIp } from "./client-ip";
 import { IP_HASH_SALT } from "./params";
 import {
   CREATES_PER_IP_PER_HOUR,
@@ -89,7 +90,9 @@ export async function createJarHandler(
 
   const firestore = db();
   const now = Date.now();
-  const ip = request.rawRequest.ip ?? "unknown";
+  // NOT rawRequest.ip: the platform-appended header entry is the only
+  // address a caller cannot write (see client-ip.ts).
+  const ip = clientIp(request.rawRequest, DIRECT_HOPS);
 
   const uidAllowed = await bumpQuota(
     firestore, `create-uid-${uid}`, Math.floor(now / DAY_MS), CREATES_PER_UID_PER_DAY, 2 * DAY_MS,

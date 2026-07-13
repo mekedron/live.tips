@@ -9,6 +9,7 @@ import type { Request } from "firebase-functions/v2/https";
 import type { Response } from "express";
 import { Timestamp } from "firebase-admin/firestore";
 import { ipQuotaKey } from "./auth";
+import { HOSTING_HOPS, clientIp } from "./client-ip";
 import { buildRedirectUrl } from "./deeplinks";
 import { methodCurrency } from "./methods";
 import { IP_HASH_SALT, TURNSTILE_SECRET, TURNSTILE_SITE_KEY } from "./params";
@@ -57,12 +58,6 @@ function sendHtml(res: Response, body: string, status: number): void {
       "X-Robots-Tag": "noindex",
     })
     .send(body);
-}
-
-function clientIp(req: Request): string {
-  // Behind Hosting/Cloud Run the platform-appended entry is trusted; express
-  // resolves it into req.ip.
-  return req.ip ?? "unknown";
 }
 
 export async function tipHandler(req: Request, res: Response): Promise<void> {
@@ -114,19 +109,9 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const ip = clientIp(req);
-    const hourBucket = Math.floor(now / 3_600_000);
-    const ipAllowed = await bumpQuota(
-      firestore,
-      ipQuotaKey(ip, salt, "tips"),
-      hourBucket,
-      TIPS_PER_IP_PER_HOUR,
-      2 * 3_600_000,
-    );
-    if (!ipAllowed) {
-      sendJson(res, { error: "too many requests" }, 429, { "Retry-After": "30" });
-      return;
-    }
+    // NOT req.ip: the Hosting-appended header entry is the only address a
+    // client cannot write (see client-ip.ts).
+    const ip = clientIp(req, HOSTING_HOPS);
 
     if (!isValidJarId(jarId)) {
       sendJson(res, { error: "not found" }, 404);
@@ -161,6 +146,23 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
 
     if (!(await verifyTurnstile(turnstileToken, ip, TURNSTILE_SECRET.value()))) {
       sendJson(res, { error: "verification failed" }, 403);
+      return;
+    }
+
+    // The per-IP quota spends only AFTER Turnstile has vouched for the
+    // request: a junk POST must not consume the bucket of whatever address
+    // it claims to be, or 120 of them naming a venue's NAT would 429 every
+    // fan in the bar for the rest of the hour.
+    const hourBucket = Math.floor(now / 3_600_000);
+    const ipAllowed = await bumpQuota(
+      firestore,
+      ipQuotaKey(ip, salt, "tips"),
+      hourBucket,
+      TIPS_PER_IP_PER_HOUR,
+      2 * 3_600_000,
+    );
+    if (!ipAllowed) {
+      sendJson(res, { error: "too many requests" }, 429, { "Retry-After": "30" });
       return;
     }
 

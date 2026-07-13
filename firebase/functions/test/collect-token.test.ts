@@ -76,14 +76,14 @@ function linkRequest(): never {
   // CallableRequest is structurally typed; only what the handler reads.
   return {
     data: { code: CODE, nonce: NONCE },
-    rawRequest: { ip: "203.0.113.7" },
+    rawRequest: { headers: {}, socket: { remoteAddress: "203.0.113.7" } },
   } as never;
 }
 
 function loginRequest(): never {
   return {
     data: { requestId: REQUEST_ID, collectNonce: NONCE },
-    rawRequest: { ip: "203.0.113.7" },
+    rawRequest: { headers: {}, socket: { remoteAddress: "203.0.113.7" } },
   } as never;
 }
 
