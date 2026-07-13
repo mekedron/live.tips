@@ -157,6 +157,37 @@ Future<void> _open(WidgetTester tester, String door) async {
   await tester.pumpAndSettle();
 }
 
+/// The refusal was SAID — to the artist, not to the widget tree (#53).
+///
+/// `find.text` was the whole of our vocabulary for this, and it is satisfied by
+/// a widget under three layers of paint: the refusal used to be a snackbar on
+/// the ROOT messenger, printed in the Scaffold of the route BELOW the sheet,
+/// under an opaque modal barrier. Present in the tree, invisible to a human,
+/// green in five tests, and the artist mid-gig saw a tap that did nothing.
+///
+/// So this asserts what a human could actually do with it:
+///
+/// * `hitTestable()` — the sentence can be TOUCHED where it is drawn. A modal
+///   barrier absorbs the hit test, so anything painted behind the sheet fails
+///   here. This is the assertion that fails against the pre-fix code.
+/// * `descendant of BottomSheet` — it lives on the topmost route. For overlay
+///   entries, route membership IS paint order.
+/// * no SnackBar — the message did not also go to the room next door.
+///
+/// **A tree proves a widget exists. It never proves it is on top.**
+void _expectSaidOnTheSheet(String message) {
+  expect(find.text(message).hitTestable(), findsOneWidget,
+      reason: 'the refusal must be reachable by a thumb where it is drawn — '
+          'behind the sheet it is not');
+  expect(
+    find.descendant(of: find.byType(BottomSheet), matching: find.text(message)),
+    findsOneWidget,
+    reason: 'the refusal belongs on the surface the artist is looking at',
+  );
+  expect(find.byType(SnackBar), findsNothing,
+      reason: 'a snackbar under a bottom sheet is a refusal nobody hears');
+}
+
 /// Lets a live session's poll timer (and a snackbar's) drain before teardown.
 Future<void> _drain(WidgetTester tester, ProviderContainer container) async {
   await container.read(liveSessionProvider.notifier).stop();
@@ -273,11 +304,60 @@ void main() {
     await tester.tap(find.text('Night Shift'));
     await tester.pumpAndSettle();
 
-    expect(
-        find.text('Stop the live session before switching.'), findsOneWidget);
+    _expectSaidOnTheSheet('Stop the live session before switching.');
     expect(container.read(appStateProvider).accountId, isNot('acc_cloud2'));
 
     await _drain(tester, container);
+  });
+
+  testWidgets('a second tap on a blocked row is answered again — the refusal '
+      'pulses rather than sitting there as a still frame', (tester) async {
+    final container = await _pumpDoors(tester, cloud: true, live: true);
+    await _open(tester, 'profiles');
+
+    await tester.tap(find.text('Night Shift'));
+    await tester.pumpAndSettle();
+    _expectSaidOnTheSheet('Stop the live session before switching.');
+
+    // The artist taps again — the sentence does not change, so nothing on the
+    // screen would either unless the notice is REPLAYED. It is keyed on the
+    // refusal count, so the second refusal is a new widget mid-animation…
+    await tester.tap(find.text('Night Shift'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    final pulsing = tester.widget<Opacity>(find.ancestor(
+      of: find.text('Stop the live session before switching.'),
+      matching: find.byType(Opacity),
+    ));
+    expect(pulsing.opacity, lessThan(1.0),
+        reason: 'the second refusal must animate in, not sit still');
+
+    // …and it settles back to exactly one visible sentence, not a stack of them.
+    await tester.pumpAndSettle();
+    _expectSaidOnTheSheet('Stop the live session before switching.');
+
+    await _drain(tester, container);
+  });
+
+  testWidgets('the refusal goes when the block goes: stopping the set clears '
+      'the sentence that explained it', (tester) async {
+    final container = await _pumpDoors(tester, cloud: true, live: true);
+    await _open(tester, 'profiles');
+
+    await tester.tap(find.text('Night Shift'));
+    await tester.pumpAndSettle();
+    _expectSaidOnTheSheet('Stop the live session before switching.');
+
+    await _drain(tester, container);
+
+    // The set is over and the sheet is still open: a sentence about a session
+    // that ended is a lie, however loudly it is printed.
+    expect(find.text('Stop the live session before switching.'), findsNothing);
+    expect(find.text('A live session is running — stop it to switch.'),
+        findsNothing,
+        reason: 'the hint goes with the block it described');
+    expect(find.text('Your profiles'), findsOneWidget,
+        reason: 'the sheet is still open, and now refuses nothing');
   });
 
   testWidgets('a live session refuses an ACCOUNT flip too — the same guard, '
@@ -290,11 +370,15 @@ void main() {
     await tester.tap(find.text('On this device'));
     await tester.pumpAndSettle();
 
-    expect(
-        find.text('Stop the live session before switching.'), findsOneWidget);
+    _expectSaidOnTheSheet('Stop the live session before switching.');
     expect(container.read(accountsDirectoryProvider).activeAccountId, 'uid_1',
         reason: 'the flip must not have happened');
     expect(container.read(liveSessionProvider), isNotNull);
+
+    // The other door out of this sheet refuses the same way, in the same place.
+    await tester.tap(find.text('Sign in to another account'));
+    await tester.pumpAndSettle();
+    _expectSaidOnTheSheet('Stop the live session before switching.');
 
     await _drain(tester, container);
   });
@@ -310,8 +394,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
-    expect(find.text('Stop the live session before signing out.'),
-        findsOneWidget);
+    _expectSaidOnTheSheet('Stop the live session before signing out.');
     expect(find.text('Sign out?'), findsNothing,
         reason: 'not even the dialog — the refusal comes first');
     expect(container.read(accountsDirectoryProvider).contains('uid_1'), isTrue);
@@ -343,8 +426,7 @@ void main() {
     await tester.tap(find.text('Add a profile'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Stop the live session before adding a profile.'),
-        findsOneWidget);
+    _expectSaidOnTheSheet('Stop the live session before adding a profile.');
     expect(container.read(appStateProvider).accounts, hasLength(2),
         reason: 'nothing is minted behind a refusal');
 

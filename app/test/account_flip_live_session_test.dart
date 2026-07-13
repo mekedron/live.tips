@@ -231,8 +231,15 @@ void main() {
     await tester.tap(find.text('On this device'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Stop the live session before switching.'),
-        findsOneWidget);
+    // Said ON the sheet, not behind it (#53): a snackbar posted from a modal
+    // bottom sheet is painted under it, and `find.text` cannot tell.
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('Stop the live session before switching.'),
+      ).hitTestable(),
+      findsOneWidget,
+    );
     expect(container.read(accountsDirectoryProvider).activeAccountId,
         'uid_1',
         reason: 'the flip must not have happened');

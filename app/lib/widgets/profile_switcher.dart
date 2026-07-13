@@ -83,12 +83,108 @@ String accountBlockMessage(
         context.s.t(sessionKey ?? 'widgets.profile_switcher.stop_session_switch'),
     };
 
+/// A refusal, and the number of times it has been said. The [tick] is what makes
+/// a SECOND tap on the same blocked row visible: the sentence does not change,
+/// so nothing on the screen would, and an artist who taps again and sees the
+/// same still frame has learned nothing. The banner replays its pulse on every
+/// new tick.
+class _Refusal {
+  const _Refusal(this.message, this.tick);
+
+  final String message;
+  final int tick;
+}
+
+/// Where a sheet's refusals are SAID. One per open sheet, and the sheet's chrome
+/// listens to it ([_SheetFrame]).
+class _RefusalSink extends ValueNotifier<_Refusal?> {
+  _RefusalSink() : super(null);
+
+  void say(String message) => value = _Refusal(message, (value?.tick ?? 0) + 1);
+
+  void clear() => value = null;
+}
+
+/// The scope a refusal is spoken INTO — wrapped around each sheet's body, and
+/// absent everywhere else. It is how [accountActionAllowed] knows which surface
+/// the artist is actually looking at.
+class _RefusalScope extends InheritedWidget {
+  const _RefusalScope({required this.sink, required super.child});
+
+  final _RefusalSink sink;
+
+  /// Deliberately non-dependent (`getElementForInheritedWidgetOfExactType`):
+  /// this is read from a TAP, not from a build, and a refusal must not
+  /// re-subscribe half the sheet on its way out.
+  static _RefusalSink? maybeOf(BuildContext context) {
+    final element =
+        context.getElementForInheritedWidgetOfExactType<_RefusalScope>();
+    return (element?.widget as _RefusalScope?)?.sink;
+  }
+
+  @override
+  bool updateShouldNotify(_RefusalScope oldWidget) => sink != oldWidget.sink;
+}
+
+/// Owns the sink for the sheet under it — one refusal channel per open sheet,
+/// disposed with it.
+class _RefusalHost extends StatefulWidget {
+  const _RefusalHost({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_RefusalHost> createState() => _RefusalHostState();
+}
+
+class _RefusalHostState extends State<_RefusalHost> {
+  final _sink = _RefusalSink();
+
+  @override
+  void dispose() {
+    _sink.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _RefusalScope(sink: _sink, child: widget.child);
+}
+
+/// How a refusal is HEARD on the surface it was asked from — the whole of #53.
+///
+/// A snackbar is anchored to the bottom edge of the screen; a bottom sheet
+/// covers the bottom edge. Every refusal this file has ever given from inside a
+/// sheet was painted UNDER that sheet, behind the barrier, on a route whose
+/// semantics are blocked — a correct guard, refusing in a whisper, into a room
+/// the artist is not standing in. Mid-gig, the artist tapped and nothing moved.
+///
+/// So the surface decides. Inside a sheet ([_RefusalScope]) the sentence goes to
+/// the sheet's own chrome, above the barrier, and STAYS there as long as the
+/// block does — a condition that is still true when a snackbar would have timed
+/// out has no business timing out. On a full screen (Settings, the root picker)
+/// there is no scope, the snackbar is visible, and nothing changes.
+///
+/// The sink is resolved from the context BEFORE any await, so a caller that
+/// comes back to an unmounted context can still speak (it is the sheet's sink,
+/// not the sheet's context, that does the talking).
+void Function(String message) _refusalVoice(BuildContext context) {
+  final sink = _RefusalScope.maybeOf(context);
+  if (sink != null) return sink.say;
+  final messenger = ScaffoldMessenger.of(context);
+  return (message) =>
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+}
+
 /// THE guard, asked once, before anything moves — and it always answers out
 /// loud. Every account-level act (switch, add, sign out, delete, move, change
 /// the device kind) runs through this: guards that disagreed is how a dead
 /// session used to lock an account out of its own switcher, and how a live set
 /// could be yanked out from under an artist by one of the two switchers but
 /// never by the other.
+///
+/// "Out loud" means ON THE SURFACE THE ARTIST IS LOOKING AT — see
+/// [_refusalVoice]. It refuses exactly as before; only the room changed.
 bool accountActionAllowed(
   BuildContext context,
   WidgetRef ref, {
@@ -96,9 +192,9 @@ bool accountActionAllowed(
 }) {
   final block = ref.read(appStateProvider.notifier).accountActionBlock;
   if (block == null) return true;
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(accountBlockMessage(context, block, sessionKey: sessionKey)),
-  ));
+  _refusalVoice(context)(
+    accountBlockMessage(context, block, sessionKey: sessionKey),
+  );
   return false;
 }
 
@@ -247,7 +343,9 @@ Future<void> showProfileSheet(BuildContext context, WidgetRef ref) async {
   final toAccounts = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    builder: (sheetContext) => const _ProfileSheet(),
+    // The sheet is the room the artist is standing in, so it is the room a
+    // refusal is spoken in (#53).
+    builder: (sheetContext) => const _RefusalHost(child: _ProfileSheet()),
   );
   if (toAccounts == true && context.mounted) {
     await showAccountSheet(context, ref);
@@ -279,7 +377,7 @@ Future<void> showAccountSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (sheetContext) => const _AccountSheet(),
+    builder: (sheetContext) => const _RefusalHost(child: _AccountSheet()),
   );
 }
 
@@ -305,7 +403,8 @@ Future<bool> switchTo(
 
   final directory = ref.read(accountsDirectoryProvider);
   final notifier = ref.read(appStateProvider.notifier);
-  final messenger = ScaffoldMessenger.of(context);
+  // Resolved BEFORE the awaits below — the voice outlives this context.
+  final refuse = _refusalVoice(context);
   final stopSessionMsg =
       context.s.t('widgets.profile_switcher.stop_session_switch');
 
@@ -335,8 +434,8 @@ Future<bool> switchTo(
   final ok = await notifier.switchAccount(band.id);
   if (!ok) {
     // The guard said yes and something moved in between — say why, in the same
-    // sentence every other refusal here uses.
-    messenger.showSnackBar(SnackBar(content: Text(stopSessionMsg)));
+    // sentence every other refusal here uses, and in the same place.
+    refuse(stopSessionMsg);
     return false;
   }
   // The unfinished profile is no longer active — remove it now that we have
@@ -567,8 +666,9 @@ bool _accountsReachable(BuildContext context, WidgetRef ref) =>
     ref.read(authControllerProvider.notifier).available;
 
 /// The chrome both sheets wear: a heading that says which question is being
-/// asked, the one hint a blocked state gets, the rows, and a foot. Written once
-/// — the sheets differ in what they ASK, and in nothing else.
+/// asked, the one hint a blocked state gets — which SPEAKS when a blocked row is
+/// tapped (#53) — the rows, and a foot. Written once: the sheets differ in what
+/// they ASK, and in nothing else.
 class _SheetFrame extends ConsumerWidget {
   const _SheetFrame({required this.title, required this.rows, this.footer});
 
@@ -583,6 +683,16 @@ class _SheetFrame extends ConsumerWidget {
     final live = ref.watch(liveSessionProvider);
     final switching = ref.watch(appStateProvider.select((a) => a.switching));
     final blocked = live != null || switching;
+    final hint = live != null
+        ? s.t('widgets.profile_switcher.live_running_hint')
+        : s.t('widgets.band_switcher.switching');
+    final sink = _RefusalScope.maybeOf(context);
+    // The block is over (the set was stopped from another surface): the refusal
+    // it explained goes with it — a sentence about a session that ended is a
+    // lie, however loudly it is printed.
+    if (!blocked && sink?.value != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => sink?.clear());
+    }
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
@@ -598,22 +708,96 @@ class _SheetFrame extends ConsumerWidget {
               ),
             ),
             if (blocked)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                child: Text(
-                  live != null
-                      ? s.t('widgets.profile_switcher.live_running_hint')
-                      : s.t('widgets.band_switcher.switching'),
-                  style: TextStyle(
-                    fontFamily: kFontBody,
-                    fontSize: 12.5,
-                    color: c.textMuted,
-                  ),
+              if (sink == null)
+                _BlockedNotice(hint: hint, refusal: null)
+              else
+                ValueListenableBuilder<_Refusal?>(
+                  valueListenable: sink,
+                  builder: (context, refusal, _) =>
+                      _BlockedNotice(hint: hint, refusal: refusal),
                 ),
-              ),
             Flexible(child: ListView(shrinkWrap: true, children: rows)),
             ?footer,
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The sheet's one blocked-state line, in its two voices.
+///
+/// **Untapped** — the muted hint it has always been: a live session is running,
+/// so some of this is refused.
+///
+/// **Refused** — the artist tapped anyway, and the sentence the guard answered
+/// with takes the line over: loud, named for the act that was refused ("Stop the
+/// live session before adding a profile."), and INSIDE the sheet, which is the
+/// only place a refusal is worth printing while a sheet is open. It stays for as
+/// long as the block does, and pulses again on every further tap — a repeated
+/// tap must produce a repeated answer, or the artist is back to a still frame.
+class _BlockedNotice extends StatelessWidget {
+  const _BlockedNotice({required this.hint, required this.refusal});
+
+  final String hint;
+  final _Refusal? refusal;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    final refused = refusal;
+    if (refused == null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+        child: Text(
+          hint,
+          style: TextStyle(
+            fontFamily: kFontBody,
+            fontSize: 12.5,
+            color: c.textMuted,
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+      // Keyed on the tick: a second refusal is a NEW widget, so the pulse runs
+      // again even though the words did not change.
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey(refused.tick),
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutBack,
+        builder: (context, t, child) => Transform.scale(
+          scale: 0.94 + 0.06 * t,
+          alignment: Alignment.centerLeft,
+          child: Opacity(opacity: t.clamp(0, 1), child: child),
+        ),
+        // A live region: the artist who cannot see it is told it, which is more
+        // than the snackbar managed — a modal route blocks the semantics of the
+        // screen the snackbar was printed on.
+        child: Semantics(
+          liveRegion: true,
+          child: Container(
+            decoration: BoxDecoration(
+              color: c.warningContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.error_outline_rounded, size: 18, color: c.warning),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    refused.message,
+                    style: outfitStyle(13.5, c.warning, weight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
