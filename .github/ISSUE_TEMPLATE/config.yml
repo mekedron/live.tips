@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🔒 Report an exploitable vulnerability (private)
+    url: https://github.com/mekedron/live.tips/security/advisories/new
+    about: live.tips moves real money. If a weakness is exploitable against production, report it privately here — never as a public issue.
+  - name: 💬 Question about the project
+    url: https://github.com/mekedron/live.tips/discussions
+    about: Not a bug? Ask here.

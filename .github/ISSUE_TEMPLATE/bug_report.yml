@@ -1,0 +1,93 @@
+name: Bug report
+description: Something behaves incorrectly — wrong output, crash, data loss, or a broken flow.
+title: "[Bug] "
+labels: ["type/bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing. The most useful bug report names a **failure scenario**:
+        concrete inputs or state, and the wrong outcome they produce.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence stating the defect.
+      placeholder: Tapping "Resume session" does nothing when another device holds the session.
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: Failure scenario
+      description: Inputs / state → wrong outcome. Be specific enough that someone else can reproduce or reason about it.
+      placeholder: |
+        1. Cloud account, device A goes live, then crashes mid-set (stored snapshot survives).
+        2. Device B starts a new session.
+        3. On A, Home shows the "Resume session" row. Tap it.
+        → Nothing happens. No snackbar, no navigation. Fails identically on every retry.
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Where it lives
+      description: File paths with line numbers, if known. One per line.
+      placeholder: |
+        app/lib/features/home/home_screen.dart:435
+        app/lib/state/live_session_controller.dart:190
+      render: text
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - app / state
+        - app / data layer
+        - app / UI
+        - functions / relay + tips
+        - functions / auth + devices
+        - functions / Stripe
+        - firestore rules
+        - infra / CI / config
+        - website / docs
+        - unsure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Best guess. Maintainers will confirm and apply the P-label.
+      options:
+        - P0 — ship blocker (money loss, data loss, security, prod down)
+        - P1 — high (broken flow, silent failure, no workaround)
+        - P2 — medium (degraded behaviour, workaround exists)
+        - P3 — low (cosmetic, cleanup, hygiene)
+    validations:
+      required: true
+
+  - type: textarea
+    id: why_tests_missed
+    attributes:
+      label: Why the tests didn't catch it
+      description: |
+        This project has been burned repeatedly by green suites hiding a broken production —
+        the fakes model server truth, while real Firestore answers from cache first.
+        If you know why this slipped through, say so. It usually points at the real fix.
+      placeholder: FakeCallables accepts any payload, so the client/server validation mismatch is invisible in tests.
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Blocks / Blocked by
+      description: Issue numbers this must land before or after.
+      placeholder: |
+        Blocked by: #12
+        Blocks: #34
+      render: text

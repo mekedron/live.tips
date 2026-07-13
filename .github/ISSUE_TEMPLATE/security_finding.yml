@@ -1,0 +1,68 @@
+name: Security finding (already public / low risk)
+description: A security weakness that is safe to discuss in the open. For anything exploitable, use private reporting instead — see SECURITY.md.
+title: "[Security] "
+labels: ["type/security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚠️ Stop and read
+
+        This repository is **public**. An issue filed here is visible to everyone,
+        indexed by search engines, and cached even if you delete it later.
+
+        **If the weakness is exploitable against production, do not file it here.**
+        Report it privately: [open a draft security advisory](../../security/advisories/new).
+        See [SECURITY.md](../../blob/main/SECURITY.md).
+
+        Use this template only when disclosure carries no real risk — hardening
+        work, defence-in-depth, a weakness that needs access you already trust,
+        or a finding that has been publicly disclosed already.
+
+  - type: checkboxes
+    id: disclosure
+    attributes:
+      label: Disclosure check
+      options:
+        - label: I have confirmed this is NOT exploitable against production by an outside attacker, or it is already public.
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence stating the weakness.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What an attacker gains, and what it costs them. If the exposure is bounded (short TTL, requires pre-positioning, self-healing), say so.
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Where it lives
+      render: text
+
+  - type: textarea
+    id: fix
+    attributes:
+      label: Proposed fix
+      description: Shape of the fix, if known.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - P0 — ship blocker
+        - P1 — high
+        - P2 — medium
+        - P3 — low
+    validations:
+      required: true
