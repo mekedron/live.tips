@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../state/auth_providers.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
+import '../../state/venue_providers.dart';
 import '../onboarding/account_name_screen.dart';
 import '../onboarding/profile_pick_screen.dart';
+import '../settings/settings_screen.dart';
 import '../shell/app_shell.dart';
+import '../../domain/device_kind.dart';
 import '../../domain/pending_redirect.dart';
 
 /// The return leg of a web sign-in.
@@ -98,8 +101,21 @@ class _RedirectSignInGateState extends ConsumerState<RedirectSignInGate> {
         ));
       case RedirectOrigin.settings:
         // Settings, the switcher and the sheet all live behind the Settings
-        // tab — land there rather than on Home.
-        ref.read(shellTabRequestProvider.notifier).request(ShellTab.settings);
+        // tab — land there rather than on Home. Except when the account that
+        // just signed in has no profile, or several and no answer: the root is
+        // then the picker, no shell mounts, and the tab request was left on the
+        // floor — the artist landed on a create/pick screen with no word about
+        // the sign-in they had just completed (#40). The picker has a Settings
+        // route of its own now, so ask for the screen rather than the tab.
+        final render = ref.read(activeProfileRenderProvider);
+        if (ref.read(deviceKindProvider) != DeviceKind.venue &&
+            (render == ProfileRender.pick || render == ProfileRender.create)) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SettingsRouteScreen()),
+          );
+        } else {
+          ref.read(shellTabRequestProvider.notifier).request(ShellTab.settings);
+        }
       case RedirectOrigin.app:
         break;
     }

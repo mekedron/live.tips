@@ -27,8 +27,30 @@ import 'security_screen.dart';
 import 'sign_in_methods_screen.dart';
 import 'stripe_key_screen.dart';
 
+/// Settings as a pushed ROUTE, with a Back arrow of its own.
+///
+/// The shell hangs this screen on a tab, and every door out of a state — sign
+/// in, sign out, the sign-in methods, delete account, what this device is, the
+/// demo — lives behind it. The band-less roots (RootGate's picker and its
+/// create step) have no tab bar to hang anything on, which is how an artist
+/// with no profile came to have no Settings at all, and no way back to
+/// onboarding (#40). They push this instead: the same screen, over a root that
+/// is not going anywhere, so its Back arrow means what it says.
+class SettingsRouteScreen extends StatelessWidget {
+  const SettingsRouteScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(context.s.t('settings.main.title'))),
+        body: const SettingsScreen(showTitle: false),
+      );
+}
+
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.showTitle = true});
+
+  /// The tab draws its own heading; the pushed route puts it in the app bar.
+  final bool showTitle;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -216,6 +238,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Settings keep showing the account you had just left. Null means the
     // local profile — the sign-in row.
     final activeProfile = directory.active;
+    // Nothing is open: the profile set is empty, or the picker has not been
+    // answered yet (RootGate's band-less roots, which push this screen). The
+    // profile's own rows would name — and act on — a profile that does not
+    // exist, so they stand aside. The switcher stays: it is the door to the
+    // profiles and accounts that DO exist, and it is the reason this screen is
+    // reachable from there at all (#40).
+    final hasProfile = app.accountId.isNotEmpty;
     final cloudEntry = activeProfile.isLocal
         ? null
         // A user the directory hasn't caught up with yet (mid sign-in) falls
@@ -366,17 +395,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         LtRowGroup(
           header: s.t('settings.main.profile_details_header'),
           children: [
-            LtRow(
-              icon: Icons.badge_rounded,
-              title: app.displayName.isEmpty
-                  ? s.t('settings.main.your_profile_fallback')
-                  : app.displayName,
-              subtitle: s.t('settings.main.account_details_subtitle'),
-              chevron: true,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AccountDetailsScreen()),
+            if (hasProfile)
+              LtRow(
+                icon: Icons.badge_rounded,
+                title: app.displayName.isEmpty
+                    ? s.t('settings.main.your_profile_fallback')
+                    : app.displayName,
+                subtitle: s.t('settings.main.account_details_subtitle'),
+                chevron: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AccountDetailsScreen(),
+                  ),
+                ),
               ),
-            ),
             // THE switcher — profiles and the accounts they live under, one
             // list, one set of rules (#29).
             LtRow(
@@ -392,21 +424,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // every device either way. The artist ending a gig on a borrowed
             // tablet signs the account OUT — offline-safe, and it takes the
             // whole account with it instead of one profile.
-            LtRow(
-              icon: Icons.delete_forever_rounded,
-              iconColor: c.danger,
-              title: s.t('settings.main.delete_profile_row'),
-              titleColor: c.danger,
-              subtitle: activeProfile.isLocal
-                  ? s.t('settings.main.delete_profile_subtitle_local')
-                  : s.t('settings.main.delete_profile_subtitle_cloud'),
-              chevron: true,
-              onTap: _confirmDeleteProfile,
-            ),
+            if (hasProfile)
+              LtRow(
+                icon: Icons.delete_forever_rounded,
+                iconColor: c.danger,
+                title: s.t('settings.main.delete_profile_row'),
+                titleColor: c.danger,
+                subtitle: activeProfile.isLocal
+                    ? s.t('settings.main.delete_profile_subtitle_local')
+                    : s.t('settings.main.delete_profile_subtitle_cloud'),
+                chevron: true,
+                onTap: _confirmDeleteProfile,
+              ),
           ],
         ),
       // ----------------------------------------------- payment methods ---
-      if (!app.demo)
+      if (!app.demo && hasProfile)
         LtRowGroup(
           header: s.t('settings.main.payment_methods_header'),
           children: [
@@ -632,11 +665,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  s.t('settings.main.title'),
-                  style: outfitStyle(32, c.text, weight: FontWeight.w800),
-                ),
-                const SizedBox(height: 24),
+                if (widget.showTitle) ...[
+                  Text(
+                    s.t('settings.main.title'),
+                    style: outfitStyle(32, c.text, weight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 24),
+                ],
                 for (final section in sections) ...[
                   section,
                   const SizedBox(height: 14),
@@ -654,16 +689,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           children: [
-            SizedBox(
-              height: 56,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  s.t('settings.main.title'),
-                  style: outfitStyle(20, c.text, weight: FontWeight.w700),
+            if (widget.showTitle)
+              SizedBox(
+                height: 56,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    s.t('settings.main.title'),
+                    style: outfitStyle(20, c.text, weight: FontWeight.w700),
+                  ),
                 ),
               ),
-            ),
             const SizedBox(height: 4),
             for (final section in sections) ...[
               section,

@@ -107,7 +107,13 @@ class LiveTipsApp extends ConsumerWidget {
 /// shell was unreachable, and the user's other bands were invisible.
 ///
 /// Two states have no band to build the shell AROUND, and neither of them is
-/// answered by inventing one ([activeProfileRenderProvider]):
+/// answered by inventing one ([activeProfileRenderProvider]). They are roots of
+/// their own — a forced question with nothing to dismiss onto — and they carry
+/// the shell's doors themselves: THE switcher, and Settings as a pushed route
+/// (see ProfilePickScreen). Every door out of a state used to live in the
+/// shell, so a band-less root was a room with no doors at all: no sign-out, no
+/// device kind, no way back to onboarding, and — once one cloud account is on
+/// the device ([deviceIsSetUpProvider]) — no Welcome ever again (#40).
 ///
 /// * A profile set that is warm and empty — a cloud account with no profile
 ///   yet, or the local profile after its last band was removed → the create

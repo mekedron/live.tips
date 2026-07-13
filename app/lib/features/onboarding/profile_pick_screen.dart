@@ -11,6 +11,7 @@ import '../../state/auth_providers.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/profile_switcher.dart';
+import '../settings/settings_screen.dart';
 import 'onboarding_flow.dart';
 
 /// The profile question of a cloud account, in its two forms — and the app
@@ -53,7 +54,15 @@ import 'onboarding_flow.dart';
 ///
 /// As the root there is nothing to forward TO (a pushReplacement would bury
 /// RootGate itself), so the deadline and the auto-forward are the pushed
-/// form's alone — and there is a door out to the other accounts instead.
+/// form's alone — and there are doors instead. It needs them: every other root
+/// is the shell, where the switcher, Settings, sign-out, the account section
+/// and the device kind are one tap away, and this one has no tab bar to hang
+/// any of that on. An artist whose profile set is empty used to land here with
+/// two affordances — create a profile, or switch to an account that might be
+/// just as empty — and no Settings on the device at all: no sign-out, no way to
+/// change what the device is, no way back to onboarding (#40). So the root form
+/// carries its own chrome: THE switcher (a sheet, over this screen), and
+/// Settings (a route, pushed over a root that is not moving).
 class ProfilePickScreen extends ConsumerStatefulWidget {
   const ProfilePickScreen({super.key, this.asRoot = false});
 
@@ -128,6 +137,15 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
   /// changes their mind (and so the flip cannot land on a rebuild of the very
   /// route it was tapped on — #38).
   void _switchAccount() => unawaited(showSwitcherSheet(context, ref));
+
+  /// And the door the shell has always had, which this root did not: Settings.
+  /// Sign out, the sign-in methods, delete account, what this device is, the
+  /// demo — every exit from a state lives in there, and a root with no tab bar
+  /// used to reach none of them (#40). A pushed route over a root that is not
+  /// moving: its Back arrow comes back here, which is where the artist is.
+  void _settings() => unawaited(Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SettingsRouteScreen()),
+      ));
 
   /// "Add a profile" by another name — the same one place a profile is minted.
   Future<void> _createNew() async {
@@ -213,14 +231,20 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
       appBar: AppBar(
         title: Text(s.t('onboarding.profile_pick.title')),
         actions: [
-          if (asRoot)
+          if (asRoot) ...[
+            TextButton(
+              onPressed: _switchAccount,
+              child: Text(s.t('settings.account.switch_title')),
+            ),
             Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: TextButton(
-                onPressed: _switchAccount,
-                child: Text(s.t('settings.account.switch_title')),
+              padding: const EdgeInsets.only(right: 4),
+              child: IconButton(
+                onPressed: _settings,
+                tooltip: s.t('settings.main.title'),
+                icon: const Icon(Icons.settings_outlined),
               ),
             ),
+          ],
         ],
       ),
       body: Center(
