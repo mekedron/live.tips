@@ -141,7 +141,9 @@ export interface JarDoc {
   tipsDay: number;
   tipsToday: number;
   tipsTotal: number;
-  /** 90 days after last activity; expireJars deletes unowned jars past it. */
+  /** 90 days after the ARTIST was last seen (jarSeen / profile update /
+   * secret rotation — never a fan tip); expireJars deletes unowned jars
+   * past it. */
   expiresAt: Timestamp;
 }
 

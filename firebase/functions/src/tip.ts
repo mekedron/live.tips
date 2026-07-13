@@ -24,7 +24,6 @@ import {
   bumpQuota,
   db,
   dedupeSignature,
-  expiryTimestamp,
   jarIsLive,
   jarRateRef,
   jarRef,
@@ -166,10 +165,22 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Per-jar rate caps + 60s dedupe, atomically on private/rate.
+    // Per-jar rate caps + 60s dedupe, atomically on private/rate. The tip
+    // counters ride the same transaction: the jar snapshot above predates the
+    // Turnstile round-trip by hundreds of milliseconds, so a read-modify-write
+    // from it loses concurrent increments and can mis-reset tipsToday at
+    // midnight — and a blind update against a since-deleted jar would throw
+    // the whole batch, a 500 to a fan whose single-use Turnstile token is
+    // already spent. The worker had all of this for free inside the DO's
+    // single-threaded lock; the transaction restores it.
     const sig = dedupeSignature(tipRequest);
     const outcome = await firestore.runTransaction(async (tx) => {
-      const rateSnap = await tx.get(jarRateRef(firestore, jarId));
+      const snaps = await tx.getAll(ref, jarRateRef(firestore, jarId));
+      const [jarSnap, rateSnap] = [snaps[0]!, snaps[1]!];
+      // Deleted mid-flight: nothing left to count on, and no rate doc to
+      // resurrect under it. The fan still gets their payment link below.
+      if (!jarSnap.exists) return "gone" as const;
+      const fresh = jarSnap.data() as JarDoc;
       const rate = (rateSnap.data() as RateDoc | undefined) ?? {
         minute: 0, minuteCount: 0, hour: 0, hourCount: 0, recentSigs: [],
       };
@@ -185,7 +196,21 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
       const duplicate = rate.recentSigs.some((r) => r.sig === sig);
       rate.minuteCount += 1;
       rate.hourCount += 1;
-      if (!duplicate) rate.recentSigs.push({ sig, tsMs: ts });
+      if (!duplicate) {
+        rate.recentSigs.push({ sig, tsMs: ts });
+        const today = Math.floor(ts / DAY_MS);
+        // Deliberately NOT lastSeenDay/expiresAt: a fan tip is not the
+        // artist. The worker bumped the 90-day clock only while the artist's
+        // device was connected ("a connected device is proof the artist is
+        // active"); here that signal is jarSeen and the app's daily profile
+        // re-push. Stamping it per tip would let anyone keep an abandoned
+        // jar's URL alive forever (see expireJarsHandler).
+        tx.update(ref, {
+          tipsTotal: fresh.tipsTotal + 1,
+          tipsToday: fresh.tipsDay === today ? fresh.tipsToday + 1 : 1,
+          tipsDay: today,
+        });
+      }
       tx.set(jarRateRef(firestore, jarId), rate);
       return duplicate ? ("duplicate" as const) : ("ok" as const);
     });
@@ -221,20 +246,12 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
         expiresAt: Timestamp.fromMillis(now + PENDING_TTL_MS),
       };
       batch.set(pendingCol.doc(randomUUID()), event);
-
-      const today = Math.floor(now / DAY_MS);
-      batch.update(ref, {
-        tipsTotal: jar.tipsTotal + 1,
-        tipsToday: jar.tipsDay === today ? jar.tipsToday + 1 : 1,
-        tipsDay: today,
-        lastSeenDay: today,
-        expiresAt: expiryTimestamp(now),
-      });
       await batch.commit();
     }
 
-    // A duplicate is accepted but not queued — the sender learns nothing,
-    // the stage stays clean, and the fan still gets their payment link.
+    // A duplicate — or a jar deleted mid-flight — is accepted but not queued:
+    // the sender learns nothing, the stage stays clean, and the fan still
+    // gets their payment link.
     sendJson(res, { redirectUrl, queued: outcome === "ok" });
     return;
   }
