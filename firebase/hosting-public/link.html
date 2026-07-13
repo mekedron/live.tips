@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>live.tips — add this device</title>
+<!--
+  The landing page for an add-device QR, https://tip.live.tips/link#c=<code>.
+
+  A device that HAS live.tips never sees this page: the OS matches the
+  universal link (AASA / assetlinks, path /link*) and hands the URL straight
+  to the app. This page is what is left over — the venue tablet or the
+  bandmate's phone that does not have the app yet, which is exactly the
+  device the flow exists to onboard. Before it existed, that device got a
+  bare Firebase 404 (issue #21).
+
+  What the SERVER knows: nothing. The code rides in the fragment on purpose
+  (link_codes.dart), and a fragment is never sent in the request — that is
+  what keeps a live sign-in code out of hosting and CDN access logs. So the
+  page is served identically to everyone, and only the script below, running
+  in the browser, ever sees whether there is a code and what it is.
+
+  Where it sends you: the web build of the app, live.tips/app/, with the code
+  forwarded in the fragment again — never the query. main() reads the boot
+  URL's fragment before Flutter scrubs it (main.dart), and parseLinkCode
+  accepts `#c=` on any *.live.tips host (core/deep_links.dart), so the app
+  comes up already holding the code. Nothing is minted or redeemed here.
+
+  English only, like every other hosted page (index.html, signin.html, the
+  tip page). website/i18n/ localizes the marketing site, not this host.
+-->
+<style>
+:root { color-scheme: light dark; --accent: #e8542f; --bg: #faf6f1; --fg: #2b2018; --card: #ffffff; --muted: #8a7a6d; --line: #e7ddd3; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1c1713; --fg: #f3ece4; --card: #292219; --muted: #a2917f; --line: #3d332a; } }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; justify-content: center; padding: 24px 16px 40px; }
+main { width: 100%; max-width: 420px; }
+h1 { font-size: 1.6rem; margin: 8px 0 4px; }
+.msg { color: var(--muted); margin-bottom: 20px; }
+.paybtn { display: block; width: 100%; text-align: center; padding: 14px 16px; margin: 10px 0; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--fg); font-size: 1.05rem; font-weight: 600; text-decoration: none; }
+.paybtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.note { color: var(--muted); font-size: 0.9rem; margin-top: 14px; }
+footer { margin-top: 28px; font-size: 0.75rem; color: var(--muted); }
+footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Adding this device</h1>
+  <p class="msg" id="lede">Reading the code from the link…</p>
+
+  <section id="have" hidden>
+    <a class="paybtn primary" id="open" href="https://live.tips/app/">Open live.tips here</a>
+    <a class="paybtn" href="https://live.tips/">What is live.tips?</a>
+    <p class="note">
+      This opens the app in this browser with the code in hand. Your signed-in
+      device still has to say yes: it will ask you to confirm this device by
+      name. The code works once, and only for two minutes — if it has run out,
+      ask that device for a fresh QR.
+    </p>
+    <p class="note">
+      Already have live.tips installed on this device? Then opening this link
+      here means the app did not pick it up — open the app yourself and scan
+      the QR from inside it.
+    </p>
+  </section>
+
+  <section id="none" hidden>
+    <a class="paybtn primary" href="https://live.tips/app/">Open live.tips</a>
+    <a class="paybtn" href="https://live.tips/">What is live.tips?</a>
+    <p class="note">
+      An add-device code rides after the “#”, and that part of a URL never
+      leaves the browser — so if it was dropped when the link was copied,
+      nothing on this page can recover it. Scan the QR again, or type the code
+      into the app’s “Sign in with a QR” screen.
+    </p>
+  </section>
+
+  <noscript>
+    <p class="msg">
+      JavaScript is off. The code in this link lives after the “#”, where only
+      the browser can read it, so this page cannot pass it on for you. Open
+      live.tips on this device and type the code into the “Sign in with a QR”
+      screen instead.
+    </p>
+    <a class="paybtn primary" href="https://live.tips/app/">Open live.tips</a>
+  </noscript>
+
+  <footer>
+    This page sends nothing anywhere: the code stays in the fragment, which
+    your browser never puts on the wire. Powered by
+    <a href="https://live.tips" rel="noopener">live.tips</a>.
+  </footer>
+</main>
+<script>
+(function () {
+  // 22 chars of base64url — the same shape the app (core/deep_links.dart) and
+  // the server (isValidLinkCode) both insist on. Anything else is not a code,
+  // and is treated as no code at all rather than forwarded on a guess.
+  var CODE = /^[A-Za-z0-9_-]{22}$/;
+
+  function codeFromFragment() {
+    var hash = location.hash.replace(/^#/, '');
+    if (!hash) return null;
+    var params = new URLSearchParams(hash);
+    var c = (params.get('c') || '').trim();
+    return CODE.test(c) ? c : null;
+  }
+
+  var code = codeFromFragment();
+  var title = document.getElementById('title');
+  var lede = document.getElementById('lede');
+
+  if (code) {
+    // Forward it in the fragment, never the query: a query string would land
+    // the live code in the access log of the very host we kept it out of.
+    document.getElementById('open').href = 'https://live.tips/app/#c=' + encodeURIComponent(code);
+    title.textContent = 'Sign this device in';
+    lede.textContent = 'live.tips is not installed on this device, so the link opened in the browser. It runs here too.';
+    document.getElementById('have').removeAttribute('hidden');
+  } else {
+    title.textContent = 'This link has no code in it';
+    lede.textContent = 'An add-device link carries a short-lived code after the “#”. This one arrived without a usable one.';
+    document.getElementById('none').removeAttribute('hidden');
+  }
+})();
+</script>
+</body>
+</html>
