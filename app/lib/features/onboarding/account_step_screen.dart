@@ -11,6 +11,7 @@ import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
 import 'account_name_screen.dart';
 import 'onboarding_flow.dart';
+import 'profile_pick_screen.dart';
 
 /// The account question, asked once, right after Welcome and before any band
 /// setup: sign in with Apple or Google, start an anonymous cloud account, or
@@ -74,11 +75,16 @@ class _AccountStepScreenState extends ConsumerState<AccountStepScreen> {
     final user = await attempt(ref.read(authControllerProvider.notifier));
     if (!mounted || user == null) return;
     // A provider that already knows the user's name skips the naming step.
+    // Either way the next stop is the profile fork, not band creation: the
+    // account that just signed in may already HAVE profiles (a new device,
+    // a re-onboarding), and ProfilePickScreen offers them before anything
+    // new is minted.
     final unnamed = (user.displayName ?? '').trim().isEmpty;
     navigator.pushReplacement(
       MaterialPageRoute(
-        builder: (_) =>
-            unnamed ? const AccountNameScreen() : firstBandSetupScreen(),
+        builder: (_) => unnamed
+            ? const AccountNameScreen()
+            : const ProfilePickScreen(),
       ),
     );
   }

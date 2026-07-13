@@ -5,7 +5,7 @@ import '../../state/auth_providers.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../onboarding/account_name_screen.dart';
-import '../onboarding/onboarding_flow.dart';
+import '../onboarding/profile_pick_screen.dart';
 import '../shell/app_shell.dart';
 import '../../domain/pending_redirect.dart';
 
@@ -86,12 +86,15 @@ class _RedirectSignInGateState extends ConsumerState<RedirectSignInGate> {
 
     switch (record.origin) {
       case RedirectOrigin.onboarding:
-        // Exactly what AccountStepScreen does after a native sign-in: name the
-        // account if the provider didn't, then on to the band setup.
+        // Exactly what AccountStepScreen does after a native sign-in: name
+        // the account if the provider didn't, then the profile fork — the
+        // account's existing profiles, when it has any, come before band
+        // creation here too.
         final unnamed = (user.displayName ?? '').trim().isEmpty;
         Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) =>
-              unnamed ? const AccountNameScreen() : firstBandSetupScreen(),
+          builder: (_) => unnamed
+              ? const AccountNameScreen()
+              : const ProfilePickScreen(),
         ));
       case RedirectOrigin.settings:
         // Settings, the switcher and the sheet all live behind the Settings

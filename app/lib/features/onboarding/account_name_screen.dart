@@ -6,7 +6,7 @@ import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/onboarding_draft.dart';
 import '../../widgets/lt_ui.dart';
-import 'onboarding_flow.dart';
+import 'profile_pick_screen.dart';
 
 /// Names the ACCOUNT — not a profile. Shown right after a sign-in whose
 /// provider handed over no display name (anonymous always, Apple/Google
@@ -82,8 +82,11 @@ class _AccountNameScreenState extends ConsumerState<AccountNameScreen> {
       }
       return;
     }
+    // Not straight to band creation: the account may already have profiles
+    // (an existing account whose provider offered no name routes through
+    // here too), and the fork screen offers them before minting a new one.
     navigator.push(
-      MaterialPageRoute(builder: (_) => firstBandSetupScreen()),
+      MaterialPageRoute(builder: (_) => const ProfilePickScreen()),
     );
   }
 
