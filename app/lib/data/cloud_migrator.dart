@@ -95,22 +95,9 @@ class CloudMigrator {
 
     await _local.saveCloudUploadPending(uid, [for (final b in bands) b.id]);
 
-    // Of the claimed bands, a resumed run re-uploads only those that still
-    // HAVE local data. The wipe loop below runs strictly after the commit
-    // point, so a claimed band that is gone locally was already uploaded
-    // whole — and re-reading its wiped blobs would overwrite the cloud
-    // copy's bandSettings with defaults. The band still goes through the
-    // cleanup below; only the upload is skipped.
-    final toUpload = claimed == null
-        ? bands
-        : [
-            for (final band in bands)
-              if (_local.accountHasData(band.id)) band,
-          ];
-
-    final total = toUpload.length;
+    final total = bands.length;
     var done = 0;
-    for (final band in toUpload) {
+    for (final band in bands) {
       onProgress?.call(band.name, done, total);
       await _uploadBand(uid, band);
       done++;
@@ -161,14 +148,24 @@ class CloudMigrator {
         _db.collection('users').doc(uid).collection('bands').doc(band.id);
     final now = DateTime.now().millisecondsSinceEpoch;
 
+    // Every local blob is null-guarded, settings included: a resumed run can
+    // reach here AFTER the crashed run's local wipe, when readBandSettings
+    // would answer defaults — and writing those would overwrite the real
+    // settings the crashed run had already committed to the cloud. An absent
+    // blob is always right to skip: absent means "already uploaded and wiped"
+    // or "never configured", and the merge below leaves the cloud doc as it
+    // should be either way. (Skipping the whole band instead was wrong: "no
+    // local data" cannot tell a wiped band from a named-but-never-configured
+    // one, whose name still has to move.)
     final tipJar = _local.readTipJar(band.id);
     final relayJar = _local.readRelayJar(band.id);
+    final bandSettings = _local.readBandSettingsOrNull(band.id);
     await bandDoc.set({
       'name': band.name,
       'createdAtMs': band.createdAtMs,
       if (tipJar != null) 'tipJar': tipJar.toJson(),
       if (relayJar != null) 'relayJar': relayJar.toJson(),
-      'bandSettings': _local.readBandSettings(band.id).toJson(),
+      if (bandSettings != null) 'bandSettings': bandSettings.toJson(),
       'updatedAtMs': now,
     }, SetOptions(merge: true));
 

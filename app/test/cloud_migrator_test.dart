@@ -204,8 +204,8 @@ void main() {
 
     final bandA = (await bands.doc('acc_a').get()).data()!;
     expect((bandA['bandSettings'] as Map)['lastGoalMinor'], 7500,
-        reason: 'a wiped band re-uploaded reads default settings — the '
-            'resume must skip it, not clobber the cloud copy');
+        reason: 'a wiped band re-read answers default settings — the upload '
+            'must omit the absent blob, not merge defaults over the cloud');
     expect((bandA['tipJar'] as Map)['url'], 'https://buy.stripe.com/x');
     // The resume still finishes the crashed run's cleanup.
     final registry = local.readAccountsRegistry()!;
@@ -214,6 +214,41 @@ void main() {
     expect(migrator.hasPendingUpload, isFalse);
     expect(local.readActiveCloudBand(_uid), 'acc_a',
         reason: 'the cloud profile still opens on the migrated band');
+  });
+
+  test('resume still uploads a band that was only ever named — "no local data" '
+      'is not proof it was already in the cloud', () async {
+    final (local, secure) = await _seedTwoBands();
+    // A third band the artist named and never configured: no jar, no settings,
+    // no history. It holds no local data — and it has NOT been uploaded.
+    final registry = local.readAccountsRegistry()!;
+    await local.saveAccountsRegistry(AccountsRegistry(
+      accounts: [
+        ...registry.accounts,
+        const BandAccount(id: 'acc_c', name: 'Gamma', createdAtMs: 3),
+      ],
+      activeId: registry.activeId,
+    ));
+    // The crashed run died inside the upload loop: the flag claims all three,
+    // nothing is wiped yet, and Gamma never made it to the cloud.
+    await local.saveCloudUploadPending(_uid, ['acc_a', 'acc_b', 'acc_c']);
+
+    final db = FakeFirebaseFirestore();
+    final migrator = CloudMigrator(local: local, secure: secure, db: db);
+    await migrator.uploadLocalBands(_uid);
+
+    expect(local.accountHasData('acc_c'), isFalse,
+        reason: 'the band this test is about holds no local data at all');
+    final gamma = await db
+        .collection('users')
+        .doc(_uid)
+        .collection('bands')
+        .doc('acc_c')
+        .get();
+    expect(gamma.exists, isTrue,
+        reason: 'skipping empty-looking bands on a resume would strand a band '
+            'the artist named but had not configured yet');
+    expect(gamma.data()!['name'], 'Gamma');
   });
 
   test('a locked keychain skips secrets but never the migration', () async {

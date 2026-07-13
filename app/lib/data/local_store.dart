@@ -443,13 +443,21 @@ class LocalStore {
 
   // --- Band settings ---
 
-  BandSettings readBandSettings(String accountId) {
+  BandSettings readBandSettings(String accountId) =>
+      readBandSettingsOrNull(accountId) ?? const BandSettings();
+
+  /// Nullable variant for the one caller that must tell "never saved" apart
+  /// from "saved the defaults": the cloud migrator. A crash-resumed upload can
+  /// run after the local wipe, when this key is gone — and writing
+  /// `const BandSettings()` then would overwrite the settings the crashed run
+  /// had already committed to the cloud.
+  BandSettings? readBandSettingsOrNull(String accountId) {
     final raw = _getString(accountKey(kBandSettingsBase, accountId));
-    if (raw == null) return const BandSettings();
+    if (raw == null) return null;
     try {
       return BandSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
-      return const BandSettings();
+      return null;
     }
   }
 
