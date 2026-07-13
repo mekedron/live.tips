@@ -144,6 +144,31 @@ describe("validateProfile", () => {
     expect(validateProfile({ ...baseProfile, artistName: "x".repeat(51) }).ok).toBe(false);
   });
 
+  it("counts artistName in CODE POINTS, not grapheme clusters — the unit the app's clamp must mirror", () => {
+    // 25 flag emoji: 25 graphemes but exactly 50 code points and 200 UTF-8
+    // bytes — the largest output the client's clamp may produce, sitting
+    // exactly on both caps.
+    expect(validateProfile({ ...baseProfile, artistName: "🇫🇮".repeat(25) }).ok).toBe(true);
+    // One more flag is still only 26 graphemes, but 52 code points: refused.
+    // A client clamping by grapheme believed this was safe (issue #20).
+    expect(validateProfile({ ...baseProfile, artistName: "🇫🇮".repeat(26) }).ok).toBe(false);
+  });
+
+  it("scrubs ZWJ before counting, so a family emoji counts its people only", () => {
+    // 👨‍👩‍👧‍👦 is 7 raw code points but 4 after the invisibles scrub strips its
+    // three joiners: 12 families = 48 code points, under the 50 cap. A client
+    // counting raw code points over-clamps here — the safe direction.
+    expect(validateProfile({ ...baseProfile, artistName: "👨‍👩‍👧‍👦".repeat(12) }).ok).toBe(true);
+    expect(validateProfile({ ...baseProfile, artistName: "👨‍👩‍👧‍👦".repeat(13) }).ok).toBe(false);
+  });
+
+  it("pins the message caps: 200 code points, 800 bytes", () => {
+    // One guitar is 1 code point / 4 UTF-8 bytes: 200 of them sit exactly on
+    // both caps at once (the byte cap is 4× the code-point cap everywhere).
+    expect(validateProfile({ ...baseProfile, message: "🎸".repeat(200) }).ok).toBe(true);
+    expect(validateProfile({ ...baseProfile, message: "🎸".repeat(201) }).ok).toBe(false);
+  });
+
   it("requires at least one method", () => {
     expect(validateProfile({ ...baseProfile, methods: {} }).ok).toBe(false);
   });

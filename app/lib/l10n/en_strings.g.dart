@@ -276,6 +276,7 @@ const Map<String, String> kEnStrings = {
   "onboarding.done.subtitle_connected": "One QR for every way you take tips. Print it, tape it to your case, put it on the merch table.",
   "onboarding.done.subtitle_no_method": "You didn't add a payment method yet. Add one anytime from Settings, then share your QR.",
   "onboarding.done.subtitle_relay_failed": "We couldn't reach live.tips to build the page fans scan. Nothing you entered was lost.",
+  "onboarding.done.subtitle_relay_rejected": "live.tips refused to build the page fans scan — {reason}",
   "onboarding.done.subtitle_stripe": "Print it, tape it to your case, put it on the merch table — anyone can tip you in seconds.",
   "onboarding.done.title_no_method": "You're all set",
   "onboarding.done.title_ready": "Your tip QR is ready!",

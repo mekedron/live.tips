@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -246,17 +248,60 @@ typedef RelayCall = ({String name, Map<String, dynamic> args});
 
 /// Stands in for the jar callables: records every call, answers each by name
 /// from [routes] (a route may throw), and returns `{}` for anything unrouted.
+///
+/// Any `profile` sent through it is held to the relay's real text caps
+/// (functions `validate.ts`): a fake that accepted anything is exactly how
+/// the grapheme-vs-code-point clamp mismatch stayed invisible to this suite —
+/// green tests, and a production relay refusing every emoji band name.
 class FakeCallables {
   FakeCallables([this.routes = const {}]);
 
   final Map<String, Map<String, dynamic> Function(Map<String, dynamic>)> routes;
   final calls = <RelayCall>[];
 
+  /// Clear only for a test that must reach the fake with a deliberately
+  /// over-limit profile.
+  bool enforceTextCaps = true;
+
   Future<Map<String, dynamic>> call(
       String name, Map<String, dynamic> args) async {
     calls.add((name: name, args: args));
+    if (enforceTextCaps) _checkProfile(args);
     final route = routes[name];
     return route == null ? const {} : route(args);
+  }
+
+  /// The scrub `validate.ts` runs before counting (minus NFC normalization,
+  /// which Dart lacks and which only matters for decomposed input no keyboard
+  /// produces): strip invisibles, controls become spaces, trim.
+  static final _invisibles =
+      RegExp('[\u202A-\u202E\u2066-\u2069\u200B-\u200D\u2060\uFEFF]');
+  static final _controls = RegExp('[\u0000-\u001F\u007F-\u009F]');
+
+  /// `textField` from `validate.ts`, verbatim where it counts: the relay
+  /// rejects (never truncates) when the scrubbed CODE POINT count or the
+  /// UTF-8 BYTE length exceeds the field's cap. Only the caps the client
+  /// promises to satisfy by clamping are enforced — structural validity
+  /// (required fields, payment methods) stays each test's own business.
+  static void _checkText(
+      Object? raw, String field, int maxCodePoints, int maxBytes) {
+    if (raw is! String) return;
+    final clean =
+        raw.replaceAll(_invisibles, '').replaceAll(_controls, ' ').trim();
+    if (clean.runes.length > maxCodePoints) {
+      throw FakeFunctionsException('invalid-argument',
+          '$field is too long (max $maxCodePoints characters)');
+    }
+    if (utf8.encode(clean).length > maxBytes) {
+      throw FakeFunctionsException('invalid-argument', '$field is too long');
+    }
+  }
+
+  static void _checkProfile(Map<String, dynamic> args) {
+    final profile = args['profile'];
+    if (profile is! Map) return;
+    _checkText(profile['artistName'], 'artistName', 50, 200);
+    _checkText(profile['message'], 'message', 200, 800);
   }
 
   List<String> get names => [for (final call in calls) call.name];

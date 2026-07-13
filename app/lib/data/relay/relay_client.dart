@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:characters/characters.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -89,9 +90,14 @@ class RelayClient {
   /// The relay enforces these caps (functions `validate.ts`); mirror them here
   /// so a long Stripe display name can never be rejected on an otherwise-valid
   /// update — it's clamped rather than refused, since the relay artist name is
-  /// cosmetic.
+  /// cosmetic. The relay counts Unicode CODE POINTS and separately caps the
+  /// UTF-8 BYTE length; there is no contract file shared between the Dart app
+  /// and the TypeScript functions, so the numbers are duplicated verbatim
+  /// (and pinned on both sides by tests).
   static const _maxArtistName = 50;
+  static const _maxArtistNameBytes = 200;
   static const _maxMessage = 200;
+  static const _maxMessageBytes = 800;
 
   static CallableInvoker _callables(FirebaseFunctions? functions) =>
       (name, args) async {
@@ -105,20 +111,38 @@ class RelayClient {
         return const {};
       };
 
-  static String _clampName(String s) {
-    final chars = s.characters;
-    return chars.length <= _maxArtistName
-        ? s
-        : chars.take(_maxArtistName).toString();
+  /// Clamps [s] to at most [maxCodePoints] code points and [maxBytes] UTF-8
+  /// bytes — the units `validate.ts` rejects in. Clamping by grapheme cluster
+  /// (what `characters.take` counts) broke the promise above: a flag emoji is
+  /// one grapheme but 2 code points, a skin-toned or ZWJ emoji up to 7, so an
+  /// emoji-heavy name well under 50 graphemes was still refused with
+  /// `invalid-argument` — only in production, where the real validator runs.
+  /// Whole graphemes are kept while both budgets hold, so an emoji is never
+  /// cut in half. The relay scrubs before counting (NFC, then ZWJ and other
+  /// invisibles stripped, controls collapsed, trimmed), which for anything a
+  /// keyboard produces only shrinks the string — counting the raw input here
+  /// can only over-clamp, never under.
+  static String _clampText(String s, int maxCodePoints, int maxBytes) {
+    if (s.runes.length <= maxCodePoints && utf8.encode(s).length <= maxBytes) {
+      return s;
+    }
+    final out = StringBuffer();
+    var codePoints = 0;
+    var bytes = 0;
+    for (final grapheme in s.characters) {
+      codePoints += grapheme.runes.length;
+      bytes += utf8.encode(grapheme).length;
+      if (codePoints > maxCodePoints || bytes > maxBytes) break;
+      out.write(grapheme);
+    }
+    return out.toString();
   }
 
-  static String? _clampMessage(String? s) {
-    if (s == null) return null;
-    final chars = s.characters;
-    return chars.length <= _maxMessage
-        ? s
-        : chars.take(_maxMessage).toString();
-  }
+  static String _clampName(String s) =>
+      _clampText(s, _maxArtistName, _maxArtistNameBytes);
+
+  static String? _clampMessage(String? s) =>
+      s == null ? null : _clampText(s, _maxMessage, _maxMessageBytes);
 
   static Map<String, dynamic> _profile({
     required String artistName,

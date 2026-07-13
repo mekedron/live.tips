@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/relay/relay_client.dart';
 import 'package:live_tips/domain/relay_jar.dart';
@@ -73,6 +75,66 @@ void main() {
 
     final profile = backend.argsFor('createJar')['profile'] as Map;
     expect((profile['artistName'] as String).length, 50);
+  });
+
+  test('an emoji-heavy name is clamped in the SERVER\'s units — code points '
+      'and UTF-8 bytes, not grapheme clusters', () async {
+    final backend = FakeCallables({'createJar': _created});
+    // 40 flags: 40 graphemes but 80 code points and 320 UTF-8 bytes. The old
+    // grapheme clamp sent this out untouched, and production refused it with
+    // `invalid-argument` — the artist could not onboard at all (issue #20).
+    // The enforcing FakeCallables now models that refusal, so this createJar
+    // completing IS the assertion that the clamped output passes validate.ts.
+    final flags = '🇫🇮' * 40;
+
+    await fakeRelayClient(backend)
+        .createJar(artistName: flags, currency: 'eur', revolutUsername: 'x');
+
+    final sent = (backend.argsFor('createJar')['profile'] as Map)['artistName']
+        as String;
+    expect(sent.runes.length, lessThanOrEqualTo(50));
+    expect(utf8.encode(sent).length, lessThanOrEqualTo(200));
+    // Whole graphemes only: 25 flags are exactly 50 code points — the clamp
+    // must never ship half a flag.
+    expect(sent, '🇫🇮' * 25);
+  });
+
+  test('the message is clamped the same way, ZWJ sequences kept whole',
+      () async {
+    final backend = FakeCallables({'createJar': _created});
+    // A family emoji is ONE grapheme but SEVEN code points (four people,
+    // three zero-width joiners): 60 of them are 420 code points against the
+    // relay's 200-code-point message cap.
+    final families = '👨‍👩‍👧‍👦' * 60;
+
+    await fakeRelayClient(backend).createJar(
+      artistName: 'Maya',
+      message: families,
+      currency: 'eur',
+      revolutUsername: 'x',
+    );
+
+    final sent =
+        (backend.argsFor('createJar')['profile'] as Map)['message'] as String;
+    expect(sent.runes.length, lessThanOrEqualTo(200));
+    expect(utf8.encode(sent).length, lessThanOrEqualTo(800));
+    // 28 × 7 = 196 code points fit; a 29th family would not — and no family
+    // is ever cut in the middle of a joiner.
+    expect(sent, '👨‍👩‍👧‍👦' * 28);
+  });
+
+  test('FakeCallables itself refuses an over-limit profile like production '
+      'does — the guard the suite was missing', () async {
+    final backend = FakeCallables({'createJar': _created});
+    // Bypass the client's clamp by calling the fake directly: 26 flags are
+    // only 26 graphemes but 52 code points — over the relay's 50.
+    expect(
+      () => backend.call('createJar', {
+        'profile': {'artistName': '🇫🇮' * 26},
+      }),
+      throwsA(isA<FakeFunctionsException>()
+          .having((e) => e.code, 'code', 'invalid-argument')),
+    );
   });
 
   test('the authenticated calls carry the jar id and the secret', () async {

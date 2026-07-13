@@ -27,13 +27,14 @@ const _draft = OnboardingDraft(
 Future<FakeCallables> _pump(
   WidgetTester tester, {
   required bool failing,
+  Object? error,
 }) async {
   await tester.binding.setSurfaceSize(const Size(600, 1200));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   final local = await seededStore(bandName: 'Solo Act');
   final backend = FakeCallables({
     'createJar': (args) {
-      if (failing) throw FakeFunctionsException('internal');
+      if (failing) throw error ?? FakeFunctionsException('internal');
       return {
         'jarId': 'jar_1',
         'tipUrl': 'https://live.tips/t/jar_1',
@@ -75,6 +76,38 @@ void main() {
     expect(find.text('Your tip QR is ready!'), findsNothing);
     // And a way forward, not just an apology.
     expect(find.text('Try again'), findsOneWidget);
+  });
+
+  testWidgets('a relay VERDICT surfaces the server\'s own sentence — '
+      '"couldn\'t reach live.tips" is only for calls that never landed',
+      (tester) async {
+    // The relay answered and refused the profile. Before #20, onboarding
+    // dressed every failure as a connectivity problem, so an artist whose
+    // band name was rejected had nothing to change and nowhere to go.
+    await _pump(
+      tester,
+      failing: true,
+      error: FakeFunctionsException(
+          'invalid-argument', 'artistName is too long (max 50 characters)'),
+    );
+
+    expect(find.text("Your tip page isn't ready"), findsOneWidget);
+    expect(find.textContaining('artistName is too long (max 50 characters)'),
+        findsOneWidget);
+    expect(find.textContaining("couldn't reach live.tips"), findsNothing);
+  });
+
+  testWidgets('a call that never landed still reads as a network failure',
+      (tester) async {
+    await _pump(
+      tester,
+      failing: true,
+      error: FakeFunctionsException('unavailable', 'socket closed'),
+    );
+
+    expect(find.text("Your tip page isn't ready"), findsOneWidget);
+    expect(find.textContaining("couldn't reach live.tips"), findsOneWidget);
+    expect(find.textContaining('socket closed'), findsNothing);
   });
 
   testWidgets('retry re-runs the registration and lands on the QR',

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme.dart';
+import '../../data/relay/relay_client.dart';
 import '../../domain/app_settings.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/onboarding_draft.dart';
@@ -35,6 +36,11 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
   bool _connectedPage = false;
   bool _relayFailed = false;
 
+  /// The relay's own sentence when it ANSWERED and refused (a rejected
+  /// profile, a rate limit…). Null when the call never landed — the only
+  /// case "we couldn't reach live.tips" is true for.
+  String? _relayVerdict;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +53,7 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
     setState(() {
       _working = true;
       _relayFailed = false;
+      _relayVerdict = null;
     });
     unawaited(_prepare());
   }
@@ -86,6 +93,15 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
           _working = false;
         });
         return;
+      } on RelayApiException catch (e) {
+        // The relay answered and said no. "We couldn't reach live.tips"
+        // would be a lie here — show the server's own sentence, so an
+        // artist whose profile was refused knows what to change.
+        if (!mounted) return;
+        setState(() {
+          _relayFailed = true;
+          _relayVerdict = e.friendlyMessage;
+        });
       } catch (_) {
         // Fall back to the Stripe link (or nothing) below — but the failure
         // is NEVER swallowed: this screen may not show a green check and
@@ -161,8 +177,13 @@ class _OnboardingDoneScreenState extends ConsumerState<OnboardingDoneScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _relayFailed
-                          ? context.s
-                              .t('onboarding.done.subtitle_relay_failed')
+                          ? (_relayVerdict != null
+                              ? context.s.t(
+                                  'onboarding.done.subtitle_relay_rejected',
+                                  {'reason': _relayVerdict},
+                                )
+                              : context.s
+                                  .t('onboarding.done.subtitle_relay_failed'))
                           : _url == null
                           ? context.s.t('onboarding.done.subtitle_no_method')
                           : _connectedPage
