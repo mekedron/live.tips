@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/data/repository/firestore_repository.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/domain/app_account.dart';
+import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
 
@@ -96,6 +98,72 @@ void main() {
     final docs = (await _bands(db).get()).docs;
     expect(docs.map((d) => d.id), [_bandId],
         reason: 'no band doc may be created on a cold boot');
+  });
+
+  test('an offline boot — an empty FROM-CACHE snapshot — still seeds nothing',
+      () async {
+    final local = await _guestStore();
+    await local.saveActiveCloudBand(_uid, _bandId);
+    final container = _container(local, db);
+    final repo =
+        container.read(accountDataRepositoryProvider) as FirestoreRepository;
+
+    // Firestore raises an empty from-cache snapshot when the device boots
+    // offline with a cold cache (or venue mode's disabled one).
+    // fake_cloud_firestore can never raise it — feed the handler directly,
+    // before the fake's own snapshot lands.
+    repo.applyBandsSnapshot(const {}, fromCache: true);
+
+    final offline = container.read(appStateProvider);
+    expect(offline.accounts, isEmpty,
+        reason: 'an offline empty cache is silence, not "no bands"');
+    expect(offline.accountId, isEmpty);
+    expect((await _bands(db).get()).docs.map((d) => d.id), [_bandId],
+        reason: 'no junk band doc may be minted, let alone synced');
+
+    // Connectivity returns; the fake's snapshot stands in for the server's.
+    await pumpEventQueue();
+    final online = container.read(appStateProvider);
+    expect(online.accounts.map((a) => a.id), [_bandId],
+        reason: 'the artist\'s real band, not a fabricated empty one');
+    expect(online.accountId, _bandId);
+    expect((await _bands(db).get()).docs, hasLength(1));
+  });
+
+  test('an unnamed band whose history lives only in Firestore is NOT '
+      'collected on switch-away', () async {
+    // Synced from another device, never opened on this one.
+    await _bands(db).doc('acc_new').set({'name': '', 'createdAtMs': 2});
+    await _bands(db).doc('acc_new').collection('sessions').doc('s1').set(
+        LiveSession(
+          id: 's1',
+          startedAt: DateTime.fromMillisecondsSinceEpoch(1751500000000),
+          endedAt: DateTime.fromMillisecondsSinceEpoch(1751500000001),
+          currency: 'eur',
+          goalMinor: 10000,
+          tips: const [],
+        ).toJson());
+    final local = await _guestStore();
+    await local.saveActiveCloudBand(_uid, 'acc_new');
+    final container = _container(local, db);
+    container.read(appStateProvider);
+    await pumpEventQueue();
+    expect(container.read(appStateProvider).accountId, 'acc_new');
+
+    final ok = await container
+        .read(appStateProvider.notifier)
+        .switchAccount(_bandId);
+    expect(ok, isTrue);
+    await pumpEventQueue();
+
+    // The sessions mirror had not heard from the server when the collector
+    // asked: "nobody can say yet" must keep the band — and its history.
+    expect((await _bands(db).get()).docs.map((d) => d.id),
+        containsAll(['acc_new', _bandId]));
+    expect(
+        (await _bands(db).doc('acc_new').collection('sessions').get()).docs,
+        hasLength(1),
+        reason: 'deleting on a maybe is how synced history vanished');
   });
 
   test('a stored active band id that names nothing falls through to a REAL '

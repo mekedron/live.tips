@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/app_settings.dart';
 import '../../domain/band_account.dart';
@@ -20,7 +21,7 @@ import 'account_data_repository.dart';
 /// so every non-secret read is served from in-memory mirrors fed by snapshot
 /// listeners. Offline persistence (on by default) makes the first snapshot
 /// after a restart arrive from cache immediately, so the mirrors are warm by
-/// the time anything meaningful reads them. Two mirror rules keep the
+/// the time anything meaningful reads them. Three mirror rules keep the
 /// contract honest:
 ///
 /// * Writes update the mirror BEFORE the network ack — a sync read-back
@@ -30,6 +31,12 @@ import 'account_data_repository.dart';
 /// * [onChanged] fires on every snapshot that updated a mirror — the wiring
 ///   layer's cue to re-read, which is how another device's edits reach the
 ///   UI.
+/// * A cache snapshot proves what EXISTS, never what doesn't: an offline
+///   boot with a cold cache (or a disabled one — venue mode turns
+///   persistence off) raises an EMPTY from-cache snapshot first, and
+///   believing it once seeded a junk band over an artist's real ones.
+///   Emptiness is only ever the server's word — [isWarm] and
+///   [accountHasData] both wait for it.
 ///
 /// Secrets stay keychain-first: the keychain is the fast path and the only
 /// store trusted while offline-and-signed-out, and the `secrets/v1` doc is
@@ -81,10 +88,21 @@ class FirestoreRepository implements AccountDataRepository {
   final Map<String, List<Tip>> _relayTips = {};
   AppSettings? _settings;
 
-  /// Flipped by the FIRST bands snapshot, cache or server. Until then the
-  /// empty mirror means "I don't know yet", and every caller that would
-  /// otherwise read it as "this account has no bands" must hold off.
+  /// Flipped by the first bands snapshot that can be BELIEVED: any server
+  /// snapshot, or a cache snapshot that actually carries bands. The empty
+  /// from-cache snapshot an offline boot raises first flips nothing — until
+  /// the server speaks, the empty mirror means "I don't know yet", and every
+  /// caller that would otherwise read it as "this account has no bands"
+  /// must hold off.
   bool _warm = false;
+
+  // "Has heard from the server", per mirror: the bands flag plus one entry
+  // per band whose sessions/relayTips listener delivered a server snapshot.
+  // A cache snapshot proves presence, never absence, so [accountHasData]
+  // refuses to confirm "empty" before the relevant flags are set.
+  bool _bandsSettled = false;
+  final Set<String> _sessionsSettled = {};
+  final Set<String> _relayTipsSettled = {};
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _bandsSub;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _settingsSub;
@@ -141,20 +159,42 @@ class FirestoreRepository implements AccountDataRepository {
 
   // --- Snapshot handlers ---
 
-  void _onBandsSnapshot(QuerySnapshot<Map<String, dynamic>> snap) {
+  void _onBandsSnapshot(QuerySnapshot<Map<String, dynamic>> snap) =>
+      applyBandsSnapshot(
+        {for (final doc in snap.docs) doc.id: doc.data()},
+        fromCache: snap.metadata.isFromCache,
+      );
+
+  /// The bands listener's body, split from the [QuerySnapshot] so tests can
+  /// feed it the one snapshot fake_cloud_firestore can never raise: the
+  /// EMPTY from-cache snapshot an offline boot starts with.
+  @visibleForTesting
+  void applyBandsSnapshot(
+    Map<String, Map<String, dynamic>> docs, {
+    required bool fromCache,
+  }) {
     final next = <String, _BandMirror>{};
-    for (final doc in snap.docs) {
-      final band = _decodeBand(doc.id, doc.data());
+    for (final entry in docs.entries) {
+      final band = _decodeBand(entry.key, entry.value);
       if (band == null) continue; // a malformed doc costs itself, not the boot
-      next[doc.id] = band;
+      next[entry.key] = band;
       // Secrets listeners are eager per band: the keychain write-through has
       // to happen before anyone asks for the key, not after.
-      _ensureSecretsListener(doc.id);
+      _ensureSecretsListener(entry.key);
     }
     _bands
       ..clear()
       ..addAll(next);
-    _warm = true;
+    // A server snapshot is always an answer; a cache snapshot only vouches
+    // for the bands it carries. The empty from-cache snapshot of an offline
+    // boot is SILENCE — warming on it read as "this account has no bands",
+    // and a junk band got minted over the real ones and synced everywhere.
+    if (!fromCache) {
+      _warm = true;
+      _bandsSettled = true;
+    } else if (next.isNotEmpty) {
+      _warm = true;
+    }
     _notify();
   }
 
@@ -233,15 +273,30 @@ class FirestoreRepository implements AccountDataRepository {
     _sessionSubs[bandId] = _sessionsCol(bandId)
         .orderBy('startedAt')
         .snapshots()
-        .listen((snap) {
-      final decoded = <LiveSession>[];
-      for (final doc in snap.docs) {
-        final session = _decodeField(doc.data(), LiveSession.fromJson);
-        if (session != null) decoded.add(session);
-      }
-      _sessions[bandId] = decoded;
-      _notify();
-    }, onError: _ignore);
+        .listen(
+            (snap) => applySessionsSnapshot(
+                  bandId,
+                  [for (final doc in snap.docs) doc.data()],
+                  fromCache: snap.metadata.isFromCache,
+                ),
+            onError: _ignore);
+  }
+
+  /// Split out and test-visible for the same reason as [applyBandsSnapshot].
+  @visibleForTesting
+  void applySessionsSnapshot(
+    String bandId,
+    List<Map<String, dynamic>> docs, {
+    required bool fromCache,
+  }) {
+    final decoded = <LiveSession>[];
+    for (final data in docs) {
+      final session = _decodeField(data, LiveSession.fromJson);
+      if (session != null) decoded.add(session);
+    }
+    _sessions[bandId] = decoded;
+    if (!fromCache) _sessionsSettled.add(bandId);
+    _notify();
   }
 
   void _ensureRelayTipsListener(String bandId) {
@@ -252,15 +307,30 @@ class FirestoreRepository implements AccountDataRepository {
         .orderBy('createdAt', descending: true)
         .limit(LocalStore.relayHistoryCap)
         .snapshots()
-        .listen((snap) {
-      final decoded = <Tip>[];
-      for (final doc in snap.docs) {
-        final tip = _decodeField(doc.data(), Tip.fromJson);
-        if (tip != null) decoded.add(tip);
-      }
-      _relayTips[bandId] = decoded;
-      _notify();
-    }, onError: _ignore);
+        .listen(
+            (snap) => applyRelayTipsSnapshot(
+                  bandId,
+                  [for (final doc in snap.docs) doc.data()],
+                  fromCache: snap.metadata.isFromCache,
+                ),
+            onError: _ignore);
+  }
+
+  /// Split out and test-visible for the same reason as [applyBandsSnapshot].
+  @visibleForTesting
+  void applyRelayTipsSnapshot(
+    String bandId,
+    List<Map<String, dynamic>> docs, {
+    required bool fromCache,
+  }) {
+    final decoded = <Tip>[];
+    for (final data in docs) {
+      final tip = _decodeField(data, Tip.fromJson);
+      if (tip != null) decoded.add(tip);
+    }
+    _relayTips[bandId] = decoded;
+    if (!fromCache) _relayTipsSettled.add(bandId);
+    _notify();
   }
 
   // --- Lenient decoding ---
@@ -620,17 +690,27 @@ class FirestoreRepository implements AccountDataRepository {
   // --- Whole-band lifecycle ---
 
   @override
-  bool accountHasData(String accountId) {
+  bool? accountHasData(String accountId) {
     // Kick the lazy history listeners so the answer improves on the next
-    // ask — the first call may run before the histories have mirrored, and
-    // a false negative here is recoverable (the caller re-asks on change).
+    // ask — the first call may run before the histories have mirrored.
     _ensureSessionsListener(accountId);
     _ensureRelayTipsListener(accountId);
     final band = _bands[accountId];
-    return band?.tipJar != null ||
+    if (band?.tipJar != null ||
         band?.relayJar != null ||
         (_sessions[accountId]?.isNotEmpty ?? false) ||
-        (_relayTips[accountId]?.isNotEmpty ?? false);
+        (_relayTips[accountId]?.isNotEmpty ?? false)) {
+      return true;
+    }
+    // Nothing in the mirrors — which is only an ANSWER once every mirror
+    // has heard from the server. Before that it is silence: history synced
+    // from another device but never opened here would read as "empty", and
+    // both callers of this method delete on "empty".
+    return _bandsSettled &&
+            _sessionsSettled.contains(accountId) &&
+            _relayTipsSettled.contains(accountId)
+        ? false
+        : null;
   }
 
   /// Same predicate as the local store's: a session that never took real

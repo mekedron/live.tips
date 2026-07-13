@@ -838,8 +838,9 @@ class AppStateNotifier extends Notifier<AppState> {
   }
 
   /// Drops a band the user walked away from without ever configuring:
-  /// no name, no local data, and (confirmed, not just unloaded) no secrets.
-  /// Any doubt — a keychain error, one leftover key — keeps the band.
+  /// no name, no data, no secrets — each CONFIRMED, not just unloaded.
+  /// Any doubt — an unsettled cloud mirror, a keychain error, one leftover
+  /// key — keeps the band.
   Future<void> _maybeCollectAbandoned(String id) async {
     final registry = _registry;
     if (!registry.contains(id) || registry.accounts.length < 2) return;
@@ -851,7 +852,11 @@ class AppStateNotifier extends Notifier<AppState> {
       return;
     }
     final repo = ref.read(accountDataRepositoryProvider);
-    if (repo.accountHasData(id)) return;
+    // `!= false`, not `!`: a cloud repository whose history mirrors have not
+    // heard from the server answers null — "nobody can say yet" — and
+    // history synced from another device but never opened here must not be
+    // collected as if it were nothing.
+    if (repo.accountHasData(id) != false) return;
     try {
       if (await repo.readApiKey(id) != null) return;
       if (await repo.readRelaySecret(id) != null) return;

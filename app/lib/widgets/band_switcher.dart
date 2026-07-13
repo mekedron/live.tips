@@ -211,10 +211,14 @@ class _BandSwitcherSheet extends ConsumerWidget {
     // reachable (the shell's empty-state home) but worthless. Offer to discard
     // it on the way out rather than let unfinished profiles pile up.
     final leavingId = app.accountId;
+    // `== false`, not `!`: the cloud repository answers null until its
+    // mirrors have heard from the server, and a discard dialog must never
+    // be driven by a maybe — an unconfirmed profile is simply left alone.
     final abandoning =
         account.id != leavingId &&
         !app.connected &&
-        !ref.read(accountDataRepositoryProvider).accountHasData(leavingId);
+        ref.read(accountDataRepositoryProvider).accountHasData(leavingId) ==
+            false;
     if (abandoning) {
       final discard = await showDialog<bool>(
         context: context,

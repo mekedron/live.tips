@@ -122,6 +122,89 @@ void main() {
     expect(changes, greaterThan(before));
   });
 
+  test('an empty from-cache snapshot leaves the repository cold — offline '
+      'silence is not "no bands"', () async {
+    final repo = makeRepo();
+    // fake_cloud_firestore never raises a from-cache snapshot, so feed the
+    // handler the one an offline boot starts with (a cold or — venue mode —
+    // disabled cache).
+    repo.applyBandsSnapshot(const {}, fromCache: true);
+
+    expect(repo.isWarm, isFalse,
+        reason: 'warming on it read as "this account has no bands", and a '
+            'junk band got minted over the real ones and synced everywhere');
+    expect(repo.listBands(), isEmpty);
+
+    // Connectivity returns; the fake's snapshot stands in for the server's.
+    await pumpEventQueue();
+    expect(repo.isWarm, isTrue,
+        reason: 'a server snapshot — even an empty one — is an answer');
+  });
+
+  test('a from-cache snapshot WITH bands warms the mirror — an offline '
+      'restart still shows the cached bands', () async {
+    final repo = makeRepo();
+    repo.applyBandsSnapshot({
+      _bandId: {'name': 'Cached Band', 'createdAtMs': 1},
+    }, fromCache: true);
+
+    expect(repo.isWarm, isTrue,
+        reason: 'the cache vouches for what exists; only emptiness needs '
+            'the server\'s word');
+    expect(repo.listBands().single.name, 'Cached Band');
+  });
+
+  test('accountHasData answers null, not "empty", until every mirror has '
+      'heard from the server', () async {
+    await bandDoc()
+        .collection('sessions')
+        .doc('s1')
+        .set(_session('s1', [_stripeTip('cs_1', livemode: true)]).toJson());
+
+    final repo = makeRepo();
+    expect(repo.accountHasData(_bandId), isNull,
+        reason: 'history that exists only in Firestore must not read as '
+            '"holds no data" — every caller of this method deletes on that '
+            'answer');
+
+    await pumpEventQueue();
+    expect(repo.accountHasData(_bandId), isTrue);
+  });
+
+  test('from-cache empties never confirm "no data"; server snapshots do',
+      () async {
+    final repo = makeRepo();
+    expect(repo.accountHasData(_bandId), isNull,
+        reason: 'nothing has answered at all yet');
+
+    // The offline boot: every mirror answers from an empty cache.
+    repo.applyBandsSnapshot(const {}, fromCache: true);
+    repo.applySessionsSnapshot(_bandId, const [], fromCache: true);
+    repo.applyRelayTipsSnapshot(_bandId, const [], fromCache: true);
+    expect(repo.accountHasData(_bandId), isNull,
+        reason: 'a cache vouches for what exists, never for what does not');
+
+    // Connectivity returns; the fake's snapshots stand in for the server's.
+    await pumpEventQueue();
+    expect(repo.accountHasData(_bandId), isFalse,
+        reason: 'every mirror now has the server\'s word — empty is an '
+            'answer');
+  });
+
+  test('a from-cache history snapshot still proves what exists', () async {
+    final repo = makeRepo();
+    repo.applySessionsSnapshot(
+        _bandId,
+        [
+          _session('s1', [_stripeTip('cs_1', livemode: true)]).toJson(),
+        ],
+        fromCache: true);
+
+    expect(repo.accountHasData(_bandId), isTrue,
+        reason: 'presence needs no server confirmation — the cached session '
+            'is real');
+  });
+
   test('jar writes read back synchronously — before any ack — and land in '
       'the band doc', () async {
     final repo = makeRepo();

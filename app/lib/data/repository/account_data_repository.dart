@@ -24,8 +24,9 @@ abstract interface class AccountDataRepository {
   /// Whether [listBands] can be believed yet. A cloud mirror starts out
   /// EMPTY AND SILENT: "no snapshot has landed" and "this account has no
   /// bands" are different answers, and a caller that reads the first as the
-  /// second fabricates a band on every cold start. The local store is warm
-  /// the moment it exists.
+  /// second fabricates a band on every cold start. Emptiness is the SERVER's
+  /// word alone — an offline boot's empty from-cache snapshot stays silence.
+  /// The local store is warm the moment it exists.
   bool get isWarm;
 
   // --- The band list itself ---
@@ -82,7 +83,15 @@ abstract interface class AccountDataRepository {
   Future<void> deleteRelaySecret(String accountId);
 
   // --- Whole-band lifecycle ---
-  bool accountHasData(String accountId);
+
+  /// Whether [accountId] holds anything worth keeping — a jar, a session,
+  /// tip history. Tri-state on purpose: `true` is "yes", `false` is
+  /// "CONFIRMED empty", and `null` is "nobody can say yet" — a cloud mirror
+  /// that has not heard from the server cannot tell empty from not-loaded.
+  /// Every caller of this method deletes on "empty", so a destructive
+  /// caller must treat `null` exactly like `true` and keep its hands off.
+  /// The local store always has an answer.
+  bool? accountHasData(String accountId);
   Future<void> purgeSimulatedData(String accountId);
 
   /// Removes every non-secret blob belonging to [accountId].
