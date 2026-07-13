@@ -178,8 +178,43 @@ export interface LinkCodeDoc {
   confirmedAtMs?: number;
 }
 
+/**
+ * accountDeletions/{uid} — the ledger of an account deletion in flight
+ * (account.ts). TOP-LEVEL on purpose: a deletion's whole point is that
+ * users/{uid} and the Auth user stop existing, so the record of what has
+ * already been erased cannot live under either. Server-only; the account
+ * that asked is being deleted and has nothing to read here.
+ */
+export interface AccountDeletionDoc {
+  uid: string;
+  requestedAtMs: number;
+  /** Stages already finished, so a resume never redoes a Stripe round-trip. */
+  done: string[];
+  attempts: number;
+  lastErrorAtMs?: number;
+  lastError?: string;
+  /**
+   * Webhook endpoints on the artist's OWN Stripe account that we could not
+   * remove (they revoked the key first, Stripe was down). Named, never
+   * silently dropped: the app tells the artist to delete them by hand.
+   */
+  strandedEndpoints?: string[];
+}
+
 export function jarRef(firestore: Firestore, jarId: string): DocumentReference {
   return firestore.collection("jars").doc(jarId);
+}
+
+export function accountDeletionRef(firestore: Firestore, uid: string): DocumentReference {
+  return firestore.collection("accountDeletions").doc(uid);
+}
+
+export function userRef(firestore: Firestore, uid: string): DocumentReference {
+  return firestore.collection("users").doc(uid);
+}
+
+export function bandsCol(firestore: Firestore, uid: string) {
+  return firestore.collection("users").doc(uid).collection("bands");
 }
 
 export function linkCodeRef(firestore: Firestore, codeId: string): DocumentReference {

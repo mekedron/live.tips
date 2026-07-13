@@ -13,6 +13,7 @@ import '../../state/device_providers.dart';
 import '../../widgets/lt_ui.dart';
 import 'add_device_screen.dart';
 import 'scan_device_screen.dart';
+import 'sign_in_methods_screen.dart';
 
 /// The account's devices, and the two things you can do about them: ask one
 /// to sign out (cooperative), or end every other session for real.
@@ -331,6 +332,26 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                               color: c.textSecondary,
                             ),
                           ),
+                          // The instruction, made into a door (#32): telling a
+                          // guest to "link Apple or Google first" and leaving
+                          // them to hunt for a control that did not exist is
+                          // how this screen used to end.
+                          if (anonymous)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton(
+                                onPressed: _busy
+                                    ? null
+                                    : () => Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const SignInMethodsScreen(),
+                                          ),
+                                        ),
+                                child: Text(
+                                    s.t('settings.security.link_method')),
+                              ),
+                            ),
                           const SizedBox(height: 12),
                           LtDangerButton(
                             label: s.t('settings.security.sign_out_others'),

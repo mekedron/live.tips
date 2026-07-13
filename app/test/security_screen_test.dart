@@ -203,9 +203,9 @@ void main() {
         reason: 'revokeDevice must never be sent this device\'s own id');
   });
 
-  testWidgets('a guest account cannot sign out everywhere else', (
-    tester,
-  ) async {
+  testWidgets(
+      'a guest account cannot sign out everywhere else — and is given the '
+      'door it was told to walk through', (tester) async {
     await _pump(
       tester,
       kind: AccountKind.anonymous,
@@ -223,6 +223,43 @@ void main() {
       ),
     );
     expect(button.onPressed, isNull);
+
+    // #32: the instruction used to be a dead end — the app named the one
+    // control that would make the account safe and offered no way to reach it.
+    await tester.tap(find.text('Link Apple or Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign-in methods'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Link'), findsNWidgets(2));
+  });
+
+  testWidgets('once a provider is linked, the kill switch is armed', (
+    tester,
+  ) async {
+    // The other half of #32: linking is not decoration. The moment the guest
+    // account has a way back in, "Sign out everywhere else" — which would
+    // otherwise have locked them out of their own account — becomes usable.
+    final service = await _pump(
+      tester,
+      kind: AccountKind.google,
+      ownDeviceId: 'dev_a',
+      devices: [_device(id: 'dev_a', name: "Casey's iPhone", isCurrent: true)],
+    );
+
+    expect(find.textContaining('Link Apple or Google first'), findsNothing);
+    final button = tester.widget<OutlinedButton>(
+      find.ancestor(
+        of: find.text('Sign out everywhere else'),
+        matching: find.byType(OutlinedButton),
+      ),
+    );
+    expect(button.onPressed, isNotNull);
+
+    await tester.tap(find.text('Sign out everywhere else'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign out others'));
+    await tester.pumpAndSettle();
+
+    expect(service.revokedAllFor, 'dev_a');
   });
 
   testWidgets('an empty account still renders its (empty) list', (

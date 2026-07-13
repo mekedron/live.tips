@@ -134,6 +134,45 @@ void main() {
     );
   });
 
+  // #32/#33: a permanent section, for any signed-in cloud account — the link
+  // offer used to exist ONLY inside the sign-out dialog, and the delete
+  // nowhere at all.
+
+  testWidgets('signed in: the sign-in methods row is always there', (
+    tester,
+  ) async {
+    await _pumpSettings(
+      tester,
+      auth: FakeAuthService(
+        user: const AuthUser(
+          uid: 'uid_1',
+          kind: AccountKind.google,
+          displayName: 'Casey',
+          providers: [AccountKind.google],
+        ),
+      ),
+    );
+
+    expect(find.text('Sign-in methods'), findsOneWidget);
+    expect(find.text('How you get back into this account'), findsOneWidget);
+  });
+
+  testWidgets('a guest account is told, on the row itself, what it lacks', (
+    tester,
+  ) async {
+    await _pumpSettings(
+      tester,
+      auth: FakeAuthService(
+        user: const AuthUser(uid: 'anon_1', kind: AccountKind.anonymous),
+      ),
+    );
+
+    expect(
+      find.text('Guest account — nothing can sign it back in'),
+      findsOneWidget,
+    );
+  });
+
   // The permanent door #25 asked for: the sign-in offer is one-shot per
   // profile, so a local profile created after that answer needs a home in
   // Settings that is ALWAYS there while a local profile and a signed-in

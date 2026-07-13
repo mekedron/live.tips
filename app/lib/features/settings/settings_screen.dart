@@ -26,6 +26,7 @@ import 'account_details_screen.dart';
 import 'account_switch_screen.dart';
 import 'relay_method_screen.dart';
 import 'security_screen.dart';
+import 'sign_in_methods_screen.dart';
 import 'stripe_key_screen.dart';
 
 /// What the sign-out dialog resolved to. A guest can also leave by KEEPING
@@ -373,6 +374,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
+              // The permanent door #32 asked for. Not on a venue device: a
+              // shared tablet must not be able to attach an identity to — or
+              // delete — the artist's account.
+              if (!venueMode)
+                LtRow(
+                  icon: Icons.key_rounded,
+                  title: s.t('settings.sign_in_methods.row_title'),
+                  subtitle: cloudEntry.kind == AccountKind.anonymous
+                      ? s.t('settings.sign_in_methods.row_subtitle_guest')
+                      : s.t('settings.sign_in_methods.row_subtitle'),
+                  chevron: true,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SignInMethodsScreen(),
+                    ),
+                  ),
+                ),
               // Not on a venue device: Security can mint add-device codes,
               // and this tablet could confirm its own — anyone holding it
               // could join THEIR phone to the artist's account for good.

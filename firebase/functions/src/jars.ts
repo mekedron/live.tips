@@ -22,6 +22,8 @@ import {
 } from "./store";
 import { isValidJarId, validateProfile } from "./validate";
 
+import type { Firestore } from "firebase-admin/firestore";
+
 export const TIP_URL_BASE = "https://tip.live.tips/t/";
 
 export function requireUid(request: CallableRequest): string {
@@ -184,14 +186,23 @@ export async function updateJarProfileHandler(request: CallableRequest): Promise
   return { ok: true };
 }
 
+/**
+ * The jar and everything under it — the doc, private/{auth,rate}, any pending
+ * tips — in one move; nothing under a deleted jar may survive it, and the
+ * public tip page dies with the doc. Exported: deleting an account walks its
+ * bands' jars through this same door (account.ts), where there is no jar
+ * secret to present and the caller is the server itself.
+ */
+export async function purgeJar(firestore: Firestore, jarId: string): Promise<void> {
+  await firestore.recursiveDelete(jarRef(firestore, jarId));
+}
+
 export async function deleteJarHandler(request: CallableRequest): Promise<{ ok: true }> {
   const uid = requireUid(request);
   const data = dataObject(request);
   const jarId = requireJarId(data);
   await authorizeJar(jarId, uid, data["secret"]);
-  // Recursive: the jar doc, private/{auth,rate}, and any pending tips go
-  // together — nothing under a deleted jar may survive it.
-  await db().recursiveDelete(jarRef(db(), jarId));
+  await purgeJar(db(), jarId);
   return { ok: true };
 }
 

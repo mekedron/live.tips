@@ -3,6 +3,7 @@
 /// queries over expiresAt fields.
 
 import { Timestamp, type Firestore, type Query } from "firebase-admin/firestore";
+import { resumeAccountDeletions } from "./account";
 import { db } from "./store";
 
 const BATCH = 250;
@@ -89,6 +90,25 @@ export async function sweepLinkCodesHandler(): Promise<void> {
     firestore.collection("linkCodes").where("expiresAt", "<", Timestamp.now()),
   );
   if (codes > 0) console.log(`sweepLinkCodes: deleted ${codes} stale link codes`);
+}
+
+/**
+ * How long a recorded deletion is left to the caller before the sweep takes
+ * it over — comfortably longer than the callable's own run.
+ */
+const DELETION_GRACE_MS = 10 * 60_000;
+
+/**
+ * Deletions that were promised and not finished (account.ts). This is the
+ * half of "fail-closed and resumable" that does not depend on the artist
+ * coming back: the last stage deletes the Auth user, so a failure there — or a
+ * process that died mid-run — leaves nobody who COULD ask again. The ledger
+ * asks for them.
+ */
+export async function sweepAccountDeletionsHandler(): Promise<void> {
+  const firestore = db();
+  const finished = await resumeAccountDeletions(firestore, Date.now(), DELETION_GRACE_MS);
+  if (finished > 0) console.log(`sweepAccountDeletions: finished ${finished} unfinished account deletions`);
 }
 
 /** Quota buckets outlive their usefulness after ~2h; clear them hourly. */

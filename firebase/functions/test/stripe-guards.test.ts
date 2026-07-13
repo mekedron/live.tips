@@ -36,6 +36,21 @@ function docRef(path: string) {
       const data = docs.get(path);
       return { exists: data !== undefined, data: () => (data === undefined ? undefined : { ...data }) };
     },
+    // The teardown (stripe-connect.ts tearDownConnection, shared with the
+    // account deletion) drops the sealed doc — and then the pointer entry —
+    // on their own refs, not through a batch: our side is cleaned up whatever
+    // Stripe said, and a dangling pointer reads as not connected anyway.
+    set: async (data: Record<string, unknown>, opts?: { merge?: boolean }) => {
+      const existing = (opts?.merge ? docs.get(path) : undefined) ?? {};
+      const connections = {
+        ...(existing["connections"] as Record<string, unknown> | undefined),
+        ...(data["connections"] as Record<string, unknown> | undefined),
+      };
+      docs.set(path, { ...existing, ...data, connections });
+    },
+    delete: async () => {
+      docs.delete(path);
+    },
   };
 }
 

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/firebase/account_service.dart';
 import '../data/firebase/account_sessions.dart';
 import '../data/firebase/auth_bridge.dart';
 import '../data/firebase/auth_domain.dart';
@@ -116,6 +117,23 @@ final linkTokenMinterProvider = Provider<Future<String> Function()>((ref) {
     }
     return token;
   };
+});
+
+/// The account-level callables (deleteAccount today), resolved against the
+/// ACTIVE account's own Firebase app — like [linkTokenMinterProvider], and for
+/// the same reason: a callable that erases an account must speak AS that
+/// account. Null functions wherever Firebase isn't; the service then refuses
+/// politely instead of the app crashing on a null.
+final accountServiceProvider = Provider<AccountService>((ref) {
+  final sessions = ref.watch(accountSessionsProvider);
+  ref.watch(accountSessionsChangesProvider);
+  final active =
+      ref.watch(accountsDirectoryProvider.select((d) => d.activeAccountId));
+  final functions = (active != kLocalAccountId
+          ? sessions.sessionFor(active)?.functions(_kFunctionsRegion)
+          : null) ??
+      sessions.defaultFunctions(_kFunctionsRegion);
+  return AccountService(functions: functions);
 });
 
 /// Every profile this device knows (the local one plus signed-in Firebase
@@ -511,6 +529,42 @@ class AuthController extends Notifier<AuthState> {
     await directory.upsert(entry);
     await directory.setActive(user.uid);
     unawaited(_writeProfileDoc(entry));
+  }
+
+  /// Whether [kind] may be detached from the signed-in account right now.
+  ///
+  /// Only while ANOTHER permanent method remains. Unlinking the last one turns
+  /// the account back into a guest — no way to sign in, no kill switch, no
+  /// recovery — and Firebase will do it without a murmur. The refusal is ours.
+  bool canUnlink(AccountKind kind) {
+    final providers = state.user?.providers ?? const [];
+    return providers.contains(kind) && providers.length > 1;
+  }
+
+  /// Detaches [kind]. Returns false when it was refused ([canUnlink]) or the
+  /// provider call failed — the error is on [AuthState.error] either way.
+  Future<bool> unlinkProvider(AccountKind kind) async {
+    final user = state.user;
+    if (user == null || state.busy) return false;
+    if (!canUnlink(kind)) return false;
+    state = state.copyWith(busy: true, clearError: true);
+    try {
+      final updated =
+          await ref.read(authServiceProvider).unlinkProvider(kind);
+      if (updated == null) {
+        state = state.copyWith(busy: false);
+        return false;
+      }
+      state = state.copyWith(user: updated, busy: false);
+      // The switcher shows the account's method — an unlink that left the row
+      // saying "Google" would be a lie about how you get back in.
+      await _adopt(updated);
+      return true;
+    } catch (e) {
+      debugPrint('unlink failed: $e');
+      state = state.copyWith(busy: false, error: friendlyAuthError(e));
+      return false;
+    }
   }
 
   /// Names the ACCOUNT (not a band): Firebase profile + directory + doc.

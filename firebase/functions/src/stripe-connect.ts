@@ -40,6 +40,8 @@ import {
 import { bumpQuota, db } from "./store";
 import { isValidJarId } from "./validate";
 
+import type { Firestore } from "firebase-admin/firestore";
+
 /**
  * Where the artist's Stripe account will POST events: the Hosting rewrite in
  * front of the stripeWebhook function. A string param so emulators/staging
@@ -112,14 +114,59 @@ export async function lookupConnection(uid: string, bandId: string): Promise<Con
 }
 
 /** Best-effort webhook-endpoint removal — cleanup in SOMEONE ELSE'S Stripe
- * dashboard must be attempted, but a revoked key must never block our own. */
-async function tryDeleteEndpoint(api: StripeApi, endpointId: string, context: string): Promise<void> {
+ * dashboard must be attempted, but a revoked key must never block our own.
+ * Returns whether the endpoint is actually gone: deleting an account has to
+ * NAME the ones that are not (store.ts, AccountDeletionDoc.strandedEndpoints)
+ * rather than let a live endpoint quietly outlive "delete everything". */
+async function tryDeleteEndpoint(api: StripeApi, endpointId: string, context: string): Promise<boolean> {
   try {
     await api.delete(`webhook_endpoints/${endpointId}`);
+    return true;
   } catch (e) {
     const status = e instanceof StripeApiError ? e.status : "network";
     console.warn(`${context}: could not delete webhook endpoint (${status}); it may remain on the artist's account`);
+    return false;
   }
+}
+
+/**
+ * The teardown half of a disconnect, for whoever holds the connection: the
+ * webhook endpoint comes off the ARTIST'S Stripe account, the tip-jar payment
+ * link is optionally deactivated, and our sealed doc goes.
+ *
+ * Stripe-side cleanup is best effort THROUGHOUT — the artist may have revoked
+ * the key in their dashboard already, and a dead key must never leave our
+ * ciphertext lingering. Our side is cleaned up regardless. Returns false when
+ * the endpoint survived on their account (the one residue we cannot fix from
+ * here, and therefore the one we must report).
+ *
+ * Exported because deleting an account walks EVERY connection through exactly
+ * this door (account.ts) — a second implementation of it is a second chance
+ * to leave a live endpoint behind.
+ */
+export async function tearDownConnection(
+  firestore: Firestore,
+  connectionId: string,
+  doc: StripeConnectionDoc,
+  { deactivateLink = false, context = "stripeDisconnect" } = {},
+): Promise<boolean> {
+  let endpointRemoved = false;
+  try {
+    const key = await openSecret(doc.key, requireWrapper());
+    const api = new StripeApi(key);
+    endpointRemoved = await tryDeleteEndpoint(api, doc.webhookEndpointId, context);
+    if (deactivateLink && doc.paymentLinkId !== null) {
+      try {
+        await api.post(`payment_links/${doc.paymentLinkId}`, { active: "false" });
+      } catch {
+        console.warn(`${context}: could not deactivate the payment link (key revoked?)`);
+      }
+    }
+  } catch (e) {
+    console.warn(`${context}: could not open the stored key; cleaning up our side only`, e instanceof Error ? e.message : "");
+  }
+  await stripeConnectionRef(firestore, connectionId).delete();
+  return endpointRemoved;
 }
 
 // ---------------------------------------------------------------------------
@@ -311,27 +358,11 @@ export async function stripeDisconnectHandler(request: CallableRequest): Promise
     return { ok: true };
   }
 
-  // Stripe-side cleanup is best effort THROUGHOUT: the artist may have
-  // revoked the key in their dashboard already, and a dead key must never
-  // leave our ciphertext lingering. Our side is cleaned up regardless.
-  try {
-    const key = await openSecret(existing.doc.key, requireWrapper());
-    const api = new StripeApi(key);
-    await tryDeleteEndpoint(api, existing.doc.webhookEndpointId, "stripeDisconnect");
-    if (deactivateLink && existing.doc.paymentLinkId !== null) {
-      try {
-        await api.post(`payment_links/${existing.doc.paymentLinkId}`, { active: "false" });
-      } catch {
-        console.warn("stripeDisconnect: could not deactivate the payment link (key revoked?)");
-      }
-    }
-  } catch (e) {
-    console.warn("stripeDisconnect: could not open the stored key; cleaning up our side only", e instanceof Error ? e.message : "");
-  }
-
-  const batch = firestore.batch();
-  batch.delete(stripeConnectionRef(firestore, existing.connectionId));
-  batch.set(stripePointerRef(firestore, uid), { connections: { [bandId]: FieldValue.delete() } }, { merge: true });
-  await batch.commit();
+  await tearDownConnection(firestore, existing.connectionId, existing.doc, { deactivateLink });
+  // The pointer entry goes last: a dangling pointer reads as not connected
+  // (lookupConnection), so the order can only ever fail safe.
+  await stripePointerRef(firestore, uid).set(
+    { connections: { [bandId]: FieldValue.delete() } }, { merge: true },
+  );
   return { ok: true };
 }

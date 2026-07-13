@@ -157,14 +157,52 @@ class FakeAuthService extends AuthService {
 
   Future<AuthUser?> _signIn() async => user = nextUser;
 
+  /// A LINK is an upgrade in place, and the fake must model that or the tests
+  /// would prove nothing: the uid does not change, the account keeps everything
+  /// it had, and it simply gains a permanent method.
+  Future<AuthUser?> _link(AccountKind kind) async {
+    final current = user;
+    if (current == null) return _signIn();
+    return user = AuthUser(
+      uid: current.uid,
+      kind: kind,
+      displayName: current.displayName,
+      email: current.email,
+      providers: [
+        for (final p in current.providers)
+          if (p != kind) p,
+        kind,
+      ],
+    );
+  }
+
   @override
   Future<AuthUser?> signInAnonymously() => _signIn();
 
   @override
-  Future<AuthUser?> signInWithApple({bool link = false}) => _signIn();
+  Future<AuthUser?> signInWithApple({bool link = false}) =>
+      link ? _link(AccountKind.apple) : _signIn();
 
   @override
-  Future<AuthUser?> signInWithGoogle({bool link = false}) => _signIn();
+  Future<AuthUser?> signInWithGoogle({bool link = false}) =>
+      link ? _link(AccountKind.google) : _signIn();
+
+  @override
+  Future<AuthUser?> unlinkProvider(AccountKind kind) async {
+    final current = user;
+    if (current == null) return null;
+    final left = [
+      for (final p in current.providers)
+        if (p != kind) p,
+    ];
+    return user = AuthUser(
+      uid: current.uid,
+      kind: left.isEmpty ? AccountKind.anonymous : left.first,
+      displayName: current.displayName,
+      email: current.email,
+      providers: left,
+    );
+  }
 
   /// Every custom token redeemed on this service — the bridge return leg
   /// (see AuthController.consumePendingRedirect) signs in with exactly one.

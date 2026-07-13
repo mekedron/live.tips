@@ -127,6 +127,12 @@ service cloud.firestore {
     // Quota buckets (salted IP hashes, uid day-buckets): server-only.
     match /rateLimits/{key} { allow read, write: if false; }
 
+    // Account deletions in flight (functions/src/account.ts): the ledger that
+    // makes a deletion resumable. Server-only, and not even readable by the
+    // uid it names — that account is being erased, and a client that could
+    // write here could forge "already done" over a deletion that never ran.
+    match /accountDeletions/{uid} { allow read, write: if false; }
+
     // Cloud Stripe connections: the envelope-encrypted restricted key and
     // webhook signing secret (KMS-wrapped — a Firestore dump alone is
     // worthless, see functions/src/stripe-crypto.ts). Server-only, ALWAYS,

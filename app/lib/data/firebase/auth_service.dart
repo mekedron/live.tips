@@ -36,29 +36,59 @@ class AuthUser {
     required this.kind,
     this.displayName,
     this.email,
+    this.providers = const [],
   });
 
   final String uid;
   final AccountKind kind;
   final String? displayName;
   final String? email;
+
+  /// Every PERMANENT sign-in method attached to this account. Empty for a
+  /// guest — and that emptiness is the whole of what "Link Apple or Google
+  /// first" is about: nothing can sign the account back in, and unlinking the
+  /// last one would put it back there (see AuthController.unlinkProvider).
+  /// [kind] is simply the first of these; it says which icon to draw, not how
+  /// many ways back in the account has.
+  final List<AccountKind> providers;
+
+  bool get isGuest => providers.isEmpty;
 }
 
-AccountKind _kindOf(User user) {
-  if (user.isAnonymous) return AccountKind.anonymous;
+/// The permanent methods on [user], in Firebase's own order.
+List<AccountKind> _providersOf(User user) {
+  final kinds = <AccountKind>[];
   for (final info in user.providerData) {
-    if (info.providerId == 'apple.com') return AccountKind.apple;
-    if (info.providerId == 'google.com') return AccountKind.google;
+    final kind = switch (info.providerId) {
+      'apple.com' => AccountKind.apple,
+      'google.com' => AccountKind.google,
+      _ => null,
+    };
+    if (kind != null && !kinds.contains(kind)) kinds.add(kind);
   }
-  return AccountKind.anonymous;
+  return kinds;
 }
 
-AuthUser toAuthUser(User user) => AuthUser(
-      uid: user.uid,
-      kind: _kindOf(user),
-      displayName: user.displayName,
-      email: user.email,
-    );
+AuthUser toAuthUser(User user) {
+  final providers = _providersOf(user);
+  return AuthUser(
+    uid: user.uid,
+    // A linked account is no longer isAnonymous, and an account with no
+    // provider left is a guest again — so the list IS the answer.
+    kind: providers.isEmpty ? AccountKind.anonymous : providers.first,
+    displayName: user.displayName,
+    email: user.email,
+    providers: providers,
+  );
+}
+
+/// The Firebase provider id for a linkable method, or null for a kind that is
+/// not one (local, anonymous — the absence of a method).
+String? providerIdOf(AccountKind kind) => switch (kind) {
+      AccountKind.apple => 'apple.com',
+      AccountKind.google => 'google.com',
+      _ => null,
+    };
 
 /// Everything Firebase Auth, behind one seam. Constructed with a null
 /// [FirebaseAuth] on platforms/builds without Firebase — then [userChanges]
@@ -176,6 +206,19 @@ class AuthService {
       if (fullName.isNotEmpty) await user.updateDisplayName(fullName);
     }
     return user == null ? null : toAuthUser(user);
+  }
+
+  /// Detaches [kind] from the CURRENT user and returns what is left of it.
+  ///
+  /// Firebase will happily unlink the LAST method and hand back an account
+  /// nobody — the owner included — can ever sign into again. It does not
+  /// refuse; [AuthController.unlinkProvider] does, before this is ever called.
+  Future<AuthUser?> unlinkProvider(AccountKind kind) async {
+    final auth = _required;
+    final user = auth.currentUser;
+    final providerId = providerIdOf(kind);
+    if (user == null || providerId == null) return null;
+    return toAuthUser(await user.unlink(providerId));
   }
 
   Future<void> updateDisplayName(String name) async {
