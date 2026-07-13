@@ -14,7 +14,6 @@ import 'features/account/redirect_sign_in_gate.dart';
 import 'features/live/stage/stage_overlay.dart';
 import 'features/onboarding/profile_pick_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
-import 'features/settings/account_switch_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
 import 'features/shell/app_shell.dart';
 import 'features/venue/venue_banner.dart';
@@ -107,13 +106,16 @@ class LiveTipsApp extends ConsumerWidget {
 /// half-made band used to be a room with no door: welcome had no chrome, the
 /// shell was unreachable, and the user's other bands were invisible.
 ///
-/// Three states have no band to build the shell AROUND, and none of them is
+/// Two states have no band to build the shell AROUND, and neither of them is
 /// answered by inventing one ([activeProfileRenderProvider]):
 ///
-/// * The local profile after its last band was removed → the account PICKER,
-///   the accounts this device still knows plus a fresh sign-in.
-/// * A cloud account with no profile yet → ProfilePickScreen's create step.
-///   Nothing is written to the account until the artist finishes it (#26).
+/// * A profile set that is warm and empty — a cloud account with no profile
+///   yet, or the local profile after its last band was removed → the create
+///   step. Nothing is written until the artist finishes it (#26). The empty
+///   local profile used to land on the account switcher instead, which is the
+///   screen it was tapped ON: the pushed copy popped into a root the flip had
+///   just rebuilt as the same screen, and there was no door to a profile from
+///   it — a room with no way out (#38).
 /// * A cloud account with several profiles and no answer → ProfilePickScreen
 ///   asking WHICH one. The app used to pick (the stored id, else the first
 ///   band) and open the wrong gig (#28).
@@ -143,8 +145,6 @@ class RootGate extends ConsumerWidget {
     final render = ref.watch(activeProfileRenderProvider);
     final screen = !setUp
         ? const WelcomeScreen()
-        : render == ProfileRender.accounts
-        ? const AccountSwitchScreen()
         : render == ProfileRender.pick || render == ProfileRender.create
         ? const ProfilePickScreen(asRoot: true)
         : (app.hasStripe && app.effectiveTipJar == null)

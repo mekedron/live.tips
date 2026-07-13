@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../data/repository/account_data_repository.dart';
 import '../../domain/band_account.dart';
 import '../../l10n/app_localizations.dart';
+import '../../state/auth_providers.dart';
 import '../../state/onboarding_draft.dart';
 import '../../state/providers.dart';
 import '../../widgets/band_switcher.dart';
@@ -44,6 +45,13 @@ import 'onboarding_flow.dart';
 /// * NO profile at all: the account genuinely has none, which is a state, not
 ///   an accident to repair. The create card is the only card, and no band doc
 ///   is written until the artist walks through the setup that names it.
+///
+/// The LOCAL profile with no bands left lands here too, on that same second
+/// form — it is an empty profile set like any other, and the way out of one is
+/// to make a profile. (It used to land on the account switcher, which is the
+/// screen the artist had just tapped the local row on: a dead end with no door
+/// to a profile at all — #38.) The copy is the one thing that differs: there is
+/// no account for a device profile to have profiles "in".
 ///
 /// As the root there is nothing to forward TO (a pushReplacement would bury
 /// RootGate itself), so the deadline and the auto-forward are the pushed
@@ -208,6 +216,11 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     // screen exists for.
     final lastUsed = repo.readActiveBandId();
     final empty = existing.isEmpty;
+    // The device profile has no account behind it, so "no profile in this
+    // account" would name a thing that does not exist. Same screen, same card,
+    // honest heading.
+    final local =
+        ref.watch(accountsDirectoryProvider.select((d) => d.active.isLocal));
     return Scaffold(
       appBar: AppBar(
         title: Text(s.t('onboarding.profile_pick.title')),
@@ -229,16 +242,20 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             children: [
               Text(
-                s.t(empty
-                    ? 'onboarding.profile_pick.empty_heading'
-                    : 'onboarding.profile_pick.heading'),
+                s.t(!empty
+                    ? 'onboarding.profile_pick.heading'
+                    : local
+                        ? 'onboarding.profile_pick.empty_heading_local'
+                        : 'onboarding.profile_pick.empty_heading'),
                 style: outfitStyle(22, c.text, weight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
               Text(
-                s.t(empty
-                    ? 'onboarding.profile_pick.empty_subtitle'
-                    : 'onboarding.profile_pick.subtitle'),
+                s.t(!empty
+                    ? 'onboarding.profile_pick.subtitle'
+                    : local
+                        ? 'onboarding.profile_pick.empty_subtitle_local'
+                        : 'onboarding.profile_pick.empty_subtitle'),
                 style: TextStyle(
                   fontFamily: kFontBody,
                   fontSize: 14,

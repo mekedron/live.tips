@@ -1,9 +1,11 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/app.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/domain/relay_jar.dart';
@@ -39,6 +41,7 @@ Future<void> _pumpApp(
   WidgetTester tester,
   LocalStore local, {
   AuthService? auth,
+  FakeFirebaseFirestore? db,
 }) async {
   await tester.binding.setSurfaceSize(const Size(700, 1400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -49,6 +52,16 @@ Future<void> _pumpApp(
         secureStoreProvider.overrideWithValue(FakeSecureStore()),
         initialApiKeyProvider.overrideWithValue(null),
         if (auth != null) authServiceProvider.overrideWithValue(auth),
+        // Only the cloud tests need one: without a Firestore the repository
+        // falls back to the local store, which is a different scenario.
+        if (db != null) ...[
+          firestoreProvider.overrideWithValue(db),
+          tipSourceFactoryProvider.overrideWithValue(
+              ({required demo, required apiKey, required jar}) =>
+                  NullTipSource()),
+          relayChannelFactoryProvider.overrideWithValue(
+              ({required demo, required jar, required secret}) => null),
+        ],
       ],
       child: const LiveTipsApp(),
     ),
@@ -157,8 +170,8 @@ void main() {
 
   testWidgets(
       'removing the last local profile beside a cloud account lands on the '
-      'account picker — not in the shell on a fabricated profile',
-      (tester) async {
+      'create-a-profile step — not in the shell on a fabricated profile, and '
+      'not on the switcher it was tapped from (#38)', (tester) async {
     final local = await _store();
     await local.saveAccountsRegistry(const AccountsRegistry(
       accounts: [BandAccount(id: 'acc_solo', name: 'Solo Act', createdAtMs: 0)],
@@ -184,13 +197,82 @@ void main() {
         isTrue);
     await tester.pumpAndSettle();
 
-    expect(find.byType(AccountSwitchScreen), findsOneWidget);
+    // An empty profile set is an empty profile set, whoever owns it: the way
+    // out is to make a profile, not to be handed the list of accounts (which
+    // is the screen the artist would have come FROM).
+    expect(find.byType(ProfilePickScreen), findsOneWidget);
+    expect(find.byType(AccountSwitchScreen), findsNothing);
+    expect(find.text('No profile on this device yet'), findsOneWidget);
+    expect(find.text('Create a new profile'), findsOneWidget);
+    expect(find.text('Switch account'), findsOneWidget,
+        reason: 'and the other accounts stay one tap away');
     expect(find.byType(AppShell), findsNothing);
     expect(find.byType(WelcomeScreen), findsNothing);
     expect(container.read(appStateProvider).accounts, isEmpty,
         reason: 'no replacement profile may be conjured back');
     expect(local.readAccountsRegistry()!.accounts, isEmpty,
         reason: 'the removal must survive a reboot too');
+  });
+
+  testWidgets(
+      'the empty "On this device" profile is not a dead end: picking it from '
+      'the switcher lands on the create step, never back on the switcher (#38)',
+      (tester) async {
+    // The state the artist is really in after the upload flow moved their
+    // local profiles into an account (#25/#30), or after deleting the last
+    // local one (#23): a guest cloud account holding the one profile, and a
+    // local registry with nothing in it.
+    final local = await _store();
+    await local.saveAccountsRegistry(
+        const AccountsRegistry(accounts: [], activeId: ''));
+    await local.saveAccountsDirectory(
+      AccountsDirectory.initial()
+          .withAccount(const AppAccount(
+            id: 'uid_guest',
+            name: 'Guest',
+            kind: AccountKind.anonymous,
+          ))
+          .withActive('uid_guest'),
+    );
+    final db = FakeFirebaseFirestore();
+    await db
+        .collection('users')
+        .doc('uid_guest')
+        .collection('bands')
+        .doc('acc_cloud')
+        .set({'name': 'The Foxes', 'createdAtMs': 1});
+    await _pumpApp(
+      tester,
+      local,
+      auth: FakeAuthService(
+          user: const AuthUser(uid: 'uid_guest', kind: AccountKind.anonymous)),
+      db: db,
+    );
+    expect(find.byType(AppShell), findsOneWidget);
+
+    // Settings is a TAB of the shell, so the switcher is pushed straight on top
+    // of the root — which is what made the pop land on the screen it came from.
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Switch account'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountSwitchScreen), findsOneWidget);
+
+    await tester.tap(find.text('On this device'));
+    await tester.pumpAndSettle();
+
+    // Forward, not back: the local profile has no bands, and the create step is
+    // the door it never had. The switcher is gone — the artist is not standing
+    // on the row they just tapped.
+    expect(find.byType(ProfilePickScreen), findsOneWidget);
+    expect(find.byType(AccountSwitchScreen), findsNothing);
+    expect(find.text('No profile on this device yet'), findsOneWidget);
+    expect(find.text('Create a new profile'), findsOneWidget);
+    final container = ProviderScope.containerOf(
+        tester.element(find.byType(ProfilePickScreen)));
+    expect(container.read(activeProfileRenderProvider), ProfileRender.create);
+    expect(container.read(appStateProvider).accounts, isEmpty,
+        reason: 'and nothing was minted to make the screen go away');
   });
 
   testWidgets(

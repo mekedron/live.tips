@@ -21,12 +21,15 @@ import '../../widgets/sign_in_sheet.dart';
 /// concepts, two surfaces — mixing them into one list is how a user ends up
 /// signing into a second account when they meant to switch bands.
 ///
-/// Also RootGate's landing for "the local profile has no bands left": after
-/// the last local profile is removed there is nothing to build the shell
-/// around, and this list — every account the device knows, plus a fresh
-/// sign-in — is the honest set of ways forward. The pops below are guarded
-/// for that use: as the root screen there is nothing to pop, and the
-/// switched-to account re-routes through RootGate on its own.
+/// ALWAYS a pushed route, never RootGate's landing — and that is a rule, not
+/// an accident. It used to be the root for "the local profile has no bands
+/// left", which made the one screen a tap on the local row could reach the
+/// very screen the tap came from: the flip rebuilt the root as this list, the
+/// pushed copy popped into it, and the artist was back where they started with
+/// the row now checked and dead (#38). An empty profile set now lands on the
+/// create step like every other empty profile set, so the pop below can never
+/// arrive at a rebuild of this widget — [Navigator.canPop] is the whole guard
+/// it needs.
 class AccountSwitchScreen extends ConsumerWidget {
   const AccountSwitchScreen({super.key});
 

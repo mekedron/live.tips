@@ -767,8 +767,9 @@ class AppStateNotifier extends Notifier<AppState> {
   /// the trap: removal always produced a fresh empty profile and the router
   /// always had somewhere to put it, so the last profile could never actually
   /// be deleted. "No profile" is a routable state now: RootGate lands it on
-  /// the account picker (when the device knows other accounts) or back on
-  /// Welcome (when nothing at all remains). Refused during a live session, and
+  /// the create-a-profile step (when the device still knows an account of any
+  /// kind) or back on Welcome (when nothing at all remains). Refused during a
+  /// live session, and
   /// when a cloud band's server-side wipe is unreachable (offline) — a refusal
   /// deletes nothing and returns false.
   Future<bool> removeAccount(String id) async {
@@ -1038,32 +1039,30 @@ enum ProfileRender {
   /// wrong goal on the stage, tips against another band's history. It asks.
   pick,
 
-  /// A warm account with no profile at all. Not a hole to be plugged with a
-  /// fabricated band — that band was written back to the cloud and undid
-  /// deletions made on other devices. The artist creates the first profile,
-  /// and nothing is written to the account until they do.
+  /// A profile set that is warm and has nothing in it — a fresh cloud account,
+  /// or the local profile after its last band was removed. Not a hole to be
+  /// plugged with a fabricated band: that band was written back to the cloud
+  /// and undid deletions made on other devices. The artist creates the first
+  /// profile, and nothing is written until they do.
+  ///
+  /// The empty LOCAL profile used to answer with the account list instead, and
+  /// that was a dead end: the list is the screen the artist tapped the local
+  /// row ON, it re-rendered as the root under the pushed copy, and there was no
+  /// door to a profile from it (#38). An empty profile set is an empty profile
+  /// set, whoever owns it, and the way out of one is to make a profile.
   create,
-
-  /// The local profile over an empty registry: no band to build a shell
-  /// around, and no account behind it to create one in. The accounts this
-  /// device knows (plus a fresh sign-in) are the honest ways forward.
-  accounts,
 }
 
 final activeProfileRenderProvider = Provider<ProfileRender>((ref) {
   final app = ref.watch(appStateProvider);
   if (app.accountId.isNotEmpty) return ProfileRender.band;
-  final activeIsLocal =
-      ref.watch(accountsDirectoryProvider.select((d) => d.active.isLocal));
-  if (activeIsLocal) {
-    // The local profile never withholds a band it has: the device IS the
-    // profile, and its emptiness is the removal of the last one.
-    return app.accounts.isEmpty ? ProfileRender.accounts : ProfileRender.band;
-  }
   if (app.accounts.isNotEmpty) return ProfileRender.pick;
   // No bands and no answer yet — but "no bands" only means something once the
   // mirror has spoken. A cold snapshot can bring them in after the first
-  // frame, so watch the revision and keep the shell until it does.
+  // frame, so watch the revision and keep the shell until it does. The local
+  // store has never had a cold moment (LocalStoreRepository.isWarm), so the
+  // local profile's emptiness is an answer the instant it is read: the removal
+  // of its last band, and the create step is where that lands.
   ref.watch(repoRevisionProvider);
   return ref.watch(accountDataRepositoryProvider).isWarm
       ? ProfileRender.create
