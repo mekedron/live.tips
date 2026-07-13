@@ -114,8 +114,10 @@ function requireNonAnonymousUid(request: CallableRequest): string {
  * the account's sessionsValidAfterMs watermark may not drive the device
  * surface either — otherwise a stolen (revoked) session could confirm its
  * own link code and mint a fresh custom token, outliving the revocation.
+ * Exported: the cloud-Stripe callables enforce the same watermark (a revoked
+ * session must not read tip history or re-point a webhook).
  */
-async function requireFreshSession(
+export async function requireFreshSession(
   firestore: Firestore,
   uid: string,
   request: CallableRequest,

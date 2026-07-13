@@ -31,6 +31,13 @@
           "functionId": "tip",
           "region": "europe-west1"
         }
+      },
+      {
+        "source": "/stripe/webhook/**",
+        "function": {
+          "functionId": "stripeWebhook",
+          "region": "europe-west1"
+        }
       }
     ]
   },

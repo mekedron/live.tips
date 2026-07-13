@@ -31,6 +31,9 @@ import {
   sweepPendingTipsHandler,
   sweepRateLimitsHandler,
 } from "./sweeps";
+import { stripeConnectHandler, stripeDisconnectHandler } from "./stripe-connect";
+import { stripeProxyHandler } from "./stripe-proxy";
+import { stripeWebhookHandler } from "./stripe-webhook";
 import { tipHandler } from "./tip";
 
 setGlobalOptions({ region: "europe-west1", maxInstances: 10 });
@@ -87,6 +90,21 @@ export const collectLoginToken = onCall(
   { cors: true, secrets: [IP_HASH_SALT] },
   collectLoginTokenHandler,
 );
+
+// ------------------------------------------- cloud Stripe (key custody path)
+//
+// Signed-in cloud accounts only. The artist's restricted key lives here —
+// envelope-encrypted, KMS-wrapped, never on a device — and Stripe pushes
+// tips to the webhook; the app stops polling entirely. The local no-account
+// mode never touches any of these functions: its key stays in the device
+// keychain and talks to api.stripe.com directly, exactly as before.
+
+export const stripeConnect = onCall({ cors: true }, stripeConnectHandler);
+export const stripeProxy = onCall({ cors: true }, stripeProxyHandler);
+export const stripeDisconnect = onCall({ cors: true }, stripeDisconnectHandler);
+/** POST /stripe/webhook/:connectionId, via the Hosting rewrite. Public; the
+ * per-connection Stripe signature is the authentication. */
+export const stripeWebhook = onRequest(stripeWebhookHandler);
 
 // ------------------------------------------------------------------- cleanup
 

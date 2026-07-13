@@ -21,9 +21,12 @@ async function deleteByQuery(firestore: Firestore, query: Query): Promise<number
 }
 
 /**
- * Undelivered tips are the only thing at rest with a fan's name on it, so
- * they age out on schedule whether or not the artist ever comes back.
- * Every 10 minutes + the 1h TTL keeps fan text at rest ≤ ~70 minutes.
+ * Undelivered tips age out on schedule whether or not the artist ever comes
+ * back. Two queues, one contract (delivery is deletion; the sweep is the
+ * backstop): the relay's pendingTips — the only place fan text rests for a
+ * NO-account artist, so every 10 minutes + the 1h TTL keeps it at rest
+ * ≤ ~70 minutes — and the cloud accounts' stripeTips (stripe-store.ts),
+ * same TTL, where a swept QR tip is still recoverable through History.
  */
 export async function sweepPendingTipsHandler(): Promise<void> {
   const firestore = db();
@@ -32,6 +35,11 @@ export async function sweepPendingTipsHandler(): Promise<void> {
     firestore.collectionGroup("pendingTips").where("expiresAt", "<", Timestamp.now()),
   );
   if (swept > 0) console.log(`sweepPendingTips: deleted ${swept} expired pending tips`);
+  const stripeSwept = await deleteByQuery(
+    firestore,
+    firestore.collectionGroup("stripeTips").where("expiresAt", "<", Timestamp.now()),
+  );
+  if (stripeSwept > 0) console.log(`sweepPendingTips: deleted ${stripeSwept} expired stripe tips`);
 }
 
 /**

@@ -38,7 +38,11 @@ service cloud.firestore {
       allow read, write: if isOwner(uid) && notRevoked(uid);
 
       // Bands and everything nested under them (secrets/v1, sessions,
-      // relayTips) — same owner-only semantics as before.
+      // relayTips, and the webhook-fed stripeTips delivery queue — the
+      // owner reads a queued tip and deletes it, delivery IS deletion) —
+      // same owner-only semantics as before. The owner could also CREATE a
+      // stripeTips doc; that forges nothing but their own stage, which they
+      // control anyway.
       match /bands/{document=**} {
         allow read, write: if isOwner(uid) && notRevoked(uid);
       }
@@ -73,9 +77,14 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // Function-written security state (private/security): the owner may
-      // read their own watermark, never write anything here.
-      match /private/{document=**} {
+      // Function-written state under private/. ONLY the security doc is
+      // readable (the owner may see their own revocation watermark, never
+      // write it). Deliberately NOT a {document=**} read grant anymore:
+      // private/stripe — the pointer to the account's Stripe connections —
+      // and anything added here later fall through to the default deny,
+      // because the Stripe custody path (stripeConnections/*, see below)
+      // must have NO client-reachable edge, its owner included.
+      match /private/security {
         allow read: if isOwner(uid) && notRevoked(uid);
         allow write: if false;
       }
@@ -135,6 +144,15 @@ service cloud.firestore {
 
     // Quota buckets (salted IP hashes, uid day-buckets): server-only.
     match /rateLimits/{key} { allow read, write: if false; }
+
+    // Cloud Stripe connections: the envelope-encrypted restricted key and
+    // webhook signing secret (KMS-wrapped — a Firestore dump alone is
+    // worthless, see functions/src/stripe-crypto.ts). Server-only, ALWAYS,
+    // for every principal including the owning artist: the entire point of
+    // key custody is that no device ever holds the key again, so no rule
+    // here may ever grant a read. Explicit rather than falling through to
+    // the default deny, so nobody "opens it up" without meeting this comment.
+    match /stripeConnections/{connectionId} { allow read, write: if false; }
 
     // Everything else is closed until a later phase opens it explicitly.
     match /{document=**} {

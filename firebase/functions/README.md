@@ -6,6 +6,13 @@ deleted) and keeps its validation, deep-link composition, SSR tip page, rate
 caps, dedupe, and privacy invariants; the Worker's Durable Object storage
 became the Firestore model below.
 
+Since the cloud-Stripe change it is also the **key-custody backend** for
+signed-in accounts: the artist's Stripe restricted key lives here (encrypted,
+see below), Stripe pushes tips to a webhook, and the app stops polling. See
+[Cloud Stripe](#cloud-stripe-key-custody-webhook-tips-and-the-proxy) — and
+read [What changed in the trust model](#what-changed-in-the-trust-model-read-this)
+before touching any of it.
+
 ## Data model
 
 ```
@@ -36,6 +43,24 @@ loginRequests/{requestId}        QR sign-in-on-a-shared-device handshake (the
                                  attempts, expiresAt = createdAtMs + 60 s.
                                  NO client read and NO client write — rules
                                  grant this collection nothing at all
+stripeConnections/{connectionId} one connected band's Stripe custody doc:
+                                 uid, bandId, key (ENVELOPE — see Cloud
+                                 Stripe), livemode, webhookEndpointId,
+                                 webhookSecret (envelope), paymentLinkId,
+                                 createdAtMs. connectionId is 128-bit random
+                                 and doubles as the webhook URL token.
+                                 Server-only for EVERY principal, the owner
+                                 included — rules grant nothing, explicitly
+users/{uid}/private/stripe       { connections: {bandId: connectionId} } —
+                                 server-only pointer (NOT client-readable:
+                                 rules now open private/security alone)
+users/{uid}/bands/{bandId}/      webhook-fed tip queue, doc id = the Stripe
+  stripeTips/{cs_…|ch_…}         object id; tsMs, method:"stripe",
+                                 amountMinor, currency, name, message,
+                                 inPerson, livemode, paymentIntentId?,
+                                 expiresAt = arrival + 1h. Owner-readable and
+                                 owner-deletable (delivery IS deletion, like
+                                 pendingTips); created by the webhook
 ```
 
 ## Functions
@@ -63,10 +88,14 @@ loginRequests/{requestId}        QR sign-in-on-a-shared-device handshake (the
   `revokeAllOtherDevices {currentDeviceId}` (NON-anonymous; watermark +
   device flags + `revokeRefreshTokens` — the caller must silently
   re-authenticate afterwards).
-- Scheduled: `sweepPendingTips` (10 min — fan text at rest ≤ ~70 min),
-  `expireJars` (daily; unowned jars past expiresAt), `sweepRateLimits`
-  (hourly), `sweepLinkCodes` (hourly; link codes AND login requests past
-  expiresAt).
+- Cloud Stripe (signed-in accounts only, see the dedicated section):
+  `stripeConnect`, `stripeProxy`, `stripeDisconnect` (callables) and
+  `stripeWebhook` (https, POST `/stripe/webhook/:connectionId` via the
+  Hosting rewrite).
+- Scheduled: `sweepPendingTips` (10 min — fan text at rest ≤ ~70 min; also
+  sweeps the cloud accounts' expired `stripeTips`), `expireJars` (daily;
+  unowned jars past expiresAt), `sweepRateLimits` (hourly), `sweepLinkCodes`
+  (hourly; link codes AND login requests past expiresAt).
 
 ## The two QR flows, side by side
 
@@ -109,6 +138,161 @@ with no `0/O/1/I` — 40 bits. `describe`/`approve` are auth-required and
 IP-quota'd at 120/h, so a guesser gets ~120 tries an hour against ~2^40 codes,
 and a hit buys them nothing but the race above.
 
+## Cloud Stripe (key custody, webhook tips, and the proxy)
+
+For a **signed-in cloud account**, the app no longer holds the artist's
+Stripe restricted key and no longer polls `api.stripe.com/v1/events`:
+
+1. `stripeConnect {bandId, key, paymentLinkId?}` validates the key (must be
+   `rk_…`; `sk_…` is refused here exactly as the app refuses it at the paste
+   box), probes its permissions, **encrypts and stores it server-side**, and
+   registers a webhook endpoint on the artist's own Stripe account pointing
+   at our receiver. Re-connecting replaces cleanly (new endpoint first, then
+   the old endpoint and ciphertext are removed). Returns
+   `{ok, livemode, checks}`.
+2. Stripe **pushes** each tip to `stripeWebhook`. The per-connection signing
+   secret is the authentication; a verified tip is written to
+   `users/{uid}/bands/{bandId}/stripeTips/{objectId}` and the artist's
+   devices pick it up through the same Firestore-listener mechanism the
+   relay's `pendingTips` already uses. No polling at all.
+3. `stripeProxy {bandId, op, params?}` covers the handful of non-realtime
+   calls the app still needs — a **strict allowlist** (`src/stripe-ops.ts`),
+   not a passthrough. The five operations, exactly the calls the app's
+   `StripeRequests` makes today (minus the events poll, which no longer
+   exists for cloud accounts): `checkKey`, `createTipJar`,
+   `updateTipJarDetails`, `deactivatePaymentLink`, `listTips`.
+4. `stripeDisconnect {bandId, deactivateLink?}` deletes the webhook endpoint
+   from the artist's dashboard (best effort — a revoked key must not strand
+   our cleanup), optionally deactivates the payment link, and deletes the
+   ciphertext and pointer. Idempotent.
+
+**The local, no-account mode is UNCHANGED and none of this touches it**: its
+key stays in the device keychain, its calls go straight to `api.stripe.com`,
+and its polling loop is untouched. "No live.tips server between you and
+Stripe" remains literally true for that mode — nothing in these functions can
+even be addressed without a Firebase uid and a stored connection.
+
+### Key custody: envelope encryption with Cloud KMS
+
+The restricted key and the webhook signing secret are **never stored in
+plaintext**. Each is sealed with a fresh one-shot AES-256-GCM data key, and
+only that DEK goes to Cloud KMS to be wrapped (`src/stripe-crypto.ts`).
+Firestore holds `{wrapped DEK, IV, ciphertext+tag}` — **a Firestore dump
+alone is worthless**; reading a key back requires a `cryptoKeys.decrypt`
+call that only the functions' service account is allowed to make. KMS never
+sees a Stripe key; Firestore never sees a usable one.
+
+One-time setup (owner, `gcloud`), before first deploy of these functions:
+
+```sh
+gcloud services enable cloudkms.googleapis.com --project=livetips-app
+
+gcloud kms keyrings create livetips \
+  --location=europe-west1 --project=livetips-app
+
+gcloud kms keys create stripe-secrets \
+  --keyring=livetips --location=europe-west1 --project=livetips-app \
+  --purpose=encryption \
+  --rotation-period=90d \
+  --next-rotation-time=$(date -u -v+90d +%Y-%m-%dT%H:%M:%SZ)
+```
+
+(KMS key rotation re-keys future wraps automatically; old envelopes keep
+decrypting because KMS retains prior key versions. Envelopes record the key
+resource in `kmsKeyName` so a manual re-wrap migration is possible later.)
+
+IAM — grant the functions' runtime service account encrypt/decrypt on that
+key and nothing wider (2nd-gen functions run as the Compute Engine default
+service account unless configured otherwise; check with
+`gcloud functions describe stripeConnect --region=europe-west1 --format='value(serviceConfig.serviceAccountEmail)'`):
+
+```sh
+PROJECT_NUMBER=$(gcloud projects describe livetips-app --format='value(projectNumber)')
+gcloud kms keys add-iam-policy-binding stripe-secrets \
+  --keyring=livetips --location=europe-west1 --project=livetips-app \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role=roles/cloudkms.cryptoKeyEncrypterDecrypter
+```
+
+The key resource is resolved at runtime as
+`projects/$GCLOUD_PROJECT/locations/europe-west1/keyRings/livetips/cryptoKeys/stripe-secrets`;
+override with the `KMS_KEY_RESOURCE` string param if it ever lives elsewhere.
+If KMS is unreachable or unconfigured, every custody path **fails closed**
+(`internal` / 500) — nothing is ever stored or used unencrypted.
+
+### Stripe restricted-key permissions (the app's onboarding checklist)
+
+The key the artist creates must now carry exactly:
+
+| Resource               | Permission | Why                                            |
+| ---------------------- | ---------- | ---------------------------------------------- |
+| Checkout Sessions      | **Read**   | History (`listTips`)                           |
+| Charges                | **Read**   | in-person tap tips (charge payloads)           |
+| Payment Links          | **Write**  | create / edit / deactivate the tip link        |
+| Products               | **Write**  | the "Tip" product                              |
+| Prices                 | **Write**  | the pay-what-you-want price                    |
+| Webhook Endpoints      | **Write**  | **NEW** — we register/remove the tip feed      |
+
+**Events — Read is no longer needed** (nothing polls for a cloud account;
+the local mode's checklist keeps it). `stripeConnect` probes each of these
+read-side and refuses a key that cannot do the job, listing every missing
+permission (`failed-precondition`, `details.checks`). Nothing the key can do
+moves money: no refunds, no payouts, no transfers, no balance.
+
+### The webhook pipeline, precisely
+
+- **Signature is the auth.** Every request must carry a valid
+  `Stripe-Signature` (HMAC-SHA256 over the raw bytes, ±5 min tolerance,
+  timing-safe compare — `src/stripe-events.ts`) keyed by *that connection's*
+  signing secret. Unverifiable → 400, logged loudly by connectionId, and
+  nothing is touched.
+- **Filter.** Only `checkout.session.completed` /
+  `checkout.session.async_payment_succeeded` for **the band's own payment
+  link** with `payment_status == "paid"`, and `charge.succeeded` where
+  `payment_method_details.type == "card_present"`, become tips. An artist
+  may run other business through the same Stripe account: everything else is
+  answered 200 and **not stored** — the privacy policy states this filter.
+  The card-present check is the same double-count guard the app's poller
+  has always had (a QR checkout also emits `charge.succeeded`).
+- **Idempotent by object id.** The queue doc id is the Stripe object id
+  (`cs_…`/`ch_…`); `create()` refuses overwrites, so Stripe retries, re-sent
+  events, and the completed/async pair for one session all collapse into one
+  write (ALREADY_EXISTS → 200). The app's session model dedupes by the same
+  id, which also absorbs a redelivery after the doc was consumed.
+- **Bounded.** Per-uid quota (600 tips/h across bands; over it → 429 so
+  Stripe retries into a later bucket — delayed, not lost) and a 60-doc
+  per-band queue cap (oldest goes; a swept QR tip is still in History).
+  Undelivered docs expire after 1 h via `sweepPendingTips`.
+- **Fast 2xx.** The whole handler is one signature check, one mapping, one
+  small batch — far inside Stripe's 20 s timeout.
+
+### What changed in the trust model (read this)
+
+Bluntly: **for a signed-in cloud account, live.tips is now IN the Stripe
+path.** Before, the promise was "your key never leaves your device and no
+live.tips server sits between you and Stripe" — that promise now belongs to
+the local, no-account mode ONLY, where it remains literally true. A cloud
+account instead trusts this backend to hold a restricted key and sign Stripe
+requests with it.
+
+What a full compromise of this backend (code + KMS decrypt rights) would
+allow, and would not:
+
+- **Could:** read connected artists' tip/checkout data (names, messages,
+  amounts); create or deactivate payment links, products and prices on their
+  accounts; register or delete webhook endpoints; watch tips arrive.
+  Payment links it created would still pay **the artist** — the key grants
+  no way to redirect funds.
+- **Could NOT:** move money out (no refunds, payouts, transfers, balance or
+  account permissions on the key); see full card numbers (Stripe never
+  exposes them to any key); touch local-mode artists at all (their keys are
+  not here); read the keys from a Firestore dump alone (envelope + KMS) or
+  from logs (never logged).
+
+The blast radius is bounded by the restricted key's own permission list —
+which is why `stripeConnect` refuses anything stronger than it needs, and
+especially any `sk_` key, server-side and unconditionally.
+
 ## Secrets (required — handlers fail closed when unset)
 
 ```sh
@@ -121,6 +305,16 @@ callables answer 500/internal rather than store an unsalted (brute-forceable)
 digest of a visitor's IP. Without
 `TURNSTILE_SECRET`, every tip verification fails (403). The public sitekey is
 the `TURNSTILE_SITE_KEY` string param (default committed in `src/params.ts`).
+
+The cloud-Stripe surface adds two non-secret **string params** (defaults are
+right for production; override for emulators/staging):
+
+- `KMS_KEY_RESOURCE` — the KMS key wrapping the DEKs (default derived from
+  the project, see Cloud Stripe above). The Stripe keys themselves are NOT
+  function secrets: they are per-artist data, envelope-encrypted in Firestore.
+- `STRIPE_WEBHOOK_BASE` — where registered endpoints point (default
+  `https://tip.live.tips/stripe/webhook`; the Hosting rewrite routes it to
+  the `stripeWebhook` function).
 
 ## Firestore TTL policies (recommended)
 
@@ -137,6 +331,8 @@ gcloud firestore fields ttl-policies update expiresAt \
   --collection-group=linkCodes --project=livetips-app
 gcloud firestore fields ttl-policies update expiresAt \
   --collection-group=loginRequests --project=livetips-app
+gcloud firestore fields ttl-policies update expiresAt \
+  --collection-group=stripeTips --project=livetips-app
 ```
 
 Do NOT add a TTL policy on `jars.expiresAt`: TTL deletes are unconditional,
