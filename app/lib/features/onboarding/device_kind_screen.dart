@@ -40,7 +40,18 @@ class DeviceKindScreen extends ConsumerWidget {
 
   Future<void> _pickVenue(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
-    await ref.read(deviceKindProvider.notifier).choose(DeviceKind.venue);
+    final messenger = ScaffoldMessenger.of(context);
+    final s = context.s;
+    try {
+      await ref.read(deviceKindProvider.notifier).choose(DeviceKind.venue);
+    } catch (_) {
+      // A shared device without its at-rest cipher must not exist (see
+      // DeviceKindNotifier._applyKind) — the choice simply didn't take.
+      messenger.showSnackBar(
+        SnackBar(content: Text(s.t('venue.boot.choose_failed'))),
+      );
+      return;
+    }
     if (!context.mounted) return;
     navigator.push(
       MaterialPageRoute(builder: (_) => const VenueIntroScreen()),

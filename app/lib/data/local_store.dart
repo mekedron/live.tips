@@ -56,8 +56,32 @@ class LocalStore {
 
   Future<bool> _setString(String key, String value) {
     final cipher = _cipher;
-    return _prefs.setString(key, cipher == null ? value : cipher.encrypt(value));
+    if (cipher == null) {
+      // A plaintext write over an envelope would destroy the one copy of a
+      // value this device can't currently read — the exact overwrite a
+      // blocked venue boot exists to prevent (see attachVenueCipher). Any
+      // path that still gets here is a bug, and it fails loudly rather
+      // than eating the data silently.
+      final existing = _prefs.getString(key);
+      if (existing != null && existing.startsWith(LocalCipher.prefix)) {
+        throw StateError(
+            'refusing to overwrite the encrypted value under "$key" '
+            'without the cipher');
+      }
+      return _prefs.setString(key, value);
+    }
+    return _prefs.setString(key, cipher.encrypt(value));
   }
+
+  /// Whether any stored value is an encryption envelope — the boot-time
+  /// probe that tells a genuinely fresh venue install (safe to mint a root
+  /// key) from a restore whose key didn't come along (a stop — see
+  /// attachVenueCipher). `_prefs.get`, not getString: a foreign-typed value
+  /// must read as "not an envelope", never crash the probe.
+  bool hasEncryptedValues() => _prefs.getKeys().any((key) {
+        final value = _prefs.get(key);
+        return value is String && value.startsWith(LocalCipher.prefix);
+      });
 
   // Device-wide keys.
   static const kAccounts = 'accounts_v1';

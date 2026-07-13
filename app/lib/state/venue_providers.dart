@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/local_cipher.dart';
+import '../data/venue_boot.dart';
 import '../domain/device_kind.dart';
 import 'auth_providers.dart';
 import 'onboarding_draft.dart';
@@ -27,7 +27,8 @@ class DeviceKindNotifier extends Notifier<DeviceKind?> {
 
   /// The onboarding choice (a fresh device, nothing to wipe). Entering venue
   /// mode attaches the at-rest cipher and turns off Firestore's disk cache
-  /// before any account data can land; leaving it detaches them.
+  /// before any account data can land; leaving it detaches them. Throws —
+  /// and changes nothing — when the cipher can't attach (see [_applyKind]).
   Future<void> choose(DeviceKind kind) async {
     await _applyKind(kind);
     state = kind;
@@ -44,18 +45,14 @@ class DeviceKindNotifier extends Notifier<DeviceKind?> {
   Future<void> _applyKind(DeviceKind kind) async {
     final local = ref.read(localStoreProvider);
     if (kind == DeviceKind.venue) {
-      final secure = ref.read(secureStoreProvider);
-      try {
-        var key = await secure.readLocalCipherKey();
-        if (key == null) {
-          key = LocalCipher.newRootKey();
-          await secure.writeLocalCipherKey(key);
-        }
-        local.cipher = LocalCipher(key);
-      } catch (e) {
-        // Locked keychain: this boot runs unencrypted rather than not at
-        // all. The 12-hour ceiling and end-of-session wipes still hold.
-        debugPrint('venue cipher unavailable: $e');
+      final block =
+          await attachVenueCipher(local, ref.read(secureStoreProvider));
+      if (block != null) {
+        // No cipher, no venue mode: proceeding would put a shared tablet's
+        // data on disk in plaintext, and the next boot would fail closed on
+        // it anyway (see attachVenueCipher). The kind stays unchosen — the
+        // caller tells the user to unlock the device and try again.
+        throw StateError('venue cipher unavailable: ${block.name}');
       }
     } else {
       local.cipher = null;

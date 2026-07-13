@@ -13,12 +13,13 @@ import 'core/platform_support.dart';
 import 'data/cloud_migrator.dart';
 import 'data/firebase/account_sessions.dart';
 import 'data/firebase/auth_domain.dart';
-import 'data/local_cipher.dart';
 import 'data/local_store.dart';
 import 'data/migrations.dart';
 import 'data/secure_store.dart';
+import 'data/venue_boot.dart';
 import 'domain/app_account.dart';
 import 'domain/device_kind.dart';
+import 'features/venue/venue_boot_blocked_screen.dart';
 import 'firebase_options.dart';
 import 'l10n/app_locale.dart';
 import 'l10n/app_localizations.dart';
@@ -50,17 +51,36 @@ Future<void> main() async {
   // design (see LocalStore.readDeviceKind).
   final deviceKind = localStore.readDeviceKind();
   if (deviceKind == DeviceKind.venue) {
-    try {
-      var cipherKey = await secureStore.readLocalCipherKey();
-      if (cipherKey == null) {
-        cipherKey = LocalCipher.newRootKey();
-        await secureStore.writeLocalCipherKey(cipherKey);
-      }
-      localStore.cipher = LocalCipher(cipherKey);
-    } catch (e) {
-      // Locked keychain: run unencrypted this boot (encrypted values read as
-      // absent). The ceiling and end-of-session wipes still hold.
-      debugPrint('venue cipher unavailable this boot: $e');
+    final block = await attachVenueCipher(localStore, secureStore);
+    if (block != null) {
+      // A cipher that can't attach is a STOP, not a run-degraded condition
+      // — see attachVenueCipher for what a degraded boot used to destroy.
+      // Nothing below this line runs: nothing is seeded, minted or
+      // overwritten. The saved language is an envelope too, so the device
+      // locale picks the blocking screen's words.
+      final blockedLocale = resolveSupportedLocale(
+          WidgetsBinding.instance.platformDispatcher.locale);
+      await AppLocalizations.load(blockedLocale);
+      runApp(VenueBootBlockedApp(
+        block: block,
+        locale: blockedLocale,
+        // A blocked boot returns before Firebase or any provider exists,
+        // so a retry is simply main() again, from the top.
+        onRetry: () => unawaited(main()),
+        onErase: () async {
+          // The confirmed reset — same order as wipeDevice(): keychain
+          // first, then prefs, so nothing left can NAME a surviving
+          // keychain entry if the wipe half-fails.
+          try {
+            await secureStore.wipeAll();
+          } catch (e) {
+            debugPrint('keychain wipe failed: $e');
+          }
+          await localStore.wipeAll();
+          await main();
+        },
+      ));
+      return;
     }
   }
 
