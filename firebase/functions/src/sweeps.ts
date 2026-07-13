@@ -59,17 +59,27 @@ export async function expireJarsHandler(): Promise<void> {
 }
 
 /**
- * QR link codes live 2 minutes; whatever state they end in (used, expired,
- * abandoned mid-handshake) the doc is garbage once expiresAt passes — it
- * still names a device and hashes a nonce, so it does not get to linger.
+ * Both QR handshakes' scratch state. Link codes live 2 minutes and login
+ * requests 60 seconds; whatever state either ends in (used, expired, abandoned
+ * mid-handshake) the doc is garbage once expiresAt passes — it still names a
+ * device and hashes a nonce, so it does not get to linger.
+ *
+ * Sweeping loginRequests also keeps the displayCode namespace honest: describe
+ * refuses a code that matches more than one live request, and dead docs are
+ * the only way that ambiguity could accumulate.
  */
 export async function sweepLinkCodesHandler(): Promise<void> {
   const firestore = db();
-  const swept = await deleteByQuery(
+  const codes = await deleteByQuery(
     firestore,
     firestore.collection("linkCodes").where("expiresAt", "<", Timestamp.now()),
   );
-  if (swept > 0) console.log(`sweepLinkCodes: deleted ${swept} stale link codes`);
+  if (codes > 0) console.log(`sweepLinkCodes: deleted ${codes} stale link codes`);
+  const logins = await deleteByQuery(
+    firestore,
+    firestore.collection("loginRequests").where("expiresAt", "<", Timestamp.now()),
+  );
+  if (logins > 0) console.log(`sweepLinkCodes: deleted ${logins} stale login requests`);
 }
 
 /** Quota buckets outlive their usefulness after ~2h; clear them hourly. */

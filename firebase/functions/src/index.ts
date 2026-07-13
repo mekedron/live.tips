@@ -13,9 +13,13 @@ import {
   updateJarProfileHandler,
 } from "./jars";
 import {
+  approveLoginRequestHandler,
   collectLinkTokenHandler,
+  collectLoginTokenHandler,
   confirmLinkCodeHandler,
   createLinkCodeHandler,
+  createLoginRequestHandler,
+  describeLoginRequestHandler,
   redeemLinkCodeHandler,
   revokeAllOtherDevicesHandler,
   revokeDeviceHandler,
@@ -60,9 +64,34 @@ export const collectLinkToken = onCall({ cors: true, secrets: [IP_HASH_SALT] }, 
 export const revokeDevice = onCall({ cors: true }, revokeDeviceHandler);
 export const revokeAllOtherDevices = onCall({ cors: true }, revokeAllOtherDevicesHandler);
 
+// -------------------------- QR sign-in on a shared device (the bar's tablet)
+//
+// The MIRROR of the block above: there the signed-in device shows the QR, here
+// the UNSIGNED one does. Tablet side (create/collect) is unauthenticated by
+// necessity — hence the salted per-IP quotas. Phone side (describe/approve)
+// requires auth; approve accepts ANONYMOUS callers on purpose (see the handler:
+// it is a guest account's only route onto a second screen).
+export const createLoginRequest = onCall(
+  { cors: true, secrets: [IP_HASH_SALT] },
+  createLoginRequestHandler,
+);
+export const describeLoginRequest = onCall(
+  { cors: true, secrets: [IP_HASH_SALT] },
+  describeLoginRequestHandler,
+);
+export const approveLoginRequest = onCall(
+  { cors: true, secrets: [IP_HASH_SALT] },
+  approveLoginRequestHandler,
+);
+export const collectLoginToken = onCall(
+  { cors: true, secrets: [IP_HASH_SALT] },
+  collectLoginTokenHandler,
+);
+
 // ------------------------------------------------------------------- cleanup
 
 export const sweepPendingTips = onSchedule("every 10 minutes", sweepPendingTipsHandler);
 export const expireJars = onSchedule("every day 03:00", expireJarsHandler);
 export const sweepRateLimits = onSchedule("every 1 hours", sweepRateLimitsHandler);
+// Both QR flows' short-lived state (linkCodes + loginRequests).
 export const sweepLinkCodes = onSchedule("every 1 hours", sweepLinkCodesHandler);

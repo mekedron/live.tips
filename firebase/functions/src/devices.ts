@@ -13,9 +13,19 @@
 ///    must silently re-authenticate right after (its refresh credential is
 ///    gone, its provider session is not).
 ///
-/// The link-code handshake lives in linkcodes.ts (pure) + these handlers;
-/// see that file for the pending→claimed→confirmed→used lifecycle and why a
-/// photographed QR is useless.
+/// TWO QR flows live here, and they are mirror images. Keep them straight:
+///
+///  - ADD A DEVICE (linkCodes, linkcodes.ts): the SIGNED-IN device shows the
+///    QR, the NEW device scans it, the signed-in device confirms.
+///    pending→claimed→confirmed→used.
+///  - SIGN IN ON A SHARED DEVICE (loginRequests, loginrequests.ts): the
+///    UNSIGNED device (a bar's tablet) shows the QR, the artist's SIGNED-IN
+///    phone scans and approves it, the tablet collects the token.
+///    pending→approved→used.
+///
+/// In both, the QR carries only an id and the token is only collectable by the
+/// device holding a nonce that never appeared in the QR — see each pure module
+/// for why a photographed QR is useless.
 
 import { getAuth } from "firebase-admin/auth";
 import { Timestamp } from "firebase-admin/firestore";
@@ -37,8 +47,23 @@ import {
   decideRedeem,
   type LinkCodeSnapshot,
   type LinkCodeStatus,
-  type LinkDecision,
 } from "./linkcodes";
+import {
+  decideApprove,
+  decideCollect as decideLoginCollect,
+  decideDescribe,
+  isValidLoginRequestId,
+  LOGIN_DEVICE_NAME_MAX,
+  LOGIN_DEVICE_PLATFORM_MAX,
+  loginDeviceField,
+  loginRequestExpiryMs,
+  newCollectNonce,
+  newDisplayCode,
+  newLoginRequestId,
+  parseLoginCode,
+  type LoginRequestSnapshot,
+  type LoginRequestStatus,
+} from "./loginrequests";
 import { IP_HASH_SALT } from "./params";
 import {
   bumpQuota,
@@ -48,8 +73,14 @@ import {
   LINK_COLLECTS_PER_IP_PER_HOUR,
   LINK_REDEEMS_PER_IP_PER_HOUR,
   linkCodeRef,
+  LOGIN_COLLECTS_PER_IP_PER_HOUR,
+  LOGIN_CREATES_PER_IP_PER_HOUR,
+  LOGIN_DESCRIBES_PER_IP_PER_HOUR,
+  loginRequestRef,
+  loginRequestsCol,
   securityRef,
   type LinkCodeDoc,
+  type LoginRequestDoc,
 } from "./store";
 import { isValidDeviceId } from "./validate";
 
@@ -133,12 +164,16 @@ function snapshotOf(snap: DocumentSnapshot): LinkCodeSnapshot {
   };
 }
 
-/** Apply a rejection's side effects (expire / burn an attempt) inside the tx. */
+/**
+ * Apply a rejection's side effects (expire / burn an attempt) inside the tx.
+ * Shared by both QR flows: LinkDecision and LoginDecision are deliberately the
+ * same shape, and 'expired' means the same thing in both status machines.
+ */
 function applyRejection(
   tx: Transaction,
   ref: DocumentReference,
-  state: LinkCodeSnapshot,
-  decision: LinkDecision & { ok: false },
+  state: { attempts: number },
+  decision: { expire: boolean; countAttempt: boolean },
 ): void {
   const update: Record<string, unknown> = {};
   if (decision.countAttempt) update["attempts"] = state.attempts + 1;
@@ -306,6 +341,259 @@ export async function collectLinkTokenHandler(
     if (decision.pending) return { failed: false as const, pending: true as const };
     tx.update(ref, { status: "used" satisfies LinkCodeStatus });
     return { failed: false as const, uid: snap.get("uid") as string };
+  });
+
+  if (outcome.failed === "not-found") throw new HttpsError("not-found", "not found");
+  if (outcome.failed === "precondition") throw new HttpsError("failed-precondition", outcome.message);
+  if ("pending" in outcome) return { pending: true };
+  const token = await getAuth().createCustomToken(outcome.uid);
+  return { token };
+}
+
+// ---------------------------------------------------------------------------
+// The OTHER QR flow: signing in on a shared, unsigned-in device (the tablet
+// behind the bar that four artists take turns on). Mirror image of the four
+// handlers above — here the UNSIGNED device shows the QR and the SIGNED-IN
+// phone approves. Nothing about a login request is client-readable: the tablet
+// has no uid, so rules grant loginRequests nothing at all and both sides learn
+// everything from these callable returns.
+
+function loginSnapshotOf(snap: DocumentSnapshot): LoginRequestSnapshot {
+  const doc = snap.data() as LoginRequestDoc;
+  return {
+    status: doc.status as LoginRequestStatus,
+    expiresAtMs: doc.expiresAt.toMillis(),
+    attempts: doc.attempts ?? 0,
+  };
+}
+
+/**
+ * Resolve what the phone sent — a 22-char requestId out of the QR, or the
+ * 8-char displayCode a human typed — to the request's document.
+ *
+ * The displayCode is not a document id and carries no uniqueness constraint,
+ * so it is QUERIED, and an ambiguous answer is treated as no answer: expired
+ * requests linger until the hourly sweep, so a code could in principle (p ≈
+ * 1e-5 across a day's traffic at 40 bits) match a live request and a dead one.
+ * Refusing the ambiguous case costs a live tablet one QR rotation and removes
+ * any chance of approving the wrong request.
+ */
+async function resolveLoginRequest(
+  firestore: Firestore,
+  raw: unknown,
+  nowMs: number,
+): Promise<DocumentReference> {
+  const parsed = parseLoginCode(raw);
+  // Malformed codes answer exactly like unknown ones (anti-enumeration).
+  if (parsed === null) throw new HttpsError("not-found", "not found");
+  if (parsed.kind === "requestId") return loginRequestRef(firestore, parsed.value);
+
+  const matches = await loginRequestsCol(firestore)
+    .where("displayCode", "==", parsed.value)
+    .limit(5)
+    .get();
+  const live = matches.docs.filter((d) => {
+    const doc = d.data() as LoginRequestDoc;
+    return doc.status === "pending" && doc.expiresAt.toMillis() > nowMs;
+  });
+  if (live.length !== 1) throw new HttpsError("not-found", "not found");
+  return live[0]!.ref;
+}
+
+/**
+ * Step 1, on the SHARED TABLET — unauthenticated (that is the whole point:
+ * this device has no account yet), therefore salted-IP rate-limited.
+ *
+ * Mints a 128-bit requestId (the QR payload), a 128-bit collectNonce (returned
+ * to this tablet ONLY, stored as sha256, never in the QR — it is what stops a
+ * photographed QR from being collectable by the photographer), and an 8-char
+ * displayCode for the artist whose camera will not focus in a dark bar.
+ * TTL 60 s: the tablet should re-mint every ~45 s.
+ *
+ * Never log the requestId, the nonce, or the displayCode.
+ */
+export async function createLoginRequestHandler(
+  request: CallableRequest,
+): Promise<{ requestId: string; displayCode: string; collectNonce: string; expiresAtMs: number }> {
+  const data = dataObject(request);
+  const name = loginDeviceField(data["deviceName"], LOGIN_DEVICE_NAME_MAX);
+  const platform = loginDeviceField(data["devicePlatform"], LOGIN_DEVICE_PLATFORM_MAX);
+  // Required: the approver's whole safety check is reading what they are about
+  // to sign in to. An unnamed request would present as "sign in… somewhere?".
+  if (name === null) throw new HttpsError("invalid-argument", "deviceName is required");
+  if (platform === null) throw new HttpsError("invalid-argument", "devicePlatform is required");
+
+  const firestore = db();
+  await bumpIpQuota(firestore, request, "login-create", LOGIN_CREATES_PER_IP_PER_HOUR);
+
+  const now = Date.now();
+  const requestId = newLoginRequestId();
+  const collectNonce = newCollectNonce();
+  const expiresAtMs = loginRequestExpiryMs(now);
+  const doc: LoginRequestDoc = {
+    status: "pending",
+    createdAtMs: now,
+    expiresAt: Timestamp.fromMillis(expiresAtMs),
+    displayCode: newDisplayCode(),
+    deviceName: name,
+    devicePlatform: platform,
+    collectNonceHash: sha256Hex(collectNonce),
+    attempts: 0,
+  };
+  // create(), not set(): a requestId collision (2^-128) must fail, not merge.
+  await loginRequestRef(firestore, requestId).create(doc);
+  return { requestId, displayCode: doc.displayCode, collectNonce, expiresAtMs };
+}
+
+/**
+ * Step 2, on the artist's PHONE (signed in) — what the QR scan hits first, so
+ * the human can be shown WHAT they are about to sign in to ("Sign in on Bar
+ * tablet (iPad)?") before they approve anything.
+ *
+ * Returns the device's own (untrusted, scrubbed) label and nothing else: not
+ * the status, not the approver, not the nonce, not the displayCode. Unknown,
+ * expired, already-approved and already-used requests are all the same
+ * 'not-found' — a code that has been used up must not be distinguishable from
+ * one that never existed. Counts an attempt, because this is the surface a
+ * displayCode-guesser would hammer.
+ */
+export async function describeLoginRequestHandler(
+  request: CallableRequest,
+): Promise<{ deviceName: string | null; devicePlatform: string | null; expiresAtMs: number }> {
+  const uid = requireUid(request);
+  const data = dataObject(request);
+  const firestore = db();
+  await requireFreshSession(firestore, uid, request);
+  await bumpIpQuota(firestore, request, "login-describe", LOGIN_DESCRIBES_PER_IP_PER_HOUR);
+
+  const ref = await resolveLoginRequest(firestore, data["code"], Date.now());
+  const outcome = await firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return { failed: "not-found" as const };
+    const state = loginSnapshotOf(snap);
+    const decision = decideDescribe(state, Date.now());
+    if (!decision.ok) {
+      applyRejection(tx, ref, state, decision);
+      return { failed: "not-found" as const };
+    }
+    tx.update(ref, { attempts: state.attempts + 1 });
+    const doc = snap.data() as LoginRequestDoc;
+    return {
+      failed: false as const,
+      deviceName: doc.deviceName ?? null,
+      devicePlatform: doc.devicePlatform ?? null,
+      expiresAtMs: state.expiresAtMs,
+    };
+  });
+
+  if (outcome.failed === "not-found") throw new HttpsError("not-found", "not found");
+  return {
+    deviceName: outcome.deviceName,
+    devicePlatform: outcome.devicePlatform,
+    expiresAtMs: outcome.expiresAtMs,
+  };
+}
+
+/**
+ * Step 3, on the artist's PHONE: the human tap that turns a worthless QR into
+ * a session. pending → approved, stamping the CALLER's uid — the only uid this
+ * request can ever mint a token for.
+ *
+ * ANONYMOUS CALLERS ARE ALLOWED, deliberately, and this is the one place in
+ * this file where that is true (contrast requireNonAnonymousUid above). A
+ * guest account has no credential to sign in with anywhere; approving a login
+ * request is the ONLY way it can ever reach a second screen, and the only way
+ * an artist's jars survive a lost phone. Refusing anonymous here would protect
+ * nobody and strand everybody. Approving cannot strand the caller either — it
+ * hands out an additional session, it does not revoke the current one.
+ *
+ * A stale (post-revocation) session may not approve: requireFreshSession is
+ * the same gate the rules apply to users/**, or a stolen session could laminate
+ * itself onto a fresh device and outlive the revocation.
+ */
+export async function approveLoginRequestHandler(
+  request: CallableRequest,
+): Promise<{ ok: true }> {
+  const uid = requireUid(request);
+  const data = dataObject(request);
+  const firestore = db();
+  await requireFreshSession(firestore, uid, request);
+  await bumpIpQuota(firestore, request, "login-approve", LOGIN_DESCRIBES_PER_IP_PER_HOUR);
+
+  const ref = await resolveLoginRequest(firestore, data["code"], Date.now());
+  const outcome = await firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return { failed: "not-found" as const };
+    const state = loginSnapshotOf(snap);
+    const decision = decideApprove(state, Date.now());
+    if (!decision.ok) {
+      applyRejection(tx, ref, state, decision);
+      return { failed: "precondition" as const, message: decision.message };
+    }
+    tx.update(ref, {
+      status: "approved" satisfies LoginRequestStatus,
+      approvedUid: uid,
+      attempts: state.attempts + 1,
+    });
+    return { failed: false as const };
+  });
+
+  if (outcome.failed === "not-found") throw new HttpsError("not-found", "not found");
+  if (outcome.failed === "precondition") throw new HttpsError("failed-precondition", outcome.message);
+  return { ok: true };
+}
+
+/**
+ * Step 4, back on the TABLET — unauthenticated, polled (~5 s; see
+ * LOGIN_COLLECTS_PER_IP_PER_HOUR before polling faster). {requestId,
+ * collectNonce}: while nobody has approved yet it answers {pending: true} (not
+ * an error — this is the normal state of a tablet standing on a bar), and once
+ * approved the transaction flips approved → used (single use IS that
+ * transition) and only then mints a custom token for the approver's uid.
+ *
+ * The nonce is what makes the QR safe to photograph: only the tablet that
+ * CREATED the request has ever seen it, so only that tablet can collect. Wrong
+ * nonces burn attempts and force-expire the request at 5 — a leaked requestId
+ * therefore buys 5 guesses at a 128-bit secret.
+ *
+ * Never log the token, the nonce, or the requestId.
+ */
+export async function collectLoginTokenHandler(
+  request: CallableRequest,
+): Promise<{ token?: string; pending?: true }> {
+  const data = dataObject(request);
+  const requestId = data["requestId"];
+  // The tablet always holds the real id (it minted it); a displayCode is not
+  // accepted here, so nobody can collect against a code they read off a screen.
+  if (typeof requestId !== "string" || !isValidLoginRequestId(requestId)) {
+    throw new HttpsError("not-found", "not found");
+  }
+  const nonce = data["collectNonce"];
+
+  const firestore = db();
+  await bumpIpQuota(firestore, request, "login-collect", LOGIN_COLLECTS_PER_IP_PER_HOUR);
+
+  const outcome = await firestore.runTransaction(async (tx) => {
+    const ref = loginRequestRef(firestore, requestId);
+    const snap = await tx.get(ref);
+    if (!snap.exists) return { failed: "not-found" as const };
+    const state = loginSnapshotOf(snap);
+    const storedHash = snap.get("collectNonceHash") as string | undefined;
+    const nonceMatches = typeof storedHash === "string" && verifySecret(nonce, storedHash);
+    const decision = decideLoginCollect(state, Date.now(), nonceMatches);
+    if (!decision.ok) {
+      applyRejection(tx, ref, state, decision);
+      return { failed: "precondition" as const, message: decision.message };
+    }
+    if (decision.pending) return { failed: false as const, pending: true as const };
+    const approvedUid = snap.get("approvedUid") as string | undefined;
+    // An 'approved' doc with no approvedUid cannot happen (one transaction
+    // writes both); if it ever did, mint nothing.
+    if (typeof approvedUid !== "string" || approvedUid.length === 0) {
+      return { failed: "precondition" as const, message: "request is not collectable" };
+    }
+    tx.update(ref, { status: "used" satisfies LoginRequestStatus });
+    return { failed: false as const, uid: approvedUid };
   });
 
   if (outcome.failed === "not-found") throw new HttpsError("not-found", "not found");

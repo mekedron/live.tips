@@ -14,6 +14,7 @@ import {
 } from "firebase-admin/firestore";
 import { sha256Hex } from "./auth";
 import type { LinkCodeStatus } from "./linkcodes";
+import type { LoginRequestStatus } from "./loginrequests";
 import type { JarProfile, TipRequest } from "./types";
 
 export const DAY_MS = 86_400_000;
@@ -61,6 +62,49 @@ export const LINK_REDEEMS_PER_IP_PER_HOUR = 30;
  * the joining device POLLS collect until the owner confirms (2 min windows,
  * ~1 poll/s worst case), so this only stops abuse, never a handshake. */
 export const LINK_COLLECTS_PER_IP_PER_HOUR = 600;
+
+/**
+ * createLoginRequest per (salted) IP hash per hour — the shared-tablet QR.
+ *
+ * The arithmetic: a login request lives 60 s and the tablet re-mints its QR
+ * every ~45 s, so ONE tablet standing on a bar all evening legitimately calls
+ * this ~80 times an hour. A venue with two or three tablets behind one NAT (a
+ * bar and its stage, a festival with a router) is an ordinary shape, and every
+ * one of them is behind the same public IP: 3 × 80 = 240, plus retries after
+ * flaky bar wifi. 300 covers that with room to spare and still stops anyone
+ * from bulk-minting requests.
+ *
+ * A generous limit is cheap here because a login request is WORTHLESS without
+ * a human approval — minting a million of them gets an attacker a million
+ * documents that expire in a minute, not a single session. The quota exists to
+ * bound Firestore writes, not to defend the account.
+ */
+export const LOGIN_CREATES_PER_IP_PER_HOUR = 300;
+
+/**
+ * describeLoginRequest + approveLoginRequest per (salted) IP hash per hour.
+ * These are the surfaces a displayCode-guesser would hammer, so unlike the
+ * create quota this one IS a security bound (see DISPLAY_CODE_LENGTH's
+ * arithmetic in loginrequests.ts, which assumes exactly this number). A human
+ * puts one account on one tablet: 120/h is already a hundred times a real
+ * evening's traffic from one venue's wifi.
+ */
+export const LOGIN_DESCRIBES_PER_IP_PER_HOUR = 120;
+
+/**
+ * collectLoginToken per (salted) IP hash per hour. The tablet POLLS this for
+ * the whole time its QR is on screen — i.e. all evening, not just during a
+ * handshake (that is the difference from LINK_COLLECTS, where the joining
+ * device only polls inside a live 2-min window). At the recommended ~5 s poll
+ * interval that is ~720 calls/h per tablet; 2000 leaves room for two tablets
+ * behind one NAT and a burst of retries.
+ *
+ * NOTE for the client: do NOT poll faster than a few seconds. Each collect
+ * writes the same rateLimits/{ipHash} document, and Firestore sustains roughly
+ * one write per second to a single doc — a 1 s poll from two tablets on one
+ * wifi would start contending on that bucket, not on anything that matters.
+ */
+export const LOGIN_COLLECTS_PER_IP_PER_HOUR = 2000;
 
 let cached: Firestore | null = null;
 
@@ -169,12 +213,51 @@ export interface LinkCodeDoc {
   redeemNonceHash?: string;
 }
 
+/**
+ * loginRequests/{requestId} — the MIRROR of linkCodes: here the UNSIGNED
+ * device (a bar's shared tablet) shows the QR and the SIGNED-IN phone scans
+ * and approves it. Top-level for the same reason as linkCodes (the tablet has
+ * no uid to put in a path) but with a stricter rule: NO client read either.
+ * The tablet is unauthenticated, so a client-readable collection would let
+ * anyone enumerate live requests; both parties learn everything they need from
+ * callable returns instead. See loginrequests.ts for the lifecycle.
+ */
+export interface LoginRequestDoc {
+  status: LoginRequestStatus;
+  createdAtMs: number;
+  /** createdAtMs + 60 s; the hourly sweep (or a TTL policy) deletes past it. */
+  expiresAt: Timestamp;
+  /** The typable fallback (8 chars, unambiguous alphabet). Queried on. */
+  displayCode: string;
+  /** Untrusted self-description, shown to the human who approves. */
+  deviceName?: string;
+  devicePlatform?: string;
+  /** Stamped by the approver; the uid the custom token will be minted for. */
+  approvedUid?: string;
+  /**
+   * sha256 of the collect nonce. Always written at create (optional only so a
+   * read of a malformed/legacy doc fails closed rather than throwing); the
+   * nonce itself is never at rest and never in the QR.
+   */
+  collectNonceHash?: string;
+  /** describe/approve calls + bad-nonce collects; ≥5 force-expires the request. */
+  attempts: number;
+}
+
 export function jarRef(firestore: Firestore, jarId: string): DocumentReference {
   return firestore.collection("jars").doc(jarId);
 }
 
 export function linkCodeRef(firestore: Firestore, codeId: string): DocumentReference {
   return firestore.collection("linkCodes").doc(codeId);
+}
+
+export function loginRequestRef(firestore: Firestore, requestId: string): DocumentReference {
+  return firestore.collection("loginRequests").doc(requestId);
+}
+
+export function loginRequestsCol(firestore: Firestore) {
+  return firestore.collection("loginRequests");
 }
 
 export function deviceRef(firestore: Firestore, uid: string, deviceId: string): DocumentReference {
