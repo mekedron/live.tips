@@ -157,10 +157,31 @@ Stripe restricted key and no longer polls `api.stripe.com/v1/events`:
    relay's `pendingTips` already uses. No polling at all.
 3. `stripeProxy {bandId, op, params?}` covers the handful of non-realtime
    calls the app still needs — a **strict allowlist** (`src/stripe-ops.ts`),
-   not a passthrough. The five operations, exactly the calls the app's
+   not a passthrough. The six operations, exactly the calls the app's
    `StripeRequests` makes today (minus the events poll, which no longer
    exists for cloud accounts): `checkKey`, `createTipJar`,
-   `updateTipJarDetails`, `deactivatePaymentLink`, `listTips`.
+   `updateTipJarDetails`, `deactivatePaymentLink`, `listTips`, `listTaps`.
+
+   `listTips` and `listTaps` are the **reconciliation pair**, and they exist
+   because the webhook is a delivery mechanism, not a guarantee: Stripe can
+   be late, our function can be down, an artist can disable or delete the
+   endpoint in their own dashboard. Both take an optional
+   `createdAfterMs` window ("everything since the set started", floored to
+   Stripe's whole-second `created[gte]`) plus the usual
+   `startingAfter`/`limit` paging, so the app can ask "what did this account
+   actually take in since T" on live-session start/resume and periodically
+   as a safety net. `listTips` re-reads the QR checkouts; `listTaps`
+   (`GET /v1/charges`, filtered server-side to succeeded+paid
+   **card-present** charges) is the one that MUST exist: an in-person tap
+   appears in no other list, so without it a dropped webhook loses that tip
+   from History permanently. The card-present filter is the same
+   double-count guard as the webhook's (a QR checkout also produces a
+   charge, card-NOT-present), and the sanitizer strips the payer before
+   anything goes to a device — above all `billing_details.name`, the
+   cardholder read off the chip: a tap is anonymous on stage by design.
+   Both return `{…, hasMore, nextCursor}` where `nextCursor` is the last
+   RAW item's id — a page can sanitize to nothing (a busy QR night is a
+   page of card-not-present charges) and the loop must still advance.
 4. `stripeDisconnect {bandId, deactivateLink?}` deletes the webhook endpoint
    from the artist's dashboard (best effort — a revoked key must not strand
    our cleanup), optionally deactivates the payment link, and deletes the
@@ -227,7 +248,7 @@ The key the artist creates must now carry exactly:
 | Resource               | Permission | Why                                            |
 | ---------------------- | ---------- | ---------------------------------------------- |
 | Checkout Sessions      | **Read**   | History (`listTips`)                           |
-| Charges                | **Read**   | in-person tap tips (charge payloads)           |
+| Charges                | **Read**   | in-person tap tips (payloads + `listTaps`)     |
 | Payment Links          | **Write**  | create / edit / deactivate the tip link        |
 | Products               | **Write**  | the "Tip" product                              |
 | Prices                 | **Write**  | the pay-what-you-want price                    |

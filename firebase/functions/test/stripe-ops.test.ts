@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { PROXY_OPS, parseProxyRequest, sanitizeCheckoutSession } from "../src/stripe-ops";
+import {
+  PROXY_OPS,
+  nextPageCursor,
+  parseProxyRequest,
+  sanitizeCardPresentCharge,
+  sanitizeCheckoutSession,
+} from "../src/stripe-ops";
 import { isValidBandId, isValidPaymentLinkId } from "../src/stripe-store";
 
 describe("parseProxyRequest — the allowlist boundary", () => {
@@ -12,7 +18,7 @@ describe("parseProxyRequest — the allowlist boundary", () => {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.error).toBe("unknown operation");
     }
-    expect(PROXY_OPS).toEqual(["checkKey", "createTipJar", "updateTipJarDetails", "deactivatePaymentLink", "listTips"]);
+    expect(PROXY_OPS).toEqual(["checkKey", "createTipJar", "updateTipJarDetails", "deactivatePaymentLink", "listTips", "listTaps"]);
   });
 
   it("rejects non-object params and unknown fields inside them", () => {
@@ -66,16 +72,52 @@ describe("parseProxyRequest — the allowlist boundary", () => {
 
   it("listTips defaults, clamps and validates its paging", () => {
     expect(parseProxyRequest("listTips", undefined)).toEqual({
-      ok: true, value: { op: "listTips", startingAfter: null, limit: 25 },
+      ok: true, value: { op: "listTips", startingAfter: null, createdAfterMs: null, limit: 25 },
     });
     expect(parseProxyRequest("listTips", { startingAfter: "cs_test_abc", limit: 100 })).toEqual({
-      ok: true, value: { op: "listTips", startingAfter: "cs_test_abc", limit: 100 },
+      ok: true, value: { op: "listTips", startingAfter: "cs_test_abc", createdAfterMs: null, limit: 100 },
     });
     for (const limit of [0, 101, 1.5, "25", -1]) {
       expect(parseProxyRequest("listTips", { limit }).ok).toBe(false);
     }
     expect(parseProxyRequest("listTips", { startingAfter: "evt_123" }).ok).toBe(false);
     expect(parseProxyRequest("listTips", { startingAfter: "cs_../x" }).ok).toBe(false);
+  });
+
+  it("listTaps defaults, clamps and validates its paging", () => {
+    expect(parseProxyRequest("listTaps", undefined)).toEqual({
+      ok: true, value: { op: "listTaps", startingAfter: null, createdAfterMs: null, limit: 25 },
+    });
+    expect(parseProxyRequest("listTaps", { startingAfter: "ch_3Qtest_abc", limit: 100 })).toEqual({
+      ok: true, value: { op: "listTaps", startingAfter: "ch_3Qtest_abc", createdAfterMs: null, limit: 100 },
+    });
+    for (const limit of [0, 101, 1.5, "25", -1]) {
+      expect(parseProxyRequest("listTaps", { limit }).ok).toBe(false);
+    }
+    expect(parseProxyRequest("listTaps", { limit: 10, expand: "everything" }).ok).toBe(false);
+    expect(parseProxyRequest("listTaps", { startingAfter: "evt_123" }).ok).toBe(false);
+    expect(parseProxyRequest("listTaps", { startingAfter: "ch_../x" }).ok).toBe(false);
+  });
+
+  it("the two cursors are NOT interchangeable: taps want ch_…, tips want cs_…", () => {
+    expect(parseProxyRequest("listTaps", { startingAfter: "cs_test_abc" }).ok).toBe(false);
+    expect(parseProxyRequest("listTips", { startingAfter: "ch_3Qtest_abc" }).ok).toBe(false);
+  });
+
+  it("createdAfterMs is a positive integer of milliseconds, on both lists", () => {
+    for (const op of ["listTips", "listTaps"] as const) {
+      const r = parseProxyRequest(op, { createdAfterMs: 1_752_000_000_000 });
+      expect(r).toEqual({
+        ok: true, value: { op, startingAfter: null, createdAfterMs: 1_752_000_000_000, limit: 25 },
+      });
+      for (const bad of [0, -1, -1_752_000_000_000, 1.5, 1_752_000_000_000.25, "1752000000000", true, {}, NaN, Infinity]) {
+        expect(parseProxyRequest(op, { createdAfterMs: bad }).ok).toBe(false);
+      }
+      // null/absent both mean "no window".
+      expect(parseProxyRequest(op, { createdAfterMs: null })).toEqual({
+        ok: true, value: { op, startingAfter: null, createdAfterMs: null, limit: 25 },
+      });
+    }
   });
 });
 
@@ -134,6 +176,115 @@ describe("sanitizeCheckoutSession", () => {
     const s = sanitizeCheckoutSession({ ...session, payment_link: "plink_1", payment_intent: { id: "pi_exp" } })!;
     expect(s["payment_link"]).toBe("plink_1");
     expect(s["payment_intent"]).toBe("pi_exp");
+  });
+});
+
+describe("sanitizeCardPresentCharge", () => {
+  // A real /v1/charges item for a tap, carrying everything a charge drags
+  // along that a tip must never see: the CARDHOLDER name off the chip, a
+  // receipt email, the card fingerprint, the risk block.
+  const charge = {
+    id: "ch_3QTapAbc123",
+    object: "charge",
+    amount: 500,
+    currency: "eur",
+    created: 1_752_000_000,
+    livemode: true,
+    status: "succeeded",
+    paid: true,
+    payment_intent: "pi_tap123",
+    billing_details: {
+      name: "MARJA-LIISA VIRTANEN",
+      email: "cardholder@example.com",
+      phone: "+358501234567",
+      address: { city: "Tampere", postal_code: "33100", line1: "Hämeenkatu 1" },
+    },
+    receipt_email: "receipts@example.com",
+    outcome: { risk_level: "normal", seller_message: "Payment complete." },
+    payment_method_details: {
+      type: "card_present",
+      card_present: {
+        brand: "visa",
+        last4: "4242",
+        fingerprint: "Xt5EWLLDS7FJjR1c",
+        read_method: "contactless_emv",
+      },
+    },
+  };
+
+  it("keeps exactly what Tip.fromCardPresentCharge reads, and nothing else", () => {
+    expect(sanitizeCardPresentCharge(charge)).toEqual({
+      id: "ch_3QTapAbc123",
+      amount: 500,
+      currency: "eur",
+      created: 1_752_000_000,
+      livemode: true,
+      status: "succeeded",
+      paid: true,
+      payment_intent: "pi_tap123",
+      payment_method_details: { type: "card_present" },
+    });
+  });
+
+  it("strips the cardholder entirely — no name, email, phone, address, receipt, fingerprint or last4 survives", () => {
+    const wire = JSON.stringify(sanitizeCardPresentCharge(charge));
+    for (const pii of [
+      "MARJA-LIISA VIRTANEN",
+      "cardholder@example.com",
+      "+358501234567",
+      "Tampere", "33100", "Hämeenkatu 1",
+      "receipts@example.com",
+      "Xt5EWLLDS7FJjR1c",
+      "4242",
+    ]) {
+      expect(wire).not.toContain(pii);
+    }
+    // A tap is anonymous on stage by design: the output carries no name key
+    // at all, and no billing_details block for one to hide in.
+    expect(wire).not.toContain("billing_details");
+    expect(wire).not.toContain('"name"');
+  });
+
+  it("rejects the card-NOT-present charge behind every QR checkout — the double-count guard", () => {
+    expect(sanitizeCardPresentCharge({
+      ...charge,
+      payment_method_details: { type: "card", card: { brand: "visa", last4: "4242" } },
+    })).toBeNull();
+  });
+
+  it("rejects failed, unpaid and junk charges", () => {
+    expect(sanitizeCardPresentCharge({ ...charge, status: "failed" })).toBeNull();
+    expect(sanitizeCardPresentCharge({ ...charge, status: "pending" })).toBeNull();
+    expect(sanitizeCardPresentCharge({ ...charge, paid: false })).toBeNull();
+    expect(sanitizeCardPresentCharge({ ...charge, id: 42 })).toBeNull();
+    expect(sanitizeCardPresentCharge(null)).toBeNull();
+    expect(sanitizeCardPresentCharge(undefined)).toBeNull();
+    expect(sanitizeCardPresentCharge("ch_123")).toBeNull();
+    expect(sanitizeCardPresentCharge([charge])).toBeNull();
+    expect(sanitizeCardPresentCharge({ status: "succeeded", paid: true })).toBeNull(); // no id
+  });
+
+  it("unwraps an expanded payment_intent object to its id", () => {
+    const s = sanitizeCardPresentCharge({ ...charge, payment_intent: { id: "pi_exp" } })!;
+    expect(s["payment_intent"]).toBe("pi_exp");
+    const none = sanitizeCardPresentCharge({ ...charge, payment_intent: null })!;
+    expect(none["payment_intent"]).toBeNull();
+  });
+});
+
+describe("nextPageCursor — paging survives a fully-filtered page", () => {
+  it("returns the last RAW item's id for both list shapes", () => {
+    expect(nextPageCursor([{ id: "ch_1" }, { id: "ch_2" }])).toBe("ch_2");
+    expect(nextPageCursor([{ id: "cs_1" }, { id: "cs_2" }])).toBe("cs_2");
+  });
+
+  it("returns null on empty, junk, or foreign-shaped ids", () => {
+    expect(nextPageCursor([])).toBeNull();
+    expect(nextPageCursor(undefined)).toBeNull();
+    expect(nextPageCursor("nope")).toBeNull();
+    expect(nextPageCursor([{ id: "ch_1" }, null])).toBeNull();
+    expect(nextPageCursor([{ id: "ch_1" }, { id: 42 }])).toBeNull();
+    expect(nextPageCursor([{ id: "evt_123" }])).toBeNull();
   });
 });
 

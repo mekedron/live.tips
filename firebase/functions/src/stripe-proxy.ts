@@ -15,7 +15,7 @@ import { kmsKeyWrapper } from "./kms";
 import { StripeApi, runKeyProbes } from "./stripe-api";
 import { lookupConnection, stripeToHttpsError } from "./stripe-connect";
 import { openSecret } from "./stripe-crypto";
-import { parseProxyRequest, sanitizeCheckoutSession } from "./stripe-ops";
+import { nextPageCursor, parseProxyRequest, sanitizeCardPresentCharge, sanitizeCheckoutSession } from "./stripe-ops";
 import {
   STRIPE_PROXY_PER_UID_PER_HOUR,
   isValidBandId,
@@ -140,6 +140,9 @@ export async function stripeProxyHandler(request: CallableRequest): Promise<Reco
           limit: String(req.limit),
         };
         if (req.startingAfter !== null) query["starting_after"] = req.startingAfter;
+        // Stripe filters on whole seconds; the ms window floors down so a tip
+        // created in the same second as T is included, never dropped.
+        if (req.createdAfterMs !== null) query["created[gte]"] = String(Math.floor(req.createdAfterMs / 1000));
         const response = await api.get("checkout/sessions", query);
         const sessions: Record<string, unknown>[] = [];
         if (Array.isArray(response["data"])) {
@@ -148,7 +151,33 @@ export async function stripeProxyHandler(request: CallableRequest): Promise<Reco
             if (sanitized !== null) sessions.push(sanitized);
           }
         }
-        return { sessions, hasMore: response["has_more"] === true };
+        // hasMore/nextCursor describe the RAW page (sanitization may have
+        // dropped items, even all of them — the loop pages by nextCursor,
+        // never by the last sanitized id).
+        return { sessions, hasMore: response["has_more"] === true, nextCursor: nextPageCursor(response["data"]) };
+      }
+
+      case "listTaps": {
+        // The other half of reconciliation: in-person taps are card-present
+        // charges, and unlike QR tips they appear in NO other list — a
+        // dropped webhook would lose them permanently without this. The raw
+        // /v1/charges page can contain anything the account does; only what
+        // sanitizeCardPresentCharge accepts (succeeded+paid card_present,
+        // PII stripped) goes on the wire, so hasMore and nextCursor refer to
+        // the raw page — a busy QR night is a page of card-NOT-present
+        // charges that sanitizes to [], and the loop must still advance.
+        const query: Record<string, string | string[]> = { limit: String(req.limit) };
+        if (req.startingAfter !== null) query["starting_after"] = req.startingAfter;
+        if (req.createdAfterMs !== null) query["created[gte]"] = String(Math.floor(req.createdAfterMs / 1000));
+        const response = await api.get("charges", query);
+        const charges: Record<string, unknown>[] = [];
+        if (Array.isArray(response["data"])) {
+          for (const item of response["data"]) {
+            const sanitized = sanitizeCardPresentCharge(item);
+            if (sanitized !== null) charges.push(sanitized);
+          }
+        }
+        return { charges, hasMore: response["has_more"] === true, nextCursor: nextPageCursor(response["data"]) };
       }
     }
   } catch (e) {
