@@ -36,7 +36,10 @@ import 'account_data_repository.dart';
 /// the sync channel behind it. A remote secrets snapshot is written through
 /// to the keychain under the SAME key names the local profile uses, so the
 /// keychain doubles as the cloud profile's cache and everything downstream
-/// of [SecureStore] keeps working unchanged.
+/// of [SecureStore] keeps working unchanged. Deletions travel too: a
+/// disconnect stamps a tombstone next to the deleted field, and a snapshot
+/// carrying one clears the keychain entry — a revocation must revoke on
+/// every device, not just the one that tapped the button.
 ///
 /// The active-session crash snapshot and the relay-link-replaced notice
 /// delegate to [LocalStore] verbatim: both are device-local by contract —
@@ -183,19 +186,43 @@ class FirestoreRepository implements AccountDataRepository {
       final mirror = _secrets.putIfAbsent(bandId, _SecretsMirror.new);
       final nextKey = stripeKey is String ? stripeKey : null;
       final nextSecret = relaySecret is String ? relaySecret : null;
+      // A tombstone (stamped by the delete path, cleared by the write path)
+      // is what tells "disconnected on another device" apart from "never
+      // uploaded". A present value always outranks it: write and delete
+      // touch both fields in one doc write, so a snapshot carrying both is
+      // a pair mid-replacement — trust the key.
+      final keyTombstoned =
+          nextKey == null && data['stripeKeyDeletedAtMs'] is num;
+      final secretTombstoned =
+          nextSecret == null && data['relaySecretDeletedAtMs'] is num;
       final keyChanged = mirror.stripeKey != nextKey;
       final secretChanged = mirror.relaySecret != nextSecret;
-      mirror.stripeKey = nextKey;
-      mirror.relaySecret = nextSecret;
+      // Edge-triggered: a fresh mirror starts untombstoned, so a device that
+      // slept through the disconnect still revokes on its first snapshot,
+      // while later echoes of the same tombstone don't re-delete.
+      final keyRevoked = keyTombstoned && !mirror.stripeKeyTombstoned;
+      final secretRevoked = secretTombstoned && !mirror.relaySecretTombstoned;
+      mirror
+        ..stripeKey = nextKey
+        ..stripeKeyTombstoned = keyTombstoned
+        ..relaySecret = nextSecret
+        ..relaySecretTombstoned = secretTombstoned;
       // Write-through to the keychain so what another device configured is
-      // there before anyone asks. Additions only — a doc with no key says
-      // nothing about a keychain that has one (a migration may have skipped
-      // secrets), so absence must never delete.
+      // there before anyone asks. Additions and tombstones only — a doc
+      // with no key AND no tombstone says nothing about a keychain that has
+      // one (a migration may have skipped secrets), so bare absence must
+      // never delete; an explicit disconnect elsewhere must.
       if (keyChanged && nextKey != null) {
         _keychainBestEffort(() => _secure.writeApiKey(bandId, nextKey));
       }
+      if (keyRevoked) {
+        _keychainBestEffort(() => _secure.deleteApiKey(bandId));
+      }
       if (secretChanged && nextSecret != null) {
         _keychainBestEffort(() => _secure.writeRelaySecret(bandId, nextSecret));
+      }
+      if (secretRevoked) {
+        _keychainBestEffort(() => _secure.deleteRelaySecret(bandId));
       }
       _notify();
     }, onError: _ignore);
@@ -516,9 +543,14 @@ class FirestoreRepository implements AccountDataRepository {
     // path can't produce.
     await _secure.writeApiKey(accountId, key);
     final trimmed = key.trim();
-    _secrets.putIfAbsent(accountId, _SecretsMirror.new).stripeKey = trimmed;
+    _secrets.putIfAbsent(accountId, _SecretsMirror.new)
+      ..stripeKey = trimmed
+      ..stripeKeyTombstoned = false;
     await _secretsDoc(accountId).set({
       'stripeKey': trimmed,
+      // A reconnect after a disconnect: the fresh key must win everywhere,
+      // so the tombstone leaves in the same write.
+      'stripeKeyDeletedAtMs': FieldValue.delete(),
       'updatedAtMs': _nowMs,
     }, SetOptions(merge: true));
   }
@@ -526,9 +558,16 @@ class FirestoreRepository implements AccountDataRepository {
   @override
   Future<void> deleteApiKey(String accountId) async {
     await _secure.deleteApiKey(accountId);
-    _secrets[accountId]?.stripeKey = null;
+    _secrets.putIfAbsent(accountId, _SecretsMirror.new)
+      ..stripeKey = null
+      ..stripeKeyTombstoned = true;
     await _secretsDoc(accountId).set({
       'stripeKey': FieldValue.delete(),
+      // Not a bare deletion: the tombstone is how every OTHER device's
+      // snapshot handler tells "disconnected" apart from "never uploaded"
+      // and clears its keychain too — without it the disconnect only ever
+      // revoked the key on the device that tapped it.
+      'stripeKeyDeletedAtMs': _nowMs,
       'updatedAtMs': _nowMs,
     }, SetOptions(merge: true));
   }
@@ -551,9 +590,14 @@ class FirestoreRepository implements AccountDataRepository {
   Future<void> writeRelaySecret(String accountId, String secret) async {
     await _secure.writeRelaySecret(accountId, secret);
     final trimmed = secret.trim();
-    _secrets.putIfAbsent(accountId, _SecretsMirror.new).relaySecret = trimmed;
+    _secrets.putIfAbsent(accountId, _SecretsMirror.new)
+      ..relaySecret = trimmed
+      ..relaySecretTombstoned = false;
     await _secretsDoc(accountId).set({
       'relaySecret': trimmed,
+      // Same reconnect rule as the Stripe key: the fresh secret evicts the
+      // tombstone in the same write.
+      'relaySecretDeletedAtMs': FieldValue.delete(),
       'updatedAtMs': _nowMs,
     }, SetOptions(merge: true));
   }
@@ -561,9 +605,14 @@ class FirestoreRepository implements AccountDataRepository {
   @override
   Future<void> deleteRelaySecret(String accountId) async {
     await _secure.deleteRelaySecret(accountId);
-    _secrets[accountId]?.relaySecret = null;
+    _secrets.putIfAbsent(accountId, _SecretsMirror.new)
+      ..relaySecret = null
+      ..relaySecretTombstoned = true;
     await _secretsDoc(accountId).set({
       'relaySecret': FieldValue.delete(),
+      // Same mechanism as the Stripe key: forgetting the relay jar here
+      // must forget its secret on every device.
+      'relaySecretDeletedAtMs': _nowMs,
       'updatedAtMs': _nowMs,
     }, SetOptions(merge: true));
   }
@@ -671,9 +720,14 @@ class _BandMirror {
 }
 
 /// The `secrets/v1` doc, mirrored so a locked keychain still has a fallback.
+/// The tombstone flags remember that the last snapshot said "explicitly
+/// disconnected" (not merely absent), so the keychain is cleared once per
+/// disconnect instead of on every echo.
 class _SecretsMirror {
   String? stripeKey;
+  bool stripeKeyTombstoned = false;
   String? relaySecret;
+  bool relaySecretTombstoned = false;
 }
 
 /// Firestore caps a batch at 500 writes; stay under it with headroom.

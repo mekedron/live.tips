@@ -341,6 +341,115 @@ void main() {
     expect(changes, greaterThan(before));
   });
 
+  // A second "device": its own keychain over the same account's Firestore.
+  (FirestoreRepository, FakeSecureStore) makeDeviceB() {
+    final secureB = FakeSecureStore();
+    final repoB = FirestoreRepository(
+      uid: _uid,
+      db: db,
+      local: local,
+      resolveSecure: () => secureB,
+    );
+    addTearDown(repoB.dispose);
+    return (repoB, secureB);
+  }
+
+  test('disconnecting Stripe on one device clears the other device\'s '
+      'keychain — the tombstone travels', () async {
+    await bandDoc().set({'name': 'Band', 'createdAtMs': 1});
+    final repoA = makeRepo();
+    final (repoB, secureB) = makeDeviceB();
+    await repoA.writeApiKey(_bandId, 'rk_live_1');
+    await pumpEventQueue();
+    expect(await secureB.readApiKey(_bandId), 'rk_live_1',
+        reason: 'the connect synced to device B first');
+
+    await repoA.deleteApiKey(_bandId);
+    await pumpEventQueue();
+
+    expect(await secureB.readApiKey(_bandId), isNull,
+        reason: 'a revocation must revoke everywhere, not just on the '
+            'device that tapped Disconnect');
+    expect(await repoB.readApiKey(_bandId), isNull,
+        reason: 'neither the keychain nor the mirror may keep serving it');
+  });
+
+  test('a device that slept through the disconnect still revokes on its '
+      'first snapshot', () async {
+    await bandDoc().set({'name': 'Band', 'createdAtMs': 1});
+    await bandDoc().collection('secrets').doc('v1').set({
+      'stripeKeyDeletedAtMs': 5,
+      'updatedAtMs': 5,
+    });
+    await secure.writeApiKey(_bandId, 'rk_stale');
+
+    final repo = makeRepo();
+    await pumpEventQueue();
+
+    expect(await secure.readApiKey(_bandId), isNull,
+        reason: 'a fresh mirror starts untombstoned, so the very first '
+            'snapshot is edge enough to clear the keychain');
+    expect(await repo.readApiKey(_bandId), isNull);
+  });
+
+  test('a secret the doc never held is NOT deleted — bare absence stays '
+      'additions-only', () async {
+    await bandDoc().set({'name': 'Band', 'createdAtMs': 1});
+    // The doc knows the relay secret but never saw the Stripe key: exactly
+    // what a migration over a locked keychain leaves behind.
+    await bandDoc().collection('secrets').doc('v1').set({
+      'relaySecret': 'sec_cloud',
+      'updatedAtMs': 1,
+    });
+    await secure.writeApiKey(_bandId, 'rk_local_only');
+
+    final repo = makeRepo();
+    await pumpEventQueue();
+
+    expect(await repo.readApiKey(_bandId), 'rk_local_only',
+        reason: 'no tombstone means the doc says nothing about the key — '
+            'the migration-skipped secret must survive');
+  });
+
+  test('a reconnect after a disconnect wins: the fresh key clears the '
+      'tombstone and syncs back out', () async {
+    await bandDoc().set({'name': 'Band', 'createdAtMs': 1});
+    final repoA = makeRepo();
+    final (repoB, secureB) = makeDeviceB();
+    await repoA.writeApiKey(_bandId, 'rk_first');
+    await pumpEventQueue();
+    await repoA.deleteApiKey(_bandId);
+    await pumpEventQueue();
+    expect(await secureB.readApiKey(_bandId), isNull);
+
+    await repoA.writeApiKey(_bandId, 'rk_second');
+    await pumpEventQueue();
+
+    expect(await secureB.readApiKey(_bandId), 'rk_second',
+        reason: 'a key written after the tombstone must win');
+    expect(await repoB.readApiKey(_bandId), 'rk_second');
+    final doc = await bandDoc().collection('secrets').doc('v1').get();
+    expect(doc.data()!.containsKey('stripeKeyDeletedAtMs'), isFalse,
+        reason: 'the write evicts the tombstone in the same doc write');
+  });
+
+  test('deleteRelaySecret rides the same tombstone mechanism', () async {
+    await bandDoc().set({'name': 'Band', 'createdAtMs': 1});
+    final repoA = makeRepo();
+    final (repoB, secureB) = makeDeviceB();
+    await repoA.writeRelaySecret(_bandId, 'sec_1');
+    await pumpEventQueue();
+    expect(await secureB.readRelaySecret(_bandId), 'sec_1');
+
+    await repoA.deleteRelaySecret(_bandId);
+    await pumpEventQueue();
+
+    expect(await secureB.readRelaySecret(_bandId), isNull,
+        reason: 'forgetting the relay jar must forget its secret on every '
+            'device');
+    expect(await repoB.readRelaySecret(_bandId), isNull);
+  });
+
   test('wipeAccountData removes every doc and the local snapshot', () async {
     final repo = makeRepo();
     await repo.upsertBandEntry(
