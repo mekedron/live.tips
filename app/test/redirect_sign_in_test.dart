@@ -413,6 +413,38 @@ void main() {
     expect(h.local.readPendingRedirect(), isNull);
   });
 
+  test('operation-not-allowed is permanent — the message names the provider '
+      'and does not say "try again"', () async {
+    // A provider the console never enabled/configured (#56): no fake can
+    // produce this — every fake provider is always enabled — but the bridge
+    // carries it as an opaque string, so the mapping itself is testable. The
+    // fallback's "Try again." would invite the user to re-run the whole
+    // bridge round trip forever, against an error only the console can fix.
+    final h = await _harness(
+      bridge: const BridgeResponse(
+          nonce: 'n1', error: 'auth/operation-not-allowed'),
+      pending: const PendingRedirect(
+        appName: 'acct_slot_0',
+        provider: 'apple',
+        link: false,
+        nonce: 'n1',
+      ),
+    );
+
+    final resume = await h.container
+        .read(authControllerProvider.notifier)
+        .consumePendingRedirect();
+
+    expect(resume!.user, isNull);
+    expect(resume.error, contains('Apple'),
+        reason: 'the record knows which method was refused — say it');
+    expect(resume.error, isNot(contains('ry again')),
+        reason: 'retrying a console-config error is advice that cannot work');
+    expect(h.container.read(authControllerProvider).busy, isFalse);
+    // Consumed, not retried: the record is gone whatever the message says.
+    expect(h.local.readPendingRedirect(), isNull);
+  });
+
   test('a sign-in that cannot even leave is an error, not a spinner',
       () async {
     final h = await _harness(

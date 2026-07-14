@@ -459,7 +459,7 @@ class AuthController extends Notifier<AuthState> {
       }
       final failure = response.error;
       if (failure != null) {
-        final message = friendlyBridgeError(failure);
+        final message = friendlyBridgeError(failure, provider: record.provider);
         state = state.copyWith(busy: false, error: message);
         return RedirectResume(record: record, user: null, error: message);
       }
@@ -731,7 +731,10 @@ final authControllerProvider =
 
 /// Reduces a bridge error code (`auth/...`, the only thing a URL fragment can
 /// carry across origins) to something worth showing on a button.
-String friendlyBridgeError(String code) => switch (code) {
+///
+/// [provider] is the pending record's provider name ('apple' | 'google'),
+/// so a permanent refusal can name the method it refuses.
+String friendlyBridgeError(String code, {String? provider}) => switch (code) {
       'auth/account-exists-with-different-credential' =>
         'That email already belongs to an account with a different sign-in '
             'method.',
@@ -740,7 +743,19 @@ String friendlyBridgeError(String code) => switch (code) {
       'auth/user-disabled' => 'This account has been disabled.',
       'auth/network-request-failed' =>
         'The network dropped mid sign-in. Try again.',
+      // A provider the project has not enabled/configured. Permanent: it will
+      // fail the same way on every attempt until the CONSOLE changes, so
+      // "try again" — the fallback's advice — would be a lie here (#57).
+      'auth/operation-not-allowed' =>
+        '${_bridgeProviderLabel(provider)} sign-in is not available right '
+            'now — the fix is on our side, not yours. Use another method.',
       _ => 'Sign-in failed ($code). Try again.',
+    };
+
+String _bridgeProviderLabel(String? provider) => switch (provider) {
+      'apple' => 'Apple',
+      'google' => 'Google',
+      _ => 'That',
     };
 
 /// Reduces provider/SDK exceptions to something worth showing on a button.
