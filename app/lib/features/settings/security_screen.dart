@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../data/firebase/account_service.dart';
 import '../../data/firebase/auth_service.dart';
 import '../../data/firebase/device_registry.dart';
 import '../../data/firebase/link_codes.dart';
@@ -12,6 +13,8 @@ import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/device_providers.dart';
 import '../../widgets/lt_ui.dart';
+import '../../widgets/profile_switcher.dart';
+import '../account/delete_account.dart';
 import 'add_device_screen.dart';
 import 'scan_device_screen.dart';
 import 'sign_in_methods_screen.dart';
@@ -21,6 +24,16 @@ import 'sign_in_methods_screen.dart';
 ///
 /// Only ever reached from a signed-in cloud profile — the local profile has
 /// no account to have devices on.
+///
+/// And this is where the account ENDS. Deleting used to hide behind the
+/// sign-in methods screen, where nobody thinking "delete my account" would
+/// ever look; it belongs with the rest of the account's sharp tools, as the
+/// last and most clearly destructive of them. Moved, not rewritten: same
+/// guard, same type-to-confirm dialog, same server-first order — and its
+/// strings keep their historical `settings.sign_in_methods.*` keys.
+/// Irreversible, so the confirmation is proportional: it names what goes AND
+/// what stays (the artist's Stripe payments live in the artist's own Stripe
+/// account and are not ours to touch), and it asks for the word to be typed.
 class SecurityScreen extends ConsumerStatefulWidget {
   const SecurityScreen({super.key});
 
@@ -215,6 +228,56 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     ));
   }
 
+  /// The irreversible one. Type-to-confirm, and the dialog states what SURVIVES
+  /// as well as what dies — a delete that quietly left the artist's Stripe
+  /// payment history unmentioned would be lying by omission about the one thing
+  /// we cannot touch.
+  Future<void> _confirmDeleteAccount() async {
+    final s = context.s;
+    // An account flip like any other: refused mid-session, by the same guard
+    // switch/add/sign-out ask. Ending an artist's live set — permanently —
+    // from a Settings tap is not an option.
+    if (!accountActionAllowed(context, ref,
+        sessionKey: 'settings.sign_in_methods.stop_session_delete')) {
+      return;
+    }
+    final word = s.t('settings.sign_in_methods.delete_word');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => _DeleteAccountDialog(word: word),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    List<String> stranded;
+    try {
+      stranded = await runAccountDelete(ref);
+    } on AccountCallError catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      // Never "deleted anyway": a refused or half-finished delete is an
+      // account that still exists, and the server says so.
+      _deleteSnack(e.kind == AccountCallErrorKind.unauthenticated
+          ? s.t('settings.sign_in_methods.delete_stale')
+          : s.t('settings.sign_in_methods.delete_failed'));
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    // The one residue we could not clear, named rather than buried: an
+    // endpoint on the artist's own Stripe account that a revoked key kept us
+    // from deleting.
+    _deleteSnack(stranded.isEmpty
+        ? s.t('settings.sign_in_methods.deleted_snack')
+        : s.t('settings.sign_in_methods.delete_stripe_leftover'));
+  }
+
+  void _deleteSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
@@ -385,10 +448,105 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    // ------------------------------------ delete account ---
+                    // Last on purpose: the page's tools escalate — revoke a
+                    // device, revoke them all, and finally the act with no
+                    // account left afterwards.
+                    LtCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          LtSectionLabel(
+                              s.t('settings.sign_in_methods.delete_header')),
+                          const SizedBox(height: 8),
+                          Text(
+                            s.t('settings.sign_in_methods.delete_body'),
+                            style: TextStyle(
+                              fontFamily: kFontBody,
+                              fontSize: 12.5,
+                              height: 1.45,
+                              color: c.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          LtDangerButton(
+                            label:
+                                s.t('settings.sign_in_methods.delete_button'),
+                            icon: Icons.delete_forever_rounded,
+                            busy: _busy,
+                            onPressed: _busy ? null : _confirmDeleteAccount,
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// Type-to-confirm. The button stays dead until the word is typed exactly —
+/// this is the one act with no undo anywhere behind it.
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog({required this.word});
+
+  final String word;
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final armed = _controller.text.trim() == widget.word;
+    return AlertDialog(
+      title: Text(s.t('settings.sign_in_methods.delete_title')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.t('settings.sign_in_methods.delete_dialog_body')),
+            const SizedBox(height: 16),
+            Text(s.t('settings.sign_in_methods.delete_type_to_confirm',
+                {'word': widget.word})),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _controller,
+              autocorrect: false,
+              decoration: InputDecoration(hintText: widget.word),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(s.t('common.cancel')),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: armed ? () => Navigator.of(context).pop(true) : null,
+          child: Text(s.t('settings.sign_in_methods.delete_confirm')),
+        ),
+      ],
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/features/onboarding/profile_pick_screen.dart';
 import 'package:live_tips/features/onboarding/welcome_screen.dart';
+import 'package:live_tips/features/settings/cloud_account_screen.dart';
 import 'package:live_tips/features/settings/settings_screen.dart';
 import 'package:live_tips/features/shell/app_shell.dart';
 import 'package:live_tips/state/auth_providers.dart';
@@ -101,6 +102,19 @@ FakeAuthService _casey() => FakeAuthService(
       ),
     );
 
+/// Settings' account group is two rows now; the account's own doors (sign
+/// out among them) sit one level in, behind the signed-in row. Walked by
+/// icon within the Settings screen: "Casey" is also on the root the route
+/// was pushed over, and a bare text finder cannot tell them apart.
+Future<void> _openAccountScreen(WidgetTester tester) async {
+  await tester.tap(find.descendant(
+    of: find.byType(SettingsScreen),
+    matching: find.byIcon(Icons.account_circle_rounded),
+  ));
+  await tester.pumpAndSettle();
+  expect(find.byType(CloudAccountScreen), findsOneWidget);
+}
+
 void main() {
   group('the empty profile set of a cloud account', () {
     testWidgets('reaches Settings — and Back from it comes back here',
@@ -118,14 +132,20 @@ void main() {
 
       // The doors, all of them behind this one screen.
       expect(find.byType(SettingsRouteScreen), findsOneWidget);
-      expect(find.text('Sign out'), findsOneWidget);
       expect(find.text('My own device'), findsOneWidget,
           reason: 'what this device is stays changeable from every root');
       // …and nothing that would act on the profile that does not exist.
       expect(find.text('Delete this profile'), findsNothing);
 
-      // The Back arrow of a pushed route over a root that has not moved: it
-      // means what it says.
+      // Sign out is one level in, behind the signed-in account row.
+      await _openAccountScreen(tester);
+      expect(find.text('Sign out'), findsOneWidget);
+
+      // The Back arrows of pushed routes over a root that has not moved:
+      // they mean what they say.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsRouteScreen), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.byType(ProfilePickScreen), findsOneWidget);
@@ -140,6 +160,7 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.settings_outlined));
       await tester.pumpAndSettle();
+      await _openAccountScreen(tester);
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
       // The dialog's own "Sign out" is the second of the two.
@@ -172,14 +193,18 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SettingsRouteScreen), findsOneWidget);
 
+      await _openAccountScreen(tester);
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sign out').last);
       await tester.pumpAndSettle();
 
-      // The route is GONE — not merely wrong, gone. Route membership, because a
+      // The routes are GONE — not merely wrong, gone: the Settings route AND
+      // the account screen standing on it. Route membership, because a
       // widget that is still mounted under an opaque screen proves nothing
       // either way.
+      expect(find.byType(CloudAccountScreen), findsNothing,
+          reason: 'the account screen described the account that just left');
       expect(find.byType(SettingsRouteScreen), findsNothing,
           reason: 'the root flipped; the route standing on it flips with it');
       final navigator = tester.state<NavigatorState>(find.byType(Navigator));
@@ -321,10 +346,14 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
     expect(find.byType(SettingsRouteScreen), findsOneWidget);
-    expect(find.text('Sign out'), findsOneWidget);
     // Nothing here may act on a profile the artist has not chosen yet.
     expect(find.text('Delete this profile'), findsNothing);
+    // Sign out is one level in, behind the signed-in account row.
+    await _openAccountScreen(tester);
+    expect(find.text('Sign out'), findsOneWidget);
 
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(ProfilePickScreen), findsOneWidget);
@@ -349,6 +378,9 @@ void main() {
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(find.byType(SettingsRouteScreen), findsNothing,
         reason: 'the shell hangs it on a tab — no route, no Back arrow');
+    // The profile's delete moved inside the details page.
+    await tester.tap(find.text('Name, currency and thank-you message'));
+    await tester.pumpAndSettle();
     expect(find.text('Delete this profile'), findsOneWidget);
   });
 }

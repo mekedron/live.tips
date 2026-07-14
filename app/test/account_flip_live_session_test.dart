@@ -285,6 +285,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
+    // Sign out lives one level in now, behind the signed-in account row —
+    // opening that page is mere navigation and is not refused.
+    await tester.tap(find.byIcon(Icons.account_circle_rounded));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
 

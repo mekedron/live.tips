@@ -5,6 +5,7 @@ import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/features/onboarding/account_name_screen.dart';
+import 'package:live_tips/features/settings/cloud_account_screen.dart';
 import 'package:live_tips/features/settings/settings_screen.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
@@ -100,6 +101,11 @@ void main() {
     await _pumpSettings(tester, user: _casey);
 
     expect(find.text('Switch account'), findsOneWidget);
+    // The two switch rows wear the SAME icon — the owner wants the account
+    // switcher and the profile switcher to rhyme, so the pattern is
+    // memorable: one icon, two questions.
+    expect(find.byIcon(Icons.swap_horiz_rounded), findsNWidgets(2));
+    expect(find.byIcon(Icons.switch_account_rounded), findsNothing);
 
     await tester.tap(find.text('Switch account'));
     await tester.pumpAndSettle();
@@ -114,11 +120,20 @@ void main() {
     expect(find.text('Add a profile'), findsNothing);
   });
 
-  testWidgets('the identity row opens the account rename screen',
-      (tester) async {
+  testWidgets('the identity row opens the account screen, and its own '
+      'identity row the rename', (tester) async {
     await _pumpSettings(tester, user: _casey);
 
+    // Settings' account row is now a door to the whole account page…
     await tester.tap(find.text('Casey'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CloudAccountScreen), findsOneWidget);
+
+    // …where the same identity row is the way to the name.
+    await tester.tap(find.descendant(
+      of: find.byType(CloudAccountScreen),
+      matching: find.text('Casey'),
+    ));
     await tester.pumpAndSettle();
 
     expect(find.byType(AccountNameScreen), findsOneWidget);

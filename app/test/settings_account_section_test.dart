@@ -6,6 +6,7 @@ import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/features/account/cloud_upload_offer.dart';
+import 'package:live_tips/features/settings/cloud_account_screen.dart';
 import 'package:live_tips/features/settings/settings_screen.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
@@ -71,6 +72,18 @@ Future<void> _pumpSettings(
   await tester.pumpAndSettle();
 }
 
+/// The account's own actions (name, sign-in methods, security, move, sign
+/// out) now live one level in, behind the signed-in row — Settings itself
+/// carries only that row and "Switch account".
+Future<void> _openAccountScreen(WidgetTester tester) async {
+  await tester.tap(find.descendant(
+    of: find.byType(SettingsScreen),
+    matching: find.byIcon(Icons.account_circle_rounded),
+  ));
+  await tester.pumpAndSettle();
+  expect(find.byType(CloudAccountScreen), findsOneWidget);
+}
+
 void main() {
   testWidgets('signed out with auth available: the sign-in row shows', (
     tester,
@@ -90,7 +103,7 @@ void main() {
     expect(find.text('Sign in / Create account'), findsNothing);
   });
 
-  testWidgets('signed in: name, provider · email, and a Sign out row', (
+  testWidgets('signed in: name, provider · email — and Sign out one level in', (
     tester,
   ) async {
     await _pumpSettings(
@@ -108,6 +121,11 @@ void main() {
     expect(find.text('Casey'), findsOneWidget);
     expect(find.text('Google · casey@example.com'), findsOneWidget);
     expect(find.text('Sign in / Create account'), findsNothing);
+    // Two rows on Settings itself; the account's own actions moved behind
+    // the signed-in row.
+    expect(find.text('Sign out'), findsNothing);
+
+    await _openAccountScreen(tester);
     expect(find.text('Sign out'), findsOneWidget);
 
     // Signing out asks first.
@@ -125,6 +143,7 @@ void main() {
         user: const AuthUser(uid: 'anon_1', kind: AccountKind.anonymous),
       ),
     );
+    await _openAccountScreen(tester);
 
     expect(
       find.text(
@@ -152,6 +171,7 @@ void main() {
         ),
       ),
     );
+    await _openAccountScreen(tester);
 
     expect(find.text('Sign-in methods'), findsOneWidget);
     expect(find.text('How you get back into this account'), findsOneWidget);
@@ -166,6 +186,7 @@ void main() {
         user: const AuthUser(uid: 'anon_1', kind: AccountKind.anonymous),
       ),
     );
+    await _openAccountScreen(tester);
 
     expect(
       find.text('Guest account — nothing can sign it back in'),
@@ -194,6 +215,7 @@ void main() {
       bandName: 'Solo Act',
       uploads: uploads,
     );
+    await _openAccountScreen(tester);
 
     await tester.tap(find.text('Move profiles into this account'));
     await tester.pumpAndSettle();
@@ -224,6 +246,7 @@ void main() {
       ),
       uploads: <String>[],
     );
+    await _openAccountScreen(tester);
 
     expect(find.text('Move profiles into this account'), findsNothing);
   });

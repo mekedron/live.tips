@@ -73,22 +73,30 @@ void main() {
   ) async {
     await _pumpSettings(tester, withStripe: true);
 
-    // The new top section (LtSectionLabel upper-cases its header) and its rows.
+    // The new top section (LtSectionLabel upper-cases its header) and its
+    // TWO rows: the details door and the switch.
     expect(find.text('PROFILE DETAILS'), findsOneWidget);
     expect(find.text('Name, currency and thank-you message'), findsOneWidget);
     expect(find.text('Switch profile'), findsOneWidget);
+    // The delete moved inside the details page — a destructive act does not
+    // sit flat on the settings list beside the theme picker.
+    expect(find.text('Delete this profile'), findsNothing);
+
+    // The retired payment-methods rows are gone.
+    expect(find.text('New tip page link'), findsNothing);
+    expect(find.text('Disconnect tip page'), findsNothing);
+
     // The LOCAL profile has one removal, because it has one meaning: the band
     // lives here and nowhere else. The row says delete, and says permanent —
-    // it never claims to be a device-local tidy-up (#27).
+    // it never claims to be a device-local tidy-up (#27). Its home is the
+    // profile-details page, at the bottom.
+    await tester.tap(find.text('Name, currency and thank-you message'));
+    await tester.pumpAndSettle();
     expect(find.text('Delete this profile'), findsOneWidget);
     expect(find.text('Permanent — this profile is on this device only'),
         findsOneWidget);
     expect(find.text('Remove from this device'), findsNothing);
     expect(find.text('Remove this profile from this device'), findsNothing);
-
-    // The retired payment-methods rows are gone.
-    expect(find.text('New tip page link'), findsNothing);
-    expect(find.text('Disconnect tip page'), findsNothing);
   });
 
   testWidgets('profile name row opens the Profile Details editor', (tester) async {

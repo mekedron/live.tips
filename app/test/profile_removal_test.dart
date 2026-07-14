@@ -181,6 +181,10 @@ Future<void> _pumpSettings(
   await container.read(appStateProvider.notifier).switchAccount(_bandA);
   await tester.pumpAndSettle();
   expect(find.text('The Foxes'), findsOneWidget);
+  // The delete lives inside the profile-details page now — Settings' profile
+  // group is two rows (details, switch), so walk in the way the artist would.
+  await tester.tap(find.text('Name, currency and thank-you message'));
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -305,7 +309,10 @@ void main() {
     // And no row may offer a device-local removal at all (#37): the profile set
     // is the same on every device, so there is nothing for such a row to do.
     expect(find.text('Remove from this device'), findsNothing);
-    // What the profile section offers instead — switch, and delete.
+    // What the profile section offers instead — the switch on the settings
+    // page, and the delete in here, at the bottom of the details page.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     expect(find.text('Switch profile'), findsOneWidget);
   });
 
@@ -333,10 +340,13 @@ void main() {
     expect(find.textContaining('Remove from this device'), findsNothing);
 
     // Proportional to the act: the button stays dead until the word is typed.
+    // The dialog's own field — the details page beneath has text fields too.
+    final confirmField = find.descendant(
+        of: find.byType(AlertDialog), matching: find.byType(TextField));
     FilledButton deleteButton() => tester.widget<FilledButton>(find.ancestor(
         of: find.text('Delete'), matching: find.byType(FilledButton)));
     expect(deleteButton().onPressed, isNull);
-    await tester.enterText(find.byType(TextField), 'delete');
+    await tester.enterText(confirmField, 'delete');
     await tester.pumpAndSettle();
     expect(deleteButton().onPressed, isNotNull);
 

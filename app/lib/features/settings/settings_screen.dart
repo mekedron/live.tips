@@ -15,18 +15,15 @@ import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../state/venue_providers.dart';
+import '../../state/root_world.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/profile_switcher.dart';
 import '../../widgets/sign_in_sheet.dart';
-import '../account/cloud_upload_offer.dart';
 import '../shell/app_shell.dart';
-import '../onboarding/account_name_screen.dart';
-import '../venue/venue_reapproval_screen.dart';
 import 'account_details_screen.dart';
+import 'cloud_account_screen.dart';
 import 'relay_method_screen.dart';
-import 'security_screen.dart';
-import 'sign_in_methods_screen.dart';
 import 'stripe_key_screen.dart';
 
 /// Settings as a pushed ROUTE, with a Back arrow of its own.
@@ -77,115 +74,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// Box ids are unreadable uuids — show enough to recognize, no more.
   String _shortBoxId(String id) =>
       id.length <= 12 ? id : '${id.substring(0, 8)}…';
-
-  /// What the dialogs call the account a cloud profile belongs to: the email
-  /// if there is one (that is the thing an artist recognizes as "my account"),
-  /// else its name, else the provider.
-  String _accountLabel(AppAccount profile) =>
-      profile.email ?? accountDisplayName(context, profile);
-
-  /// DELETES the profile — from the ACCOUNT, on every device, for good. This
-  /// is what the row labelled "Remove this profile from this device" used to
-  /// run while promising the opposite (#27), so the dialog says the word
-  /// delete, names the account it is deleting from, says "every other device",
-  /// and — since a tap can't be taken back — makes the artist type the word.
-  ///
-  /// The ONLY removal a profile has (#37). A profile is in the account or it is
-  /// not; there is no third state in which this device holds fewer of them than
-  /// the artist's other phone. An artist walking away from a borrowed tablet
-  /// signs the ACCOUNT out — which takes every profile off it, offline, and
-  /// deletes nothing.
-  Future<void> _confirmDeleteProfile() async {
-    // On a venue device, destroying a profile is an account-level act — it
-    // needs the same fresh phone approval as switching one.
-    if (!await ensureVenueReapproval(context, ref)) return;
-    if (!mounted) return;
-    final s = context.s;
-    final app = ref.read(appStateProvider);
-    // A refusal always names itself — and it asks the same guard switch/add/
-    // sign-out ask, so a session that died with its tab can no longer wedge
-    // this shut.
-    if (!accountActionAllowed(context, ref,
-        sessionKey: 'settings.main.stop_session_remove_profile')) {
-      return;
-    }
-    final profile = ref.read(accountsDirectoryProvider).active;
-    final cloud = !profile.isLocal;
-    final hasOthers = app.accounts.length > 1;
-    final name = app.displayName.isEmpty
-        ? s.t('settings.main.this_profile_fallback')
-        : app.displayName;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => _DeleteProfileDialog(
-        title: s.t('settings.main.delete_title', {'name': name}),
-        body: (cloud
-                ? s.t('settings.main.delete_body_cloud',
-                    {'name': name, 'account': _accountLabel(profile)})
-                : s.t('settings.main.delete_body_local')) +
-            (hasOthers ? s.t('settings.main.delete_body_others_suffix') : ''),
-        // Type-to-confirm exactly where the act reaches past this device and
-        // past this artist's other devices. The local profile's delete is
-        // just as permanent, but it destroys only what is in front of you.
-        typeToConfirm: cloud,
-      ),
-    );
-    if (confirmed != true) return;
-    final removed = await ref
-        .read(appStateProvider.notifier)
-        .removeAccount(ref.read(appStateProvider).accountId);
-    if (!mounted) return;
-    if (!removed) {
-      // A cloud band's wipe refuses offline rather than half-deleting.
-      // Nothing was removed — and a silent no-op would read as a dead
-      // button. The snack points at the removal that DOES work offline.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.t('settings.main.delete_offline_snack'))),
-      );
-      return;
-    }
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
-  /// The permanent home of the local→cloud move. The offer that pops after
-  /// a sign-in is a convenience with a memory — it only asks about profiles
-  /// it hasn't asked about — so without this row, an account that once said
-  /// "Not now" had no way to ever bring those profiles over. Same question,
-  /// same dialog, same migrator; the only difference is that the artist
-  /// walked up to it.
-  Future<void> _confirmMoveLocalProfiles() async {
-    final s = context.s;
-    // The move ends by switching to the migrated profile — the same guard
-    // switch/add/sign-out ask, for the same reason: no reshuffling under a
-    // live set.
-    if (!accountActionAllowed(context, ref,
-        sessionKey: 'settings.account.stop_session_move')) {
-      return;
-    }
-    final uid = ref.read(accountsDirectoryProvider).activeAccountId;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(s.t('account.profile_upload.title')),
-        content: Text(s.t('account.profile_upload.body')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(s.t('common.cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(s.t('account.profile_upload.accept')),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    // The account this screen was about must still be the signed-in one —
-    // the dialog sat open, and the upload writes into ITS subtree.
-    if (ref.read(authControllerProvider).user?.uid != uid) return;
-    await runCloudUpload(context, ref, uid);
-  }
 
   /// Changing what this device is wipes it — the dialog says exactly that,
   /// because there is no half-way: data written under one trust model must
@@ -289,21 +177,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 email: auth.user!.email ?? activeProfile.email,
               )
             : activeProfile);
-    // Whether this device still holds local profiles worth moving into the
-    // signed-in account (named, or holding data — pristine placeholders are
-    // noise, not value). Needs the account's OWN session alive: the upload
-    // writes into its Firestore subtree.
-    final localStore = ref.watch(localStoreProvider);
-    final canMoveLocalProfiles = cloudEntry != null &&
-        auth.user?.uid == activeProfile.id &&
-        ref.watch(cloudUploadRunnerProvider) != null &&
-        (localStore.readAccountsRegistry()?.accounts.any((a) =>
-                a.name.trim().isNotEmpty ||
-                localStore.accountHasData(a.id)) ??
-            false);
 
     final sections = <Widget>[
       // --------------------------------------------------- cloud account ---
+      // TWO rows, mirroring the profile group below: who is signed in (a door
+      // to everything that edits the ACCOUNT — name, sign-in methods,
+      // security, moving local profiles in, sign out — see
+      // [CloudAccountScreen]) and the switch. The five account rows that used
+      // to sit flat here moved behind the first door, unchanged.
       if (cloudAvailable)
         LtRowGroup(
           header: s.t('settings.account.header'),
@@ -317,10 +198,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   chevron: true,
                   onTap: () => showSignInSheet(context),
                 ),
-            ] else ...[
-              // Tappable: an account you can't name is an account you can't
-              // tell apart from the next guest one. AuthController.setAccountName
-              // existed all along with nothing to call it.
+            ] else
+              // Who is signed in — and the door to editing it. A
+              // [RootBoundRoute]: the pushed screen describes THIS account,
+              // and its own sign-out row is one of the flips that must take
+              // it down (#48).
               LtRow(
                 icon: Icons.account_circle_rounded,
                 title: accountDisplayName(context, cloudEntry),
@@ -330,75 +212,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ].join(' · '),
                 chevron: true,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const AccountNameScreen(rename: true),
+                  RootBoundRoute(
+                    builder: (_) => const CloudAccountScreen(),
                   ),
                 ),
               ),
-              // The permanent door #32 asked for. Not on a venue device: a
-              // shared tablet must not be able to attach an identity to — or
-              // delete — the artist's account.
-              if (!venueMode)
-                LtRow(
-                  icon: Icons.key_rounded,
-                  title: s.t('settings.sign_in_methods.row_title'),
-                  subtitle: cloudEntry.kind == AccountKind.anonymous
-                      ? s.t('settings.sign_in_methods.row_subtitle_guest')
-                      : s.t('settings.sign_in_methods.row_subtitle'),
-                  chevron: true,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const SignInMethodsScreen(),
-                    ),
-                  ),
-                ),
-              // Not on a venue device: Security can mint add-device codes,
-              // and this tablet could confirm its own — anyone holding it
-              // could join THEIR phone to the artist's account for good.
-              // Devices are managed from the artist's own phone.
-              if (!venueMode)
-                LtRow(
-                  icon: Icons.shield_outlined,
-                  title: s.t('settings.security.row_title'),
-                  subtitle: s.t('settings.security.row_subtitle'),
-                  chevron: true,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SecurityScreen()),
-                  ),
-                ),
-              // The way over for a local profile stranded beside this
-              // account. Always here while both coexist — the sign-in offer
-              // is one-shot per profile, and a dialog that already ran must
-              // never be the only door to the migrator.
-              if (!venueMode && canMoveLocalProfiles)
-                LtRow(
-                  icon: Icons.cloud_upload_outlined,
-                  title: s.t('settings.account.move_profiles_row'),
-                  subtitle: s.t('settings.account.move_profiles_subtitle'),
-                  chevron: true,
-                  onTap: _confirmMoveLocalProfiles,
-                ),
-              if (!venueMode)
-                LtRow(
-                  icon: Icons.logout_rounded,
-                  title: s.t('settings.account.sign_out'),
-                  subtitle: cloudEntry.kind == AccountKind.anonymous
-                      ? s.t('settings.account.sign_out_anonymous_warning')
-                      : null,
-                  chevron: true,
-                  onTap: () => confirmSignOut(context, ref),
-                ),
-            ],
             // The account door — in the ACCOUNT group, opening the ACCOUNT
             // sheet (#49). It stands beside "Switch profile" below, and the two
             // are not a redrawn split: they open two sheets that ask two
-            // different questions, in the same shape, under the same rules. Only
-            // where there is another account to reach, though: with none, the
-            // sheet would hold this device and a sign-in offer the row above it
-            // already makes.
+            // different questions, in the same shape, under the same rules —
+            // and they wear the same icon, so the pair reads as one pattern.
+            // Only where there is another account to reach, though: with none,
+            // the sheet would hold this device and a sign-in offer the row
+            // above it already makes.
             if (!venueMode && directory.accounts.any((a) => !a.isLocal))
               LtRow(
-                icon: Icons.switch_account_rounded,
+                icon: Icons.swap_horiz_rounded,
                 title: s.t('settings.account.switch_title'),
                 subtitle: s.t('settings.account.switch_subtitle'),
                 chevron: true,
@@ -425,6 +254,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         )
       else
+        // TWO rows, same shape as the account group above: the profile's
+        // details (a door — name, currency, thank-you message, and the
+        // profile's one, account-wide delete now live inside it, see
+        // [AccountDetailsScreen]) and the switch.
         LtRowGroup(
           header: s.t('settings.main.profile_details_header'),
           children: [
@@ -453,24 +286,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               chevron: true,
               onTap: () => showProfileSheet(context, ref),
             ),
-            // ONE removal, and it is account-wide (#37). "Remove from this
-            // device" sat here for a few hours and had to go with the model it
-            // came from: a profile is in the account or it is not, and it is on
-            // every device either way. The artist ending a gig on a borrowed
-            // tablet signs the account OUT — offline-safe, and it takes the
-            // whole account with it instead of one profile.
-            if (hasProfile)
-              LtRow(
-                icon: Icons.delete_forever_rounded,
-                iconColor: c.danger,
-                title: s.t('settings.main.delete_profile_row'),
-                titleColor: c.danger,
-                subtitle: activeProfile.isLocal
-                    ? s.t('settings.main.delete_profile_subtitle_local')
-                    : s.t('settings.main.delete_profile_subtitle_cloud'),
-                chevron: true,
-                onTap: _confirmDeleteProfile,
-              ),
           ],
         ),
       // ----------------------------------------------- payment methods ---
@@ -743,82 +558,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// The delete confirmation. With [typeToConfirm] the artist has to type the
-/// word before the button lights up — the ceremony a cloud profile's delete
-/// deserves, because it reaches every device they own and there is nothing
-/// anywhere to restore it from. Without it (the local profile) the red button
-/// stands alone, as it always has.
-class _DeleteProfileDialog extends StatefulWidget {
-  const _DeleteProfileDialog({
-    required this.title,
-    required this.body,
-    required this.typeToConfirm,
-  });
-
-  final String title;
-  final String body;
-  final bool typeToConfirm;
-
-  @override
-  State<_DeleteProfileDialog> createState() => _DeleteProfileDialogState();
-}
-
-class _DeleteProfileDialogState extends State<_DeleteProfileDialog> {
-  final _typed = TextEditingController();
-
-  @override
-  void dispose() {
-    _typed.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.s;
-    final word = s.t('settings.main.delete_confirm_word');
-    final armed = !widget.typeToConfirm ||
-        _typed.text.trim().toUpperCase() == word.toUpperCase();
-    return AlertDialog(
-      title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(widget.body),
-          if (widget.typeToConfirm) ...[
-            const SizedBox(height: 16),
-            TextField(
-              controller: _typed,
-              autocorrect: false,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText:
-                    s.t('settings.main.delete_confirm_hint', {'word': word}),
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(s.t('common.cancel')),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-            foregroundColor: Colors.white,
-          ),
-          onPressed: armed ? () => Navigator.of(context).pop(true) : null,
-          child: Text(s.t('common.delete')),
-        ),
-      ],
     );
   }
 }

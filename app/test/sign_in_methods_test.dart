@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
-import 'package:live_tips/data/firebase/account_service.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/secure_store.dart';
@@ -13,45 +12,25 @@ import 'package:live_tips/state/providers.dart';
 
 import 'helpers.dart';
 
-/// The section #32 asked for, and the exit #33 asked for.
+/// The section #32 asked for.
 ///
 /// What is pinned here: linking UPGRADES a guest in place (same uid, same
 /// profiles, same secrets — nothing migrates); unlinking the last permanent
 /// method is refused, out loud, because it would put the account back to
-/// unrecoverable; and the delete does nothing at all until the word is typed —
-/// then it calls the server, and only then does this device let go of its
-/// copy.
-
-/// The deleteAccount callable, recorded. [stranded] models the one residue the
-/// server cannot clear: an endpoint the artist's Stripe account kept.
-class FakeAccountService extends AccountService {
-  FakeAccountService({this.stranded = const [], this.error});
-
-  final List<String> stranded;
-  final AccountCallError? error;
-  int calls = 0;
-
-  @override
-  Future<List<String>> deleteAccount() async {
-    calls++;
-    final failure = error;
-    if (failure != null) throw failure;
-    return stranded;
-  }
-}
+/// unrecoverable. The exit #33 asked for — Delete account — used to live at
+/// the bottom of this screen; it moved to Security (where an artist actually
+/// looks for it), and its tests moved to security_screen_test.dart with it.
 
 class _Harness {
-  _Harness(this.store, this.secure, this.account);
+  _Harness(this.store, this.secure);
 
   final LocalStore store;
   final FakeSecureStore secure;
-  final FakeAccountService account;
 }
 
 Future<_Harness> _pump(
   WidgetTester tester, {
   required AuthUser user,
-  FakeAccountService? account,
 }) async {
   await tester.binding.setSurfaceSize(const Size(600, 1400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -68,12 +47,10 @@ Future<_Harness> _pump(
         ))
         .withActive(user.uid),
   );
-  // The band's Stripe key: it must survive a LINK untouched, and go with a
-  // delete.
+  // The band's Stripe key: it must survive a LINK untouched.
   final secure = FakeSecureStore({
     '${SecureStore.kApiKeyBase}_$kTestAccountId': 'sk_test_seeded',
   });
-  final service = account ?? FakeAccountService();
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -81,7 +58,6 @@ Future<_Harness> _pump(
         secureStoreProvider.overrideWithValue(secure),
         initialApiKeyProvider.overrideWithValue(null),
         authServiceProvider.overrideWithValue(FakeAuthService(user: user)),
-        accountServiceProvider.overrideWithValue(service),
       ],
       child: MaterialApp(
         localizationsDelegates: kTestL10nDelegates,
@@ -92,7 +68,7 @@ Future<_Harness> _pump(
     ),
   );
   await tester.pumpAndSettle();
-  return _Harness(localStore, secure, service);
+  return _Harness(localStore, secure);
 }
 
 const _guest = AuthUser(uid: 'uid_guest', kind: AccountKind.anonymous);
@@ -186,91 +162,12 @@ void main() {
     expect(find.text('Linked'), findsOneWidget); // Google's, still there
   });
 
-  testWidgets('deleting the account does nothing until the word is typed',
+  testWidgets('the delete no longer lives here — Security is its home now',
       (tester) async {
-    final harness = await _pump(tester, user: _google);
+    await _pump(tester, user: _google);
 
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete account'));
-    await tester.pumpAndSettle();
-
-    // The confirmation is proportional: it names what goes AND what stays.
-    expect(find.text('Delete this account?'), findsOneWidget);
-    expect(find.textContaining('the tip.live.tips links stop working'),
-        findsOneWidget);
-    expect(find.textContaining('live in YOUR Stripe account'), findsOneWidget);
-
-    // Armed only by the exact word — a stray tap deletes nothing.
-    final button = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Delete forever'),
-    );
-    expect(button.onPressed, isNull);
-    expect(harness.account.calls, 0);
-
-    await tester.enterText(find.byType(TextField), 'delete');
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Delete forever'))
-          .onPressed,
-      isNull,
-      reason: 'the word must match exactly',
-    );
-
-    await tester.enterText(find.byType(TextField), 'DELETE');
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete forever'));
-    await tester.pumpAndSettle();
-
-    // The server erases the account; the device lets go of its copy only then.
-    expect(harness.account.calls, 1);
-    expect(harness.store.readAccountsDirectory()!.contains('uid_1'), isFalse);
-    expect(await harness.secure.readApiKey(kTestAccountId), isNull);
-    expect(find.text('Your account and everything in it are gone.'),
-        findsOneWidget);
-  });
-
-  testWidgets('a refused delete keeps the account, and never claims otherwise',
-      (tester) async {
-    final harness = await _pump(
-      tester,
-      user: _google,
-      account: FakeAccountService(
-        error: const AccountCallError(AccountCallErrorKind.unauthenticated),
-      ),
-    );
-
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete account'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'DELETE');
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete forever'));
-    await tester.pumpAndSettle();
-
-    // A stale session is the ONE refusal with a fix the artist can act on.
-    expect(find.textContaining('Sign in again'), findsOneWidget);
-    // And nothing local was touched: the account still exists.
-    expect(harness.store.readAccountsDirectory()!.contains('uid_1'), isTrue);
-    expect(await harness.secure.readApiKey(kTestAccountId), 'sk_test_seeded');
-  });
-
-  testWidgets('an endpoint Stripe kept is named, not swallowed', (tester) async {
-    await _pump(
-      tester,
-      user: _google,
-      account: FakeAccountService(stranded: const ['we_left_behind']),
-    );
-
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete account'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'DELETE');
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete forever'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.textContaining('could not be removed from your Stripe account'),
-      findsOneWidget,
-    );
+    expect(find.text('Delete account'), findsNothing,
+        reason: 'nobody thinking "delete my account" looks under sign-in '
+            'methods; the act moved to Security, unchanged');
   });
 }
