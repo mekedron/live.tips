@@ -5,10 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/data/tip_channel.dart';
+import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/domain/relay_jar.dart';
+import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/tip_jar.dart';
 import 'package:live_tips/features/settings/song_requests_screen.dart';
+import 'package:live_tips/state/jar_requests_publisher.dart';
+import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
+import 'package:live_tips/state/session_coordinator.dart';
 
 import 'helpers.dart';
 
@@ -223,4 +229,130 @@ void main() {
     final config = backend.argsFor('setJarRequests')['config'] as Map;
     expect(config['methods'], ['revolut']);
   });
+
+  testWidgets(
+      'enabling the feature while a set runs arms the RUNNING session — '
+      'the fan page opens without a restart', (tester) async {
+    // The owner's exact night: live with an empty library and the feature
+    // off, then Settings → enable mid-set. The band doc got the new config,
+    // but the session stayed shut and the fan window was never armed —
+    // requests could not happen until a restart (or the hidden Resume).
+    await tester.binding.setSurfaceSize(const Size(600, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = await seededStore(accountValues: {
+      LocalStore.kRelayJarBase: jsonEncode(_relayJar.toJson()),
+    });
+    final backend = FakeCallables();
+    final publisher = _RecordingPublisher();
+    final container = ProviderContainer(overrides: [
+      localStoreProvider.overrideWithValue(store),
+      secureStoreProvider.overrideWithValue(FakeSecureStore()),
+      initialApiKeyProvider.overrideWithValue(null),
+      initialRelaySecretProvider.overrideWithValue('sec'),
+      relayClientProvider.overrideWithValue(fakeRelayClient(backend)),
+      sessionCoordinatorFactoryProvider
+          .overrideWithValue((events) => _FakeCoordinator()),
+      jarRequestsPublisherFactoryProvider.overrideWithValue(() => publisher),
+    ]);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          localizationsDelegates: kTestL10nDelegates,
+          locale: const Locale('en'),
+          theme: buildLightTheme(),
+          home: const SongRequestsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Go live with the feature off — requests shut, publisher silent.
+    await container
+        .read(liveSessionProvider.notifier)
+        .start(goalMinor: 10000);
+    await tester.pumpAndSettle();
+    expect(
+        container.read(liveSessionProvider)!.session.requestsOpen, isFalse);
+    expect(publisher.events, isEmpty);
+
+    // Enable the feature mid-set.
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    expect(store.readBandSettings(kTestAccountId).songRequests.enabled,
+        isTrue);
+    expect(container.read(liveSessionProvider)!.session.requestsOpen, isTrue,
+        reason: 'the running set must open — fans request TONIGHT, not '
+            'after a restart');
+    expect(publisher.events, ['open:true'],
+        reason: 'the fan page window must be armed by the enable itself');
+
+    // And the symmetric close: disabling the feature mid-set shuts the set.
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(
+        container.read(liveSessionProvider)!.session.requestsOpen, isFalse);
+    expect(publisher.events, ['open:true', 'open:false']);
+
+    await container.read(liveSessionProvider.notifier).stop();
+  });
+}
+
+/// Transport-less coordinator (the requests_screen_test mold), except it
+/// PUBLISHES: the point here is that the settings screen's enable reaches
+/// the fan page through the session publisher.
+class _FakeCoordinator implements SessionCoordinator {
+  @override
+  RelayHealth? get relayHealthSeed => null;
+
+  @override
+  Future<void> start(LiveSession session,
+      {String? resumeCursor,
+      SessionStartMode mode = SessionStartMode.fresh}) async {}
+
+  @override
+  void onTipsIngested(LiveSession session, List<Tip> fresh) {}
+
+  @override
+  void onGoalEdited(LiveSession session) {}
+
+  @override
+  void onRequestsEdited(LiveSession session) {}
+
+  @override
+  void onTipVerified(LiveSession session, Tip tip) {}
+
+  @override
+  bool get publishesRequests => true;
+
+  @override
+  Future<void> stop(LiveSession session, {bool durable = false}) async {}
+
+  @override
+  void reconnectNow() {}
+
+  @override
+  Future<void> dispose() async {}
+}
+
+/// Records the controller's publish seams (live_session_controller_test's
+/// RecordingPublisher, local copy — the wire shape is not on trial here).
+class _RecordingPublisher extends JarRequestsPublisher {
+  _RecordingPublisher()
+      : super(
+            client: fakeRelayClient(FakeCallables()), jar: null, secret: null);
+
+  final events = <String>[];
+
+  @override
+  void onQueueChanged(LiveSession session) => events.add('queue');
+
+  @override
+  void onOpenChanged(LiveSession session) =>
+      events.add('open:${session.requestsOpen}');
+
+  @override
+  void onStop() => events.add('stop');
 }

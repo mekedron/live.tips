@@ -431,6 +431,43 @@ void main() {
     });
 
     test(
+        'a request tip that arrives while the session says requests-off is '
+        'never dropped: song fields intact on every device, and a mid-set '
+        'setRequestsOpen reaches the follower', () async {
+      // The server's 12h window can be armed while the leader's session says
+      // closed (a re-opened window, a lost close) — a request can therefore
+      // arrive "impossibly". It must land as money with its song fields, on
+      // the leader AND on a follower, whatever the open flag says.
+      final a = await device('dev_a', batches: [
+        [requestTip('cs_offreq', 700)],
+      ]);
+      final b = await device('dev_b');
+
+      await a
+          .read(liveSessionProvider.notifier)
+          .start(goalMinor: 10000, requestsOpen: false);
+      await settle();
+      await b.read(liveSessionProvider.notifier).join(await readInfo());
+      await settle();
+
+      for (final device in [a, b]) {
+        final tip = device.read(liveSessionProvider)!.session.tips.single;
+        expect(tip.songId, 'sng_1',
+            reason: 'the round trip through toJson/fromJson keeps the song');
+        expect(tip.songTitle, 'Wonderwall');
+        expect(tip.amountMinor, 700);
+      }
+
+      // The mid-session settings-enable path: the leader opens explicitly
+      // and the follower's copy follows through live/current.
+      a.read(liveSessionProvider.notifier).setRequestsOpen(true);
+      await settle();
+      expect((await liveDoc().get()).data()!['requests'],
+          containsPair('open', true));
+      expect(b.read(liveSessionProvider)!.session.requestsOpen, isTrue);
+    });
+
+    test(
         'a verified flip on one device reaches the other as a MODIFIED doc — '
         'replaced in place, no re-ingest, no leftover verified field',
         () async {

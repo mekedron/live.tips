@@ -73,7 +73,8 @@ void main() {
   late ProviderContainer container;
   late SessionEvents events;
 
-  Future<void> pumpRequests(WidgetTester tester) async {
+  Future<void> pumpRequests(WidgetTester tester,
+      {ActiveSessionInfo? activeInfo}) async {
     final store = await seededStore();
     container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
@@ -81,6 +82,10 @@ void main() {
         events = e;
         return _FakeCoordinator();
       }),
+      // The account's live/current doc, as the Join banner would see it —
+      // a session running on another device that this one hasn't joined.
+      if (activeInfo != null)
+        activeSessionProvider.overrideWith((ref) => Stream.value(activeInfo)),
     ]);
     addTearDown(container.dispose);
     container.read(appStateProvider.notifier).enterDemo();
@@ -112,6 +117,41 @@ void main() {
     expect(find.textContaining('during a live set'), findsOneWidget);
     expect(find.byType(Switch), findsNothing,
         reason: 'nothing to pause without a session');
+  });
+
+  testWidgets(
+      'account live on ANOTHER device → inline Join, never the "no live set" '
+      'lie — and joining fills the tab in place', (tester) async {
+    // The owner's device B: the session runs elsewhere, this device never
+    // tapped the banner. The tab must say so and offer the way in — a blank
+    // "No live set right now" while the account IS live is fiction.
+    final info = ActiveSessionInfo(
+      active: true,
+      bandId: kTestAccountId,
+      sessionId: 'ses_remote',
+      startedAtMs: DateTime.now().millisecondsSinceEpoch,
+      currency: 'usd',
+      goalMinor: 10000,
+      goalUpdatedAtMs: 0,
+      leaderDeviceId: 'dev_a',
+      leaderLeaseUntilMs:
+          DateTime.now().millisecondsSinceEpoch + 45000,
+    );
+    await pumpRequests(tester, activeInfo: info);
+
+    expect(find.text('No live set right now'), findsNothing,
+        reason: 'the account IS live — saying otherwise is a lie');
+    expect(find.text('Join the live session'), findsOneWidget);
+
+    await tester.tap(find.text('Join the live session'));
+    await tester.pump();
+    await tester.pump();
+
+    // Joined as a follower: the session exists here now, and the tab shows
+    // the session surface (paused, until the doc listener says otherwise).
+    expect(container.read(liveSessionProvider), isNotNull);
+    expect(container.read(liveSessionProvider)!.session.id, 'ses_remote');
+    expect(find.text('Join the live session'), findsNothing);
   });
 
   testWidgets('live with requests off → paused state, and Resume reopens',

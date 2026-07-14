@@ -8,6 +8,22 @@ import '../state/live_session_controller.dart';
 import '../state/providers.dart';
 import '../state/session_coordinator.dart';
 
+/// Attaches this device to the account's running session as a follower —
+/// switching to the session's band first when needed (same profile, so
+/// allowed even mid-guard). THE one join road: the banner and the Requests
+/// tab's inline affordance both walk it, so "Join" means the same thing
+/// wherever it is offered. Returns false when the switch or the join was
+/// refused; navigation (or not) stays the caller's business.
+Future<bool> joinActiveSession(WidgetRef ref, ActiveSessionInfo info) async {
+  final app = ref.read(appStateProvider);
+  if (info.bandId != app.accountId) {
+    final switched =
+        await ref.read(appStateProvider.notifier).switchAccount(info.bandId);
+    if (!switched) return false;
+  }
+  return ref.read(liveSessionProvider.notifier).join(info);
+}
+
 /// "Live session running in {band} — Join": shown across the shell when the
 /// signed-in ACCOUNT runs a session on another device and this one isn't
 /// attached to it. Join switches to the session's band first when needed
@@ -34,15 +50,7 @@ class _LiveSessionBannerState extends ConsumerState<LiveSessionBanner> {
     if (_joining) return;
     setState(() => _joining = true);
     try {
-      final app = ref.read(appStateProvider);
-      if (info.bandId != app.accountId) {
-        final switched = await ref
-            .read(appStateProvider.notifier)
-            .switchAccount(info.bandId);
-        if (!switched) return;
-      }
-      final joined =
-          await ref.read(liveSessionProvider.notifier).join(info);
+      final joined = await joinActiveSession(ref, info);
       if (!joined || !mounted) return;
       final onJoined = widget.onJoined;
       if (onJoined != null) {

@@ -315,6 +315,37 @@ void main() {
       expect(publisher.events, ['open:false', 'open:true']);
     });
 
+    test(
+        'setRequestsOpen arms a set that went live with the feature OFF — '
+        'the mid-session settings-enable path', () async {
+      await setUpContainer([[]]);
+      final controller = container.read(liveSessionProvider.notifier);
+
+      // Empty library, feature off — exactly the owner's go-live state.
+      await controller.start(goalMinor: 10000);
+      expect(
+          container.read(liveSessionProvider)!.session.requestsOpen, isFalse);
+      expect(publisher.events, isEmpty);
+
+      // The artist enables the feature in settings mid-set: the running
+      // session must open and the fan page must hear it, without a restart.
+      controller.setRequestsOpen(true);
+      expect(
+          container.read(liveSessionProvider)!.session.requestsOpen, isTrue);
+      expect(publisher.events, ['open:true']);
+
+      // Same state again is a no-op — settings echoes must not spam the
+      // relay (the ~720/uid/hour quota is real).
+      controller.setRequestsOpen(true);
+      expect(publisher.events, ['open:true']);
+
+      // And the symmetric close, for the artist who kills the feature.
+      controller.setRequestsOpen(false);
+      expect(
+          container.read(liveSessionProvider)!.session.requestsOpen, isFalse);
+      expect(publisher.events, ['open:true', 'open:false']);
+    });
+
     test('a plain (non-request) tip never publishes the queue', () async {
       // The request-tip → queue-publish half lives in the relay variant
       // (live_session_controller_relay_test.dart), where a channel tip can

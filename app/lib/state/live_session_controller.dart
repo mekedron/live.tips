@@ -340,10 +340,19 @@ class LiveSessionController extends Notifier<LiveState?> {
   /// The mid-set pause/resume for song requests. Session state first, then
   /// the other devices (coordination doc), then the fan page — immediately,
   /// because "we stopped taking requests" must not wait out a throttle.
-  void toggleRequestsOpen() {
+  void toggleRequestsOpen() =>
+      setRequestsOpen(!(state?.session.requestsOpen ?? false));
+
+  /// [toggleRequestsOpen]'s explicit form — the settings screen's road into
+  /// a RUNNING set: flipping the band's master switch mid-session must open
+  /// (or close) tonight's requests too, or a set that went live before the
+  /// feature existed can never honestly take a request until it is stopped
+  /// and restarted. Equal state is a no-op, so settings echoes cost no
+  /// relay call. No session, no-op — the go-live default handles the rest.
+  void setRequestsOpen(bool open) {
     final current = state;
-    if (current == null) return;
-    current.session.requestsOpen = !current.session.requestsOpen;
+    if (current == null || current.session.requestsOpen == open) return;
+    current.session.requestsOpen = open;
     state = current.copyWith(session: current.session);
     _coordinator?.onRequestsEdited(current.session);
     _publishOpen();

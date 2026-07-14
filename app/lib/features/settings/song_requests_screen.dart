@@ -12,6 +12,7 @@ import '../../domain/song_request_settings.dart';
 import '../../domain/tip_method.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/enum_labels.dart';
+import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
 import '../../widgets/goal_editor.dart';
 import '../../widgets/lt_ui.dart';
@@ -37,9 +38,23 @@ class _SongRequestsScreenState extends ConsumerState<SongRequestsScreen> {
   Future<void> _apply(SongRequestSettings next) async {
     final band = ref.read(appStateProvider).band;
     final previousSongs = band.songRequests.songs;
+    final wasEnabled = band.songRequests.enabled;
     await ref
         .read(appStateProvider.notifier)
         .updateBand(band.copyWith(songRequests: next));
+    // Flipping the MASTER switch while a set runs on this device must reach
+    // tonight's session too: the config publish below tells the fan page
+    // what's on the menu, but only an armed open window lets fans order —
+    // and the session is what arms it. Without this, a set that went live
+    // before the feature was enabled could never take a request until it
+    // was stopped and restarted (the owner's night, issue #68). Only the
+    // enabled TRANSITION speaks: library edits with the feature already on
+    // must not overrule the artist's go-live choice or a mid-set pause.
+    // (Profile switching is refused during a set, so a running session is
+    // always this band's.)
+    if (wasEnabled != next.enabled) {
+      ref.read(liveSessionProvider.notifier).setRequestsOpen(next.enabled);
+    }
     final synced = await _syncStripeLinks(previousSongs, next);
     await _publish(synced ?? next);
   }

@@ -9,6 +9,8 @@ import '../../domain/song_request_settings.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
+import '../../state/session_coordinator.dart';
+import '../../widgets/live_session_banner.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/tip_tile.dart';
 
@@ -38,11 +40,20 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
 
     final Widget body;
     if (live == null) {
-      body = _Blurb(
-        icon: Icons.queue_music_rounded,
-        title: context.s.t('requests.empty_title'),
-        message: context.s.t('requests.empty_body'),
-      );
+      // The account may be live on ANOTHER device (the Join banner's case).
+      // Then "no live set right now" is a lie, and the silent blank is how
+      // requests got lost on the artist's second phone: the queue exists,
+      // this device just hasn't attached. Offer the same join, inline.
+      final remote = ref.watch(activeSessionProvider).value;
+      if (remote != null && remote.active) {
+        body = _JoinState(info: remote);
+      } else {
+        body = _Blurb(
+          icon: Icons.queue_music_rounded,
+          title: context.s.t('requests.empty_title'),
+          message: context.s.t('requests.empty_body'),
+        );
+      }
     } else if (!live.session.requestsOpen) {
       body = _PausedState(
           onResume: ref.read(liveSessionProvider.notifier).toggleRequestsOpen);
@@ -132,6 +143,53 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
             onMarkVerified: controller.markVerified,
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// The account is live on another device and this one hasn't joined: say so
+/// and offer the way in — the SAME join the shell banner performs, minus the
+/// jump to the stage (here the artist wants the queue, and it fills in place
+/// the moment the session attaches).
+class _JoinState extends ConsumerStatefulWidget {
+  const _JoinState({required this.info});
+
+  final ActiveSessionInfo info;
+
+  @override
+  ConsumerState<_JoinState> createState() => _JoinStateState();
+}
+
+class _JoinStateState extends ConsumerState<_JoinState> {
+  bool _joining = false;
+
+  Future<void> _join() async {
+    if (_joining) return;
+    setState(() => _joining = true);
+    try {
+      await joinActiveSession(ref, widget.info);
+    } finally {
+      if (mounted) setState(() => _joining = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Blurb(
+          icon: Icons.sensors_rounded,
+          title: context.s.t('requests.join_title'),
+          message: context.s.t('requests.join_body'),
+        ),
+        const SizedBox(height: 14),
+        LtPrimaryButton(
+          label: context.s.t('requests.join'),
+          icon: Icons.sensors_rounded,
+          onPressed: _joining ? null : _join,
+        ),
       ],
     );
   }
