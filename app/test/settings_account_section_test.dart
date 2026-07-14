@@ -55,7 +55,7 @@ Future<void> _pumpSettings(
         initialApiKeyProvider.overrideWithValue(null),
         if (auth != null) authServiceProvider.overrideWithValue(auth),
         if (uploads != null)
-          cloudUploadRunnerProvider.overrideWithValue((uid, {onProgress}) async {
+          cloudUploadRunnerProvider.overrideWithValue((uid, {selectedBandIds, onProgress}) async {
             uploads.add(uid);
             return null;
           }),

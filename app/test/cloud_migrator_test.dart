@@ -415,4 +415,84 @@ void main() {
     expect(local.readCloudUploadPending()!.bandIds, ['acc_a', 'acc_b']);
     expect(local.accountHasData('acc_a'), isTrue);
   });
+
+  test('a fresh run with a selection moves only the ticked bands and leaves '
+      'the rest local, untouched', () async {
+    // The per-profile move: the artist ticked one of two local bands. The
+    // ticked one goes up and is wiped locally; the unticked one is not
+    // uploaded, not wiped, and stays in the registry exactly as it was. Before
+    // the fix there was no way to say "just this one" — uploadLocalBands moved
+    // the whole registry, all or nothing.
+    final (local, secure) = await _seedTwoBands();
+    final db = FakeFirebaseFirestore();
+    final migrator = CloudMigrator(local: local, secure: secure, db: db);
+
+    final active =
+        await migrator.uploadLocalBands(_uid, selectedBandIds: {'acc_a'});
+
+    final bands = db.collection('users').doc(_uid).collection('bands');
+    expect((await bands.get()).docs.map((d) => d.id), ['acc_a'],
+        reason: 'only the ticked band reaches the cloud');
+    expect(active, 'acc_a', reason: 'the app lands on a band that moved');
+    // acc_a moved: local data wiped, out of the registry.
+    expect(local.accountHasData('acc_a'), isFalse);
+    // acc_b is the whole point — it was left behind, and it must be exactly
+    // where it was: not in the cloud, still in the registry, data intact.
+    expect((await bands.doc('acc_b').get()).exists, isFalse);
+    final registry = local.readAccountsRegistry()!;
+    expect(registry.accounts.map((b) => b.id), ['acc_b'],
+        reason: 'an unticked profile stays local — nothing is deleted');
+    expect(registry.activeId, 'acc_b',
+        reason: 'the emptied slot re-points at a band that still exists');
+    expect(local.readRelayJar('acc_b'), isNotNull);
+    expect(local.readRelayHistory('acc_b'), hasLength(1),
+        reason: 'the relay-tip archive — the only record of those tips '
+            'anywhere — is untouched');
+    expect(migrator.hasPendingUpload, isFalse);
+  });
+
+  test('a fresh run with an EMPTY selection moves nothing and loses nothing',
+      () async {
+    final (local, secure) = await _seedTwoBands();
+    final db = FakeFirebaseFirestore();
+    final migrator = CloudMigrator(local: local, secure: secure, db: db);
+
+    final active =
+        await migrator.uploadLocalBands(_uid, selectedBandIds: <String>{});
+
+    expect(active, isNull);
+    expect(
+        (await db.collection('users').doc(_uid).collection('bands').get()).docs,
+        isEmpty);
+    // Both bands are precisely where they started.
+    expect(local.readAccountsRegistry()!.accounts.map((b) => b.id),
+        ['acc_a', 'acc_b']);
+    expect(local.accountHasData('acc_a'), isTrue);
+    expect(local.readRelayJar('acc_b'), isNotNull);
+    expect(migrator.hasPendingUpload, isFalse);
+  });
+
+  test('a resume ignores a later selection — the crashed run\'s flag governs',
+      () async {
+    // Selection is a FRESH-run affordance. Once a pending flag exists, the set
+    // it recorded is the truth; a new pick must not narrow (or widen) a move
+    // already half-committed, or a crash-resume could strand a band the first
+    // run had claimed.
+    final (local, secure) = await _seedTwoBands();
+    await local.saveCloudUploadPending(_uid, ['acc_a', 'acc_b']);
+    final db = FakeFirebaseFirestore();
+    final migrator = CloudMigrator(local: local, secure: secure, db: db);
+
+    await migrator.uploadLocalBands(_uid, selectedBandIds: {'acc_a'});
+
+    expect(
+        (await db.collection('users').doc(_uid).collection('bands').get())
+            .docs
+            .map((d) => d.id),
+        ['acc_a', 'acc_b'],
+        reason: 'the resume moves what the flag claims, not what a new pick '
+            'says');
+    expect(local.readAccountsRegistry()!.accounts, isEmpty);
+    expect(migrator.hasPendingUpload, isFalse);
+  });
 }

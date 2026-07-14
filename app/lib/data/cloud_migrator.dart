@@ -110,8 +110,17 @@ class CloudMigrator {
   /// True when a crashed upload needs resuming (pending flag set).
   bool get hasPendingUpload => _local.readCloudUploadPending() != null;
 
-  /// Uploads every local band into [uid]'s Firestore subtree, or resumes a
-  /// crashed upload. Safe to call when there is nothing to do.
+  /// Uploads this device's local bands into [uid]'s Firestore subtree, or
+  /// resumes a crashed upload. Safe to call when there is nothing to do.
+  ///
+  /// [selectedBandIds] scopes a FRESH run to a subset — the artist ticked some
+  /// profiles and left the rest local. Null means every local band, which is
+  /// what the permanent Settings door and the crash-resume path both pass. A
+  /// band left out is not touched: it is not uploaded, not wiped, and stays in
+  /// the local registry exactly as it was (see [_upload]'s `remaining`). A
+  /// RESUME ignores this argument outright — the crashed run already wrote its
+  /// chosen set into the pending flag, and that flag, not a new selection, is
+  /// what a resume is allowed to move.
   ///
   /// Returns the id of the band that should be ACTIVE in the cloud profile —
   /// the band that was active locally when several moved, else the first
@@ -126,10 +135,12 @@ class CloudMigrator {
   /// PERMANENT failure clears the pending flag on its way out — see [_upload].
   Future<String?> uploadLocalBands(
     String uid, {
+    Set<String>? selectedBandIds,
     void Function(String bandName, int done, int total)? onProgress,
   }) async {
     try {
-      return await _upload(uid, onProgress: onProgress);
+      return await _upload(uid,
+          selectedBandIds: selectedBandIds, onProgress: onProgress);
     } catch (e, st) {
       final transient = _isTransient(e);
       debugPrint(
@@ -149,6 +160,7 @@ class CloudMigrator {
 
   Future<String?> _upload(
     String uid, {
+    Set<String>? selectedBandIds,
     void Function(String bandName, int done, int total)? onProgress,
   }) async {
     var pending = _local.readCloudUploadPending();
@@ -169,11 +181,18 @@ class CloudMigrator {
     }
 
     // A resumed run only re-uploads the bands the crashed run had claimed:
-    // anything newer in the registry is not pre-sign-in data to move.
+    // anything newer in the registry is not pre-sign-in data to move. A FRESH
+    // run moves the bands the artist selected ([selectedBandIds]) — or every
+    // band when the caller named none. The resume path wins over a selection:
+    // once a flag exists, its list is the truth, and a new pick cannot widen
+    // or narrow a move already half-committed.
     final claimed = pending?.bandIds.toSet();
     final bands = [
       for (final band in registry.accounts)
-        if (claimed == null || claimed.contains(band.id)) band,
+        if (claimed != null
+            ? claimed.contains(band.id)
+            : (selectedBandIds == null || selectedBandIds.contains(band.id)))
+          band,
     ];
     if (bands.isEmpty) {
       await _local.clearCloudUploadPending();

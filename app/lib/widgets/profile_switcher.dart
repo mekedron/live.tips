@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/platform_support.dart';
 import '../core/theme.dart';
+import '../data/repository/account_data_repository.dart';
 import '../domain/app_account.dart';
 import '../domain/band_account.dart';
 import '../domain/pending_redirect.dart';
@@ -43,12 +44,22 @@ String accountDisplayName(BuildContext context, AppAccount account) {
 
 /// The label under a profile row: which payment methods it has configured,
 /// read straight from the profile's stored jars (cheap prefs lookups).
+///
+/// [source] overrides where the jars are read from. It defaults to the ambient
+/// repository — which is right for the switcher and the picker, both of which
+/// list the account they are standing in. The move-in dialog is the exception:
+/// it lists LOCAL bands while a cloud account may already be the active
+/// profile, so its ambient repository is the cloud mirror and would answer
+/// "not set up" for every local band. That dialog passes the local store's own
+/// repository instead, so the methods it prints are the ones that will move.
 String bandMethodsSummary(
   BuildContext context,
   WidgetRef ref,
-  String accountId,
-) {
-  final repo = ref.read(accountDataRepositoryProvider);
+  String accountId, {
+  AccountDataRepository? source,
+}) {
+  final AccountDataRepository repo =
+      source ?? ref.read(accountDataRepositoryProvider);
   final tipJar = repo.readTipJar(accountId);
   final relayJar = repo.readRelayJar(accountId);
   final methods = <String>[
@@ -1313,6 +1324,8 @@ class ProfileRow extends ConsumerWidget {
     required this.onTap,
     this.active = false,
     this.lastUsed = false,
+    this.trailing,
+    this.dataSource,
   });
 
   final BandAccount band;
@@ -1320,6 +1333,16 @@ class ProfileRow extends ConsumerWidget {
   final bool enabled;
   final bool lastUsed;
   final VoidCallback onTap;
+
+  /// Drawn at the row's tail in place of the active check — a checkbox, in the
+  /// move-in dialog, where the row is a selection rather than a destination.
+  final Widget? trailing;
+
+  /// Where the methods summary is read from (see [bandMethodsSummary]). Null
+  /// keeps the ambient repository, which is what every switcher/picker row
+  /// wants; the move-in dialog passes a local-store repository so a local
+  /// band's methods still read while a cloud account is the active profile.
+  final AccountDataRepository? dataSource;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1374,7 +1397,8 @@ class ProfileRow extends ConsumerWidget {
                         ],
                       ),
                       Text(
-                        bandMethodsSummary(context, ref, band.id),
+                        bandMethodsSummary(context, ref, band.id,
+                            source: dataSource),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1386,7 +1410,12 @@ class ProfileRow extends ConsumerWidget {
                     ],
                   ),
                 ),
-                if (active)
+                // A tail widget takes the slot the active check would hold — a
+                // selection row has a checkbox there, and is never itself the
+                // active profile.
+                if (trailing != null)
+                  trailing!
+                else if (active)
                   Icon(Icons.check_circle_rounded, size: 22, color: c.accent),
               ],
             ),

@@ -26,12 +26,16 @@ import 'helpers.dart';
 /// The flag may only be written once an answer exists, and it only covers
 /// the profiles the question was about.
 class _Harness {
-  _Harness(this.local, this.uploads, this.container);
+  _Harness(this.local, this.uploads, this.selections, this.container);
 
   final LocalStore local;
 
   /// Every uid the upload actually ran for.
   final List<String> uploads;
+
+  /// The band selection each run was handed — null when the caller moved
+  /// everything, a set when the artist ticked a subset.
+  final List<Set<String>?> selections;
   final ProviderContainer container;
 }
 
@@ -50,6 +54,7 @@ Future<_Harness> _pump(
     await local.markCloudUploadOffered('uid_test', [kTestAccountId]);
   }
   final uploads = <String>[];
+  final selections = <Set<String>?>[];
 
   final container = ProviderContainer(overrides: [
     localStoreProvider.overrideWithValue(local),
@@ -64,8 +69,9 @@ Future<_Harness> _pump(
       firestoreProvider.overrideWithValue(db)
     else
       cloudUploadRunnerProvider.overrideWithValue(runner ??
-          (uid, {onProgress}) async {
+          (uid, {selectedBandIds, onProgress}) async {
             uploads.add(uid);
+            selections.add(selectedBandIds);
             return null;
           }),
   ]);
@@ -100,7 +106,7 @@ Future<_Harness> _pump(
     await tester.tap(find.text('sign in'));
     await tester.pumpAndSettle();
   }
-  return _Harness(local, uploads, container);
+  return _Harness(local, uploads, selections, container);
 }
 
 const _title = 'Move your profiles to this account?';
@@ -230,7 +236,7 @@ void main() {
     // failure (a denied write) wore the same sentence as a flaky network —
     // "it will resume on the next launch" — and resumed into the same wall
     // forever. Nobody, the artist and us included, could see what threw.
-    await _pump(tester, runner: (uid, {onProgress}) async {
+    await _pump(tester, runner: (uid, {selectedBandIds, onProgress}) async {
       throw CloudUploadException(
         FirebaseException(
             plugin: 'cloud_firestore',
@@ -254,7 +260,7 @@ void main() {
 
   testWidgets('an offline move keeps the promise it makes — and the flag that '
       'makes it true', (tester) async {
-    final h = await _pump(tester, runner: (uid, {onProgress}) async {
+    final h = await _pump(tester, runner: (uid, {selectedBandIds, onProgress}) async {
       throw CloudUploadException(
         FirebaseException(
             plugin: 'cloud_firestore',
@@ -303,5 +309,103 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(_title), findsOneWidget);
+  });
+
+  /// Two eligible local bands, so the offer becomes a per-profile choice. The
+  /// device is seeded with one; a second is written before the sign-in, the
+  /// same way [_pump]'s "new question" test does it.
+  Future<_Harness> pumpTwoBands(WidgetTester tester,
+      {FirebaseFirestore? db}) async {
+    final h = await _pump(tester, signIn: false, db: db);
+    await h.local.saveAccountsRegistry(const AccountsRegistry(
+      accounts: [
+        BandAccount(id: kTestAccountId, name: 'Solo Act', createdAtMs: 0),
+        BandAccount(id: 'acc_second', name: 'The Other Band', createdAtMs: 1),
+      ],
+      activeId: kTestAccountId,
+    ));
+    // Mount app state so a real migration can flip onto the moved profile.
+    h.container.read(appStateProvider);
+    await tester.tap(find.text('sign in'));
+    await tester.pumpAndSettle();
+    return h;
+  }
+
+  testWidgets('the offer lists each eligible profile with a checkbox; '
+      'unchecking one moves only the rest', (tester) async {
+    final h = await pumpTwoBands(tester);
+
+    // Both profiles are on the sheet, each with a checkbox — this is the whole
+    // change: a per-profile choice where there used to be one yes/no.
+    expect(find.text('Solo Act'), findsOneWidget);
+    expect(find.text('The Other Band'), findsOneWidget);
+    expect(find.byType(Checkbox), findsNWidgets(2));
+    // All ticked by default, so the button offers to move both.
+    expect(find.text('Move 2 profiles'), findsOneWidget);
+
+    // Untick the second band.
+    await tester.tap(find.text('The Other Band'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Move 1 profile'));
+    await tester.pumpAndSettle();
+
+    expect(h.uploads, ['uid_test']);
+    expect(h.selections.single, {kTestAccountId},
+        reason: 'only the ticked profile moves; the unticked one is left out '
+            'of the set the migrator is handed');
+  });
+
+  testWidgets('every profile is checked by default — one confirm still moves '
+      'them all', (tester) async {
+    final h = await pumpTwoBands(tester);
+
+    // No un-ticking: the old "move everything" outcome is the zero-effort one.
+    await tester.tap(find.text('Move 2 profiles'));
+    await tester.pumpAndSettle();
+
+    expect(h.uploads, ['uid_test']);
+    expect(h.selections.single, {kTestAccountId, 'acc_second'});
+  });
+
+  testWidgets('unchecking every profile disables the move — nothing is moved '
+      'and it is not called a success', (tester) async {
+    final h = await pumpTwoBands(tester);
+
+    await tester.tap(find.text('Solo Act'));
+    await tester.tap(find.text('The Other Band'));
+    await tester.pumpAndSettle();
+
+    // The primary action is dead rather than moving zero profiles.
+    final button = tester.widget<FilledButton>(find.byType(FilledButton));
+    expect(button.onPressed, isNull);
+    // The way out that IS live records the answer and moves nothing.
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(h.uploads, isEmpty);
+  });
+
+  testWidgets('end to end: the unchecked profile stays on the device while the '
+      'checked one lands in the cloud account', (tester) async {
+    // The strongest proof of an unchecked profile's fate — driven through the
+    // REAL migrator over a fake Firestore, not a recording stub.
+    final db = FakeFirebaseFirestore();
+    final h = await pumpTwoBands(tester, db: db);
+
+    // Leave 'The Other Band' on the device.
+    await tester.tap(find.text('The Other Band'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move 1 profile'));
+    await tester.pumpAndSettle();
+
+    final bands = db.collection('users').doc('uid_test').collection('bands');
+    expect((await bands.doc(kTestAccountId).get()).exists, isTrue,
+        reason: 'the checked profile moved into the account');
+    expect((await bands.doc('acc_second').get()).exists, isFalse,
+        reason: 'the unchecked profile was never uploaded');
+    // …and it is still on the device: in the local registry, nothing deleted.
+    expect(h.local.readAccountsRegistry()!.accounts.map((b) => b.id),
+        ['acc_second'],
+        reason: 'an unchecked profile stays local, untouched');
   });
 }

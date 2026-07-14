@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme.dart';
 import '../../data/cloud_migrator.dart';
+import '../../data/repository/account_data_repository.dart';
 import '../../domain/band_account.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../state/route_depth.dart';
+import '../../widgets/profile_switcher.dart';
 
 /// Moves this device's local profiles into [uid]'s account, reporting each
 /// profile as it lands, and returning the id of the band the profile should
@@ -22,6 +25,7 @@ import '../../state/route_depth.dart';
 /// answer) can be tested without a live Firestore behind them.
 typedef CloudUploadRunner = Future<String?> Function(
   String uid, {
+  Set<String>? selectedBandIds,
   void Function(String bandName, int done, int total)? onProgress,
 });
 
@@ -29,7 +33,7 @@ final cloudUploadRunnerProvider = Provider<CloudUploadRunner?>((ref) {
   final ambient = ref.watch(firestoreProvider);
   if (ambient == null) return null;
   final sessions = ref.watch(accountSessionsProvider);
-  return (uid, {onProgress}) => CloudMigrator(
+  return (uid, {selectedBandIds, onProgress}) => CloudMigrator(
         local: ref.read(localStoreProvider),
         secure: ref.read(secureStoreProvider),
         // The TARGET account's OWN Firestore, not the ambient one. The ambient
@@ -41,7 +45,8 @@ final cloudUploadRunnerProvider = Provider<CloudUploadRunner?>((ref) {
         // that is doing its job. main() resolves the resumed upload the same
         // way, for the same reason.
         db: sessions.sessionFor(uid)?.firestore ?? ambient,
-      ).uploadLocalBands(uid, onProgress: onProgress);
+      ).uploadLocalBands(uid,
+          selectedBandIds: selectedBandIds, onProgress: onProgress);
 });
 
 /// Invisible wrapper that watches for a sign-in and offers to move this
@@ -144,11 +149,13 @@ class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
     ];
     // …and anything left to ASK about? The flag means "this account
     // answered about THESE profiles", never "answered, ever" — a profile
-    // created after the first answer is a new question.
+    // created after the first answer is a new question. A profile already
+    // answered (declined before) is silenced, not re-offered: the way to move
+    // it after a "not now" is the permanent Settings door.
     final answered = local.readCloudUploadOfferedBands(uid).toSet();
     final unanswered = [
       for (final band in worthMoving)
-        if (!answered.contains(band.id)) band.id,
+        if (!answered.contains(band.id)) band,
     ];
     if (unanswered.isEmpty) {
       _pending = null;
@@ -168,41 +175,39 @@ class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
     // Held across the awaits: another route settling must not stack a second
     // dialog on top of the offer already asking.
     _running = true;
-    final s = context.s;
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(s.t('account.profile_upload.title')),
-        content: Text(s.t('account.profile_upload.body')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(s.t('account.profile_upload.decline')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(s.t('account.profile_upload.accept')),
-          ),
-        ],
-      ),
+    // The rows' methods summaries read the LOCAL band each is about — the
+    // ambient repository may already be the cloud mirror this sign-in brought
+    // up, which knows nothing of these bands and would print "not set up" for
+    // every one of them.
+    final localRepo =
+        LocalStoreRepository(local, () => ref.read(secureStoreProvider));
+    final selected = await showMoveProfilesDialog(
+      context,
+      ref,
+      unanswered,
+      dataSource: localRepo,
     );
     // Dismissed without an answer (barrier tap, back button): the question
-    // stands, so nothing is recorded and the next chance asks it again.
-    if (accepted == null) {
+    // stands, so nothing is recorded and the next chance asks it again. A
+    // decline is an empty list — answered, moving nothing.
+    if (selected == null) {
       _running = false;
       return;
     }
     _pending = null;
-    await local.markCloudUploadOffered(uid, unanswered);
-    // The signed-in user may have changed while the dialog sat open.
-    if (accepted != true ||
+    await local
+        .markCloudUploadOffered(uid, [for (final b in unanswered) b.id]);
+    // A decline moves nothing; and the signed-in user may have changed while
+    // the dialog sat open.
+    if (selected.isEmpty ||
         !mounted ||
         ref.read(authControllerProvider).user?.uid != uid) {
       _running = false;
       return;
     }
     try {
-      await runCloudUpload(context, ref, uid);
+      await runCloudUpload(context, ref, uid,
+          selectedBandIds: selected.toSet());
     } finally {
       _running = false;
     }
@@ -217,8 +222,9 @@ class _CloudUploadOfferGateState extends ConsumerState<CloudUploadOfferGate> {
 Future<void> runCloudUpload(
   BuildContext context,
   WidgetRef ref,
-  String uid,
-) async {
+  String uid, {
+  Set<String>? selectedBandIds,
+}) async {
   final upload = ref.read(cloudUploadRunnerProvider);
   if (upload == null) return;
   final s = context.s;
@@ -254,7 +260,8 @@ Future<void> runCloudUpload(
   CloudUploadException? failure;
   String? migratedBandId;
   try {
-    migratedBandId = await upload(uid, onProgress: (band, done, total) {
+    migratedBandId = await upload(uid, selectedBandIds: selectedBandIds,
+        onProgress: (band, done, total) {
       progress.value = s.t('account.profile_upload.progress_profile', {
         'profile': band,
         'done': '$done',
@@ -311,5 +318,128 @@ Future<void> _activateMigrated(
       return;
     }
     await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+}
+
+/// The move-in question, with a checkbox per profile when there is a choice to
+/// make. Returns the ids to move — every profile ticked by default, so "move
+/// everything" is still one confirm and the old all-or-nothing outcome is the
+/// zero-effort one. An empty list is a decline ("Not now"): answered, moving
+/// nothing. Null is a dismissal (barrier tap, Back): no answer, the question
+/// stands. Those are the three outcomes the gate tells apart — a decline is
+/// remembered per profile, a dismissal is not.
+///
+/// A single eligible profile gets no checkbox: there is nothing to choose
+/// between, so it stays the plain confirm the offer has always been, and its
+/// "Move profiles" button reads exactly as before.
+///
+/// [dataSource] overrides where each row's methods summary is read from — the
+/// caller passes the local store's repository so a local band's payment
+/// methods still render while a freshly signed-in cloud account is the active
+/// profile (its mirror knows nothing of these bands).
+Future<List<String>?> showMoveProfilesDialog(
+  BuildContext context,
+  WidgetRef ref,
+  List<BandAccount> profiles, {
+  AccountDataRepository? dataSource,
+}) {
+  return showDialog<List<String>>(
+    context: context,
+    builder: (context) =>
+        _MoveProfilesDialog(profiles: profiles, dataSource: dataSource),
+  );
+}
+
+class _MoveProfilesDialog extends StatefulWidget {
+  const _MoveProfilesDialog({required this.profiles, this.dataSource});
+
+  final List<BandAccount> profiles;
+  final AccountDataRepository? dataSource;
+
+  @override
+  State<_MoveProfilesDialog> createState() => _MoveProfilesDialogState();
+}
+
+class _MoveProfilesDialogState extends State<_MoveProfilesDialog> {
+  // All ticked by default — the artist who wants the old "move everything"
+  // outcome does nothing but confirm.
+  late final Set<String> _selected = {for (final b in widget.profiles) b.id};
+
+  void _toggle(String id) => setState(() {
+        if (!_selected.remove(id)) _selected.add(id);
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final c = context.lt;
+    final single = widget.profiles.length == 1;
+    final count = _selected.length;
+    // Honest about the selection: one profile reads "profile", several read
+    // "N profiles", and none disables the button (below) rather than lie.
+    final moveLabel = count <= 1
+        ? s.t('account.profile_upload.move_one')
+        : s.t('account.profile_upload.move_selected', {'count': '$count'});
+    return AlertDialog(
+      scrollable: true,
+      title: Text(s.t('account.profile_upload.title')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            s.t('account.profile_upload.body'),
+            style: TextStyle(
+              fontFamily: kFontBody,
+              fontSize: 13.5,
+              height: 1.45,
+              color: c.textSecondary,
+            ),
+          ),
+          if (!single) ...[
+            const SizedBox(height: 12),
+            Text(
+              s.t('account.profile_upload.pick_hint'),
+              style: TextStyle(
+                fontFamily: kFontBody,
+                fontSize: 12.5,
+                color: c.textMuted,
+              ),
+            ),
+            const SizedBox(height: 4),
+            for (final band in widget.profiles)
+              ProfileRow(
+                band: band,
+                enabled: true,
+                dataSource: widget.dataSource,
+                onTap: () => _toggle(band.id),
+                trailing: Checkbox(
+                  value: _selected.contains(band.id),
+                  onChanged: (_) => _toggle(band.id),
+                ),
+              ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          // A decline: answered, moving nothing.
+          onPressed: () => Navigator.of(context).pop(<String>[]),
+          child: Text(s.t('account.profile_upload.decline')),
+        ),
+        FilledButton(
+          // Nothing ticked has nothing to move — the button says so by being
+          // dead rather than moving zero profiles and calling it a success.
+          onPressed: count == 0
+              ? null
+              : () => Navigator.of(context).pop(
+                    single
+                        ? [widget.profiles.single.id]
+                        : _selected.toList(),
+                  ),
+          child: Text(single ? s.t('account.profile_upload.accept') : moveLabel),
+        ),
+      ],
+    );
   }
 }
