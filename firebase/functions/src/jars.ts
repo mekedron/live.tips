@@ -7,6 +7,7 @@
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { ipQuotaKey, newJarId, newSecret, sha256Hex, verifySecret } from "./auth";
 import { DIRECT_HOPS, clientIp } from "./client-ip";
+import { requireFreshSession } from "./devices";
 import { IP_HASH_SALT } from "./params";
 import {
   CREATES_PER_IP_PER_HOUR,
@@ -51,20 +52,31 @@ function requireJarId(data: Record<string, unknown>): string {
 
 /**
  * Owner-or-secret authorization for update/delete/seen: the caller either
- * owns the jar (ownerUid) or presents the jar secret. Returns the jar doc.
+ * owns the jar (ownerUid) or presents the jar secret. Returns the jar doc and
+ * whether a valid jar secret was presented.
+ *
+ * `viaSecret` is what the callers gate the revocation watermark on. The jar
+ * secret is the root credential and stands on its own — a caller holding it
+ * need not be a fresh session. But the owner-uid path rides only the Firebase
+ * session, and onCall accepts a still-valid ID token for up to ~1h after the
+ * kill switch fired; so an owner-only caller must clear requireFreshSession
+ * before it may mutate the jar (updateJarProfile could swap the payout
+ * methods to a thief's). Computed independently of the ownerUid short-circuit
+ * so an owner who ALSO presents the secret is credited the secret.
  */
 async function authorizeJar(
   jarId: string,
   uid: string,
   secret: unknown,
-): Promise<JarDoc> {
+): Promise<{ jar: JarDoc; viaSecret: boolean }> {
   const firestore = db();
   const [jarSnap, authSnap] = await firestore.getAll(jarRef(firestore, jarId), jarAuthRef(firestore, jarId));
   const jar = jarSnap?.data() as JarDoc | undefined;
   const secretHash = authSnap?.get("secretHash") as string | undefined;
   if (!jar || !secretHash) throw new HttpsError("not-found", "not found");
-  if (jar.ownerUid === uid) return jar;
-  if (secret !== undefined && verifySecret(secret, secretHash)) return jar;
+  const viaSecret = secret !== undefined && verifySecret(secret, secretHash);
+  if (jar.ownerUid === uid) return { jar, viaSecret };
+  if (viaSecret) return { jar, viaSecret };
   throw new HttpsError("permission-denied", "unauthorized");
 }
 
@@ -176,7 +188,12 @@ export async function updateJarProfileHandler(request: CallableRequest): Promise
   const profile = validateProfile(profileRaw as Record<string, unknown>);
   if (!profile.ok) throw new HttpsError("invalid-argument", profile.error);
 
-  await authorizeJar(jarId, uid, data["secret"]);
+  const { viaSecret } = await authorizeJar(jarId, uid, data["secret"]);
+  // Owner-uid path rides only the Firebase session, which onCall accepts for
+  // ~1h past the kill switch. Gate it on the revocation watermark so a revoked
+  // session cannot swap the payout methods to a thief's. A secret-bearing
+  // caller holds the root credential and is exempt.
+  if (!viaSecret) await requireFreshSession(db(), uid, request);
   const now = Date.now();
   await jarRef(db(), jarId).update({
     profile: profile.value,
@@ -201,7 +218,11 @@ export async function deleteJarHandler(request: CallableRequest): Promise<{ ok: 
   const uid = requireUid(request);
   const data = dataObject(request);
   const jarId = requireJarId(data);
-  await authorizeJar(jarId, uid, data["secret"]);
+  const { viaSecret } = await authorizeJar(jarId, uid, data["secret"]);
+  // Same watermark gate as updateJarProfile: a revoked owner-uid session must
+  // not be able to delete (deface) the artist's tip pages. Secret-bearing
+  // callers are exempt.
+  if (!viaSecret) await requireFreshSession(db(), uid, request);
   await purgeJar(db(), jarId);
   return { ok: true };
 }
@@ -240,7 +261,13 @@ export async function jarSeenHandler(request: CallableRequest): Promise<{ ok: tr
   const uid = requireUid(request);
   const data = dataObject(request);
   const jarId = requireJarId(data);
-  const jar = await authorizeJar(jarId, uid, data["secret"]);
+  const { jar, viaSecret } = await authorizeJar(jarId, uid, data["secret"]);
+  // The lowest-value of the three (it only bumps the keep-alive clock), but
+  // gated for the same reason and at trivial cost: jarSeen is the daily
+  // re-push, not a hot path, and already reads two jar docs — one more read of
+  // the watermark is proportionate, and a revoked session should not be able
+  // to keep an abandoned jar alive. Secret-bearing callers are exempt.
+  if (!viaSecret) await requireFreshSession(db(), uid, request);
 
   const now = Date.now();
   const today = Math.floor(now / DAY_MS);
