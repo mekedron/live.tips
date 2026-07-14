@@ -193,6 +193,7 @@ class LiveSessionController extends Notifier<LiveState?> {
         onRemoteRequests: _applyRemoteRequests,
         onTipsUpdated: _applyUpdatedTips,
         onRemoteEnded: _onRemoteEnded,
+        onLeadershipTaken: _onLeadershipTaken,
       ),
     );
     _coordinator = coordinator;
@@ -288,6 +289,22 @@ class LiveSessionController extends Notifier<LiveState?> {
     final current = state;
     if (current == null || !(_coordinator?.publishesRequests ?? false)) return;
     _publisher?.onOpenChanged(current.session);
+  }
+
+  /// This device took a dead leader's session over (cloud only): it is the
+  /// fan page's one voice now, so re-arm the request window and republish
+  /// the queue exactly the way a leading start does in [_begin] — the old
+  /// leader may have died with its last publish unsent. Same gate as there:
+  /// bands that never enabled the feature skip the relay round-trip, and
+  /// the session's own request state arrived off `live/current` before the
+  /// takeover fired (the doc listener delivers requests before it bids).
+  void _onLeadershipTaken() {
+    final current = state;
+    if (current == null || !(_coordinator?.publishesRequests ?? false)) return;
+    if (current.session.requestsOpen ||
+        ref.read(appStateProvider).band.songRequests.enabled) {
+      _publisher?.onOpenChanged(current.session);
+    }
   }
 
   void _markPollOk() {

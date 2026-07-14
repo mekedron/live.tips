@@ -76,6 +76,7 @@ class SessionEvents {
     required this.onRemoteRequests,
     required this.onTipsUpdated,
     required this.onRemoteEnded,
+    required this.onLeadershipTaken,
   });
 
   /// Freshly arrived tips, chronological. NOT exactly-once — the consumer
@@ -109,6 +110,14 @@ class SessionEvents {
   /// The session was stopped on ANOTHER device (cloud sessions only) — the
   /// controller tears down without a summary; the stopping device owns it.
   final void Function() onRemoteEnded;
+
+  /// THIS device just took a dead leader's session over (cloud sessions
+  /// only; the lease lapsed). The transports are already up — the controller
+  /// republishes the jar request state, because the fan page listens to the
+  /// leader alone and the old one may have died with its last publish
+  /// unsent. Never fires on a leading START: [SessionCoordinator.start]
+  /// returns with leadership settled and the controller publishes there.
+  final void Function() onLeadershipTaken;
 }
 
 /// The account's coordination doc (`users/{uid}/live/current`), decoded.

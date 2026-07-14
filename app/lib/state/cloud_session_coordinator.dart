@@ -39,11 +39,14 @@ import 'session_coordinator.dart';
 /// delayed, and dedupe by tip id makes the echo safe.
 ///
 /// The lease: the leader stamps `leaderLeaseUntilMs = now + 45s` on every
-/// poll tick. A follower that watches the lease go stale by more than two
-/// minutes may take leadership over (transaction again) — but only when it
-/// has the band's Stripe key to poll with. A zombie leader returning from a
-/// long sleep keeps polling harmlessly: its tip writes are idempotent and
-/// its stop still flips the same doc.
+/// poll tick. ANY follower that watches the lease go stale by more than two
+/// minutes may take leadership over (transaction again) — leading is serving
+/// the jar (the relay channel, the tips subcollection, the lease itself),
+/// and the Stripe key gates only the poller: a key-less usurper polls
+/// [NullTipSource], exactly like the key-less device that STARTS a session
+/// does. A zombie leader returning from a long sleep keeps polling
+/// harmlessly: its tip writes are idempotent and its stop still flips the
+/// same doc.
 class CloudSessionCoordinator implements SessionCoordinator {
   CloudSessionCoordinator({
     required FirebaseFirestore db,
@@ -53,7 +56,6 @@ class CloudSessionCoordinator implements SessionCoordinator {
     required AccountDataRepository repository,
     required TipSource source,
     required TipChannel? relay,
-    required bool canLead,
     required int pollIntervalSec,
     required SessionEvents events,
   })  : _db = db,
@@ -63,7 +65,6 @@ class CloudSessionCoordinator implements SessionCoordinator {
         _repo = repository,
         _source = source,
         _relay = relay,
-        _canLead = canLead,
         _pollIntervalSec = pollIntervalSec,
         _events = events;
 
@@ -95,7 +96,6 @@ class CloudSessionCoordinator implements SessionCoordinator {
   final AccountDataRepository _repo;
   final TipSource _source;
   final TipChannel? _relay;
-  final bool _canLead;
   final int _pollIntervalSec;
   final SessionEvents _events;
 
@@ -425,10 +425,15 @@ class CloudSessionCoordinator implements SessionCoordinator {
   }
 
   /// Follower-side: claims leadership when the lease has been stale for
-  /// [staleMs] — but only with a Stripe key to poll with; a key-less device
-  /// (someone's tablet on the merch table) stays a follower forever.
+  /// [staleMs]. ANY follower may bid — the leader is the only reader of the
+  /// jar's pendingTips queue, so a takeover refused is a fan-page feed
+  /// orphaned for the rest of the set (#70). This used to demand a Stripe
+  /// key ("someone's tablet on the merch table stays a follower forever"),
+  /// which conflated *can poll Stripe* with *can serve the jar*: a key-less
+  /// usurper leads exactly like a key-less starter already does — relay up,
+  /// [NullTipSource] for the poll, lease heartbeaten.
   void _maybeTakeOver() {
-    if (_disposed || _isLeader || _takingOver || !_canLead) return;
+    if (_disposed || _isLeader || _takingOver) return;
     if (_lastLeaseUntilMs <= 0) return; // doc not seen yet
     if (leaseAlive(_lastLeaseUntilMs, nowMs: _nowMs)) return; // leader alive
     _takingOver = true;
@@ -457,6 +462,10 @@ class CloudSessionCoordinator implements SessionCoordinator {
           // Backfill the whole session window: the old leader may have died
           // with unpublished tips. Duplicates are deduped by id everywhere.
           await _startLeading(session, backfill: true);
+          // The fan page's voice moved with the lease: the old leader may
+          // also have died with request state unsent, so the controller
+          // re-arms/republishes — the same publish a leading start makes.
+          if (!_disposed) _events.onLeadershipTaken();
         }
       } catch (_) {
         // Offline or contended — the next tick reconsiders.

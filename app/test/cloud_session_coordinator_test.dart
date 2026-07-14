@@ -557,8 +557,10 @@ void main() {
   });
 
   test(
-      'lease takeover: a follower with a Stripe key claims a session whose '
-      'leader went silent past the staleness window, then polls', () async {
+      'lease takeover: a follower claims a session whose leader went silent '
+      'past the staleness window, then polls with its Stripe key (the '
+      'key-less takeover is pinned in cloud_relay_leadership_test.dart)',
+      () async {
     final a = await device('dev_a', batches: [
       [d('cs_1', 500)],
     ]);

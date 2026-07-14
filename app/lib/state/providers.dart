@@ -1239,9 +1239,6 @@ final sessionCoordinatorFactoryProvider =
           repository: repo,
           source: source,
           relay: relay,
-          // Leadership needs the band's Stripe key to poll with; without
-          // one this device can only ever follow.
-          canLead: app.apiKey != null,
           pollIntervalSec: app.settings.pollIntervalSec,
           events: events,
         );
