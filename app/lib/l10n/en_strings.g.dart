@@ -170,6 +170,7 @@ const Map<String, String> kEnStrings = {
   "language.title": "Language",
   "live.adjust_goal": "Adjust goal",
   "live.adjust_goal_title": "Adjust tonight's goal",
+  "live.back_to_home": "Back to home — the session keeps running",
   "live.cancel": "Cancel",
   "live.connecting": "Connecting…",
   "live.connection_trouble": "Connection trouble",

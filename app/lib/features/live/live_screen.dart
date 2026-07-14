@@ -156,6 +156,14 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     }
   }
 
+  /// The deliberate way OFF the stage: back to the shell, session untouched —
+  /// it keeps collecting in [liveSessionProvider] (a root-level notifier that
+  /// outlives this route), and Home's goal card shows "Return to session"
+  /// for the way back. The accidental path (system back / swipe) keeps its
+  /// confirmation dialog in [_handleBack]; this arrow is the one-tap answer
+  /// the artist reaches for on purpose.
+  void _leaveStage() => Navigator.of(context).pop();
+
   // The lock button only shows where device auth exists (see canLock), so
   // locking just flips the flag — the OS prompt comes on unlock.
   void _lock() => ref.read(liveSessionProvider.notifier).setLocked(true);
@@ -314,6 +322,13 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
                         children: [
                           Row(
                             children: [
+                              StageGlassButton(
+                                icon: Icons.arrow_back_rounded,
+                                tooltip: context.s.t('live.back_to_home'),
+                                size: wide ? 44 : 40,
+                                onTap: _leaveStage,
+                              ),
+                              const SizedBox(width: 8),
                               StageGlassButton(
                                 icon: Icons.stop_rounded,
                                 iconColor: const Color(0xFFFF6B5E),
