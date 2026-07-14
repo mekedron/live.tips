@@ -13,10 +13,12 @@ import '../../domain/tip_method.dart';
 import '../../features/live/live_screen.dart' show formatDuration;
 import '../../state/live_session_controller.dart';
 import '../../state/providers.dart';
+import '../../state/root_world.dart';
 import '../../widgets/tip_tile.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/method_badges.dart';
 import '../shell/app_shell.dart';
+import 'session_detail_screen.dart';
 
 // Session-first, then the relay methods artists lean on day to day, with
 // Stripe last — it's the recommended path but the least-used tab in
@@ -466,7 +468,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     for (final s in sessions) ...[
                       _SessionCard(
                         session: s,
-                        onTap: () => _showSessionDetail(context, s),
+                        onTap: () => _openSessionDetail(context, s),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -703,89 +705,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     }
     return [
       for (final s in sessions) ...[
-        _SessionCard(session: s, onTap: () => _showSessionDetail(context, s)),
+        _SessionCard(session: s, onTap: () => _openSessionDetail(context, s)),
         const SizedBox(height: 12),
       ],
     ];
   }
 
-  void _showSessionDetail(BuildContext context, LiveSession session) {
-    final c = context.lt;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.7,
-        builder: (context, scrollController) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-              child: Column(
-                children: [
-                  Text(
-                    formatAmount(
-                      session.totalMinor,
-                      session.currency,
-                      approximate: session.isMixedCurrency,
-                    ),
-                    style: moneyStyle(34, c.text),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    context.s.t('history.session_meta', {
-                          'date': DateFormat(
-                            'EEE, MMM d',
-                          ).format(session.startedAt),
-                          'count': session.count,
-                          'duration': formatDuration(
-                            session.elapsed(session.endedAt),
-                          ),
-                        }) +
-                        (session.goalReached
-                            ? context.s.t('history.goal_reached_suffix')
-                            : ''),
-                    style: TextStyle(
-                      fontFamily: kFontBody,
-                      fontSize: 13,
-                      color: c.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: c.divider),
-            Expanded(
-              child: session.tips.isEmpty
-                  ? Center(
-                      child: Text(
-                        context.s.t('history.session_no_tips'),
-                        style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 13.5,
-                          color: c.textSecondary,
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                      itemCount: session.tips.length,
-                      separatorBuilder: (_, _) =>
-                          Divider(height: 1, color: c.divider),
-                      itemBuilder: (context, index) {
-                        final tip = session
-                            .tips[session.tips.length - 1 - index];
-                        return TipTile(
-                          tip: tip,
-                          showTime: true,
-                          onTap: _stripeTap(tip),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+  /// The dedicated session page (#67), where the bottom sheet used to be.
+  /// Root-bound: the page describes THIS profile's history, so an
+  /// account/profile switch pops it instead of leaving one band's night
+  /// rendered over another's world (#48).
+  void _openSessionDetail(BuildContext context, LiveSession session) {
+    Navigator.of(context).push(
+      RootBoundRoute<void>(
+        builder: (_) => SessionDetailScreen(session: session),
       ),
     );
   }
