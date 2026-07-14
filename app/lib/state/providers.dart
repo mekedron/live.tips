@@ -246,6 +246,22 @@ class AppStateNotifier extends Notifier<AppState> {
   /// (see [_reloadForProfile]) — the session-end listener in [build] runs it.
   bool _reloadHeld = false;
 
+  /// The next profile reload is the tail of an account EXIT — a sign-out or an
+  /// account delete — that fell back to a DIFFERENT account the artist did not
+  /// choose. That reload must NOT auto-open the fallback account's lone profile
+  /// ([_pickActive] would): the artist tapped "sign out" and is owed the
+  /// chooser, where the accounts are listed and "On this device" is visible,
+  /// not a silent drop onto some other profile's home. Set by the exit paths
+  /// ([holdPickerAfterAccountExit]) before they flip the active account; the
+  /// reload the flip schedules holds its band question open ('' → the picker,
+  /// [ProfilePickScreen] asRoot). One-shot — a cold boot still opens directly.
+  bool _pickerAfterExit = false;
+
+  /// See [_pickerAfterExit]. The sign-out / delete-account flows call this
+  /// BEFORE changing the active account, so the reload that change triggers
+  /// lands on the chooser instead of auto-entering the fallback's profile.
+  void holdPickerAfterAccountExit() => _pickerAfterExit = true;
+
   @override
   AppState build() {
     // Profile switches (directory) and remote snapshots (cloud revision)
@@ -352,6 +368,15 @@ class AppStateNotifier extends Notifier<AppState> {
     // sends that state to the create-a-profile step. Several bands and no
     // stored answer is the OTHER open question — the picker asks it.
     var accountId = _pickActive(accounts, repo.readActiveBandId(), ask: ask);
+    if (_pickerAfterExit) {
+      // This reload is the tail of a sign-out / account delete that fell back
+      // to an account the artist did not choose. Hold the band question open so
+      // RootGate shows the chooser (accounts listed, "On this device" present),
+      // never a silent drop onto the fallback account's lone profile. Consumed
+      // here, so the next ordinary reload/boot resolves normally.
+      _pickerAfterExit = false;
+      accountId = '';
+    }
     String? apiKey;
     String? relaySecret;
     if (accountId.isNotEmpty) {

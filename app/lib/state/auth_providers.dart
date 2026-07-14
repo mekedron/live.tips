@@ -667,6 +667,13 @@ final signOutProvider = Provider<Future<void> Function()>((ref) => () async {
       final uid = ref.read(authControllerProvider).user?.uid ??
           ref.read(accountsDirectoryProvider).activeAccountId;
       if (uid == kLocalAccountId) return;
+      // The artist tapped "Sign out" — they are LEAVING this account, not
+      // choosing where to land. The fall-back account (the local mode, or
+      // whichever the directory makes active) must not have its lone profile
+      // auto-opened under them: they are owed the chooser, so they can see
+      // where they now are. Set BEFORE the sign-out flips the active account,
+      // because that flip is what schedules the reload this guards.
+      ref.read(appStateProvider.notifier).holdPickerAfterAccountExit();
       // Named while the account's repository is still standing: the sign-out
       // below swaps it for the local profile's, and the only list of the
       // profiles this device cached goes with it.

@@ -54,6 +54,11 @@ Future<List<String>> runAccountDelete(WidgetRef ref) async {
     await local.wipeAccount(id);
   }
   await local.clearActiveCloudBand(uid);
+  // The account is gone; the device falls back to another it did not choose.
+  // Land on the chooser, not auto-opened into the fallback's lone profile —
+  // the same rule sign-out obeys (holdPickerAfterAccountExit). Set before the
+  // sign-out flips the active account, which is what schedules that reload.
+  ref.read(appStateProvider.notifier).holdPickerAfterAccountExit();
   await ref.read(authControllerProvider.notifier).signOut();
   // No collapsed switcher row this time: an ordinary sign-out keeps the entry
   // so you can come back, and there is nothing left to come back to.
