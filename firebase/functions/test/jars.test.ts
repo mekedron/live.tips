@@ -362,6 +362,20 @@ describe("setJarRequests payload validation", () => {
 });
 
 describe("setJarRequests partial-write semantics", () => {
+  it("open:true on a jar that never held a queue seeds an empty songs map", async () => {
+    // Go-live arms `open` before the leader publishes anything; without the
+    // seed the page/queue readers meet requestsLive with no `songs` (the
+    // 2026-07-14 prod 500).
+    seedOwnedJar({});
+
+    await setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, open: true }, nowSec()));
+
+    const l = live()!;
+    expect(l["songs"]).toEqual({});
+    expect(l["currency"]).toBe("eur");
+    expect(l["openUntilMs"] as number).toBeGreaterThan(Date.now());
+  });
+
   it("open:true stamps a now+12h window without clobbering published songs", async () => {
     seedOwnedJar({
       requestsLive: { openUntilMs: 0, updatedAtMs: 1, currency: "eur", songs: { s1: { t: 900, c: 3, s: "q" } } },

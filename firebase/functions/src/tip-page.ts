@@ -384,6 +384,9 @@ export function renderTipPage(
   let requestsSection = "";
   let requestsFormInfo = "";
   if (requestsOpen && requestsConfig && requestsLive) {
+    // `songs` can be missing on the stored doc: setJarRequests arms `open` at
+    // go-live before the leader has published any queue. Never trust the shape.
+    const liveSongs = requestsLive.songs ?? {};
     const stripeRequests = requestsConfig.methods.includes("stripe");
     // Relay methods a request may ride: offered on the jar, listed by the
     // artist, AND collecting the jar's own currency (requests are priced in
@@ -394,7 +397,7 @@ export function renderTipPage(
     const fmt = (minor: number) => formatMinor(minor, initial.factor);
 
     const cards = requestsConfig.songs.map((song) => {
-      const entry = requestsLive.songs[song.id];
+      const entry = liveSongs[song.id];
       const done = entry !== undefined && (entry.s === "p" || entry.s === "k");
       const badge = entry?.s === "p" ? "Played" : entry?.s === "k" ? "Skipped" : "";
       const standing =
@@ -454,7 +457,7 @@ export function renderTipPage(
         ...(s.priceMinor !== undefined ? { priceMinor: s.priceMinor } : {}),
         ...(stripeRequests && s.stripeUrl !== undefined ? { stripeUrl: s.stripeUrl } : {}),
       })),
-      queue: requestsLive.songs,
+      queue: liveSongs,
     };
     requestsAttr = ` data-requests="${escapeHtml(JSON.stringify(reqJson))}"`;
     // The votes × price readout that stands in for the amount input.

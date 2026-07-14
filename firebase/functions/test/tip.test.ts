@@ -400,6 +400,29 @@ describe("GET /t/:jarId/queue", () => {
     });
   });
 
+  it("survives a doc armed open before any queue publish — no songs map at all", async () => {
+    // The go-live shape: setJarRequests({open:true}) lands before the leader's
+    // first queue push, so requestsLive holds no `songs`. Both readers (page
+    // and poll) crashed on this in prod on 2026-07-14; never trust the shape.
+    jar = requestsJar();
+    delete (jar["requestsLive"] as Doc)["songs"];
+
+    const queue = rawRes();
+    await tipHandler(getReq(`/t/${JAR_ID}/queue`), queue as never);
+    expect(queue.statusCode).toBe(200);
+    expect(JSON.parse(queue.payload)).toEqual({
+      open: true,
+      currency: "eur",
+      updatedAtMs: 0,
+      songs: [],
+    });
+
+    const page = rawRes();
+    await tipHandler(getReq(`/t/${JAR_ID}`), page as never);
+    expect(page.statusCode).toBe(200);
+    expect(page.payload).toContain("Wonderwall"); // the section renders, standings empty
+  });
+
   it("reports a lapsed window as closed, with no song data", async () => {
     jar = requestsJar();
     (jar["requestsLive"] as Doc)["openUntilMs"] = Date.now() - 1;

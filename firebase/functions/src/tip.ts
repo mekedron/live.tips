@@ -117,9 +117,11 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
     }
     sendJson(res, {
       open: true,
-      currency: live.currency,
+      currency: live.currency ?? jar.profile.currency,
       updatedAtMs: live.updatedAtMs,
-      songs: Object.entries(live.songs).map(([id, e]) => ({
+      // `songs` can be missing: setJarRequests arms `open` at go-live before
+      // the leader has published any queue. Never trust the stored shape.
+      songs: Object.entries(live.songs ?? {}).map(([id, e]) => ({
         id,
         totalMinor: e.t,
         count: e.c,

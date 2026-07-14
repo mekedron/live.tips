@@ -285,6 +285,13 @@ export async function setJarRequestsHandler(request: CallableRequest): Promise<{
     // call wins over the queue's re-arm.
     update["requestsLive.openUntilMs"] = openRaw ? now + REQUESTS_OPEN_MS : 0;
     update["requestsLive.updatedAtMs"] = now;
+    // Go-live arms `open` before the leader has published any queue; without
+    // this a fresh doc holds requestsLive with no `songs` and the page/queue
+    // readers would meet an undefined map.
+    if (openRaw === true && queueRaw === undefined && jar.requestsLive?.songs === undefined) {
+      update["requestsLive.songs"] = {};
+      update["requestsLive.currency"] = jar.profile.currency;
+    }
   }
 
   await jarRef(db(), jarId).update(update);
