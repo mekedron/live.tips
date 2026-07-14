@@ -127,7 +127,11 @@ The loop that worked, in order. It is deliberately serial at the merge point.
    agents. When it does, message them to `git fetch && git rebase origin/main` and re-read the
    files — an agent that finishes against a stale tree builds on a screen that no longer exists.
 3. **Merge one at a time, run the full suite after each.** `flutter test` (~600) and
-   `cd firebase/functions && npm test` (~210), plus `flutter analyze` / `npm run check`. Two
+   `cd firebase/functions && npm test` (~210), plus `flutter analyze` / `npm run check`. **If the
+   diff touched `firebase/firestore.rules`, also run the perimeter suite:
+   `cd firebase/rules-test && npm test`** — it loads the real rules into the Firestore emulator and
+   proves the denials (the Flutter/functions fakes enforce no rules, so they cannot see a regression
+   here). Needs Java for the emulator. Two
    independently correct fixes can contradict each other: #27's removal named a successor profile
    while #28's rule says an account with several profiles asks the artist. The merge produced a
    bug neither branch had. **When that happens, reconcile the rule — do not adjust the test.**

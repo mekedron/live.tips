@@ -1,0 +1,17 @@
+{
+  "name": "livetips-rules-test",
+  "private": true,
+  "description": "Emulator-backed tests for firebase/firestore.rules — the app's only authorization perimeter.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-livetips-rules --config ../firebase.json \"vitest run\"",
+    "test:watch": "firebase emulators:exec --only firestore --project demo-livetips-rules --config ../firebase.json \"vitest\"",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "firebase-tools": "^13.35.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.7"
+  }
+}
