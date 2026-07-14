@@ -209,6 +209,20 @@ bool accountActionAllowed(
   return false;
 }
 
+/// The SWITCH-shaped half of the guard: same voice, same sentence, narrower
+/// question. A switch — of a profile or of an account — moves nothing on any
+/// other device, so only THIS device's participation refuses it
+/// ([AppStateNotifier.profileSwitchBlock]). Asking [accountActionAllowed]
+/// here is how a live set on the artist's phone locked every other device
+/// out of the "Welcome back" chooser (#66): the account-wide block reports
+/// the ACCOUNT's session, not this device's.
+bool switchActionAllowed(BuildContext context, WidgetRef ref) {
+  final block = ref.read(appStateProvider.notifier).profileSwitchBlock;
+  if (block == null) return true;
+  _refusalVoice(context)(accountBlockMessage(context, block));
+  return false;
+}
+
 /// The profile name as a tap target with a chevron — tapping opens the
 /// switcher. Used in the home headers.
 class BandNameButton extends ConsumerWidget {
@@ -382,8 +396,10 @@ Future<void> showProfileSheet(BuildContext context, WidgetRef ref) async {
 /// * **Sign in to another account**, at the foot: the door to an account this
 ///   device has never seen.
 ///
-/// A live session refuses every one of those, with the same guard and the same
-/// sentence the profile sheet uses ([accountActionAllowed]).
+/// A live session on THIS device refuses every one of those, with the same
+/// guard and the same sentence the profile sheet uses. One live on ANOTHER
+/// device refuses only the destructive acts ([accountActionAllowed]) — the
+/// flips themselves are this device's own business ([switchActionAllowed]).
 Future<void> showAccountSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
     context: context,
@@ -410,7 +426,10 @@ Future<bool> switchTo(
   // needs a fresh approval from the artist's own phone.
   if (!await ensureVenueReapproval(context, ref)) return false;
   if (!context.mounted) return false;
-  if (!accountActionAllowed(context, ref)) return false;
+  // The switch guard, not the account one: a device that is not IN the
+  // running session may move freely — including onto the live band, where
+  // the Join banner takes over (#66).
+  if (!switchActionAllowed(context, ref)) return false;
 
   final directory = ref.read(accountsDirectoryProvider);
   final notifier = ref.read(appStateProvider.notifier);
@@ -921,7 +940,7 @@ class _AccountSheet extends ConsumerWidget {
     final navigator = Navigator.of(context);
     // A sign-in lands on a fresh account's profile question — the same flip
     // every other row here performs, so it asks the same guard first.
-    if (!accountActionAllowed(context, ref)) return;
+    if (!switchActionAllowed(context, ref)) return;
     final user = await showSignInSheet(context);
     if (user != null && navigator.canPop()) navigator.pop();
   }
@@ -1350,6 +1369,11 @@ class ProfileRow extends ConsumerWidget {
     final name = band.name.trim().isEmpty
         ? context.s.t('widgets.profile_switcher.unnamed')
         : band.name;
+    // The account's running session, wherever it runs — the same lease-checked
+    // fact the guards read. On a second device this badge is the answer to
+    // "which profile do I pick to join the set?" (#66); on the device in the
+    // session it simply tells the truth about the row that is already active.
+    final live = band.id == ref.watch(liveBandIdProvider);
     return Material(
       color: active ? c.accentSoft : Colors.transparent,
       borderRadius: BorderRadius.circular(14),
@@ -1387,6 +1411,14 @@ class ProfileRow extends ConsumerWidget {
                               ),
                             ),
                           ),
+                          if (live) ...[
+                            const SizedBox(width: 8),
+                            LtPill(
+                              label: context.s
+                                  .t('widgets.profile_switcher.live_badge'),
+                              icon: Icons.sensors_rounded,
+                            ),
+                          ],
                           if (lastUsed) ...[
                             const SizedBox(width: 8),
                             LtPill(

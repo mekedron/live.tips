@@ -648,22 +648,43 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(accounts: renamed.accounts);
   }
 
-  /// Why bands can't be switched/added/removed right now, or null when they
-  /// can. A running session is bound to its band's key, payment link, and
-  /// relay socket — the app must never show band B around band A's live
-  /// numbers. On a cloud profile a session running on ANY device blocks too:
-  /// the account is live somewhere, and reshuffling bands under it invites
-  /// exactly the cross-band leaks the local guard exists to prevent.
+  /// Why the account's DATA can't be reshaped right now — add/remove a
+  /// profile, sign out, delete, move — or null when it can. A running
+  /// session is bound to its band's key, payment link, and relay socket —
+  /// the app must never show band B around band A's live numbers. And on a
+  /// cloud profile a session running on ANY device blocks these too: the
+  /// account is live somewhere, and mutating the profiles under it (removing
+  /// the live band, deleting the account) yanks the set out from under the
+  /// device that runs it.
   ///
-  /// Every refusal names its reason, and add/switch/remove all ask THIS —
-  /// three guards that disagreed is how a dead session used to lock the
-  /// account out of its own switcher.
+  /// Every refusal names its reason. SWITCHING is not in this list any more:
+  /// which band this device shows is this device's own business
+  /// ([profileSwitchBlock]) — keying the switch on the account-wide session
+  /// is how a live set on the artist's phone locked every OTHER device out
+  /// of the chooser (#66).
   AccountActionBlock? get accountActionBlock {
     if (state.switching) return AccountActionBlock.switching;
     return _sessionBlock;
   }
 
   bool get accountActionsBlocked => accountActionBlock != null;
+
+  /// Why the active profile can't be SWAPPED right now, or null when it can.
+  ///
+  /// A switch is a device-local act: the stored answer (activeBandId) never
+  /// leaves this device, so the only session that refuses it is THIS
+  /// device's own — a running/joined set holds the band's key, coordinator
+  /// and relay socket, and must be stopped (or left) before the profile
+  /// under it moves. The account being live on ANOTHER device refuses
+  /// nothing here: a second device must be able to pick a profile and join
+  /// the set, not be locked out by it (#66).
+  AccountActionBlock? get profileSwitchBlock {
+    if (state.switching) return AccountActionBlock.switching;
+    if (ref.read(liveSessionProvider) != null) {
+      return AccountActionBlock.localSession;
+    }
+    return null;
+  }
 
   /// The session half of the guard, without the mid-switch flag — the only
   /// form usable from inside an action that has already set `switching`.
@@ -672,14 +693,7 @@ class AppStateNotifier extends Notifier<AppState> {
       return AccountActionBlock.localSession;
     }
     try {
-      final info = ref.read(activeSessionProvider).value;
-      // `active` never gets cleared by a crashed tab — only the lease decays.
-      // Trusting the flag alone left the account blocked forever; the lease
-      // is what CloudSessionCoordinator itself believes (it takes a stale one
-      // over), so the guard must believe the same thing.
-      if (info != null &&
-          info.active &&
-          CloudSessionCoordinator.leaseAlive(info.leaderLeaseUntilMs)) {
+      if (ref.read(liveBandIdProvider) != null) {
         return AccountActionBlock.remoteSession;
       }
     } catch (_) {
@@ -688,25 +702,16 @@ class AppStateNotifier extends Notifier<AppState> {
     return null;
   }
 
-  /// One exception to the session guard, and only one: moving TO the band the
-  /// account is already live on. That is what tapping Join on the banner does
-  /// — the session is that band's, so following it can't show band B around
-  /// band A's numbers. Every other move stays refused.
-  bool _switchAllowedTo(String id) {
-    final block = _sessionBlock;
-    if (block == null) return true;
-    if (block != AccountActionBlock.remoteSession) return false;
-    try {
-      return ref.read(activeSessionProvider).value?.bandId == id;
-    } catch (_) {
-      return false;
-    }
-  }
+  /// Whether a band switch may proceed: only THIS device's own running
+  /// session refuses one (see [profileSwitchBlock] — a switch moves nothing
+  /// on any other device). Checked again after the keychain awaits, which is
+  /// why it cannot read [profileSwitchBlock] itself: the switch in flight
+  /// has already set `switching`.
+  bool get _switchAllowed => ref.read(liveSessionProvider) == null;
 
   /// Makes [id] the active band. Returns false when refused (unknown id,
-  /// mid-switch, or a live session — here or on another device, unless [id]
-  /// IS that session's band). Exits demo mode — switching is an explicit
-  /// "work with this band now".
+  /// mid-switch, or a live session on THIS device). Exits demo mode —
+  /// switching is an explicit "work with this band now".
   Future<bool> switchAccount(String id) async {
     if (state.switching) return false;
     if (id == state.accountId) {
@@ -716,7 +721,7 @@ class AppStateNotifier extends Notifier<AppState> {
       return true;
     }
     if (!_registry.contains(id)) return false;
-    if (!_switchAllowedTo(id)) return false;
+    if (!_switchAllowed) return false;
 
     final previousId = state.accountId;
     state = state.copyWith(switching: true);
@@ -739,7 +744,7 @@ class AppStateNotifier extends Notifier<AppState> {
     }
 
     // The guard ran before the awaits — re-check nothing slipped in.
-    if (!_switchAllowedTo(id)) {
+    if (!_switchAllowed) {
       state = state.copyWith(switching: false);
       return false;
     }
@@ -1273,6 +1278,24 @@ final activeSessionProvider = StreamProvider<ActiveSessionInfo?>((ref) {
       .doc('users/$profileId/live/current')
       .snapshots()
       .map((snap) => ActiveSessionInfo.fromData(snap.data()));
+});
+
+/// The band the signed-in account is LIVE on right now — on any device — or
+/// null when it isn't. ONE definition of "the account is live", shared by
+/// the remote half of the account-action guard and by every surface that
+/// marks the live profile (the switcher's and the chooser's LIVE badge).
+///
+/// `active` never gets cleared by a crashed tab — only the lease decays.
+/// Trusting the flag alone left the account blocked forever; the lease is
+/// what CloudSessionCoordinator itself believes (it takes a stale one over),
+/// so everything reading this must believe the same thing.
+final liveBandIdProvider = Provider<String?>((ref) {
+  final info = ref.watch(activeSessionProvider).value;
+  if (info == null || !info.active) return null;
+  if (!CloudSessionCoordinator.leaseAlive(info.leaderLeaseUntilMs)) {
+    return null;
+  }
+  return info.bandId;
 });
 
 /// Live Stripe API surface for one-off calls (recent tips, jar setup), or

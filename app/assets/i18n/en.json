@@ -880,6 +880,7 @@
   "widgets.profile_switcher.add_subtitle": "Another profile with its own links, goal and history.",
   "widgets.profile_switcher.discard_body": "You started this profile but didn't add a payment method, so there's nothing to keep. Switching away deletes it.",
   "widgets.profile_switcher.discard_title": "Discard this unfinished profile?",
+  "widgets.profile_switcher.live_badge": "LIVE",
   "widgets.profile_switcher.live_running_hint": "A live session is running — stop it to switch.",
   "widgets.profile_switcher.new_profile": "New profile",
   "widgets.profile_switcher.signed_in_as": "Signed in as {account}",
