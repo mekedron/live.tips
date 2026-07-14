@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  REVOLUT_NOTE_MAX,
   buildMobilePayUrl,
   buildMonzoUrl,
   buildRedirectUrl,
   buildRevolutUrl,
   clampNote,
   packNote,
+  packRequestNote,
 } from "../src/deeplinks";
 import type { JarProfile } from "../src/types";
 
@@ -36,6 +38,30 @@ describe("packNote / clampNote", () => {
   it("clamps by code points with an ellipsis", () => {
     expect(clampNote("abcdef", 6)).toBe("abcdef");
     expect(clampNote("abcdefg", 6)).toBe("abcde…");
+  });
+});
+
+describe("packRequestNote", () => {
+  it("puts the song title FIRST, then the packed name/message", () => {
+    expect(packRequestNote("Wonderwall", "Ada", "play it slow"))
+      .toBe("♪ Wonderwall — Ada: play it slow");
+    expect(packRequestNote("Wonderwall", "", "play it slow"))
+      .toBe("♪ Wonderwall — play it slow");
+  });
+
+  it("is just the marked title when there is no name or message", () => {
+    expect(packRequestNote("Wonderwall", "", "")).toBe("♪ Wonderwall");
+  });
+
+  it("survives the Revolut 64-char clamp with the title intact", () => {
+    // A maximum-length (60 code points) title plus a long message: the clamp
+    // eats the message, never the song — the artist must be able to read
+    // which song was paid for off the payment itself.
+    const title = "T".repeat(60);
+    const note = clampNote(packRequestNote(title, "Ada", "x".repeat(150)), REVOLUT_NOTE_MAX);
+    expect([...note].length).toBe(REVOLUT_NOTE_MAX);
+    expect(note.startsWith(`♪ ${title}`)).toBe(true);
+    expect(note.endsWith("…")).toBe(true);
   });
 });
 
@@ -92,6 +118,19 @@ describe("URL composition", () => {
       message: "great set",
     });
     expect(url).toBe("https://monzo.me/daniel/2.50?d=Ada%3A+great+set");
+  });
+
+  it("notes a song-request tip title-first", () => {
+    const url = new URL(buildRedirectUrl(profile, {
+      method: "revolut",
+      amountMinor: 600,
+      name: "Ada",
+      message: "",
+      songId: "s1",
+      songTitle: "Wonderwall",
+    })!);
+    expect(url.searchParams.get("note")).toBe("♪ Wonderwall — Ada");
+    expect(url.searchParams.get("amount")).toBe("600");
   });
 
   it("returns null for unconfigured methods", () => {

@@ -5,9 +5,12 @@ import {
   isValidJarId,
   scrubText,
   validateProfile,
+  validateRequestsConfig,
+  validateRequestsQueue,
   validateTip,
 } from "../src/validate";
 import { methodCurrency } from "../src/methods";
+import type { RequestsConfig } from "../src/types";
 
 const baseProfile = {
   artistName: "Käärijä",
@@ -174,6 +177,113 @@ describe("validateProfile", () => {
   });
 });
 
+describe("validateRequestsConfig", () => {
+  const song = (over: Record<string, unknown> = {}) => ({ id: "s1", title: "Wonderwall", ...over });
+  const base = {
+    enabled: true,
+    defaultPriceMinor: 300,
+    methods: ["stripe", "revolut"],
+    songs: [song()],
+  };
+
+  it("accepts a valid config", () => {
+    const r = validateRequestsConfig({ ...base }, "eur");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.songs[0]).toEqual({ id: "s1", title: "Wonderwall" });
+      expect(r.value.methods).toEqual(["stripe", "revolut"]);
+    }
+  });
+
+  it("keeps per-song artist, price override and stripe link", () => {
+    const r = validateRequestsConfig({
+      ...base,
+      songs: [song({ artist: "Oasis", priceMinor: 500, stripeUrl: "https://buy.stripe.com/abc123" })],
+    }, "eur");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.songs[0]).toEqual({
+        id: "s1", title: "Wonderwall", artist: "Oasis", priceMinor: 500,
+        stripeUrl: "https://buy.stripe.com/abc123",
+      });
+    }
+  });
+
+  it("rejects unknown keys at both levels", () => {
+    expect(validateRequestsConfig({ ...base, evil: 1 }, "eur").ok).toBe(false);
+    expect(validateRequestsConfig({ ...base, songs: [song({ url: "https://x" })] }, "eur").ok).toBe(false);
+  });
+
+  it("caps the library at 100 songs", () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => song({ id: `s${i}` }));
+    expect(validateRequestsConfig({ ...base, songs: many(100) }, "eur").ok).toBe(true);
+    expect(validateRequestsConfig({ ...base, songs: many(101) }, "eur").ok).toBe(false);
+  });
+
+  it("rejects bad song ids and duplicates", () => {
+    for (const id of ["", "a b", "x".repeat(33), "s/1", "ä"]) {
+      expect(validateRequestsConfig({ ...base, songs: [song({ id })] }, "eur").ok).toBe(false);
+    }
+    expect(validateRequestsConfig({ ...base, songs: [song(), song()] }, "eur").ok).toBe(false);
+  });
+
+  it("caps titles at 60 code points and requires one", () => {
+    expect(validateRequestsConfig({ ...base, songs: [song({ title: "x".repeat(60) })] }, "eur").ok).toBe(true);
+    expect(validateRequestsConfig({ ...base, songs: [song({ title: "x".repeat(61) })] }, "eur").ok).toBe(false);
+    expect(validateRequestsConfig({ ...base, songs: [song({ title: "" })] }, "eur").ok).toBe(false);
+    expect(validateRequestsConfig({ ...base, songs: [song({ artist: "x".repeat(61) })] }, "eur").ok).toBe(false);
+  });
+
+  it("bounds prices against the JAR currency", () => {
+    expect(validateRequestsConfig({ ...base, defaultPriceMinor: 99 }, "eur").ok).toBe(false);
+    expect(validateRequestsConfig({ ...base, defaultPriceMinor: 1_000_001 }, "eur").ok).toBe(false);
+    expect(validateRequestsConfig({ ...base, defaultPriceMinor: 3.5 }, "eur").ok).toBe(false);
+    expect(validateRequestsConfig({ ...base, songs: [song({ priceMinor: 99 })] }, "eur").ok).toBe(false);
+    // JPY is zero-decimal: 99 is a fine price there.
+    expect(validateRequestsConfig({ ...base, defaultPriceMinor: 99, songs: [song({ priceMinor: 99 })] }, "jpy").ok).toBe(true);
+  });
+
+  it("routes stripeUrl through the payment-link allowlist", () => {
+    for (const stripeUrl of ["https://evil.com/x", "https://buy.stripe.com/a/b", "http://buy.stripe.com/x"]) {
+      expect(validateRequestsConfig({ ...base, songs: [song({ stripeUrl })] }, "eur").ok).toBe(false);
+    }
+  });
+
+  it("requires at least one song and a real price when enabled", () => {
+    expect(validateRequestsConfig({ ...base, songs: [] }, "eur").ok).toBe(false);
+    expect(validateRequestsConfig({ ...base, defaultPriceMinor: 0 }, "eur").ok).toBe(false);
+    // Disabled configs may park an empty library and a 0 default.
+    expect(validateRequestsConfig({ ...base, enabled: false, defaultPriceMinor: 0, songs: [] }, "eur").ok).toBe(true);
+  });
+
+  it("rejects methods outside the fixed set, and repeats", () => {
+    expect(validateRequestsConfig({ ...base, methods: ["paypal"] }, "eur").ok).toBe(false);
+    expect(validateRequestsConfig({ ...base, methods: ["revolut", "revolut"] }, "eur").ok).toBe(false);
+  });
+});
+
+describe("validateRequestsQueue", () => {
+  it("accepts live totals and rejects out-of-range or junk entries", () => {
+    const r = validateRequestsQueue({ s1: { t: 900, c: 3, s: "q" }, s2: { t: 0, c: 0, s: "k" } });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value["s1"]).toEqual({ t: 900, c: 3, s: "q" });
+
+    expect(validateRequestsQueue({ "bad id": { t: 0, c: 0, s: "q" } }).ok).toBe(false);
+    expect(validateRequestsQueue({ s1: { t: -1, c: 0, s: "q" } }).ok).toBe(false);
+    expect(validateRequestsQueue({ s1: { t: 100_000_001, c: 0, s: "q" } }).ok).toBe(false);
+    expect(validateRequestsQueue({ s1: { t: 0, c: 10_001, s: "q" } }).ok).toBe(false);
+    expect(validateRequestsQueue({ s1: { t: 0, c: 0, s: "x" } }).ok).toBe(false);
+    expect(validateRequestsQueue({ s1: { t: 0, c: 0, s: "q", extra: 1 } }).ok).toBe(false);
+  });
+
+  it("caps the queue at 150 entries", () => {
+    const entries = (n: number) =>
+      Object.fromEntries(Array.from({ length: n }, (_, i) => [`s${i}`, { t: 0, c: 0, s: "q" }]));
+    expect(validateRequestsQueue(entries(150)).ok).toBe(true);
+    expect(validateRequestsQueue(entries(151)).ok).toBe(false);
+  });
+});
+
 describe("validateTip", () => {
   const tip = {
     method: "revolut",
@@ -216,6 +326,79 @@ describe("validateTip", () => {
   it("requires a turnstile token and rejects unknown fields", () => {
     expect(validateTip({ ...tip, turnstileToken: "" }, "eur").ok).toBe(false);
     expect(validateTip({ ...tip, extra: true }, "eur").ok).toBe(false);
+  });
+
+  it("rejects votes on a plain tip", () => {
+    expect(validateTip({ ...tip, votes: 2 }, "eur").ok).toBe(false);
+  });
+});
+
+describe("validateTip: song requests", () => {
+  const config: RequestsConfig = {
+    enabled: true,
+    defaultPriceMinor: 300,
+    methods: ["stripe", "revolut", "mobilepay", "monzo"],
+    songs: [
+      { id: "s1", title: "Wonderwall" },
+      { id: "s2", title: "Hallelujah", priceMinor: 500 },
+    ],
+  };
+  const req = { method: "revolut", songId: "s1", name: "Ada", message: "", turnstileToken: "tok" };
+
+  it("prices the request server-side: (priceMinor ?? default) × votes", () => {
+    const r = validateTip({ ...req }, "eur", config);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.amountMinor).toBe(300); // default price, votes default 1
+      expect(r.value.songId).toBe("s1");
+      expect(r.value.songTitle).toBe("Wonderwall");
+    }
+    const o = validateTip({ ...req, songId: "s2", votes: 3 }, "eur", config);
+    expect(o.ok).toBe(true);
+    // The per-song override wins over the default.
+    if (o.ok) expect(o.value.amountMinor).toBe(1500);
+  });
+
+  it("refuses a fan-sent amount alongside songId", () => {
+    const r = validateTip({ ...req, amountMinor: 100 }, "eur", config);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(422);
+  });
+
+  it("bounds votes at 1–50, integers only", () => {
+    expect(validateTip({ ...req, votes: 0 }, "eur", config).ok).toBe(false);
+    expect(validateTip({ ...req, votes: 51 }, "eur", config).ok).toBe(false);
+    expect(validateTip({ ...req, votes: 1.5 }, "eur", config).ok).toBe(false);
+    expect(validateTip({ ...req, votes: 50 }, "eur", config).ok).toBe(true); // 300×50 = €150, in bounds
+  });
+
+  it("rejects a computed amount outside the currency bounds", () => {
+    // 25 000 × 50 votes = 1 250 000 minor — over the €10 000 ceiling.
+    const pricey: RequestsConfig = { ...config, songs: [{ id: "s1", title: "W", priceMinor: 25_000 }] };
+    expect(validateTip({ ...req, votes: 50 }, "eur", pricey).ok).toBe(false);
+    expect(validateTip({ ...req, votes: 40 }, "eur", pricey).ok).toBe(true);
+  });
+
+  it("rejects unknown songs, malformed ids and a missing config", () => {
+    expect(validateTip({ ...req, songId: "nope" }, "eur", config).ok).toBe(false);
+    expect(validateTip({ ...req, songId: "../x" }, "eur", config).ok).toBe(false);
+    expect(validateTip({ ...req }, "eur", undefined).ok).toBe(false);
+  });
+
+  it("only sells through methods the artist listed", () => {
+    const revolutOnly: RequestsConfig = { ...config, methods: ["revolut"] };
+    expect(validateTip({ ...req, method: "mobilepay" }, "eur", revolutOnly).ok).toBe(false);
+    expect(validateTip({ ...req }, "eur", revolutOnly).ok).toBe(true);
+  });
+
+  it("refuses methods that collect a different currency than the jar's", () => {
+    // Requests are priced in the jar's currency. Monzo collects GBP, so on a
+    // EUR jar the same number would bill the fan in the wrong currency.
+    expect(validateTip({ ...req, method: "monzo" }, "eur", config).ok).toBe(false);
+    expect(validateTip({ ...req, method: "monzo" }, "gbp", config).ok).toBe(true);
+    // MobilePay collects EUR: fine on a EUR jar, refused on a GBP one.
+    expect(validateTip({ ...req, method: "mobilepay" }, "eur", config).ok).toBe(true);
+    expect(validateTip({ ...req, method: "mobilepay" }, "gbp", config).ok).toBe(false);
   });
 });
 

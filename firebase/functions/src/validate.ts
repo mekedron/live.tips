@@ -4,7 +4,7 @@
 /// accepted as free-form strings anywhere in the API.
 
 import { methodCurrency } from "./methods";
-import type { JarProfile, TipRequest } from "./types";
+import type { JarProfile, RequestsConfig, RequestsLive, RequestSong, TipRequest } from "./types";
 
 export type Ok<T> = { ok: true; value: T };
 export type Err = { ok: false; status: number; error: string };
@@ -184,14 +184,153 @@ export function validateProfile(body: Record<string, unknown>): Result<JarProfil
 }
 
 // ---------------------------------------------------------------------------
+// Song requests (#64): the artist-published config and live queue state.
+
+/** Same shape as the app's install ids: URL-safe, a safe Firestore map key. */
+const SONG_ID = /^[A-Za-z0-9_-]{1,32}$/;
+
+const REQUESTS_CONFIG_KEYS = ["enabled", "defaultPriceMinor", "methods", "songs"] as const;
+const SONG_KEYS = ["id", "title", "artist", "priceMinor", "stripeUrl"] as const;
+/** Requests may also be paid over Stripe; the relay POST still only ever sees
+ * the three relay methods (a Stripe request never reaches it). */
+const REQUEST_METHODS = ["stripe", "revolut", "mobilepay", "monzo"] as const;
+
+export const MAX_REQUEST_SONGS = 100;
+export const MAX_REQUEST_VOTES = 50;
+
+export function validateRequestsConfig(
+  body: Record<string, unknown>,
+  jarCurrency: string,
+): Result<RequestsConfig> {
+  const unknown = rejectUnknownKeys(body, REQUESTS_CONFIG_KEYS, "requestsConfig");
+  if (unknown) return unknown;
+
+  const enabled = body["enabled"];
+  if (typeof enabled !== "boolean") return err(422, "enabled must be a boolean");
+
+  const { min, max } = amountBounds(jarCurrency);
+
+  // Requests are priced in the JAR's currency (the config carries no currency
+  // of its own), so every price bounds-checks against it.
+  const defaultPrice = body["defaultPriceMinor"];
+  if (typeof defaultPrice !== "number" || !Number.isSafeInteger(defaultPrice)) {
+    return err(422, "defaultPriceMinor must be an integer");
+  }
+  // A disabled config may park a 0 default (nothing is purchasable through
+  // it); an enabled one must carry a chargeable price.
+  if ((enabled || defaultPrice !== 0) && (defaultPrice < min || defaultPrice > max)) {
+    return err(422, `defaultPriceMinor must be between ${min} and ${max}`);
+  }
+
+  const methodsRaw = body["methods"];
+  if (!Array.isArray(methodsRaw)) return err(422, "methods must be an array");
+  const methods: string[] = [];
+  for (const m of methodsRaw) {
+    if (typeof m !== "string" || !(REQUEST_METHODS as readonly string[]).includes(m)) {
+      return err(422, "methods must be a subset of stripe, revolut, mobilepay, monzo");
+    }
+    if (methods.includes(m)) return err(422, "methods must not repeat");
+    methods.push(m);
+  }
+
+  const songsRaw = body["songs"];
+  if (!Array.isArray(songsRaw)) return err(422, "songs must be an array");
+  if (songsRaw.length > MAX_REQUEST_SONGS) {
+    return err(422, `songs must not exceed ${MAX_REQUEST_SONGS} entries`);
+  }
+  if (enabled && songsRaw.length === 0) return err(422, "an enabled config needs at least one song");
+
+  const songs: RequestSong[] = [];
+  const seenIds = new Set<string>();
+  for (const raw of songsRaw) {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      return err(422, "each song must be an object");
+    }
+    const songObj = raw as Record<string, unknown>;
+    const unknownSong = rejectUnknownKeys(songObj, SONG_KEYS, "song");
+    if (unknownSong) return unknownSong;
+
+    const id = songObj["id"];
+    if (typeof id !== "string" || !SONG_ID.test(id)) return err(422, "song id is not valid");
+    // Duplicate ids would make the tip POST's lookup ambiguous.
+    if (seenIds.has(id)) return err(422, "song ids must be unique");
+    seenIds.add(id);
+
+    const title = textField(songObj["title"], "title", { maxCodePoints: 60, maxBytes: 240, required: true });
+    if (!title.ok) return title;
+    const artist = textField(songObj["artist"], "artist", { maxCodePoints: 60, maxBytes: 240 });
+    if (!artist.ok) return artist;
+
+    const song: RequestSong = { id, title: title.value };
+    if (artist.value) song.artist = artist.value;
+
+    if (songObj["priceMinor"] !== undefined) {
+      const price = songObj["priceMinor"];
+      if (typeof price !== "number" || !Number.isSafeInteger(price) || price < min || price > max) {
+        return err(422, `priceMinor must be an integer between ${min} and ${max}`);
+      }
+      song.priceMinor = price;
+    }
+    if (songObj["stripeUrl"] !== undefined) {
+      // The same phishing gate every profile Stripe link passes.
+      const v = songObj["stripeUrl"];
+      if (typeof v !== "string" || !STRIPE_URL.test(v.trim())) {
+        return err(422, "stripeUrl must be a buy.stripe.com or donate.stripe.com payment link");
+      }
+      song.stripeUrl = v.trim();
+    }
+    songs.push(song);
+  }
+
+  return { ok: true, value: { enabled, defaultPriceMinor: defaultPrice, methods, songs } };
+}
+
+const QUEUE_ENTRY_KEYS = ["t", "c", "s"] as const;
+export const MAX_QUEUE_ENTRIES = 150;
+
+/** The live per-song totals the app publishes (requestsLive.songs). */
+export function validateRequestsQueue(
+  body: Record<string, unknown>,
+): Result<RequestsLive["songs"]> {
+  if (Object.keys(body).length > MAX_QUEUE_ENTRIES) {
+    return err(422, `queue must not exceed ${MAX_QUEUE_ENTRIES} entries`);
+  }
+  const songs: RequestsLive["songs"] = {};
+  for (const [id, raw] of Object.entries(body)) {
+    if (!SONG_ID.test(id)) return err(422, "queue song id is not valid");
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      return err(422, "each queue entry must be an object");
+    }
+    const entry = raw as Record<string, unknown>;
+    const unknown = rejectUnknownKeys(entry, QUEUE_ENTRY_KEYS, "queue entry");
+    if (unknown) return unknown;
+    const t = entry["t"];
+    if (typeof t !== "number" || !Number.isSafeInteger(t) || t < 0 || t > 100_000_000) {
+      return err(422, "queue entry t must be an integer between 0 and 100000000");
+    }
+    const c = entry["c"];
+    if (typeof c !== "number" || !Number.isSafeInteger(c) || c < 0 || c > 10_000) {
+      return err(422, "queue entry c must be an integer between 0 and 10000");
+    }
+    const s = entry["s"];
+    if (s !== "q" && s !== "p" && s !== "k") return err(422, "queue entry s must be q, p or k");
+    songs[id] = { t, c, s };
+  }
+  return { ok: true, value: songs };
+}
+
+// ---------------------------------------------------------------------------
 // Tip validation (structure only — the tip endpoint checks method availability
 // against the profile and applies per-jar rate limits)
 
-const TIP_KEYS = ["method", "amountMinor", "name", "message", "turnstileToken"] as const;
+// songId/votes stay OPTIONAL members of the strict key set: pages cached from
+// before the requests feature keep POSTing plain tips unchanged.
+const TIP_KEYS = ["method", "amountMinor", "name", "message", "turnstileToken", "songId", "votes"] as const;
 
 export function validateTip(
   body: Record<string, unknown>,
   jarCurrency: string,
+  requestsConfig?: RequestsConfig,
 ): Result<TipRequest & { turnstileToken: string }> {
   const unknown = rejectUnknownKeys(body, TIP_KEYS, "tip");
   if (unknown) return unknown;
@@ -201,14 +340,57 @@ export function validateTip(
     return err(422, "method must be revolut, mobilepay or monzo");
   }
 
-  // The amount is denominated in the currency the METHOD collects — EUR for a
-  // MobilePay Box, GBP for Monzo — not necessarily the jar's. Bounds (and the
-  // zero-decimal question) have to follow it, or a JPY jar would mis-scale a
-  // MobilePay tip.
-  const amount = body["amountMinor"];
-  const { min, max } = amountBounds(methodCurrency(method, jarCurrency));
-  if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < min || amount > max) {
-    return err(422, `amountMinor must be an integer between ${min} and ${max}`);
+  let amountMinor: number;
+  let songId: string | undefined;
+  let songTitle: string | undefined;
+
+  if (body["songId"] !== undefined) {
+    // Request mode: the SERVER prices the tip from its own config — a fan-sent
+    // amount is refused outright rather than reconciled.
+    if (body["amountMinor"] !== undefined) {
+      return err(422, "amountMinor must not accompany songId");
+    }
+    const idRaw = body["songId"];
+    if (typeof idRaw !== "string" || !SONG_ID.test(idRaw)) return err(422, "songId is not valid");
+    const song = requestsConfig?.songs.find((s) => s.id === idRaw);
+    if (!requestsConfig || !song) return err(422, "unknown song");
+    if (!requestsConfig.methods.includes(method)) {
+      return err(422, "method not available for requests");
+    }
+    // Requests are priced in the jar's currency, so only methods that COLLECT
+    // that currency may carry one: Stripe/Revolut always do, a MobilePay Box
+    // only on a EUR jar, Monzo only on a GBP jar. Anything else would silently
+    // charge the fan the same number in a different currency.
+    if (methodCurrency(method, jarCurrency) !== jarCurrency) {
+      return err(422, "method not available for requests in this currency");
+    }
+    let votes = 1;
+    if (body["votes"] !== undefined) {
+      const v = body["votes"];
+      if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 1 || v > MAX_REQUEST_VOTES) {
+        return err(422, `votes must be an integer between 1 and ${MAX_REQUEST_VOTES}`);
+      }
+      votes = v;
+    }
+    const { min, max } = amountBounds(jarCurrency);
+    amountMinor = (song.priceMinor ?? requestsConfig.defaultPriceMinor) * votes;
+    if (amountMinor < min || amountMinor > max) {
+      return err(422, `votes price the request outside ${min}–${max}`);
+    }
+    songId = idRaw;
+    songTitle = song.title;
+  } else {
+    if (body["votes"] !== undefined) return err(422, "votes require a songId");
+    // The amount is denominated in the currency the METHOD collects — EUR for
+    // a MobilePay Box, GBP for Monzo — not necessarily the jar's. Bounds (and
+    // the zero-decimal question) have to follow it, or a JPY jar would
+    // mis-scale a MobilePay tip.
+    const amount = body["amountMinor"];
+    const { min, max } = amountBounds(methodCurrency(method, jarCurrency));
+    if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount < min || amount > max) {
+      return err(422, `amountMinor must be an integer between ${min} and ${max}`);
+    }
+    amountMinor = amount;
   }
 
   const name = textField(body["name"], "name", { maxCodePoints: 40, maxBytes: 160 });
@@ -227,7 +409,16 @@ export function validateTip(
 
   return {
     ok: true,
-    value: { method, amountMinor: amount, name: name.value, message: message.value, turnstileToken: token },
+    value: {
+      method,
+      amountMinor,
+      name: name.value,
+      message: message.value,
+      turnstileToken: token,
+      // Absent keys, not undefined values: plain tips keep their exact shape
+      // (and Firestore refuses undefined in any case).
+      ...(songId !== undefined && songTitle !== undefined ? { songId, songTitle } : {}),
+    },
   };
 }
 

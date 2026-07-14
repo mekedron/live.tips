@@ -60,6 +60,17 @@ export function packNote(name: string, message: string): string {
   return name || message;
 }
 
+/**
+ * Song-request note: `"♪ Title — name: message"`. The title goes FIRST so the
+ * per-method clamp (Revolut's is 64 code points) sacrifices the fan's message
+ * before the one thing the artist must read off the payment — which song was
+ * paid for. The title is the server's own config lookup, never fan input.
+ */
+export function packRequestNote(title: string, name: string, message: string): string {
+  const rest = packNote(name, message);
+  return rest ? `♪ ${title} — ${rest}` : `♪ ${title}`;
+}
+
 export function clampNote(note: string, maxCodePoints: number): string {
   const points = [...note];
   if (points.length <= maxCodePoints) return note;
@@ -109,7 +120,9 @@ export function bareMethodUrl(profile: JarProfile, method: TipRequest["method"])
 }
 
 export function buildRedirectUrl(profile: JarProfile, tip: TipRequest): string | null {
-  const note = packNote(tip.name, tip.message);
+  const note = tip.songTitle !== undefined
+    ? packRequestNote(tip.songTitle, tip.name, tip.message)
+    : packNote(tip.name, tip.message);
   if (tip.method === "revolut" && profile.methods.revolutUsername) {
     return buildRevolutUrl(profile.methods.revolutUsername, tip.amountMinor, profile.currency, note);
   }

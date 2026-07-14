@@ -14,6 +14,7 @@ import {
   CREATES_PER_UID_PER_DAY,
   DAY_MS,
   MAX_READER_UIDS,
+  REQUESTS_PER_UID_PER_HOUR,
   bumpQuota,
   db,
   expiryTimestamp,
@@ -21,7 +22,7 @@ import {
   jarRef,
   type JarDoc,
 } from "./store";
-import { isValidJarId, validateProfile } from "./validate";
+import { isValidJarId, validateProfile, validateRequestsConfig, validateRequestsQueue } from "./validate";
 
 import type { Firestore } from "firebase-admin/firestore";
 
@@ -200,6 +201,93 @@ export async function updateJarProfileHandler(request: CallableRequest): Promise
     lastSeenDay: Math.floor(now / DAY_MS),
     expiresAt: expiryTimestamp(now),
   });
+  return { ok: true };
+}
+
+/**
+ * How long one "open" lasts. Requests need a live publisher: the deadline is
+ * long enough to survive a whole show without a re-open, and short enough
+ * that a jar whose app died stops selling requests by the next day. Every
+ * queue push while open re-arms it (a publishing leader is proof of life).
+ */
+export const REQUESTS_OPEN_MS = 12 * 3_600_000;
+
+/**
+ * Song requests (#64): publish the library/config, flip the open window, and
+ * push live queue state — any subset per call. All writes are field-targeted
+ * (dot paths), never a doc set: `open` alone must not clobber the queue, a
+ * config push must not touch requestsLive, and NOTHING here touches profile,
+ * lastSeenDay or expiresAt — keep-alive belongs to jarSeen and the daily
+ * profile re-push, and a request flow that stamped it would keep abandoned
+ * jars alive.
+ */
+export async function setJarRequestsHandler(request: CallableRequest): Promise<{ ok: true }> {
+  const uid = requireUid(request);
+  const data = dataObject(request);
+  const jarId = requireJarId(data);
+
+  const configRaw = data["config"];
+  const openRaw = data["open"];
+  const queueRaw = data["queue"];
+  if (configRaw === undefined && openRaw === undefined && queueRaw === undefined) {
+    throw new HttpsError("invalid-argument", "one of config, open or queue is required");
+  }
+  if (openRaw !== undefined && typeof openRaw !== "boolean") {
+    throw new HttpsError("invalid-argument", "open must be a boolean");
+  }
+
+  const { jar, viaSecret } = await authorizeJar(jarId, uid, data["secret"]);
+  // Same watermark gate as updateJarProfile: a revoked owner-uid session must
+  // not keep publishing (or re-pricing) the request catalogue. Secret-bearing
+  // callers hold the root credential and are exempt.
+  if (!viaSecret) await requireFreshSession(db(), uid, request);
+
+  const now = Date.now();
+  // Per-uid, not per-jar: the quota is about a runaway client, and a client
+  // publishes for every jar it holds with the same loop.
+  const allowed = await bumpQuota(
+    db(), `jar-requests-${uid}`, Math.floor(now / 3_600_000), REQUESTS_PER_UID_PER_HOUR, 2 * 3_600_000,
+  );
+  if (!allowed) throw new HttpsError("resource-exhausted", "too many request updates, try later");
+
+  const update: Record<string, unknown> = {};
+
+  if (configRaw !== undefined) {
+    if (typeof configRaw !== "object" || configRaw === null || Array.isArray(configRaw)) {
+      throw new HttpsError("invalid-argument", "config must be an object");
+    }
+    // Prices are bounds-checked against the JAR's currency — requests are
+    // always denominated in it.
+    const config = validateRequestsConfig(configRaw as Record<string, unknown>, jar.profile.currency);
+    if (!config.ok) throw new HttpsError("invalid-argument", config.error);
+    update["requestsConfig"] = config.value;
+  }
+
+  if (queueRaw !== undefined) {
+    if (typeof queueRaw !== "object" || queueRaw === null || Array.isArray(queueRaw)) {
+      throw new HttpsError("invalid-argument", "queue must be an object");
+    }
+    const queue = validateRequestsQueue(queueRaw as Record<string, unknown>);
+    if (!queue.ok) throw new HttpsError("invalid-argument", queue.error);
+    update["requestsLive.songs"] = queue.value;
+    update["requestsLive.currency"] = jar.profile.currency;
+    update["requestsLive.updatedAtMs"] = now;
+    // A queue push while open (or opened by this very call) re-arms the
+    // deadline: a publishing leader is alive, so the window should not lapse
+    // mid-show.
+    if ((jar.requestsLive?.openUntilMs ?? 0) > now || openRaw === true) {
+      update["requestsLive.openUntilMs"] = now + REQUESTS_OPEN_MS;
+    }
+  }
+
+  if (openRaw !== undefined) {
+    // After the queue block on purpose: an explicit open:false in the same
+    // call wins over the queue's re-arm.
+    update["requestsLive.openUntilMs"] = openRaw ? now + REQUESTS_OPEN_MS : 0;
+    update["requestsLive.updatedAtMs"] = now;
+  }
+
+  await jarRef(db(), jarId).update(update);
   return { ok: true };
 }
 

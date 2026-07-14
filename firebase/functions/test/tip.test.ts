@@ -12,20 +12,60 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ipQuotaKey } from "../src/auth";
 
 // ---------------------------------------------------------------------------
-// Module mocks, in the collect-token.test.ts mold: constants keep their
-// meaning, functions the paths under test never reach are absent on purpose.
+// Module mocks: the REAL store module (constants, and above all the real
+// dedupeSignature — the song-request dedupe test below is only worth anything
+// against the production hash) behind an in-memory Firestore fake that
+// carries the whole POST path: transaction, rate doc, pending-tips batch.
+
+type Doc = Record<string, unknown>;
 
 const bumpQuota = vi.fn<(...args: unknown[]) => Promise<boolean>>();
 
-vi.mock("../src/store", () => ({
-  db: () => ({}),
-  jarRef: (_db: unknown, jarId: string) => ({
-    get: async () => ({ data: () => jar }),
-    path: `jars/${jarId}`,
+let jar: Doc | undefined;
+let rateDoc: Doc | undefined;
+let pendingDocs: Doc[] = [];
+
+const pendingCol = {
+  orderBy: () => ({
+    select: () => ({ get: async () => ({ size: pendingDocs.length, docs: [] as { ref: unknown }[] }) }),
   }),
+  doc: () => ({ pending: true }),
+};
+const jarDocRef = {
+  path: `jars/${"j".repeat(26)}`,
+  get: async () => ({ data: () => jar }),
+  collection: () => pendingCol,
+};
+const rateDocRef = { rate: true };
+
+const fakeDb = {
+  runTransaction: (fn: (tx: unknown) => Promise<unknown>) =>
+    fn({
+      getAll: async (...refs: unknown[]) =>
+        refs.map((ref) => {
+          const data = ref === jarDocRef ? jar : rateDoc;
+          return { exists: data !== undefined, data: () => data };
+        }),
+      update(_ref: unknown, patch: Doc) { Object.assign(jar!, patch); },
+      set(ref: unknown, data: Doc) { if (ref === rateDocRef) rateDoc = data; },
+    }),
+  batch: () => {
+    const writes: Doc[] = [];
+    return {
+      set(ref: unknown, data: Doc) { if ((ref as Doc)["pending"] === true) writes.push(data); },
+      delete() {},
+      async commit() { pendingDocs.push(...writes); },
+    };
+  },
+};
+
+vi.mock("../src/store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/store")>()),
+  db: () => fakeDb,
+  jarRef: () => jarDocRef,
+  jarRateRef: () => rateDocRef,
   jarIsLive: (doc: unknown) => doc !== undefined,
   bumpQuota: (...args: unknown[]) => bumpQuota(...args),
-  TIPS_PER_IP_PER_HOUR: 120,
 }));
 
 vi.mock("../src/params", () => ({
@@ -48,19 +88,53 @@ const CLIENT = "203.0.113.9"; // the address the platform saw
 const FORGED = "198.51.100.66"; // the venue's NAT, as typed by the attacker
 const CDN = "216.239.36.53"; // the Hosting hop Cloud Run appended
 
-const jar = {
-  profile: {
-    artistName: "Ana",
-    message: "",
-    currency: "eur",
-    methods: { revolutUsername: "ana" },
-  },
-};
+/** A plain relay jar with live counters — enough for the whole POST path. */
+function plainJar(): Doc {
+  return {
+    profile: {
+      artistName: "Ana",
+      message: "",
+      currency: "eur",
+      methods: { revolutUsername: "ana" },
+    },
+    ownerUid: null,
+    readerUids: [],
+    createdAtMs: 0,
+    lastSeenDay: 0,
+    tipsDay: 0,
+    tipsToday: 0,
+    tipsTotal: 0,
+    expiresAt: { untouched: true },
+  };
+}
+
+/** plainJar plus a published song library and an OPEN request window. */
+function requestsJar(): Doc {
+  return {
+    ...plainJar(),
+    requestsConfig: {
+      enabled: true,
+      defaultPriceMinor: 300,
+      methods: ["revolut"],
+      songs: [
+        { id: "s1", title: "Wonderwall" },
+        { id: "s2", title: "Hallelujah", priceMinor: 500 },
+        { id: "s3", title: "Yesterday" },
+      ],
+    },
+    requestsLive: { openUntilMs: Date.now() + 3_600_000, updatedAtMs: 0, currency: "eur", songs: {} },
+  };
+}
 
 /** A POST /t/:jarId/tips as Cloud Run hands it over: the forged entry the
- * attacker sent on the left, the platform-appended chain on the right. */
-function tipPost(xff: string): never {
-  const body = { method: "revolut", amountMinor: 500, name: "", message: "", turnstileToken: "tok" };
+ * attacker sent on the left, the platform-appended chain on the right.
+ * `bodyOverrides` replaces the default plain-tip body wholesale when it
+ * carries a method of its own. */
+function tipPost(xff: string, bodyOverrides: Doc = {}): never {
+  const body = {
+    method: "revolut", amountMinor: 500, name: "", message: "", turnstileToken: "tok",
+    ...bodyOverrides,
+  };
   return {
     path: `/t/${JAR_ID}/tips`,
     method: "POST",
@@ -70,6 +144,14 @@ function tipPost(xff: string): never {
     headers: { "x-forwarded-for": xff },
     socket: { remoteAddress: "169.254.8.129" },
   } as never;
+}
+
+/** A request-mode body: songId in, amountMinor deliberately OUT. */
+function requestBody(overrides: Doc = {}): Doc {
+  return {
+    method: "revolut", amountMinor: undefined, songId: "s1", name: "Ada", message: "",
+    turnstileToken: "tok", ...overrides,
+  };
 }
 
 function fakeRes() {
@@ -86,6 +168,9 @@ function fakeRes() {
 beforeEach(() => {
   bumpQuota.mockReset();
   verifyTurnstile.mockReset();
+  jar = plainJar();
+  rateDoc = undefined;
+  pendingDocs = [];
 });
 
 describe("tip POST: no quota spent without a Turnstile pass", () => {
@@ -137,5 +222,158 @@ describe("tip POST: the quota key comes from the platform, not the attacker", ()
 
     const keys = new Set(bumpQuota.mock.calls.map((call) => call[1]));
     expect(keys).toEqual(new Set([ipQuotaKey(CLIENT, "test-salt", "tips")]));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Song requests (#64) on the same POST.
+
+const XFF = `${CLIENT}, ${CDN}`;
+
+function allowThrough() {
+  verifyTurnstile.mockResolvedValue(true);
+  bumpQuota.mockResolvedValue(true);
+}
+
+describe("tip POST: song requests", () => {
+  it("prices an accepted request server-side and queues songId + songTitle", async () => {
+    jar = requestsJar();
+    allowThrough();
+    const res = fakeRes();
+
+    // votes × per-song override: 2 × 500, not 2 × 300 and not fan-chosen.
+    await tipHandler(tipPost(XFF, requestBody({ songId: "s2", votes: 2 })), res as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ queued: true });
+    expect(pendingDocs).toHaveLength(1);
+    expect(pendingDocs[0]).toMatchObject({
+      method: "revolut",
+      amountMinor: 1000,
+      currency: "eur",
+      name: "Ada",
+      songId: "s2",
+      songTitle: "Hallelujah",
+    });
+    // The deep link carries the computed amount and the title-first note.
+    const url = new URL(res.body!["redirectUrl"] as string);
+    expect(url.searchParams.get("amount")).toBe("1000");
+    expect(url.searchParams.get("note")).toBe("♪ Hallelujah — Ada");
+  });
+
+  it("falls back to the default price at one vote", async () => {
+    jar = requestsJar();
+    allowThrough();
+    const res = fakeRes();
+
+    await tipHandler(tipPost(XFF, requestBody()), res as never);
+
+    expect(pendingDocs[0]).toMatchObject({ amountMinor: 300, songId: "s1", songTitle: "Wonderwall" });
+  });
+
+  it("is 409 requests_closed when the window has lapsed — before Turnstile spends anything", async () => {
+    jar = requestsJar();
+    (jar["requestsLive"] as Doc)["openUntilMs"] = Date.now() - 1;
+    const res = fakeRes();
+
+    await tipHandler(tipPost(XFF, requestBody()), res as never);
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual({ error: "requests_closed" });
+    // A stale page must not burn the fan's Turnstile solve on a dead sale.
+    expect(verifyTurnstile).not.toHaveBeenCalled();
+    expect(pendingDocs).toHaveLength(0);
+  });
+
+  it("is 409 when requests are configured but disabled, and on a jar with no config at all", async () => {
+    jar = requestsJar();
+    (jar["requestsConfig"] as Doc)["enabled"] = false;
+    const res = fakeRes();
+    await tipHandler(tipPost(XFF, requestBody()), res as never);
+    expect(res.statusCode).toBe(409);
+
+    jar = plainJar(); // dark until a profile carries config
+    const res2 = fakeRes();
+    await tipHandler(tipPost(XFF, requestBody()), res2 as never);
+    expect(res2.statusCode).toBe(409);
+    expect(res2.body).toEqual({ error: "requests_closed" });
+  });
+
+  it("rejects an unknown songId with 422", async () => {
+    jar = requestsJar();
+    allowThrough();
+    const res = fakeRes();
+
+    await tipHandler(tipPost(XFF, requestBody({ songId: "nope" })), res as never);
+
+    expect(res.statusCode).toBe(422);
+    expect(pendingDocs).toHaveLength(0);
+  });
+
+  it("rejects a fan-sent amountMinor alongside songId with 422", async () => {
+    jar = requestsJar();
+    allowThrough();
+    const res = fakeRes();
+
+    await tipHandler(tipPost(XFF, requestBody({ amountMinor: 100 })), res as never);
+
+    expect(res.statusCode).toBe(422);
+    expect(pendingDocs).toHaveLength(0);
+  });
+
+  it("dedupe: two same-priced requests for DIFFERENT songs both queue", async () => {
+    // s1 and s3 both cost the default 300 from the same anonymous fan within
+    // the 60s window — identical method/amount/name/message. Without songId
+    // in the dedupe signature the second paid request would silently vanish.
+    jar = requestsJar();
+    allowThrough();
+
+    const first = fakeRes();
+    await tipHandler(tipPost(XFF, requestBody({ songId: "s1", name: "" })), first as never);
+    const second = fakeRes();
+    await tipHandler(tipPost(XFF, requestBody({ songId: "s3", name: "" })), second as never);
+
+    expect(first.body).toMatchObject({ queued: true });
+    expect(second.body).toMatchObject({ queued: true });
+    expect(pendingDocs).toHaveLength(2);
+    expect(pendingDocs.map((d) => d["songId"])).toEqual(["s1", "s3"]);
+
+    // The SAME song twice is still a duplicate: accepted, not re-queued.
+    const third = fakeRes();
+    await tipHandler(tipPost(XFF, requestBody({ songId: "s3", name: "" })), third as never);
+    expect(third.statusCode).toBe(200);
+    expect(third.body).toMatchObject({ queued: false });
+    expect(pendingDocs).toHaveLength(2);
+  });
+});
+
+describe("tip POST: plain tips are untouched by the requests feature", () => {
+  it("queues a plain tip with no request fields, even while requests are open", async () => {
+    jar = requestsJar(); // open window, but this fan just tips
+    allowThrough();
+    const res = fakeRes();
+
+    await tipHandler(tipPost(XFF, { name: "Ada", message: "great show" }), res as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ queued: true });
+    expect(pendingDocs).toHaveLength(1);
+    const doc = pendingDocs[0]!;
+    expect(doc).toMatchObject({ method: "revolut", amountMinor: 500, name: "Ada" });
+    // Absent KEYS, not undefined values — the pending doc keeps its old shape.
+    expect("songId" in doc).toBe(false);
+    expect("songTitle" in doc).toBe(false);
+    const url = new URL(res.body!["redirectUrl"] as string);
+    expect(url.searchParams.get("note")).toBe("Ada: great show");
+  });
+
+  it("rejects votes without a songId — the old strict key set still bites", async () => {
+    jar = plainJar();
+    allowThrough();
+    const res = fakeRes();
+
+    await tipHandler(tipPost(XFF, { votes: 3 }), res as never);
+
+    expect(res.statusCode).toBe(422);
   });
 });

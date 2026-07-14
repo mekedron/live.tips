@@ -48,10 +48,29 @@ function jarRef(_db: unknown, jarId: string) {
     update: async (patch: Record<string, unknown>) => {
       const doc = docs.get(path);
       if (doc === undefined) throw new Error(`update on missing ${path}`);
-      Object.assign(doc, patch);
+      // Firestore update() semantics: a dotted key is a FIELD PATH into a
+      // nested map (creating intermediate maps), not a literal key — the
+      // difference setJarRequests' partial writes depend on.
+      for (const [key, value] of Object.entries(patch)) {
+        const parts = key.split(".");
+        let target = doc;
+        for (const part of parts.slice(0, -1)) {
+          const next = target[part];
+          if (typeof next === "object" && next !== null) {
+            target = next as Record<string, unknown>;
+          } else {
+            const fresh: Record<string, unknown> = {};
+            target[part] = fresh;
+            target = fresh;
+          }
+        }
+        target[parts[parts.length - 1]!] = value;
+      }
     },
   };
 }
+
+const bumpQuota = vi.fn<(...args: unknown[]) => Promise<boolean>>();
 
 vi.mock("../src/store", () => ({
   db: () => fakeDb,
@@ -62,7 +81,9 @@ vi.mock("../src/store", () => ({
     get: async () => fakeSnap(`users/${uid}/private/security`),
   }),
   expiryTimestamp: (now: number) => ({ expiresAtMs: now + 90 * 86_400_000 }),
+  bumpQuota: (...args: unknown[]) => bumpQuota(...args),
   DAY_MS: 86_400_000,
+  REQUESTS_PER_UID_PER_HOUR: 720,
 }));
 
 vi.mock("../src/params", () => ({
@@ -70,8 +91,10 @@ vi.mock("../src/params", () => ({
 }));
 
 import {
+  REQUESTS_OPEN_MS,
   deleteJarHandler,
   jarSeenHandler,
+  setJarRequestsHandler,
   updateJarProfileHandler,
 } from "../src/jars";
 
@@ -136,6 +159,8 @@ function revoke(uid = OWNER) {
 
 beforeEach(() => {
   docs.clear();
+  bumpQuota.mockReset();
+  bumpQuota.mockResolvedValue(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -250,5 +275,209 @@ describe("jarSeen honours the revocation watermark on the owner path", () => {
     await jarSeenHandler(signedIn(OWNER, { jarId: JAR_ID }, nowSec()));
 
     expect(docs.get(`jars/${JAR_ID}`)!["lastSeenDay"]).toBe(Math.floor(Date.now() / DAY_MS));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setJarRequests — song requests (#64): config, open window, live queue.
+
+const CONFIG = {
+  enabled: true,
+  defaultPriceMinor: 300,
+  methods: ["revolut"],
+  songs: [{ id: "s1", title: "Wonderwall" }],
+};
+
+const jarDoc = () => docs.get(`jars/${JAR_ID}`)!;
+const live = () => jarDoc()["requestsLive"] as Record<string, unknown> | undefined;
+
+describe("setJarRequests authorization", () => {
+  it("the owner uid may publish config", async () => {
+    seedOwnedJar();
+
+    await setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, config: CONFIG }, nowSec()));
+
+    expect(jarDoc()["requestsConfig"]).toEqual(CONFIG);
+  });
+
+  it("the jar secret alone suffices, even from a revoked session", async () => {
+    seedOwnedJar();
+    revoke();
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, secret: SECRET, config: CONFIG }, nowSec()),
+    );
+
+    expect(jarDoc()["requestsConfig"]).toEqual(CONFIG);
+  });
+
+  it("neither owner nor secret is denied", async () => {
+    seedOwnedJar();
+
+    await expect(
+      setJarRequestsHandler(signedIn("uid_stranger", { jarId: JAR_ID, config: CONFIG }, nowSec())),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+
+    expect(jarDoc()["requestsConfig"]).toBeUndefined();
+  });
+
+  it("a revoked owner-uid session without the secret is denied", async () => {
+    seedOwnedJar();
+    revoke();
+
+    await expect(
+      setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, config: CONFIG }, nowSec())),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+
+    expect(jarDoc()["requestsConfig"]).toBeUndefined();
+  });
+});
+
+describe("setJarRequests payload validation", () => {
+  it("requires at least one of config, open or queue", async () => {
+    seedOwnedJar();
+    await expect(
+      setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID }, nowSec())),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("rejects an invalid config, a non-boolean open, and a junk queue", async () => {
+    seedOwnedJar();
+    const bad = [
+      { config: { ...CONFIG, songs: [] } }, // enabled with no songs
+      { config: { ...CONFIG, evil: 1 } },
+      { config: "yes" },
+      { open: "yes" },
+      { queue: { s1: { t: -1, c: 0, s: "q" } } },
+      { queue: [] },
+    ];
+    for (const data of bad) {
+      await expect(
+        setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, ...data }, nowSec())),
+      ).rejects.toMatchObject({ code: "invalid-argument" });
+    }
+    expect(jarDoc()["requestsConfig"]).toBeUndefined();
+    expect(live()).toBeUndefined();
+  });
+});
+
+describe("setJarRequests partial-write semantics", () => {
+  it("open:true stamps a now+12h window without clobbering published songs", async () => {
+    seedOwnedJar({
+      requestsLive: { openUntilMs: 0, updatedAtMs: 1, currency: "eur", songs: { s1: { t: 900, c: 3, s: "q" } } },
+    });
+    const before = Date.now();
+
+    await setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, open: true }, nowSec()));
+
+    const l = live()!;
+    expect(l["openUntilMs"] as number).toBeGreaterThanOrEqual(before + REQUESTS_OPEN_MS);
+    expect(l["songs"]).toEqual({ s1: { t: 900, c: 3, s: "q" } }); // untouched
+    expect(l["currency"]).toBe("eur");
+  });
+
+  it("open:false closes without clobbering songs", async () => {
+    seedOwnedJar({
+      requestsLive: {
+        openUntilMs: Date.now() + 3_600_000, updatedAtMs: 1, currency: "eur",
+        songs: { s1: { t: 900, c: 3, s: "q" } },
+      },
+    });
+
+    await setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, open: false }, nowSec()));
+
+    expect(live()!["openUntilMs"]).toBe(0);
+    expect(live()!["songs"]).toEqual({ s1: { t: 900, c: 3, s: "q" } });
+  });
+
+  it("a queue push while OPEN re-arms the 12h window", async () => {
+    const staleDeadline = Date.now() + 60_000; // open, but nearly lapsed
+    seedOwnedJar({
+      requestsLive: { openUntilMs: staleDeadline, updatedAtMs: 1, currency: "eur", songs: {} },
+    });
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, queue: { s1: { t: 300, c: 1, s: "q" } } }, nowSec()),
+    );
+
+    const l = live()!;
+    expect(l["songs"]).toEqual({ s1: { t: 300, c: 1, s: "q" } });
+    expect(l["openUntilMs"] as number).toBeGreaterThan(staleDeadline);
+  });
+
+  it("a queue push while CLOSED does not open the window", async () => {
+    seedOwnedJar({
+      requestsLive: { openUntilMs: 0, updatedAtMs: 1, currency: "eur", songs: {} },
+    });
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, queue: { s1: { t: 300, c: 1, s: "q" } } }, nowSec()),
+    );
+
+    expect(live()!["openUntilMs"]).toBe(0);
+    expect(live()!["songs"]).toEqual({ s1: { t: 300, c: 1, s: "q" } });
+  });
+
+  it("queue + open:true in one call opens and publishes together", async () => {
+    seedOwnedJar();
+    const before = Date.now();
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, open: true, queue: { s1: { t: 300, c: 1, s: "q" } } }, nowSec()),
+    );
+
+    const l = live()!;
+    expect(l["openUntilMs"] as number).toBeGreaterThanOrEqual(before + REQUESTS_OPEN_MS);
+    expect(l["songs"]).toEqual({ s1: { t: 300, c: 1, s: "q" } });
+    expect(l["currency"]).toBe("eur");
+  });
+
+  it("a config write leaves requestsLive alone, and vice versa", async () => {
+    seedOwnedJar({
+      requestsLive: { openUntilMs: 7, updatedAtMs: 1, currency: "eur", songs: { s1: { t: 1, c: 1, s: "p" } } },
+    });
+
+    await setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, config: CONFIG }, nowSec()));
+
+    expect(live()).toEqual({
+      openUntilMs: 7, updatedAtMs: 1, currency: "eur", songs: { s1: { t: 1, c: 1, s: "p" } },
+    });
+  });
+
+  it("never touches profile, lastSeenDay or expiresAt — requests are not keep-alive", async () => {
+    const staleDay = Math.floor(Date.now() / DAY_MS) - 40;
+    seedOwnedJar({ lastSeenDay: staleDay });
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, config: CONFIG, open: true, queue: {} }, nowSec()),
+    );
+
+    expect(jarDoc()["lastSeenDay"]).toBe(staleDay);
+    expect(jarDoc()["expiresAt"]).toEqual({ untouched: true });
+    expect((jarDoc()["profile"] as typeof PROFILE).methods).toEqual({ revolutUsername: "ana" });
+  });
+});
+
+describe("setJarRequests quota", () => {
+  it("spends the per-uid jar-requests bucket at 720/hour", async () => {
+    seedOwnedJar();
+
+    await setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, open: true }, nowSec()));
+
+    expect(bumpQuota).toHaveBeenCalledTimes(1);
+    const [, key, , limit] = bumpQuota.mock.calls[0]!;
+    expect(key).toBe(`jar-requests-${OWNER}`);
+    expect(limit).toBe(720);
+  });
+
+  it("over quota is resource-exhausted and writes nothing", async () => {
+    seedOwnedJar();
+    bumpQuota.mockResolvedValue(false);
+
+    await expect(
+      setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, open: true }, nowSec())),
+    ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+    expect(live()).toBeUndefined();
   });
 });

@@ -130,7 +130,22 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
       sendJson(res, { error: body.error }, body.status);
       return;
     }
-    const tip = validateTip(body.value, profile.currency);
+
+    // Song requests (#64) ride the same POST, marked by songId. They are only
+    // sellable while the artist's app holds the window open: enabled config
+    // AND an unexpired openUntilMs. Closed is a state, not a shape error —
+    // 409, so a fan with a stale page gets "requests are closed" rather than
+    // a validation complaint. Plain tips never enter this branch.
+    if (body.value["songId"] !== undefined) {
+      if (jar.requestsConfig?.enabled !== true || (jar.requestsLive?.openUntilMs ?? 0) <= now) {
+        sendJson(res, { error: "requests_closed" }, 409);
+        return;
+      }
+    }
+
+    // Request tips are priced HERE from the jar's own config (songId + votes
+    // in, server-computed amountMinor out) — a fan-sent amount is rejected.
+    const tip = validateTip(body.value, profile.currency, jar.requestsConfig);
     if (!tip.ok) {
       sendJson(res, { error: tip.error }, tip.status);
       return;
@@ -242,6 +257,12 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
         currency: methodCurrency(tipRequest.method, profile.currency),
         name: tipRequest.name,
         message: tipRequest.message,
+        // Request tips carry which song was bought; the title is the server's
+        // own config lookup, safe to hand the app verbatim. Absent keys (not
+        // undefined — Firestore refuses those) on plain tips.
+        ...(tipRequest.songId !== undefined && tipRequest.songTitle !== undefined
+          ? { songId: tipRequest.songId, songTitle: tipRequest.songTitle }
+          : {}),
         // The sweep must happen even if the artist never comes back.
         expiresAt: Timestamp.fromMillis(now + PENDING_TTL_MS),
       };

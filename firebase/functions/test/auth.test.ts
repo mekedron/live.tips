@@ -68,8 +68,9 @@ describe("dedupeSignature", () => {
     expect(sig).toBe(dedupeSignature({ ...tip }));
     expect(sig).toMatch(/^[0-9a-f]{64}$/);
     expect(sig).not.toContain("Ada");
-    // The exact NUL-separated preimage the worker used — byte-for-byte.
-    expect(sig).toBe(sha256Hex("revolut\u0000500\u0000Ada\u0000great show"));
+    // The exact NUL-separated preimage — byte-for-byte. The trailing empty
+    // field is the songId slot (empty for plain tips).
+    expect(sig).toBe(sha256Hex("revolut\u0000500\u0000Ada\u0000great show\u0000"));
   });
 
   it("changes when any field changes", () => {
@@ -78,6 +79,16 @@ describe("dedupeSignature", () => {
     expect(dedupeSignature({ ...tip, name: "Bea" })).not.toBe(sig);
     expect(dedupeSignature({ ...tip, message: "great show!" })).not.toBe(sig);
     expect(dedupeSignature({ ...tip, method: "monzo" })).not.toBe(sig);
+  });
+
+  it("distinguishes song requests by songId — two same-priced songs are two tips", () => {
+    // Without the songId in the signature, two anonymous default-priced
+    // requests for DIFFERENT songs inside the 60s window would collapse into
+    // one, and a fan's paid request would silently vanish from the queue.
+    const a = dedupeSignature({ ...tip, songId: "song-a", songTitle: "A" });
+    const b = dedupeSignature({ ...tip, songId: "song-b", songTitle: "B" });
+    expect(a).not.toBe(b);
+    expect(a).not.toBe(dedupeSignature(tip));
   });
 
   it("cannot be collided across field boundaries", () => {

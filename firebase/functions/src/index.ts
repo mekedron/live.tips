@@ -11,6 +11,7 @@ import {
   deleteJarHandler,
   jarSeenHandler,
   rotateJarSecretHandler,
+  setJarRequestsHandler,
   updateJarProfileHandler,
 } from "./jars";
 import {
@@ -53,6 +54,8 @@ export const updateJarProfile = onCall({ cors: true }, updateJarProfileHandler);
 export const deleteJar = onCall({ cors: true }, deleteJarHandler);
 export const rotateJarSecret = onCall({ cors: true }, rotateJarSecretHandler);
 export const jarSeen = onCall({ cors: true }, jarSeenHandler);
+/** Song requests (#64): library/config, open window, live queue state. */
+export const setJarRequests = onCall({ cors: true }, setJarRequestsHandler);
 
 // ------------------------------------- device management + QR add-device link
 

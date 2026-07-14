@@ -14,7 +14,7 @@ import {
 } from "firebase-admin/firestore";
 import { sha256Hex } from "./auth";
 import type { LinkCodeStatus } from "./linkcodes";
-import type { JarProfile, TipRequest } from "./types";
+import type { JarProfile, RequestsConfig, RequestsLive, TipRequest } from "./types";
 
 export const DAY_MS = 86_400_000;
 export const EXPIRE_DAYS = 90;
@@ -56,6 +56,11 @@ export const MAX_READER_UIDS = 5;
 /** QR link-code redemptions per (salted) IP hash per hour: a scan is a
  * once-per-new-device act, so a generous human budget is still tiny. */
 export const LINK_REDEEMS_PER_IP_PER_HOUR = 30;
+
+/** setJarRequests calls per uid per hour. Roomy on purpose: the app pushes
+ * the live queue after every accepted request during a show, so this only
+ * stops a runaway client, never a gig. */
+export const REQUESTS_PER_UID_PER_HOUR = 720;
 
 /** collectLinkToken calls per (salted) IP hash per hour. Deliberately roomy:
  * the joining device POLLS collect until the owner confirms (2 min windows,
@@ -101,6 +106,14 @@ export interface JarDoc {
    * secret rotation — never a fan tip); expireJars deletes unowned jars
    * past it. */
   expiresAt: Timestamp;
+  /**
+   * Song requests (#64), both DELIBERATE SIBLINGS of `profile`: the profile
+   * is wholesale-replaced by createJar/updateJarProfile and the app's daily
+   * re-push, so a song library nested inside it would die within 24 hours.
+   * Written only by setJarRequests; absent until a profile carries config.
+   */
+  requestsConfig?: RequestsConfig;
+  requestsLive?: RequestsLive;
 }
 
 export interface RateDoc {
@@ -119,6 +132,10 @@ export interface PendingTipDoc {
   currency: string;
   name: string;
   message: string;
+  /** Set together on song-request tips; the title is the server's own config
+   * lookup, never fan input. */
+  songId?: string;
+  songTitle?: string;
   expiresAt: Timestamp;
 }
 
@@ -274,10 +291,15 @@ export function jarIsLive(doc: JarDoc | undefined, nowMs: number): doc is JarDoc
  * sender learns nothing, the stage stays clean. The signature is HASHED
  * before it touches storage so fan name/message text is never written at
  * rest via this path (the whole point of the relay). `\u0000` separates the
- * fields so `|` inside a name/message can't forge a collision.
+ * fields so `|` inside a name/message can't forge a collision. The songId
+ * rides last (empty for plain tips): two same-priced anonymous requests for
+ * DIFFERENT songs inside the window are distinct paid requests, and
+ * collapsing them would silently drop one from the queue.
  */
 export function dedupeSignature(tip: TipRequest): string {
-  return sha256Hex(`${tip.method}\u0000${tip.amountMinor}\u0000${tip.name}\u0000${tip.message}`);
+  return sha256Hex(
+    `${tip.method}\u0000${tip.amountMinor}\u0000${tip.name}\u0000${tip.message}\u0000${tip.songId ?? ""}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
