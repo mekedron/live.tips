@@ -145,11 +145,113 @@ The loop that worked, in order. It is deliberately serial at the merge point.
    MCP for `functions_list_functions` and error logs; chrome-devtools MCP for the app
    (`~/.claude/scripts/start-chrome.sh` first; never claude-in-chrome; re-select your own page by
    URL before every interaction, because agents share one Chrome). Screenshots stay local — never
-   commit or upload them.
+   commit or upload them. **If the diff touched the web sign-in bridge, Chrome does not finish the
+   job — see "The web sign-in is verified in Safari" below.**
 8. **Close with the truth.** `Fixes #N` in the commit body closes it on merge. When you cannot
    confirm a root cause, say so in the issue rather than implying a fix (#30: the symptom is closed
    by the one mechanism that produces it exactly, and the swallowed exception that hid it is gone —
    that is what was written, because that is what was known).
+
+## The web sign-in is verified in Safari
+
+**Rule: a diff that touches the web sign-in bridge, the redirect return leg, the pending-redirect
+record or the custom-token handoff is not done until it has been driven in real Safari.** A green
+suite and a green Chrome run do not close it. These are the paths that trigger the rule:
+
+```
+app/lib/data/firebase/auth_bridge.dart, auth_bridge_web.dart, auth_bridge_stub.dart
+app/lib/data/firebase/auth_service.dart        (signInWithCustomToken)
+app/lib/data/firebase/auth_domain.dart         (the authDomain — the 49c8c5c regression)
+app/lib/data/firebase/account_sessions.dart    (the slot the token is redeemed on)
+app/lib/state/auth_providers.dart              (startBridgeSignIn / consumePendingRedirect)
+app/lib/features/account/redirect_sign_in_gate.dart
+app/lib/domain/pending_redirect.dart
+app/lib/data/local_store.dart                  (the pending_redirect_v1 keys)
+app/lib/main.dart                              (the boot-URL fragment parse, main.dart:42-46)
+firebase/hosting-public/signin.html            (the bridge page itself)
+```
+
+The surface is the `mcp__safari__*` MCP. It drives **real Safari** — verified, not assumed:
+`safari_doctor` 6/6, `Version/26.5 Safari/605.1.15`, `navigator.vendor` "Apple Computer, Inc.",
+Apple's own ITP. Chrome cannot answer the question this browser answers.
+
+### Why Chrome is not enough — and the opposite mistake, which is the common one
+
+The bridge exists *only* because of WebKit. `55ce609` and `auth_bridge.dart:1-23`: Safari hands a
+cross-origin iframe partitioned, EMPTY storage — even for `auth.live.tips` under `live.tips` — so
+Firebase's redirect result never arrives and the app hears nothing. `b9075e3` is the same engine
+withholding a sessionStorage marker, so a completed sign-in was read as "nothing happened". Chrome
+hands all of it back and goes green on the day production is broken. **A fake models what the server
+answers; it cannot model what the engine withholds.** Only the engine can.
+
+Now the counter-lesson, and it is the one you are more likely to need: **#54 looked like a Safari bug
+and was not.** It was platform-independent Dart — a repository rebuilt cold under `ProfilePickScreen`
+on the return leg — and it reproduces in Chrome. It survived because *nobody drives the web sign-in
+end to end in any browser at all*. So: Safari is mandatory for the **storage** class, but the bigger
+and cheaper win is driving the journey in **a** browser. Do not reach for "it's Safari" as an
+explanation. Reach for it as an oracle.
+
+### What this surface cannot do — read this before you trust a green run
+
+- **It cannot click the Flutter app.** The app is a canvas: `safari_snapshot` returns only
+  `flutter-view` (Flutter's semantics tree stays empty even after the placeholder is clicked), so
+  there are no refs and no click-by-text. Synthetic PointerEvents dispatched at correct page
+  coordinates — on `flutter-view` and on `flt-glass-pane` — are ignored by the engine; the native
+  CGEvent fallback silently no-ops on macOS 26 (`safari_doctor` warns about this); AppleScript
+  `System Events` "click at" errors `-25208`. **You cannot press "Continue with Google" from an
+  agent.** Drive by URL instead — see the recipe. (Clicking is what Phase 2's `safaridriver` buys.)
+- **The tab must be Safari's frontmost tab**, or the page is frame-suspended: `requestAnimationFrame`
+  never fires, Flutter paints nothing, `flt-scene` stays empty and screenshots fail. An agent that
+  skips this reads a blank window as "the app is broken" and files fiction. `safari_switch_tab`
+  re-anchors the MCP's target but does **not** front the tab — front it explicitly:
+  `osascript -e 'tell application "Safari" to set current tab of window 1 to tab N of window 1'`,
+  then prove frames are flowing with a `requestAnimationFrame` counter before believing any pixel.
+- **No boot console.** `safari_start_console` only captures after it is called and does not survive a
+  navigation — so the console during boot, which is exactly when the redirect gate runs, is
+  invisible. `safari_network` (Performance API) *does* survive boot, and shows the
+  `auth.live.tips/__/auth/iframe` request — use it as the boot-time oracle.
+- **It is the owner's real Safari, on his real profile.** `localStorage` holds his live accounts and
+  `FlutterSecureStorage` keys. **Never clear storage, never sign out, never `safari_delete_local_storage`
+  without a key.** Delete only the single key you wrote.
+- **It is not an iPhone.** Desktop Safari shares the storage semantics that break us, but it is not
+  the **installed PWA** context and not iOS ITP. `49c8c5c` was found in the PWA. A green desktop
+  Safari run does not close a PWA-window or mobile-viewport question — that still needs the phone.
+- No headless, no parallelism, one profile. `safari_evaluate` does not await promises: wrap the body
+  in an IIFE and return a string. A cross-origin navigation can lose tab tracking ("refusing to
+  target the user's current tab") — open a fresh `safari_new_tab` rather than fighting it.
+
+### The recipe
+
+The bridge's whole contract is a URL — outbound `#req=`, return `#signin=` (`auth_bridge.dart:14-17`).
+That is what makes it drivable without a click and without an identity provider.
+
+1. `safari_doctor` (expect 6/6) → `safari_new_tab` at the URL under test. **Never reuse a tab you did
+   not open**, and front your tab (above).
+2. Boot the **return leg** by URL — this is where every one of our bugs lives. Load
+   `https://live.tips/app/#signin=<url-encoded {"v":1,"state":…,"token":…|"error":…}>`. For a real
+   token, seed `flutter.pending_redirect_v1` with `safari_set_local_storage` (SharedPreferences values
+   are double-encoded JSON strings under the `flutter.` prefix) and mint a custom token for a
+   throwaway uid with the Admin SDK. A foreign nonce needs neither, and is safe to run against prod.
+3. Assert the **record, not the pixels**: `safari_local_storage` on `flutter.pending_redirect_v1`,
+   `flutter.accounts_directory_v1`, `flutter.accounts_v1`. The bug in `b9075e3` *is* a contradiction
+   between two of those keys.
+4. `safari_screenshot` for the spinner (it works once the tab is fronted; the image includes browser
+   chrome and is scaled, so it is not a coordinate source). `safari_network` for the boot leg.
+   Screenshots stay local — never committed, never uploaded.
+5. `safari_close_tab`.
+
+Verified against prod today: booting `#signin=` with a foreign nonce is parsed, the fragment is
+stripped from the address bar (`main.dart:42-46`), nothing is adopted, no spinner — correct, and
+proven in the engine rather than in a fake.
+
+### The round trip: possible, and off-limits
+
+The owner's Safari profile is signed into Google (`myaccount.google.com` opens straight into his
+account, no password, no 2FA). Google's automation block is therefore not the wall here — **an agent
+in this profile could complete a genuine OAuth round trip.** Do not. It mints a real Firebase session
+for his real account and mutates production account state (slot commit, directory, device registry).
+The real Google/Apple round trip is the owner's to run, or a throwaway test account's — never his,
+uninvited.
 
 ## Verify the agent, not just the tests
 
