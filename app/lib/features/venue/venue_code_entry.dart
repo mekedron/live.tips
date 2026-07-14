@@ -114,7 +114,14 @@ class _VenueCodeEntryState extends ConsumerState<VenueCodeEntry> {
       if (!mounted) return;
       setState(() => _phase = _Phase.waiting);
       // Blocks until the artist taps confirm on their phone (or the code dies).
-      final token = await service.awaitToken(code: code, nonce: nonce);
+      // keepWaiting stops the poll the instant this widget is disposed: backing
+      // out of "Confirm on your phone" must not collect (and thereby burn) a
+      // token nobody is here to use — see [LinkCodeService.awaitToken].
+      final token = await service.awaitToken(
+        code: code,
+        nonce: nonce,
+        keepWaiting: () => mounted,
+      );
       if (!mounted) return;
       setState(() => _phase = _Phase.finishing);
       final error = await widget.onToken(token);

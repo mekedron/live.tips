@@ -39,6 +39,12 @@ enum LinkCodeErrorKind {
   /// Offline, DNS, TLS — the call never reached a function.
   network,
 
+  /// The caller stopped waiting before the token was collected — the screen
+  /// that ran the handshake was disposed (the artist backed out of "Confirm
+  /// on your phone"). Never shown to anyone: the widget is already gone, and
+  /// the point of raising it is to unwind the orphaned poll WITHOUT collecting.
+  cancelled,
+
   unknown,
 }
 
@@ -234,14 +240,28 @@ class LinkCodeService {
   /// token. Gives up with [LinkCodeErrorKind.failedPrecondition] once the code
   /// would have expired anyway — the server would say the same, a few seconds
   /// later and one round trip more expensively.
+  ///
+  /// [keepWaiting] is the credential guard. Collecting the token is what SPENDS
+  /// the code — the server flips it 'used' and hands over a custom token, and
+  /// device A's phone reads 'used' as "they got in". So we must not collect for
+  /// a device that has walked away: [keepWaiting] is checked before every poll
+  /// (pass `() => mounted`), and once it returns false we stop WITHOUT another
+  /// collect. The code then stays 'confirmed'-and-uncollected — re-usable until
+  /// its short TTL — and the phone keeps showing "waiting", which is the truth,
+  /// rather than a success card for a sign-in that never happened.
   Future<String> awaitToken({
     required String code,
     required String nonce,
     Duration interval = const Duration(seconds: 2),
     Duration timeout = const Duration(minutes: 2),
+    bool Function()? keepWaiting,
   }) async {
     final deadline = DateTime.now().add(timeout);
     while (true) {
+      if (keepWaiting != null && !keepWaiting()) {
+        throw const LinkCodeError(
+            LinkCodeErrorKind.cancelled, 'no longer waiting for the token');
+      }
       final result = await collectLinkToken(code: code, nonce: nonce);
       final token = result.token;
       if (token != null) return token;

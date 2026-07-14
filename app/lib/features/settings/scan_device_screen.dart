@@ -121,7 +121,14 @@ class _ScanDeviceScreenState extends ConsumerState<ScanDeviceScreen> {
       setState(() => _phase = _Phase.waiting);
 
       // Blocks until the other device's owner taps confirm (or the code dies).
-      final token = await service.awaitToken(code: code, nonce: nonce);
+      // keepWaiting stops the poll the instant this screen is disposed: leaving
+      // while waiting must not collect (and thereby burn) a token this device
+      // will never use — see [LinkCodeService.awaitToken].
+      final token = await service.awaitToken(
+        code: code,
+        nonce: nonce,
+        keepWaiting: () => mounted,
+      );
       if (!mounted) return;
       setState(() => _phase = _Phase.signingIn);
 

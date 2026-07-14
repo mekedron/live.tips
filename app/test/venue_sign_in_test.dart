@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/app.dart';
+import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/firebase/device_registry.dart';
 import 'package:live_tips/data/firebase/link_codes.dart';
@@ -28,14 +29,26 @@ String fakeCustomToken(String uid) {
 }
 
 /// The tablet's half of the handshake, scripted: redeem hands back a nonce,
-/// the first collect poll hands over the token. Arm [failWith] to model the
-/// backend refusing the code (unknown, expired, offline) — it throws on the
-/// redeem and clears itself, so a retry succeeds.
+/// then the server side of the poll is modelled by [collectLinkToken] so the
+/// REAL [LinkCodeService.awaitToken] loop runs — the waiting window the phone
+/// backs out of only exists if the poll actually polls. [confirmed] is device
+/// A's tap: while false, collect answers `pending`; once true, it hands over
+/// the token (and flips [tokenCollected] — the moment the code would burn to
+/// 'used'). Arm [failWith] to model the backend refusing the code on redeem.
 class FakeLinkCodeService extends LinkCodeService {
-  FakeLinkCodeService({required this.token, this.failWith});
+  FakeLinkCodeService({required this.token, this.failWith, this.confirmed = true});
 
   final String token;
   LinkCodeError? failWith;
+
+  /// Has device A tapped confirm yet? Defaults true: the happy-path tests want
+  /// the first poll to succeed immediately. The disposal test starts it false.
+  bool confirmed;
+
+  /// Flipped the instant collect hands the token over — i.e. the instant the
+  /// real code would flip to 'used' and the phone would claim success. A
+  /// device that backed out must never trip this.
+  bool tokenCollected = false;
   final calls = <String>[];
 
   @override
@@ -60,14 +73,14 @@ class FakeLinkCodeService extends LinkCodeService {
   }
 
   @override
-  Future<String> awaitToken({
+  Future<CollectedToken> collectLinkToken({
     required String code,
     required String nonce,
-    Duration interval = const Duration(seconds: 2),
-    Duration timeout = const Duration(minutes: 2),
   }) async {
     calls.add('collect:$nonce');
-    return token;
+    if (!confirmed) return const CollectedToken(pending: true);
+    tokenCollected = true;
+    return CollectedToken(token: token);
   }
 }
 
@@ -281,5 +294,75 @@ void main() {
         findsOneWidget);
     expect(env.link.calls, isEmpty,
         reason: 'nothing that fails the shape check may reach the backend');
+  });
+
+  testWidgets(
+      'backing out of "Confirm on your phone" never collects the token: a code '
+      'confirmed after the tablet leaves stays uncollected (#58)', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(700, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    // The artist has NOT tapped confirm yet, so the poll must keep waiting.
+    final link = FakeLinkCodeService(
+      token: fakeCustomToken('uid_ana'),
+      confirmed: false,
+    );
+    String? delivered;
+
+    Widget host({required bool showEntry}) => ProviderScope(
+          overrides: [
+            linkCodeServiceProvider.overrideWithValue(link),
+            venueCameraAvailableProvider.overrideWithValue(false),
+            deviceRegistryProvider.overrideWithValue(
+                DeviceRegistry(db: null, deviceId: 'dev_tablet')),
+            describeDeviceProvider.overrideWithValue(() async =>
+                const DeviceDescription(name: 'Bar iPad', platform: 'android')),
+          ],
+          child: MaterialApp(
+            theme: buildLightTheme(),
+            localizationsDelegates: kTestL10nDelegates,
+            locale: const Locale('en'),
+            home: Scaffold(
+              body: showEntry
+                  ? VenueCodeEntry(onToken: (t) async {
+                      delivered = t;
+                      return null;
+                    })
+                  : const SizedBox.shrink(),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(host(showEntry: true));
+    await tester.enterText(find.byType(TextField).first, _artistCode);
+    await tester.tap(find.text('Continue'));
+    await tester.pump(); // redeem
+    await tester.pump(); // first collect → pending → enter the waiting phase
+
+    // We are on "Confirm on your phone", and the poll has already asked once.
+    expect(find.text('Confirm on your phone'), findsOneWidget);
+    expect(link.calls, ['redeem:$_artistCode:dev_tablet', 'collect:nonce_1']);
+    expect(link.tokenCollected, isFalse);
+
+    // The tablet backs out — the widget is disposed (mounted → false).
+    await tester.pumpWidget(host(showEntry: false));
+
+    // ...and only NOW does the artist tap confirm on their phone.
+    link.confirmed = true;
+
+    // Let the dead poll loop wake from several intervals. Pre-fix it collects
+    // the token the moment confirm lands, burning the code and lighting the
+    // phone's success card for a sign-in that never happened. With keepWaiting
+    // it refuses to poll again once the tablet is gone.
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 3));
+
+    expect(link.tokenCollected, isFalse,
+        reason: 'a disposed tablet must not collect (and burn) the token');
+    expect(link.calls, ['redeem:$_artistCode:dev_tablet', 'collect:nonce_1'],
+        reason: 'no second collect fired after the widget was disposed');
+    expect(delivered, isNull,
+        reason: 'no token reached onToken, so no ghost sign-in');
   });
 }
