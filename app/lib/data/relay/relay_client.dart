@@ -5,6 +5,7 @@ import 'package:characters/characters.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../domain/relay_jar.dart';
+import '../../domain/song_request_settings.dart';
 import 'relay_auth.dart';
 
 /// Error returned by a live.tips relay callable, mapped to something we can
@@ -251,6 +252,29 @@ class RelayClient {
     await _send('deleteJar', {'jarId': jarId, 'secret': secret});
   }
 
+  /// Publishes the jar's song-request state so the server-rendered fan page
+  /// can show it. Three independent parts, each sent only when provided:
+  /// [config] (the library + toggles, built with [requestsConfigWire]),
+  /// [open] (the mid-set "taking requests right now" flag) and [queue] (the
+  /// live request queue) — the latter two belong to the session plumbing and
+  /// are wired later; the signature carries them now so the callable's shape
+  /// is pinned once.
+  Future<void> setJarRequests({
+    required RelayJar jar,
+    required String secret,
+    Map<String, dynamic>? config,
+    bool? open,
+    Map<String, dynamic>? queue,
+  }) async {
+    await _send('setJarRequests', {
+      'jarId': jar.jarId,
+      'secret': secret,
+      'config': ?config,
+      'open': ?open,
+      'queue': ?queue,
+    });
+  }
+
   /// Tells the relay the artist has seen everything so far — keeps the jar
   /// alive and resets the unseen-tips marker.
   Future<void> markSeen({
@@ -303,3 +327,32 @@ class RelayClient {
     }
   }
 }
+
+/// The `config` part of the `setJarRequests` payload, shaped for the wire:
+/// methods filtered down to what [jarCurrency] can honestly offer (the
+/// artist's raw ticks stay in [SongRequestSettings.methods] — a currency
+/// change must not rewrite them), and each song's Stripe link record reduced
+/// to the one field the fan page needs, its URL. Pure, so it can be tested
+/// without a client and reused by every publish seam.
+Map<String, dynamic> requestsConfigWire(
+  SongRequestSettings settings, {
+  required String jarCurrency,
+}) =>
+    {
+      'enabled': settings.enabled,
+      'defaultPriceMinor': settings.defaultPriceMinor,
+      'methods': [
+        for (final method in settings.methods)
+          if (requestMethodEligible(method, jarCurrency)) method,
+      ],
+      'songs': [
+        for (final song in settings.songs)
+          {
+            'id': song.id,
+            'title': song.title,
+            if (song.artist != null) 'artist': song.artist,
+            if (song.priceMinor != null) 'priceMinor': song.priceMinor,
+            if (song.stripe != null) 'stripeUrl': song.stripe!.url,
+          },
+      ],
+    };

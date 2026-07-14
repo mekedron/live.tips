@@ -24,6 +24,7 @@ import '../shell/app_shell.dart';
 import 'account_details_screen.dart';
 import 'cloud_account_screen.dart';
 import 'relay_method_screen.dart';
+import 'song_requests_screen.dart';
 import 'stripe_key_screen.dart';
 
 /// Settings as a pushed ROUTE, with a Back arrow of its own.
@@ -420,6 +421,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       LtRowGroup(
         header: s.t('settings.main.live_session_header'),
         children: [
+          // Song requests belong to a band — demo has no jar of its own to
+          // publish a library to, and no band doc to keep it on.
+          if (!app.demo && hasProfile)
+            LtRow(
+              icon: Icons.queue_music_rounded,
+              title: s.t('settings.requests.row_title'),
+              subtitle: s.t('settings.requests.row_subtitle'),
+              chevron: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const SongRequestsScreen(),
+                ),
+              ),
+            ),
           LtRow(
             icon: Icons.speed_rounded,
             title: s.t('settings.main.poll_interval'),

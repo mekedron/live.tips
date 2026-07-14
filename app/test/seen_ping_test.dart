@@ -1,6 +1,14 @@
+import 'dart:convert';
+
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/relay/relay_client.dart';
+import 'package:live_tips/domain/band_settings.dart';
 import 'package:live_tips/domain/relay_jar.dart';
+import 'package:live_tips/domain/song_request_settings.dart';
+import 'package:live_tips/state/providers.dart';
 import 'package:live_tips/state/seen_ping.dart';
 
 import 'helpers.dart';
@@ -222,6 +230,83 @@ void main() {
     expect(backend.calls, isEmpty);
     expect(relinked, isFalse);
     expect(store.readRelaySeenAt(kTestAccountId), isNull);
+  });
+
+  group('relink re-publishes the song-request config', () {
+    Future<FakeCallables> pumpKeepalive(
+      WidgetTester tester, {
+      required SongRequestSettings requests,
+    }) async {
+      final store = await seededStore(accountValues: {
+        LocalStore.kRelayJarBase: jsonEncode(_jar.toJson()),
+      });
+      await store.saveBandSettings(
+          kTestAccountId, BandSettings(songRequests: requests));
+      // The daily ping finds the jar gone and relinks it.
+      final backend = FakeCallables({
+        'updateJarProfile': (_) => throw FakeFunctionsException('not-found'),
+        'createJar': _createdJar,
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            localStoreProvider.overrideWithValue(store),
+            secureStoreProvider.overrideWithValue(FakeSecureStore()),
+            initialApiKeyProvider.overrideWithValue(null),
+            initialRelaySecretProvider.overrideWithValue('s'),
+            relayClientProvider.overrideWithValue(fakeRelayClient(backend)),
+          ],
+          // Home watches the reprint notice in the real app, which keeps
+          // relayLinkNoticeProvider alive BEFORE any relink adopts a jar —
+          // without a live listener, adoptRelinkedJar's read would be the
+          // provider's first build, from inside the very notifier it
+          // watches, and riverpod calls that a cycle.
+          child: RelayKeepalive(
+            child: Consumer(
+              builder: (context, ref, _) {
+                ref.watch(relayLinkNoticeProvider);
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('the replacement jar gets the band library pushed at it '
+        '(a fresh jar knows nothing)', (tester) async {
+      final backend = await pumpKeepalive(
+        tester,
+        requests: const SongRequestSettings(
+          enabled: true,
+          defaultPriceMinor: 700,
+          methods: ['revolut'],
+          songs: [SongEntry(id: 'sng_a1', title: 'Wonderwall')],
+        ),
+      );
+
+      expect(backend.names,
+          ['updateJarProfile', 'createJar', 'setJarRequests']);
+      final args = backend.argsFor('setJarRequests');
+      // Aimed at the NEW jar with the NEW secret — the old pair is dead.
+      expect(args['jarId'], 'jar_new');
+      expect(args['secret'], 'newsecret');
+      final config = args['config'] as Map;
+      expect(config['enabled'], isTrue);
+      expect(config['defaultPriceMinor'], 700);
+      expect(config['methods'], ['revolut']);
+      expect((config['songs'] as List).single,
+          {'id': 'sng_a1', 'title': 'Wonderwall'});
+    });
+
+    testWidgets('a band with no request setup pushes nothing extra',
+        (tester) async {
+      final backend = await pumpKeepalive(
+          tester, requests: const SongRequestSettings());
+      expect(backend.names, ['updateJarProfile', 'createJar']);
+    });
   });
 
   test('isDue: independent per-band markers', () async {

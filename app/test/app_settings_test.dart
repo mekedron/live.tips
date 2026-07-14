@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/domain/app_settings.dart';
 import 'package:live_tips/domain/band_settings.dart';
 import 'package:live_tips/domain/poster.dart';
+import 'package:live_tips/domain/song_request_settings.dart';
 
 void main() {
   group('AppSettings', () {
@@ -75,6 +76,38 @@ void main() {
       final restored = BandSettings.fromJson({'lastGoalMinor': 5000});
       expect(restored.qrMode, QrMode.connected);
       expect(restored.lastGoalMinor, 5000);
+    });
+
+    test('songRequests defaults to disabled/empty and survives a round trip',
+        () {
+      expect(const BandSettings().songRequests, const SongRequestSettings());
+
+      final band = const BandSettings().copyWith(
+        songRequests: const SongRequestSettings(
+          enabled: true,
+          defaultPriceMinor: 700,
+          methods: ['stripe', 'revolut'],
+          songs: [SongEntry(id: 'sng_a1', title: 'Wonderwall')],
+        ),
+      );
+      final restored = BandSettings.fromJson(band.toJson());
+      expect(restored.songRequests, band.songRequests);
+      expect(restored.songRequests.songs.single.title, 'Wonderwall');
+    });
+
+    test('old stored blobs (no songRequests key) load with the default', () {
+      final restored = BandSettings.fromJson({
+        'qrMode': 'stripe',
+        'lastGoalMinor': 3000,
+        'poster': {'theme': 'ticket-stub'},
+      });
+      expect(restored.songRequests, const SongRequestSettings());
+      expect(restored.qrMode, QrMode.stripe);
+      // And garbage under the key is the default too, not a crash.
+      expect(
+        BandSettings.fromJson({'songRequests': 'on'}).songRequests,
+        const SongRequestSettings(),
+      );
     });
   });
 }

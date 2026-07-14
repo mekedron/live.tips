@@ -164,9 +164,34 @@ class _RelayKeepaliveState extends ConsumerState<RelayKeepalive>
           secret: secret,
           client: client,
           stripeUrl: store.readTipJar(account.id)?.url,
-          onRelinked: (newJar, newSecret, oldUrl) => ref
-              .read(appStateProvider.notifier)
-              .adoptRelinkedJar(account.id, newJar, newSecret, oldUrl),
+          onRelinked: (newJar, newSecret, oldUrl) async {
+            // The replacement jar was born without the band's song-request
+            // config — the profile createJar re-sends carries no requests
+            // part. Re-push it best-effort, first: it needs only the fresh
+            // jar + secret already in hand, and adoptRelinkedJar's
+            // notice-refresh read trips riverpod's debug-only cycle assert
+            // (relayLinkNoticeProvider watches appStateProvider), which in
+            // a debug build would eat everything after it. A failure just
+            // leaves a fan page without requests until the artist next
+            // edits them — the publish_failed warning in the editor's own
+            // seam covers that.
+            final requests = store.readBandSettings(account.id).songRequests;
+            if (requests.enabled || requests.songs.isNotEmpty) {
+              try {
+                await client.setJarRequests(
+                  jar: newJar,
+                  secret: newSecret,
+                  config: requestsConfigWire(requests,
+                      jarCurrency: newJar.currency),
+                );
+              } catch (_) {
+                // Offline or refused — adopting the jar still matters more.
+              }
+            }
+            await ref
+                .read(appStateProvider.notifier)
+                .adoptRelinkedJar(account.id, newJar, newSecret, oldUrl);
+          },
         );
       } catch (_) {
         // Keychain hiccup or network failure — this band retries on the

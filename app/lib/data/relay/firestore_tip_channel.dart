@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../domain/song_request_settings.dart';
 import '../../domain/tip.dart';
 import '../../domain/tip_method.dart';
 import '../tip_channel.dart';
@@ -313,6 +314,24 @@ Tip? _tipFromDoc(String id, Map<String, dynamic>? data) {
     final name = data['name'] is String ? data['name'] as String : '';
     final message = data['message'] is String ? data['message'] as String : '';
 
+    // Song-request fields (#64). Optional, and malformed values drop the
+    // FIELDS, never the tip — the money is real even when the song metadata
+    // is garbage. The id must be exactly what the library minted
+    // ([SongEntry.idPattern], which also caps it at 32 chars); the title is
+    // display text, so it only has to be non-empty and sane-length.
+    final rawSongId = data['songId'];
+    final songId = rawSongId is String && SongEntry.idPattern.hasMatch(rawSongId)
+        ? rawSongId
+        : null;
+    String? songTitle;
+    final rawSongTitle = data['songTitle'];
+    if (rawSongTitle is String) {
+      final trimmed = rawSongTitle.trim();
+      if (trimmed.isNotEmpty && trimmed.runes.length <= 120) {
+        songTitle = trimmed;
+      }
+    }
+
     return Tip.relayTip(
       amountMinor: amount.toInt().clamp(_kMinAmountMinor, _kMaxAmountMinor),
       currency: currency.toLowerCase(),
@@ -324,6 +343,8 @@ Tip? _tipFromDoc(String id, Map<String, dynamic>? data) {
       // serial only ever mattered for relays that had none.
       serial: 0,
       relayId: id,
+      songId: songId,
+      songTitle: songTitle,
     );
   } catch (_) {
     return null;

@@ -304,7 +304,10 @@ class FakeCallables {
   Future<Map<String, dynamic>> call(
       String name, Map<String, dynamic> args) async {
     calls.add((name: name, args: args));
-    if (enforceTextCaps) _checkProfile(args);
+    if (enforceTextCaps) {
+      _checkProfile(args);
+      if (name == 'setJarRequests') _checkRequestsConfig(args);
+    }
     final route = routes[name];
     return route == null ? const {} : route(args);
   }
@@ -340,6 +343,31 @@ class FakeCallables {
     if (profile is! Map) return;
     _checkText(profile['artistName'], 'artistName', 50, 200);
     _checkText(profile['message'], 'message', 200, 800);
+  }
+
+  static final _songId = RegExp(r'^[A-Za-z0-9_-]{1,32}$');
+
+  /// The `setJarRequests` contract, as the server pins it: at most 100
+  /// songs, app-minted ids, titles rejected (not truncated) over 60 code
+  /// points. Like [_checkProfile], this exists so a client that ships an
+  /// over-limit config fails HERE, in the suite, not only in production.
+  static void _checkRequestsConfig(Map<String, dynamic> args) {
+    final config = args['config'];
+    if (config is! Map) return;
+    final songs = config['songs'];
+    if (songs is! List) return;
+    if (songs.length > 100) {
+      throw FakeFunctionsException(
+          'invalid-argument', 'too many songs (max 100)');
+    }
+    for (final song in songs) {
+      if (song is! Map) continue;
+      final id = song['id'];
+      if (id is! String || !_songId.hasMatch(id)) {
+        throw FakeFunctionsException('invalid-argument', 'bad song id');
+      }
+      _checkText(song['title'], 'title', 60, 240);
+    }
   }
 
   List<String> get names => [for (final call in calls) call.name];

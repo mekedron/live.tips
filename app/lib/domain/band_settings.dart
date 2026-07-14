@@ -1,5 +1,6 @@
 import 'app_settings.dart';
 import 'poster.dart';
+import 'song_request_settings.dart';
 
 /// Per-band preferences — everything a band carries with it that isn't a
 /// jar or a secret: which URL its QR encodes, its last session goal (minor
@@ -10,6 +11,7 @@ class BandSettings {
     this.qrMode = QrMode.connected,
     this.lastGoalMinor = 5000,
     this.poster = const PosterSettings(),
+    this.songRequests = const SongRequestSettings(),
   });
 
   /// Which tip URL this band's QR encodes.
@@ -21,21 +23,29 @@ class BandSettings {
   /// This band's print-poster theme, captions, and paper size.
   final PosterSettings poster;
 
+  /// This band's song-request library and toggles (issue #64). Lives here —
+  /// not on the jar — so it syncs with the profile and works for local
+  /// accounts; the jar gets a published copy via `setJarRequests`.
+  final SongRequestSettings songRequests;
+
   BandSettings copyWith({
     QrMode? qrMode,
     int? lastGoalMinor,
     PosterSettings? poster,
+    SongRequestSettings? songRequests,
   }) =>
       BandSettings(
         qrMode: qrMode ?? this.qrMode,
         lastGoalMinor: lastGoalMinor ?? this.lastGoalMinor,
         poster: poster ?? this.poster,
+        songRequests: songRequests ?? this.songRequests,
       );
 
   Map<String, dynamic> toJson() => {
         'qrMode': qrMode.wire,
         'lastGoalMinor': lastGoalMinor,
         'poster': poster.toJson(),
+        'songRequests': songRequests.toJson(),
       };
 
   factory BandSettings.fromJson(Map<String, dynamic> json) => BandSettings(
@@ -46,5 +56,10 @@ class BandSettings {
                 Map<String, dynamic>.from(json['poster'] as Map),
               )
             : const PosterSettings(),
+        songRequests: json['songRequests'] is Map
+            ? SongRequestSettings.fromJson(
+                Map<String, dynamic>.from(json['songRequests'] as Map),
+              )
+            : const SongRequestSettings(),
       );
 }

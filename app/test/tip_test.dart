@@ -299,6 +299,67 @@ void main() {
     expect(restored.createdAt, tip.createdAt);
   });
 
+  // ------------------------------------------------- song requests (#64) ---
+
+  test('song fields survive a json round trip', () {
+    final request = Tip.relayTip(
+      amountMinor: 500,
+      currency: 'eur',
+      method: TipMethod.revolut,
+      name: 'Sam',
+      ts: 1751500000000,
+      serial: 0,
+      relayId: 'req_1',
+      songId: 'sng_abc123',
+      songTitle: 'Wonderwall',
+    );
+    expect(request.songId, 'sng_abc123');
+    expect(request.songTitle, 'Wonderwall');
+    final restored = Tip.fromJson(request.toJson());
+    expect(restored.songId, 'sng_abc123');
+    expect(restored.songTitle, 'Wonderwall');
+    expect(restored.id, request.id);
+    expect(restored.verified, isFalse);
+  });
+
+  test('a tip without song fields round-trips with them null', () {
+    final plain = Tip.relayTip(
+      amountMinor: 500,
+      currency: 'eur',
+      method: TipMethod.revolut,
+      ts: 1751500000000,
+      serial: 0,
+    );
+    final restored = Tip.fromJson(plain.toJson());
+    expect(restored.songId, isNull);
+    expect(restored.songTitle, isNull);
+  });
+
+  test('a pre-existing tip serializes byte-identically — no song keys appear',
+      () {
+    final stripe = Tip.fromCheckoutSession(checkoutSession(
+      customFields: [
+        {
+          'key': 'nickname',
+          'type': 'text',
+          'text': {'value': 'Maya'},
+        },
+      ],
+    ));
+    // The exact blob this tip stored before song requests existed. A single
+    // new always-written key here would rewrite every archived night.
+    expect(stripe.toJson(), {
+      'id': 'cs_test_1',
+      'amountMinor': 500,
+      'currency': 'eur',
+      'createdAt': 1751500000 * 1000,
+      'name': 'Maya',
+      'livemode': false,
+      'viaService': true,
+      'paymentIntentId': 'pi_1',
+    });
+  });
+
   test('Tip.relayTip builds an unverified live relay tip', () {
     final tip = Tip.relayTip(
       amountMinor: 1200,

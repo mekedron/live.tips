@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/relay/relay_client.dart';
 import 'package:live_tips/domain/relay_jar.dart';
+import 'package:live_tips/domain/song_request_settings.dart';
 
 import 'helpers.dart';
 
@@ -173,6 +174,130 @@ void main() {
             as Map;
     expect(methods['revolutUsername'], 'mayamusic');
     expect(methods['stripeUrl'], 'https://buy.stripe.com/y');
+  });
+
+  // ------------------------------------------------- song requests (#64) ---
+
+  test('setJarRequests sends jarId + secret and only the parts provided',
+      () async {
+    final backend = FakeCallables();
+    final client = fakeRelayClient(backend);
+
+    await client.setJarRequests(
+      jar: _jar,
+      secret: 's',
+      config: const {'enabled': true, 'songs': []},
+    );
+
+    expect(backend.names, ['setJarRequests']);
+    final args = backend.argsFor('setJarRequests');
+    expect(args['jarId'], 'jar_abc');
+    expect(args['secret'], 's');
+    expect(args['config'], {'enabled': true, 'songs': []});
+    // The open/queue parts belong to the session plumbing — absent here,
+    // they must be absent on the wire, not null.
+    expect(args.containsKey('open'), isFalse);
+    expect(args.containsKey('queue'), isFalse);
+  });
+
+  test('setJarRequests carries open/queue when the session hands them in',
+      () async {
+    final backend = FakeCallables();
+    await fakeRelayClient(backend).setJarRequests(
+      jar: _jar,
+      secret: 's',
+      open: true,
+      queue: const {'items': []},
+    );
+    final args = backend.argsFor('setJarRequests');
+    expect(args['open'], isTrue);
+    expect(args['queue'], {'items': []});
+    expect(args.containsKey('config'), isFalse);
+  });
+
+  test('requestsConfigWire shapes the config: currency-filtered methods, '
+      'stripe blob reduced to its url', () {
+    const settings = SongRequestSettings(
+      enabled: true,
+      defaultPriceMinor: 700,
+      // The artist's raw ticks — mobilepay stays stored even though a DKK
+      // jar can't offer it, and monzo rides only on a GBP jar.
+      methods: ['stripe', 'revolut', 'mobilepay', 'monzo'],
+      songs: [
+        SongEntry(id: 'sng_a1', title: 'Wonderwall', artist: 'Oasis'),
+        SongEntry(
+          id: 'sng_b2',
+          title: 'Yesterday',
+          priceMinor: 1000,
+          stripe: StripeSongLink(
+            productId: 'prod_1',
+            priceId: 'price_1',
+            paymentLinkId: 'plink_1',
+            url: 'https://buy.stripe.com/song_b2',
+            priceMinor: 1000,
+            title: 'Yesterday',
+          ),
+        ),
+      ],
+    );
+
+    expect(requestsConfigWire(settings, jarCurrency: 'dkk'), {
+      'enabled': true,
+      'defaultPriceMinor': 700,
+      'methods': ['stripe', 'revolut'],
+      'songs': [
+        {'id': 'sng_a1', 'title': 'Wonderwall', 'artist': 'Oasis'},
+        {
+          'id': 'sng_b2',
+          'title': 'Yesterday',
+          'priceMinor': 1000,
+          // The link record stays app-side; the fan page needs the URL only.
+          'stripeUrl': 'https://buy.stripe.com/song_b2',
+        },
+      ],
+    });
+
+    expect(
+      requestsConfigWire(settings, jarCurrency: 'eur')['methods'],
+      ['stripe', 'revolut', 'mobilepay'],
+    );
+    expect(
+      requestsConfigWire(settings, jarCurrency: 'gbp')['methods'],
+      ['stripe', 'revolut', 'monzo'],
+    );
+  });
+
+  test('the enforcing fake refuses a config the server would: over-long '
+      'title, foreign id, 101 songs', () async {
+    final client = fakeRelayClient(FakeCallables());
+    Future<void> send(Map<String, dynamic> config) =>
+        client.setJarRequests(jar: _jar, secret: 's', config: config);
+
+    Map<String, dynamic> song(String id, [String title = 'ok']) =>
+        {'id': id, 'title': title};
+
+    await expectLater(
+      () => send({
+        'songs': [song('sng_a', 'X' * 61)],
+      }),
+      throwsA(isA<RelayApiException>()),
+    );
+    await expectLater(
+      () => send({
+        'songs': [song('not an id!')],
+      }),
+      throwsA(isA<RelayApiException>()),
+    );
+    await expectLater(
+      () => send({
+        'songs': [for (var i = 0; i < 101; i++) song('sng_$i')],
+      }),
+      throwsA(isA<RelayApiException>()),
+    );
+    // And exactly 100 valid songs pass.
+    await send({
+      'songs': [for (var i = 0; i < 100; i++) song('sng_$i')],
+    });
   });
 
   test('unauthenticated and permission-denied are auth errors', () async {

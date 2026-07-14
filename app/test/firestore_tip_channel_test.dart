@@ -20,6 +20,8 @@ Map<String, dynamic> _pendingTip({
   Object? name = 'Sam',
   Object? message = 'Great set!',
   Object? tsMs = 1770000000000,
+  Object? songId,
+  Object? songTitle,
 }) =>
     {
       'method': method,
@@ -28,6 +30,8 @@ Map<String, dynamic> _pendingTip({
       'name': name,
       'message': message,
       'tsMs': tsMs,
+      'songId': ?songId,
+      'songTitle': ?songTitle,
     };
 
 /// The channel under test, wired to [db] with a backend that accepts the
@@ -132,6 +136,78 @@ void main() {
 
     expect(tips, isEmpty);
     expect((await db.collection(_path).get()).docs, isEmpty);
+  });
+
+  test('a song request carries its songId and songTitle onto the tip', () async {
+    final db = FakeFirebaseFirestore();
+    final (channel: channel, backend: _) = _channel(db);
+    addTearDown(channel.dispose);
+
+    final tips = <Tip>[];
+    channel.tips.listen(tips.add);
+    channel.start();
+    await pumpEventQueue();
+
+    await db.collection(_path).add(_pendingTip(
+          songId: 'sng_lxyz1234abcd',
+          songTitle: '  Wonderwall ', // the relay trims; so do we
+        ));
+    await pumpEventQueue();
+
+    expect(tips, hasLength(1));
+    expect(tips.single.songId, 'sng_lxyz1234abcd');
+    expect(tips.single.songTitle, 'Wonderwall');
+    expect(tips.single.amountMinor, 500);
+  });
+
+  test('malformed song fields drop the FIELDS, never the tip — the money is '
+      'real even when the metadata is garbage', () async {
+    final db = FakeFirebaseFirestore();
+    final (channel: channel, backend: _) = _channel(db);
+    addTearDown(channel.dispose);
+
+    final tips = <Tip>[];
+    channel.tips.listen(tips.add);
+    channel.start();
+    await pumpEventQueue();
+
+    // Each doc is hostile in one way: a non-string id, an id with forbidden
+    // characters, an over-long id, a non-string title, an over-long title
+    // (121 code points), and a whitespace-only title.
+    await db.collection(_path).add(_pendingTip(songId: 42, songTitle: 7));
+    await db
+        .collection(_path)
+        .add(_pendingTip(songId: 'sng bad id!', songTitle: 'X' * 121));
+    await db
+        .collection(_path)
+        .add(_pendingTip(songId: 'a' * 33, songTitle: '   '));
+    await pumpEventQueue();
+
+    expect(tips, hasLength(3), reason: 'every tip survives');
+    for (final tip in tips) {
+      expect(tip.songId, isNull);
+      expect(tip.songTitle, isNull);
+      expect(tip.amountMinor, 500);
+    }
+  });
+
+  test('one good song field survives the other being garbage', () async {
+    final db = FakeFirebaseFirestore();
+    final (channel: channel, backend: _) = _channel(db);
+    addTearDown(channel.dispose);
+
+    final tips = <Tip>[];
+    channel.tips.listen(tips.add);
+    channel.start();
+    await pumpEventQueue();
+
+    await db
+        .collection(_path)
+        .add(_pendingTip(songId: 'sng_ok', songTitle: List.filled(3, 'x')));
+    await pumpEventQueue();
+
+    expect(tips.single.songId, 'sng_ok');
+    expect(tips.single.songTitle, isNull);
   });
 
   test('a rules rejection is terminal: unauthorized, no retry', () async {

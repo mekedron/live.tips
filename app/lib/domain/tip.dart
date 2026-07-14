@@ -18,6 +18,8 @@ class Tip {
     this.method = TipMethod.stripe,
     this.verified = true,
     this.inPerson = false,
+    this.songId,
+    this.songTitle,
   });
 
   /// Stable id, used for de-duplication: the Checkout Session id (`cs_…`) for
@@ -65,6 +67,14 @@ class Tip {
   /// verified but nameless — and the tile says so with its own quiet badge
   /// rather than pretending someone typed a name.
   final bool inPerson;
+
+  /// The song this tip requested, when it is a song request (#64): the id the
+  /// artist's library minted for it, and the title as the fan page showed it.
+  /// The title is stored too — not just looked up — so History still names
+  /// the song after the artist deletes it from the library. Null for every
+  /// plain tip, and omitted from json so old history stays byte-identical.
+  final String? songId;
+  final String? songTitle;
 
   String get displayName {
     final trimmed = name?.trim() ?? '';
@@ -207,6 +217,8 @@ class Tip {
     required int ts,
     required int serial,
     String? relayId,
+    String? songId,
+    String? songTitle,
   }) =>
       Tip(
         id: relayId == null ? 'relay_${ts}_$serial' : 'relay_$relayId',
@@ -219,6 +231,8 @@ class Tip {
         viaService: true,
         method: method,
         verified: false,
+        songId: songId,
+        songTitle: songTitle,
       );
 
   Tip copyWith({
@@ -234,6 +248,8 @@ class Tip {
     TipMethod? method,
     bool? verified,
     bool? inPerson,
+    String? songId,
+    String? songTitle,
   }) =>
       Tip(
         id: id ?? this.id,
@@ -248,6 +264,8 @@ class Tip {
         method: method ?? this.method,
         verified: verified ?? this.verified,
         inPerson: inPerson ?? this.inPerson,
+        songId: songId ?? this.songId,
+        songTitle: songTitle ?? this.songTitle,
       );
 
   Map<String, dynamic> toJson() => {
@@ -265,6 +283,8 @@ class Tip {
         if (method != TipMethod.stripe) 'method': method.wire,
         if (!verified) 'verified': verified,
         if (inPerson) 'inPerson': inPerson,
+        if (songId != null) 'songId': songId,
+        if (songTitle != null) 'songTitle': songTitle,
       };
 
   factory Tip.fromJson(Map<String, dynamic> json) => Tip(
@@ -283,5 +303,7 @@ class Tip {
             TipMethod.stripe,
         verified: json['verified'] as bool? ?? true,
         inPerson: json['inPerson'] as bool? ?? false,
+        songId: json['songId'] as String?,
+        songTitle: json['songTitle'] as String?,
       );
 }
