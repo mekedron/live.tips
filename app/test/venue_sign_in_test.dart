@@ -28,11 +28,14 @@ String fakeCustomToken(String uid) {
 }
 
 /// The tablet's half of the handshake, scripted: redeem hands back a nonce,
-/// the first collect poll hands over the token.
+/// the first collect poll hands over the token. Arm [failWith] to model the
+/// backend refusing the code (unknown, expired, offline) — it throws on the
+/// redeem and clears itself, so a retry succeeds.
 class FakeLinkCodeService extends LinkCodeService {
-  FakeLinkCodeService({required this.token});
+  FakeLinkCodeService({required this.token, this.failWith});
 
   final String token;
+  LinkCodeError? failWith;
   final calls = <String>[];
 
   @override
@@ -48,6 +51,11 @@ class FakeLinkCodeService extends LinkCodeService {
     // The tablet names itself, so the artist's confirm can re-admit a device
     // they once revoked (#36).
     calls.add('redeem:$code:${deviceId ?? 'unnamed'}');
+    final failure = failWith;
+    if (failure != null) {
+      failWith = null;
+      throw failure;
+    }
     return 'nonce_1';
   }
 

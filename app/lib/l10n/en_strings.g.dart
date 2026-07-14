@@ -781,6 +781,7 @@ const Map<String, String> kEnStrings = {
   "venue.reapprove.body": "This is a shared device, so changing profiles needs a fresh approval from your own phone: open live.tips there, go to Settings → Security → Add device, and scan or type the new code here.",
   "venue.reapprove.title": "Approval needed",
   "venue.reapprove.wrong_account": "That approval came from a different account than the one on this device. Nothing was changed. Approve from the account that is signed in here.",
+  "venue.setup.heading": "Sign in from your phone",
   "venue.sign_in.how_body": "Open live.tips, go to Settings → Security → Add device, and scan the QR below with this device — or type the code shown under it.",
   "venue.sign_in.how_title": "On your phone",
   "venue.sign_in.not_venue": "This isn't a venue device",

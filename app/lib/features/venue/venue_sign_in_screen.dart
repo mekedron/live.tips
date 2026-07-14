@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../domain/device_kind.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/auth_providers.dart';
 import '../../state/device_providers.dart';
@@ -9,16 +10,34 @@ import '../../state/venue_providers.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/lt_ui.dart';
 import 'venue_code_entry.dart';
+import 'venue_setup_progress.dart';
 
-/// The venue tablet's front door — what a signed-out shared device shows.
+/// The venue add-device ceremony — one body, two doors:
 ///
-/// The artist never types a password here and never sees a Google popup on
-/// hardware they don't own: their PHONE mints an add-device code (Settings →
-/// Security → Add device), this screen scans it or takes it typed, and the
-/// phone's confirm tap is what lets the account in. On success the venue
-/// session clock starts and [VenueGate] moves to the identity check.
+/// * `setup: false` — the front door: what a signed-out shared device shows,
+///   as the root VenueGate renders. No Back arrow, because there is nothing
+///   behind it; the discreet "this isn't a venue device" wipe is the only
+///   exit (see [_confirmNotVenue]).
+/// * `setup: true` — step 2 of venue setup, an ordinary pushed route over
+///   the intro. The device kind is NOT chosen yet: Back pops to "How a
+///   shared device works" and writes nothing. The commit happens in
+///   [_onToken], on a successfully collected token, right before the account
+///   signs in — so the at-rest cipher still attaches before the first byte
+///   of account data can land, only now at the end of the flow instead of
+///   two screens early (#42).
+///
+/// Either way, the artist never types a password here and never sees a
+/// Google popup on hardware they don't own: their PHONE mints an add-device
+/// code (Settings → Security → Add device), this screen scans it or takes it
+/// typed, and the phone's confirm tap is what lets the account in. On
+/// success the venue session clock starts and [VenueGate] moves to the
+/// identity check.
 class VenueSignInScreen extends ConsumerWidget {
-  const VenueSignInScreen({super.key});
+  const VenueSignInScreen({super.key, this.setup = false});
+
+  /// True when this screen is the pushed second step of venue setup rather
+  /// than the front door of an already-venue device.
+  final bool setup;
 
   /// The escape hatch for a mis-tapped device-kind choice. Venue mode shows
   /// no Settings, no back button and no app bar leading — without this, a
@@ -27,6 +46,9 @@ class VenueSignInScreen extends ConsumerWidget {
   /// Runs the exact wipe-and-reset Settings' kind change runs, behind the
   /// same blunt confirmation — because it IS that wipe: data written under
   /// one trust model must not be inherited by the next.
+  ///
+  /// Front door only: the setup step has a real Back arrow and nothing yet
+  /// written, so "not a venue device" is answered by simply leaving.
   Future<void> _confirmNotVenue(BuildContext context, WidgetRef ref) async {
     final s = context.s;
     final confirmed = await showDialog<bool>(
@@ -56,11 +78,29 @@ class VenueSignInScreen extends ConsumerWidget {
     await ref.read(deviceKindProvider.notifier).wipeDevice();
   }
 
-  Future<String?> _onToken(WidgetRef ref, AppLocalizations s, String token) async {
+  Future<String?> _onToken(
+      BuildContext context, WidgetRef ref, String token) async {
+    final navigator = Navigator.of(context);
+    final s = context.s;
     // The flag holds the gate's stray-account eviction off while the
     // directory has flipped but the session record isn't written yet.
     ref.read(venueSignInPendingProvider.notifier).set(true);
     try {
+      if (setup) {
+        // The commit (#42): the device becomes a venue device HERE, chosen
+        // by the token that can actually finish the setup — not by the
+        // button that merely opened this screen. choose() attaches the
+        // at-rest cipher and turns off Firestore's disk cache before the
+        // sign-in below writes anything: same invariant, later door. A
+        // refused keychain refuses the whole setup — the kind stays
+        // unchosen, the error lands on the code card, and Back still
+        // returns to a device that never became anything.
+        try {
+          await ref.read(deviceKindProvider.notifier).choose(DeviceKind.venue);
+        } catch (_) {
+          return s.t('venue.boot.choose_failed');
+        }
+      }
       final user = await ref
           .read(authControllerProvider.notifier)
           .signInWithCustomToken(token);
@@ -73,6 +113,12 @@ class VenueSignInScreen extends ConsumerWidget {
       // be able to see — and revoke — this tablet. After the session start,
       // so no frame ever sees a signed-in account without a running clock.
       await ref.read(deviceRegistryProvider).registerThisDevice(user.uid);
+      // The setup stack (intro, this screen) has done its job: drop it onto
+      // the VenueGate that RootGate rebuilt when the kind was chosen — the
+      // identity check, the same landing every future boot of this tablet
+      // has. The front door needs no navigation at all: it IS the gate's
+      // rendering, and the session start above already moved the gate on.
+      if (setup) navigator.popUntil((route) => route.isFirst);
       return null;
     } finally {
       ref.read(venueSignInPendingProvider.notifier).set(false);
@@ -84,16 +130,24 @@ class VenueSignInScreen extends ConsumerWidget {
     final c = context.lt;
     final s = context.s;
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent,
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: Center(child: LanguagePill()),
-          ),
-        ],
-      ),
+      appBar: setup
+          // The pushed setup step is a plain screen in a plain stack: the
+          // implied Back arrow pops to the intro, and the pill says where
+          // in the run this is.
+          ? AppBar(
+              title: Text(s.t('venue.sign_in.title')),
+              actions: const [VenueSetupProgress(step: 2, pillOnly: true)],
+            )
+          : AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: Colors.transparent,
+              actions: const [
+                Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Center(child: LanguagePill()),
+                ),
+              ],
+            ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -101,18 +155,28 @@ class VenueSignInScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.storefront_rounded, size: 26, color: c.warning),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        s.t('venue.sign_in.title'),
-                        style: outfitStyle(24, c.text, weight: FontWeight.w800),
+                if (setup) ...[
+                  const VenueSetupProgress(step: 2),
+                  const SizedBox(height: 16),
+                  Text(
+                    s.t('venue.setup.heading'),
+                    style: outfitStyle(22, c.text, weight: FontWeight.w800),
+                  ),
+                ] else
+                  Row(
+                    children: [
+                      Icon(Icons.storefront_rounded,
+                          size: 26, color: c.warning),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          s.t('venue.sign_in.title'),
+                          style:
+                              outfitStyle(24, c.text, weight: FontWeight.w800),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 const SizedBox(height: 8),
                 Text(
                   s.t('venue.sign_in.subtitle'),
@@ -150,26 +214,28 @@ class VenueSignInScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 VenueCodeEntry(
-                  onToken: (token) => _onToken(ref, s, token),
+                  onToken: (token) => _onToken(context, ref, token),
                 ),
-                const SizedBox(height: 20),
-                // Always reachable, even signed out: the one door out of a
-                // mis-chosen venue mode (see [_confirmNotVenue]). Discreet
-                // on purpose — a real venue tablet shouldn't invite taps,
-                // and the wipe confirmation stands guard behind it.
-                Center(
-                  child: TextButton(
-                    onPressed: () => _confirmNotVenue(context, ref),
-                    child: Text(
-                      s.t('venue.sign_in.not_venue'),
-                      style: TextStyle(
-                        fontFamily: kFontBody,
-                        fontSize: 13,
-                        color: c.textSecondary,
+                if (!setup) ...[
+                  const SizedBox(height: 20),
+                  // Always reachable, even signed out: the one door out of a
+                  // mis-chosen venue mode (see [_confirmNotVenue]). Discreet
+                  // on purpose — a real venue tablet shouldn't invite taps,
+                  // and the wipe confirmation stands guard behind it.
+                  Center(
+                    child: TextButton(
+                      onPressed: () => _confirmNotVenue(context, ref),
+                      child: Text(
+                        s.t('venue.sign_in.not_venue'),
+                        style: TextStyle(
+                          fontFamily: kFontBody,
+                          fontSize: 13,
+                          color: c.textSecondary,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/app.dart';
 import 'package:live_tips/data/secure_store.dart';
-import 'package:live_tips/domain/device_kind.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/providers.dart';
 
@@ -102,10 +101,11 @@ void main() {
   // This test used to assert the bug as the rule ("claims the device for the
   // venue AND opens the intro"): the link wrote the kind on the tap and the
   // warning explained it afterwards, so Back popped into the venue sign-in door
-  // and the only way home was a wipe (#42). The link asks; the intro's Continue
-  // commits. venue_intro_commit_test.dart walks the whole path, Back included.
+  // and the only way home was a wipe (#42). The link asks; the steps explain;
+  // only a collected sign-in token commits, at the very end.
+  // venue_intro_commit_test.dart walks the whole path, Back included.
   testWidgets('the quiet venue link on Welcome opens the intro and claims '
-      'nothing — the intro\'s Continue is the choice', (tester) async {
+      'nothing — walking the steps is not the choice', (tester) async {
     await tester.binding.setSurfaceSize(const Size(600, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -135,6 +135,10 @@ void main() {
     await tester.tap(find.text('Set up sign-in'));
     await tester.pumpAndSettle();
 
-    expect(store.readDeviceKind(), DeviceKind.venue);
+    // The code step is up — and STILL nothing is committed: the kind is
+    // chosen by a successfully collected token, not by reaching the screen
+    // that asks for one.
+    expect(find.text('Sign in from your phone'), findsOneWidget);
+    expect(store.readDeviceKind(), isNull);
   });
 }

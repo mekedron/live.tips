@@ -64,14 +64,15 @@ class WelcomeScreen extends ConsumerWidget {
   /// The quiet venue link — a shared device is a different trust decision,
   /// but it is rare enough that it no longer deserves a full onboarding step.
   ///
-  /// It ASKS. It does not choose: nothing is written here, and the intro
-  /// screen's Continue is the only thing that ever writes the venue kind
-  /// (#42). This link used to commit the device and only then explain what it
-  /// had done — so the warning's Back arrow (the universal "I've read this, no
-  /// thanks") popped into a venue sign-in screen demanding a code, and the one
-  /// way back out was a destructive wipe. A question that costs a wipe to
-  /// un-ask is not a question. Backing out of the explanation now leaves the
-  /// device exactly as it was: unset, on Welcome.
+  /// It ASKS. It does not choose: nothing is written here, and nothing is
+  /// written on any step of the setup until a collected sign-in token commits
+  /// the venue kind at the very end (#42, see VenueSignInScreen). This link
+  /// used to commit the device and only then explain what it had done — so
+  /// the warning's Back arrow (the universal "I've read this, no thanks")
+  /// popped into a venue sign-in screen demanding a code, and the one way
+  /// back out was a destructive wipe. A question that costs a wipe to un-ask
+  /// is not a question. Backing out of any step now leaves the device exactly
+  /// as it was: unset, on Welcome.
   void _pickVenue(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const VenueIntroScreen()),
