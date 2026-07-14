@@ -211,24 +211,6 @@ class WelcomeScreen extends ConsumerWidget {
                             ),
                             label: Text(context.s.t('welcome.try_demo')),
                           ),
-                          // The venue path is deliberately quiet: a link for
-                          // the rare person setting up a shared tablet, not a
-                          // choice everyone has to weigh. Hidden entirely
-                          // when venue mode can't exist on this platform.
-                          if (venueAvailable) ...[
-                            const SizedBox(height: 4),
-                            TextButton(
-                              onPressed: () => _pickVenue(context),
-                              child: Text(
-                                context.s.t('welcome.venue_link'),
-                                style: TextStyle(
-                                  fontFamily: kFontBody,
-                                  fontSize: 13,
-                                  color: c.textMuted,
-                                ),
-                              ),
-                            ),
-                          ],
                           const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -252,6 +234,28 @@ class WelcomeScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
+                          // The venue path is deliberately quiet: a link for
+                          // the rare person setting up a shared tablet, not a
+                          // choice everyone has to weigh. Hidden entirely
+                          // when venue mode can't exist on this platform —
+                          // and LAST, below the trust row rather than beside
+                          // "Try the demo": a tipsy artist aiming at the demo
+                          // must not be able to fat-finger the device into a
+                          // venue-mode conversion.
+                          if (venueAvailable) ...[
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: () => _pickVenue(context),
+                              child: Text(
+                                context.s.t('welcome.venue_link'),
+                                style: TextStyle(
+                                  fontFamily: kFontBody,
+                                  fontSize: 13,
+                                  color: c.textMuted,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

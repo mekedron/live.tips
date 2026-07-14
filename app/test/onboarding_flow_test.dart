@@ -124,8 +124,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The link is there but quiet — no card, no icon, just text.
-    await tester.tap(find.text('Setting up a shared venue device?'));
+    // The link is there but quiet — no card, no icon, just text. And LAST:
+    // below the trust row, deliberately far from "Try the demo", so a tipsy
+    // artist aiming at the demo can't fat-finger a venue-mode conversion.
+    final link = find.text('Setting up a shared venue device?');
+    expect(tester.getTopLeft(link).dy,
+        greaterThan(tester.getBottomLeft(find.text('Try the demo')).dy));
+    expect(
+        tester.getTopLeft(link).dy,
+        greaterThan(tester
+            .getBottomLeft(find.text('Open source · your key never leaves '
+                'this device'))
+            .dy));
+
+    await tester.tap(link);
     await tester.pumpAndSettle();
 
     expect(find.text('How a shared device works'), findsOneWidget);
