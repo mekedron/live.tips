@@ -59,7 +59,70 @@ Map<String, dynamic> _pendingTip({
   );
 }
 
+/// Records the listen options every `snapshots()` call on the wrapped
+/// collection asks for. The health flip waits for a server-confirmed
+/// snapshot ([FirestoreTipChannel.applySnapshot] keys on `isFromCache`), and
+/// when the cached result already matches the server — the normal case: the
+/// queue is empty, acks drained it — that confirmation is a METADATA-ONLY
+/// transition. The real SDK only delivers those under
+/// `includeMetadataChanges: true`; fake_cloud_firestore can't reproduce the
+/// suppression, so the subscription's own options are the testable contract.
+class _ListenRecordingFirestore extends Fake implements FirebaseFirestore {
+  _ListenRecordingFirestore(this.inner);
+
+  final FakeFirebaseFirestore inner;
+
+  /// One entry per listen: the `includeMetadataChanges` it asked for.
+  final listens = <bool>[];
+
+  @override
+  CollectionReference<Map<String, dynamic>> collection(String path) =>
+      _ListenRecordingCollection(inner.collection(path), listens);
+}
+
+// Implementing the sealed class is deliberate, like fake_cloud_firestore's
+// own fakes.
+// ignore: subtype_of_sealed_class
+class _ListenRecordingCollection extends Fake
+    implements CollectionReference<Map<String, dynamic>> {
+  _ListenRecordingCollection(this.inner, this.listens);
+
+  final CollectionReference<Map<String, dynamic>> inner;
+  final List<bool> listens;
+
+  @override
+  Stream<QuerySnapshot<Map<String, dynamic>>> snapshots({
+    bool includeMetadataChanges = false,
+    ListenSource source = ListenSource.defaultSource,
+  }) {
+    listens.add(includeMetadataChanges);
+    return inner.snapshots(includeMetadataChanges: includeMetadataChanges);
+  }
+}
+
 void main() {
+  test(
+      'the pendingTips listen opts into metadata changes — the ok flip rides '
+      'the cache→server confirmation, which is metadata-only whenever the '
+      'cached queue already matches the server (it is usually empty: acks '
+      'drain it)', () async {
+    final db = FakeFirebaseFirestore();
+    final recorder = _ListenRecordingFirestore(db);
+    final (channel: channel, backend: _) = _channel(recorder);
+    addTearDown(channel.dispose);
+
+    channel.start();
+    await pumpEventQueue();
+
+    expect(recorder.listens, [true],
+        reason: 'without includeMetadataChanges the real SDK suppresses the '
+            'cache→server metadata-only event, so a warm-cache attach with '
+            'an unchanged (empty) queue never sees a server snapshot and '
+            'the health pill reads "Tip page connecting…" until the next '
+            'actual tip doc arrives — on a re-attach (foreground redial) '
+            'that is a healthy feed reported as never up');
+  });
+
   test('a pending tip is emitted, then acked by deleting the doc', () async {
     final db = FakeFirebaseFirestore();
     final (channel: channel, backend: backend) = _channel(db);

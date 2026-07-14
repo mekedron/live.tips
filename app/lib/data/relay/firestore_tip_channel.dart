@@ -169,8 +169,19 @@ class FirestoreTipChannel implements TipChannel {
     }
     if (_disposed || generation != _generation) return;
 
-    final stream =
-        _watch?.call() ?? _db.collection('jars/$_jarId/pendingTips').snapshots();
+    // includeMetadataChanges, non-negotiably: [applySnapshot] flips the
+    // health to ok only on a SERVER-confirmed snapshot, and when the cached
+    // result already matches the server — the normal case, the queue is
+    // empty because delivery deletes — that confirmation is a METADATA-ONLY
+    // transition (isFromCache true → false, no doc changes), which a default
+    // listen never delivers. Without the flag, any attach that starts from
+    // the cache (a foreground redial mid-set, a warm cache at Go live) sits
+    // on "Tip page connecting…" until the next actual tip doc arrives —
+    // a healthy feed reported as never up, all night if nobody tips.
+    final stream = _watch?.call() ??
+        _db
+            .collection('jars/$_jarId/pendingTips')
+            .snapshots(includeMetadataChanges: true);
     _sub = stream.listen(
       (snapshot) => _onSnapshot(generation, snapshot),
       onError: (Object error) => _onListenerError(generation, error),
