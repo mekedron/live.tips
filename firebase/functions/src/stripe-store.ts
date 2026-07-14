@@ -74,6 +74,15 @@ export const STRIPE_PENDING_TTL_MS = 60 * 60_000;
  */
 export const STRIPE_PROCESSED_TTL_MS = 4 * 24 * 3_600_000;
 
+/**
+ * How many song-request links one connection may accumulate — a LIFETIME cap,
+ * because deactivated links stay in the map (see StripeConnectionDoc.
+ * requestLinks). 200 is a generous set list several times over; past it the
+ * createSongLink op refuses rather than let the connection doc grow without
+ * bound (it is read on every webhook delivery).
+ */
+export const MAX_REQUEST_LINKS = 200;
+
 // ---------------------------------------------------------------------------
 // Ids
 
@@ -112,7 +121,24 @@ export interface StripeConnectionDoc {
    * link — the artist's unrelated business — are ignored, never stored.
    */
   paymentLinkId: string | null;
+  /**
+   * Song-request payment links, keyed by plink_… id — the webhook's OTHER
+   * recognizer: a checkout event for a key in this map is a request tip for
+   * that song (stripe-events.ts). Entries are written by the createSongLink
+   * proxy op and NEVER removed, only capped (MAX_REQUEST_LINKS): a
+   * deactivated link can still settle async payments started before it went
+   * dark, and dropping the entry would strand those paid requests as
+   * not-ours — same reasoning that keeps paymentLinkId after
+   * deactivatePaymentLink.
+   */
+  requestLinks?: Record<string, RequestLinkEntry>;
   createdAtMs: number;
+}
+
+/** One song's request link: what the webhook needs to label the tip. */
+export interface RequestLinkEntry {
+  songId: string;
+  title: string;
 }
 
 /** users/{uid}/private/stripe — the per-account pointer. */

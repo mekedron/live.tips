@@ -1,5 +1,5 @@
 /// The stripeProxy allowlist — the pure logic (no Firestore, no network, so
-/// all of it is unit-testable). Six named operations, each the server-side
+/// all of it is unit-testable). Nine named operations, each the server-side
 /// twin of a method in the app's StripeRequests
 /// (app/lib/data/stripe/stripe_requests.dart), each validating its own
 /// inputs; an unknown operation, an unknown field, or a malformed id is
@@ -26,6 +26,9 @@ export type ProxyRequest =
   | { op: "createTipJar"; currency: string; displayName: string; thankYouMessage: string }
   | { op: "updateTipJarDetails"; productId: string; paymentLinkId: string; displayName: string; thankYouMessage: string }
   | { op: "deactivatePaymentLink"; paymentLinkId: string }
+  | { op: "createSongLink"; songId: string; title: string; priceMinor: number; currency: string }
+  | { op: "updateSongLink"; productId: string; title: string }
+  | { op: "deactivateSongLink"; paymentLinkId: string }
   | { op: "listTips"; startingAfter: string | null; createdAfterMs: number | null; limit: number }
   | { op: "listTaps"; startingAfter: string | null; createdAfterMs: number | null; limit: number };
 
@@ -34,6 +37,9 @@ export const PROXY_OPS = [
   "createTipJar",
   "updateTipJarDetails",
   "deactivatePaymentLink",
+  "createSongLink",
+  "updateSongLink",
+  "deactivateSongLink",
   "listTips",
   "listTaps",
 ] as const;
@@ -102,6 +108,20 @@ export function nextPageCursor(data: unknown): string | null {
 
 const DISPLAY_NAME_MAX = 50;
 const THANK_YOU_MAX = 200;
+
+/** Song titles as shown on the Stripe checkout AND on stage with the tip. */
+const SONG_TITLE_MAX = 60;
+
+/** Song ids as the app mints them — the map key's value half; tight enough
+ * to be a safe metadata value and Firestore field content. */
+const SONG_ID = /^[A-Za-z0-9_-]{1,32}$/;
+
+/**
+ * A song's fixed price in MINOR units. The ceiling (1,000,000.00 of any
+ * currency) is far beyond any real request price; it exists so a typo cannot
+ * mint a link no fan could ever pay, and stays a safe integer times 50 votes.
+ */
+const PRICE_MINOR_MAX = 100_000_000;
 
 /** Scrub + cap, rejecting like the tip form does (a name that does not fit
  * should say so, not be silently shortened on a screen the artist prints). */
@@ -196,6 +216,57 @@ export function parseProxyRequest(op: unknown, paramsRaw: unknown): Result<Proxy
       if (stray !== null) return err(`unknown field "${stray}" in params`);
       if (!isValidPaymentLinkId(params["paymentLinkId"])) return err("paymentLinkId must be a plink_… id");
       return { ok: true, value: { op: "deactivatePaymentLink", paymentLinkId: params["paymentLinkId"] as string } };
+    }
+
+    case "createSongLink": {
+      const stray = unknownKeys(params, ["songId", "title", "priceMinor", "currency"]);
+      if (stray !== null) return err(`unknown field "${stray}" in params`);
+      const songId = params["songId"];
+      if (typeof songId !== "string" || !SONG_ID.test(songId)) {
+        return err("songId must be 1-32 characters of A-Za-z0-9_-");
+      }
+      const title = textParam(params["title"], "title", SONG_TITLE_MAX, true);
+      if (!title.ok) return title;
+      const priceMinor = params["priceMinor"];
+      if (
+        typeof priceMinor !== "number" || !Number.isSafeInteger(priceMinor) ||
+        priceMinor < 1 || priceMinor > PRICE_MINOR_MAX
+      ) {
+        return err(`priceMinor must be a positive integer of minor units (max ${PRICE_MINOR_MAX})`);
+      }
+      const currency = params["currency"];
+      if (typeof currency !== "string" || !/^[a-z]{3}$/.test(currency.toLowerCase().trim())) {
+        return err("currency must be a 3-letter code");
+      }
+      return {
+        ok: true,
+        value: {
+          op: "createSongLink",
+          songId,
+          title: title.value,
+          priceMinor,
+          currency: currency.toLowerCase().trim(),
+        },
+      };
+    }
+
+    case "updateSongLink": {
+      // Title only: a price change is deactivate + create on the app side,
+      // because Stripe prices are immutable once a link points at them.
+      const stray = unknownKeys(params, ["productId", "title"]);
+      if (stray !== null) return err(`unknown field "${stray}" in params`);
+      const productId = params["productId"];
+      if (typeof productId !== "string" || !PRODUCT_ID.test(productId)) return err("productId must be a prod_… id");
+      const title = textParam(params["title"], "title", SONG_TITLE_MAX, true);
+      if (!title.ok) return title;
+      return { ok: true, value: { op: "updateSongLink", productId, title: title.value } };
+    }
+
+    case "deactivateSongLink": {
+      const stray = unknownKeys(params, ["paymentLinkId"]);
+      if (stray !== null) return err(`unknown field "${stray}" in params`);
+      if (!isValidPaymentLinkId(params["paymentLinkId"])) return err("paymentLinkId must be a plink_… id");
+      return { ok: true, value: { op: "deactivateSongLink", paymentLinkId: params["paymentLinkId"] as string } };
     }
 
     case "listTips": {

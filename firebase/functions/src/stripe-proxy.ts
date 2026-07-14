@@ -17,8 +17,10 @@ import { lookupConnection, stripeToHttpsError } from "./stripe-connect";
 import { openSecret } from "./stripe-crypto";
 import { nextPageCursor, parseProxyRequest, sanitizeCardPresentCharge, sanitizeCheckoutSession } from "./stripe-ops";
 import {
+  MAX_REQUEST_LINKS,
   STRIPE_PROXY_PER_UID_PER_HOUR,
   isValidBandId,
+  isValidPaymentLinkId,
   stripeConnectionRef,
 } from "./stripe-store";
 import { bumpQuota, db } from "./store";
@@ -132,6 +134,92 @@ export async function stripeProxyHandler(request: CallableRequest): Promise<Reco
         // paymentLinkId stays on the connection: a deactivated link can
         // still settle async payments started before it went dark, and
         // those are tips.
+        return { ok: true };
+      }
+
+      case "createSongLink": {
+        // One Payment Link per song (issue #64): fixed price = the song's
+        // price, quantity 1–50 as "votes" — amount_total arrives already
+        // multiplied, so the webhook never parses quantities.
+        //
+        // The cap is checked BEFORE anything is minted on Stripe: requestLinks
+        // is a lifetime map (deactivated links stay for async attribution),
+        // and it is read on every webhook delivery, so it must not grow
+        // without bound.
+        const links = connection.doc.requestLinks ?? {};
+        if (Object.keys(links).length >= MAX_REQUEST_LINKS) {
+          throw new HttpsError(
+            "failed-precondition",
+            `this connection already tracks ${MAX_REQUEST_LINKS} song links (deactivated ones included) — remove songs is not enough, the cap is lifetime`,
+          );
+        }
+        const product = await api.post("products", {
+          name: `Request — ${req.title}`,
+          "metadata[managed_by]": "live.tips",
+          "metadata[song_id]": req.songId,
+        });
+        const price = await api.post("prices", {
+          product: String(product["id"]),
+          currency: req.currency,
+          unit_amount: String(req.priceMinor),
+          "metadata[managed_by]": "live.tips",
+        });
+        const link = await api.post("payment_links", {
+          "line_items[0][price]": String(price["id"]),
+          "line_items[0][quantity]": "1",
+          "line_items[0][adjustable_quantity][enabled]": "true",
+          "line_items[0][adjustable_quantity][minimum]": "1",
+          "line_items[0][adjustable_quantity][maximum]": "50",
+          submit_type: "pay",
+          // The SAME fan fields as the tip jar: a request is a tip with a
+          // song attached, and the stage shows the same name + message.
+          "custom_fields[0][key]": "nickname",
+          "custom_fields[0][label][type]": "custom",
+          "custom_fields[0][label][custom]": "Your name or nickname",
+          "custom_fields[0][type]": "text",
+          "custom_fields[0][optional]": "true",
+          "custom_fields[1][key]": "message",
+          "custom_fields[1][label][type]": "custom",
+          "custom_fields[1][label][custom]": "Leave a message",
+          "custom_fields[1][type]": "text",
+          "custom_fields[1][optional]": "true",
+          "metadata[managed_by]": "live.tips",
+          "metadata[song_id]": req.songId,
+        });
+        const paymentLinkId = link["id"];
+        if (!isValidPaymentLinkId(paymentLinkId)) {
+          // Stripe answered 200 with something that is not a plink id — do
+          // not stamp the map with a key the webhook could never match.
+          console.error("stripeProxy: createSongLink got a malformed payment link id from Stripe");
+          throw new HttpsError("internal", "unexpected reply from Stripe");
+        }
+        // Stamp the connection: this link's checkout events are request tips
+        // for this song. Dot-path update, so concurrent createSongLink calls
+        // merge instead of clobbering each other's entries.
+        await stripeConnectionRef(firestore, connection.connectionId).update({
+          [`requestLinks.${paymentLinkId}`]: { songId: req.songId, title: req.title },
+        });
+        return {
+          productId: product["id"],
+          priceId: price["id"],
+          paymentLinkId,
+          url: link["url"],
+        };
+      }
+
+      case "updateSongLink": {
+        // Title only. A price change is deactivate + create on the app side:
+        // Stripe prices are immutable, so "the same link, new price" does
+        // not exist as an operation.
+        await api.post(`products/${req.productId}`, { name: `Request — ${req.title}` });
+        return { ok: true };
+      }
+
+      case "deactivateSongLink": {
+        await api.post(`payment_links/${req.paymentLinkId}`, { active: "false" });
+        // The requestLinks entry stays, like paymentLinkId above: a
+        // deactivated link can still settle async payments started before it
+        // went dark, and those must still attribute to their song.
         return { ok: true };
       }
 

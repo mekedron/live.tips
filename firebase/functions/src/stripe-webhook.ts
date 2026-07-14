@@ -119,10 +119,11 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
     return;
   }
 
-  // Not a tip (not our payment link, not card-present, not a subscribed
-  // type, malformed): acknowledged and FORGOTTEN. No doc, no log line with
-  // contents — see the privacy note at the top.
-  const mapped = tipFromEvent(event, connection.paymentLinkId);
+  // Not a tip (not our payment link — tip jar or song-request link — not
+  // card-present, not a subscribed type, malformed): acknowledged and
+  // FORGOTTEN. No doc, no log line with contents — see the privacy note at
+  // the top.
+  const mapped = tipFromEvent(event, connection.paymentLinkId, connection.requestLinks ?? {});
   if (mapped === null) {
     send(res, 200, { received: true, tip: false });
     return;

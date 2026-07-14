@@ -18,6 +18,7 @@
 /// mapped to null, never written to Firestore, never logged with contents.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { RequestLinkEntry } from "./stripe-store";
 import { scrubText } from "./validate";
 
 /** The event types the webhook endpoint subscribes to — the exact set the
@@ -103,6 +104,11 @@ export interface StripeTipData {
   inPerson: boolean;
   livemode: boolean;
   paymentIntentId: string | null;
+  /** Present iff this is a SONG REQUEST tip — a checkout through one of the
+   * connection's requestLinks. Donations and taps carry neither key (absent,
+   * not null, so the Firestore doc shape is unchanged for them). */
+  songId?: string;
+  songTitle?: string;
 }
 
 export interface MappedTip {
@@ -116,6 +122,10 @@ export interface MappedTip {
  * payment, so over-limit text is truncated, never cause to drop a paid tip. */
 const NAME_MAX_POINTS = 40;
 const MESSAGE_MAX_POINTS = 200;
+/** Song titles get the same treatment: the map entry was validated when the
+ * link was minted, but the title still crosses onto a stage, so it goes
+ * through the same scrub as text a fan typed. */
+const SONG_TITLE_MAX_POINTS = 60;
 
 function fanText(raw: unknown, maxCodePoints: number): string {
   if (typeof raw !== "string" || raw.length > maxCodePoints * 8) return "";
@@ -184,8 +194,19 @@ export function isCardPresentCharge(charge: Record<string, unknown>): boolean {
  * in-person path cannot be narrowed to a link (a tap has nothing of ours on
  * it) and rests on the documented assumption that the account is dedicated
  * to tips — same as the app's poller always has (docs/architecture.md).
+ *
+ * `requestLinks` is the OTHER recognizer, from the same connection doc: the
+ * song-request links minted by createSongLink, keyed by plink id. A paid
+ * session through one of them is a request tip carrying songId/songTitle.
+ * Both matches are STRICT id lookups against links WE minted and recorded —
+ * never `metadata.managed_by` alone, which would swallow any unrelated link
+ * of the artist's that happened to carry (or forge) the flag.
  */
-export function tipFromEvent(event: unknown, paymentLinkId: string | null): MappedTip | null {
+export function tipFromEvent(
+  event: unknown,
+  paymentLinkId: string | null,
+  requestLinks: Record<string, RequestLinkEntry> = {},
+): MappedTip | null {
   const evt = asObject(event);
   if (!evt || typeof evt["type"] !== "string") return null;
   const type = evt["type"];
@@ -203,28 +224,41 @@ export function tipFromEvent(event: unknown, paymentLinkId: string | null): Mapp
   if (createdMs === null || amount === null || currency === null) return null;
 
   if (type.startsWith("checkout.session.")) {
-    // Ours means OUR payment link, and paid. completed fires for async
+    // Ours means OUR payment link — the tip jar (a donation) or one of the
+    // song-request links (a request, which is a donation plus a song). Both
+    // are strict id matches; any other link is the artist's unrelated
+    // business and is not stored. And paid: completed fires for async
     // payment methods before the money moves (payment_status "unpaid");
     // async_payment_succeeded re-sends the same session id once it has —
     // so gating on "paid" both drops non-payments and makes the pair
     // converge on one write.
-    if (paymentLinkId === null || object["payment_link"] !== paymentLinkId) return null;
+    const link = object["payment_link"];
+    const isDonation = paymentLinkId !== null && link === paymentLinkId;
+    const request = !isDonation && typeof link === "string" ? requestLinks[link] : undefined;
+    if (!isDonation && request === undefined) return null;
     if (object["payment_status"] !== "paid") return null;
     const customer = asObject(object["customer_details"]);
-    return {
-      id,
-      tip: {
-        tsMs: createdMs,
-        method: "stripe",
-        amountMinor: amount,
-        currency,
-        name: fanText(customField(object, "nickname") ?? customer?.["name"], NAME_MAX_POINTS),
-        message: fanText(customField(object, "message"), MESSAGE_MAX_POINTS),
-        inPerson: false,
-        livemode: object["livemode"] === true,
-        paymentIntentId: idOf(object["payment_intent"]),
-      },
+    const tip: StripeTipData = {
+      tsMs: createdMs,
+      method: "stripe",
+      amountMinor: amount,
+      currency,
+      name: fanText(customField(object, "nickname") ?? customer?.["name"], NAME_MAX_POINTS),
+      message: fanText(customField(object, "message"), MESSAGE_MAX_POINTS),
+      inPerson: false,
+      livemode: object["livemode"] === true,
+      paymentIntentId: idOf(object["payment_intent"]),
     };
+    if (request !== undefined) {
+      // amount_total is votes × price, already multiplied by Stripe
+      // (adjustable_quantity) — carried verbatim, no quantity parsing here.
+      tip.songId = request.songId;
+      // The title crosses onto a stage next to fan text, so it gets the
+      // exact same scrub, even though it was validated when the link was
+      // minted.
+      tip.songTitle = fanText(request.title, SONG_TITLE_MAX_POINTS);
+    }
+    return { id, tip };
   }
 
   // charge.succeeded — the only other subscribed type. Card-present only;

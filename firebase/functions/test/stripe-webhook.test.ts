@@ -107,23 +107,26 @@ const CONN = "d".repeat(22); // valid jarId shape (lowercase base36)
 const SECRET = "whsec_9f8e7d6c5b4a39281706f5e4d3c2b1a0";
 const OUR_LINK = "plink_1OurTipJarLink";
 
+const SONG_LINK = "plink_1SongRequestLink";
+
 const SESSION = "cs_test_abc123";
 const tipPath = `users/${UID}/bands/${BAND}/stripeTips/${SESSION}`;
 const tombstonePath = `processedEvents/${SESSION}`;
 
-async function seedConnection() {
+async function seedConnection(extra: Record<string, unknown> = {}) {
   // Only what the webhook reads: no restricted key on purpose.
   docs.set(`stripeConnections/${CONN}`, {
     uid: UID,
     bandId: BAND,
     webhookSecret: await sealSecret(SECRET, testWrapper),
     paymentLinkId: OUR_LINK,
+    ...extra,
   });
 }
 
 /** A paid checkout session against OUR link — the QR tip shape. Stripe may
  * redeliver it under a fresh evt_ id; the object id is what dedupes. */
-function checkoutEvent(sessionId: string, eventId: string): string {
+function checkoutEvent(sessionId: string, eventId: string, overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     id: eventId,
     type: "checkout.session.completed",
@@ -140,6 +143,7 @@ function checkoutEvent(sessionId: string, eventId: string): string {
         payment_intent: "pi_123",
         customer_details: { name: "Card Holder", email: "fan@example.com" },
         custom_fields: [{ key: "nickname", text: { value: "Maya" } }],
+        ...overrides,
       },
     },
   });
@@ -237,5 +241,67 @@ describe("stripeWebhook: dedupe must outlive the delivered tip", () => {
 
     expect(out).toEqual({ status: 200, body: { received: true } });
     expect(docs.has(`users/${UID}/bands/${BAND}/stripeTips/cs_test_next456`)).toBe(true);
+  });
+});
+
+describe("stripeWebhook: song-request links (issue #64)", () => {
+  const requestLinks = { [SONG_LINK]: { songId: "song_wonderwall", title: "Wonderwall" } };
+
+  it("a paid session through a mapped song link lands as a tip WITH songId/songTitle", async () => {
+    await seedConnection({ requestLinks });
+
+    // 4 votes × 5.00 EUR: amount_total arrives already multiplied.
+    const out = await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK, amount_total: 2000 }));
+
+    expect(out).toEqual({ status: 200, body: { received: true } });
+    const tip = docs.get(tipPath)!;
+    expect(tip["songId"]).toBe("song_wonderwall");
+    expect(tip["songTitle"]).toBe("Wonderwall");
+    expect(tip["amountMinor"]).toBe(2000);
+    expect(tip["name"]).toBe("Maya");
+    expect(docs.has(tombstonePath)).toBe(true);
+  });
+
+  it("a redelivered request event is idempotent, even after the tip was collected", async () => {
+    await seedConnection({ requestLinks });
+    await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK }));
+    docs.delete(tipPath); // collected — delivery is deletion
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1_redelivered", { payment_link: SONG_LINK }));
+
+    expect(out).toEqual({ status: 200, body: { received: true, duplicate: true } });
+    expect(docs.has(tipPath)).toBe(false);
+  });
+
+  it("a donation stays a donation: no song fields leak onto the tip-jar path", async () => {
+    await seedConnection({ requestLinks });
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1")); // OUR_LINK, the jar
+
+    expect(out).toEqual({ status: 200, body: { received: true } });
+    const tip = docs.get(tipPath)!;
+    expect("songId" in tip).toBe(false);
+    expect("songTitle" in tip).toBe(false);
+    expect(tip["amountMinor"]).toBe(1500);
+  });
+
+  it("an UNMAPPED foreign link is acknowledged and NOT stored — the gate holds", async () => {
+    await seedConnection({ requestLinks });
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: "plink_SomethingElse" }));
+
+    expect(out).toEqual({ status: 200, body: { received: true, tip: false } });
+    expect(docs.has(tipPath)).toBe(false);
+    expect(docs.has(tombstonePath)).toBe(false);
+  });
+
+  it("a connection without requestLinks (pre-#64 doc) behaves exactly as before", async () => {
+    await seedConnection(); // no requestLinks field at all
+
+    const request = await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK }));
+    expect(request).toEqual({ status: 200, body: { received: true, tip: false } });
+
+    const donation = await deliver(checkoutEvent("cs_test_next456", "evt_2"));
+    expect(donation).toEqual({ status: 200, body: { received: true } });
   });
 });

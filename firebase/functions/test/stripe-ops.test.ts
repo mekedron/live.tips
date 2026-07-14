@@ -18,7 +18,11 @@ describe("parseProxyRequest — the allowlist boundary", () => {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.error).toBe("unknown operation");
     }
-    expect(PROXY_OPS).toEqual(["checkKey", "createTipJar", "updateTipJarDetails", "deactivatePaymentLink", "listTips", "listTaps"]);
+    expect(PROXY_OPS).toEqual([
+      "checkKey", "createTipJar", "updateTipJarDetails", "deactivatePaymentLink",
+      "createSongLink", "updateSongLink", "deactivateSongLink",
+      "listTips", "listTaps",
+    ]);
   });
 
   it("rejects non-object params and unknown fields inside them", () => {
@@ -68,6 +72,81 @@ describe("parseProxyRequest — the allowlist boundary", () => {
     });
     expect(parseProxyRequest("deactivatePaymentLink", { paymentLinkId: "pl_nope" }).ok).toBe(false);
     expect(parseProxyRequest("deactivatePaymentLink", {}).ok).toBe(false);
+  });
+
+  it("createSongLink validates and scrubs its fields", () => {
+    const r = parseProxyRequest("createSongLink", {
+      songId: "song_Abc-123",
+      title: "  Wonder‮wall  ",
+      priceMinor: 500,
+      currency: " EUR ",
+    });
+    expect(r).toEqual({
+      ok: true,
+      value: { op: "createSongLink", songId: "song_Abc-123", title: "Wonderwall", priceMinor: 500, currency: "eur" },
+    });
+  });
+
+  it("createSongLink pins the songId shape: 1-32 of A-Za-z0-9_-, nothing else", () => {
+    const base = { title: "t", priceMinor: 500, currency: "eur" };
+    for (const songId of ["s", "a".repeat(32), "A-b_9"]) {
+      expect(parseProxyRequest("createSongLink", { ...base, songId }).ok).toBe(true);
+    }
+    for (const songId of [undefined, null, 42, "", "a".repeat(33), "a/b", "a b", "sång", "../evil"]) {
+      expect(parseProxyRequest("createSongLink", { ...base, songId }).ok).toBe(false);
+    }
+  });
+
+  it("createSongLink bounds the title at 1-60 code points, scrubbed not truncated", () => {
+    const base = { songId: "s1", priceMinor: 500, currency: "eur" };
+    expect(parseProxyRequest("createSongLink", { ...base, title: "x".repeat(60) }).ok).toBe(true);
+    expect(parseProxyRequest("createSongLink", { ...base, title: "x".repeat(61) }).ok).toBe(false);
+    expect(parseProxyRequest("createSongLink", { ...base, title: "" }).ok).toBe(false);
+    expect(parseProxyRequest("createSongLink", { ...base }).ok).toBe(false);
+    expect(parseProxyRequest("createSongLink", { ...base, title: 42 }).ok).toBe(false);
+    // 60 EMOJI code points fit — the cap counts points, not UTF-16 units.
+    expect(parseProxyRequest("createSongLink", { ...base, title: "🎸".repeat(60) }).ok).toBe(true);
+  });
+
+  it("createSongLink bounds the price: positive integer minor units, capped", () => {
+    const base = { songId: "s1", title: "t", currency: "eur" };
+    expect(parseProxyRequest("createSongLink", { ...base, priceMinor: 1 }).ok).toBe(true);
+    expect(parseProxyRequest("createSongLink", { ...base, priceMinor: 100_000_000 }).ok).toBe(true);
+    for (const priceMinor of [undefined, null, 0, -500, 1.5, "500", 100_000_001, NaN, Infinity, Number.MAX_SAFE_INTEGER + 2]) {
+      expect(parseProxyRequest("createSongLink", { ...base, priceMinor }).ok).toBe(false);
+    }
+  });
+
+  it("createSongLink rejects bad currency and unknown fields", () => {
+    const base = { songId: "s1", title: "t", priceMinor: 500 };
+    for (const currency of [undefined, "euro", "e", 42, ""]) {
+      expect(parseProxyRequest("createSongLink", { ...base, currency }).ok).toBe(false);
+    }
+    expect(parseProxyRequest("createSongLink", { ...base, currency: "eur", thankYouMessage: "ty" }).ok).toBe(false);
+  });
+
+  it("updateSongLink renames only: productId + title, nothing about price", () => {
+    expect(parseProxyRequest("updateSongLink", { productId: "prod_ABC123", title: "New Title" })).toEqual({
+      ok: true,
+      value: { op: "updateSongLink", productId: "prod_ABC123", title: "New Title" },
+    });
+    expect(parseProxyRequest("updateSongLink", { productId: "price_ABC", title: "t" }).ok).toBe(false);
+    expect(parseProxyRequest("updateSongLink", { productId: "prod_../evil", title: "t" }).ok).toBe(false);
+    expect(parseProxyRequest("updateSongLink", { productId: "prod_ABC123" }).ok).toBe(false);
+    expect(parseProxyRequest("updateSongLink", { productId: "prod_ABC123", title: "x".repeat(61) }).ok).toBe(false);
+    // Prices are immutable on Stripe — a price change is deactivate+create,
+    // so this op must not even accept the field.
+    expect(parseProxyRequest("updateSongLink", { productId: "prod_ABC123", title: "t", priceMinor: 900 }).ok).toBe(false);
+  });
+
+  it("deactivateSongLink accepts only a plink_… id and keeps no other fields", () => {
+    expect(parseProxyRequest("deactivateSongLink", { paymentLinkId: "plink_XYZ789" })).toEqual({
+      ok: true,
+      value: { op: "deactivateSongLink", paymentLinkId: "plink_XYZ789" },
+    });
+    expect(parseProxyRequest("deactivateSongLink", { paymentLinkId: "pl_nope" }).ok).toBe(false);
+    expect(parseProxyRequest("deactivateSongLink", {}).ok).toBe(false);
+    expect(parseProxyRequest("deactivateSongLink", { paymentLinkId: "plink_XYZ789", songId: "s1" }).ok).toBe(false);
   });
 
   it("listTips defaults, clamps and validates its paging", () => {
