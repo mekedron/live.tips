@@ -497,7 +497,8 @@ class _SongEditorState extends State<_SongEditor> {
           const SizedBox(height: 16),
           TextField(
             controller: widget.titleController,
-            autofocus: widget.existing == null,
+            // Never autofocus inside a bottom sheet: on iPhone the keyboard
+            // summoned mid-animation breaks the sheet. The artist taps it.
             decoration: InputDecoration(
               labelText: s.t('settings.requests.song_title'),
               errorText: _titleError,
