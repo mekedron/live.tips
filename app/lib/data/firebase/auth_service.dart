@@ -162,7 +162,11 @@ class AuthService {
     if (kIsWeb) throw _noWebProviderFlow;
     if (defaultTargetPlatform == TargetPlatform.android) {
       // No native Apple flow on Android — Firebase drives the web flow.
-      final provider = AppleAuthProvider()..addScope('email');
+      // 'name' matters as much as 'email': Apple returns it only on the first
+      // authorization, so a request that omits it loses the name for good.
+      final provider = AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name');
       final result = link && auth.currentUser != null
           ? await auth.currentUser!.linkWithProvider(provider)
           : await auth.signInWithProvider(provider);

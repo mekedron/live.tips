@@ -125,6 +125,10 @@ function providerFor(name) {
   if (name === "apple") {
     const p = new OAuthProvider("apple.com");
     p.addScope("email");
+    // Apple sends the name ONCE, on the first authorization, and only to a
+    // request that asked for it. Never asking means every Apple account is
+    // nameless forever — Apple will not repeat itself on later sign-ins.
+    p.addScope("name");
     return p;
   }
   return new GoogleAuthProvider();
