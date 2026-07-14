@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/app.dart';
+import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/data/repository/account_data_repository.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/domain/band_account.dart';
 import 'package:live_tips/features/onboarding/onboarding_details_screen.dart';
@@ -486,4 +488,148 @@ void main() {
       expect(find.text('Switch account'), findsOneWidget);
     });
   });
+
+  /// THE SPINNER THAT NEVER RESOLVED (#54).
+  ///
+  /// The screen waited on the WARMTH OF AN OBJECT instead of on the ANSWER.
+  /// `accountDataRepositoryProvider` builds a brand-new, COLD FirestoreRepository
+  /// every time the session/auth/directory graph moves under it — which is
+  /// routinely, in the very beats after the cloud sign-in that lands the artist
+  /// on this screen. The old code re-read `repo.isWarm`, found the fresh object
+  /// silent, and went back to its spinner — with its only deadline already
+  /// cancelled by the warm build before it. No deadline, and no snapshot coming
+  /// either (the new repository's listener is its own): the spinner span until
+  /// the artist reloaded the page.
+  ///
+  /// fake_cloud_firestore cannot express this: it answers every listener with
+  /// server truth, so a FirestoreRepository built on it is warm on its first
+  /// snapshot and never cold again. [_Mirror] is the widened fake — a repository
+  /// that has not heard from the server YET, which is what a real one always is
+  /// for its first beat, and stays if the server never speaks.
+  group('a repository rebuilt cold must not strand the picker (#54)', () {
+    testWidgets('the pushed picker keeps the profiles it is already showing',
+        (tester) async {
+      final local = await seededStore();
+      final secure = FakeSecureStore();
+      final repo = ValueNotifier<AccountDataRepository>(_Mirror(
+        local,
+        () => secure,
+        warm: true,
+        bands: const [BandAccount(id: 'b1', name: 'Nightbirds', createdAtMs: 0)],
+      ));
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          localStoreProvider.overrideWithValue(local),
+          secureStoreProvider.overrideWithValue(secure),
+          initialApiKeyProvider.overrideWithValue(null),
+          accountDataRepositoryProvider.overrideWith((ref) {
+            ref.watch(repoRevisionProvider);
+            return repo.value;
+          }),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: kTestL10nDelegates,
+          locale: const Locale('en'),
+          theme: buildLightTheme(),
+          home: const ProfilePickScreen(), // the gate's onboarding push
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('Nightbirds'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // The sign-in's own machinery moves the graph — a slot commit, the auth
+      // flip, the directory write — and the repository is rebuilt. Same account,
+      // same profiles; a new object that has not heard from the server yet.
+      final container = ProviderScope.containerOf(
+          tester.element(find.byType(ProfilePickScreen)));
+      repo.value = _Mirror(local, () => secure, warm: false);
+      container.read(repoRevisionProvider.notifier).bump();
+      await tester.pump();
+
+      // A cold object is not new ignorance: these bands are what routed the
+      // artist here, and they do not stop existing because the reader was
+      // replaced.
+      expect(find.text('Nightbirds'), findsOneWidget,
+          reason: 'THE BUG: the profiles were un-listed and the screen went '
+              'back to a spinner it could never leave');
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // And it stays out — there is no deadline left to save it, and none needed.
+      await tester.pump(const Duration(seconds: 30));
+      expect(find.text('Nightbirds'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('the ROOT picker — which never had a deadline at all — lists '
+        'the profiles it was routed here on', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(700, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final local = await seededStore();
+      final secure = FakeSecureStore();
+      // RootGate lands on the root picker because the app HAS several profiles
+      // and nobody has said which (ProfileRender.pick) — and it is holding them
+      // in AppState. The repository underneath is a fresh, cold object.
+      final warm = _Mirror(local, () => secure, warm: true, bands: const [
+        BandAccount(id: 'b1', name: 'Nightbirds', createdAtMs: 0),
+        BandAccount(id: 'b2', name: 'The Wreckage', createdAtMs: 0),
+      ]);
+      final repo = ValueNotifier<AccountDataRepository>(warm);
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          localStoreProvider.overrideWithValue(local),
+          secureStoreProvider.overrideWithValue(secure),
+          initialApiKeyProvider.overrideWithValue(null),
+          accountDataRepositoryProvider.overrideWith((ref) {
+            ref.watch(repoRevisionProvider);
+            return repo.value;
+          }),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: kTestL10nDelegates,
+          locale: const Locale('en'),
+          theme: buildLightTheme(),
+          home: const ProfilePickScreen(asRoot: true),
+        ),
+      ));
+      await tester.pump();
+      expect(find.text('Nightbirds'), findsOneWidget);
+
+      final container = ProviderScope.containerOf(
+          tester.element(find.byType(ProfilePickScreen)));
+      repo.value = _Mirror(local, () => secure, warm: false);
+      container.read(repoRevisionProvider.notifier).bump();
+      await tester.pump(const Duration(seconds: 30));
+
+      // The root form has no band setup to fall through to and never armed a
+      // deadline — a cold repository here was a spinner with no exit in the
+      // code at all. The only correct answer is the one the app already has.
+      expect(find.byType(CircularProgressIndicator), findsNothing,
+          reason: 'THE BUG: the root picker span forever — no deadline, no '
+              'snapshot, no way out but a page reload');
+      expect(find.text('Nightbirds'), findsOneWidget);
+      expect(find.text('The Wreckage'), findsOneWidget);
+    });
+  });
+}
+
+/// A cloud mirror that has not heard from the server YET — the state every real
+/// FirestoreRepository is in for its first beat, and stays in if the server
+/// never answers. fake_cloud_firestore cannot raise it: it hands every listener
+/// server truth, so a repository built on it is warm immediately and never goes
+/// back. Without this, the suite could not see a cold repository at all.
+class _Mirror extends LocalStoreRepository {
+  _Mirror(super.local, super.resolveSecure, {required this.warm, this.bands});
+
+  final bool warm;
+  final List<BandAccount>? bands;
+
+  @override
+  bool get isWarm => warm;
+
+  @override
+  List<BandAccount> listBands() => bands ?? const [];
 }

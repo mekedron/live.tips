@@ -29,12 +29,13 @@ import 'onboarding_flow.dart';
 /// The answer has to be WAITED for: the cloud mirror is silent until its
 /// first snapshot, and an empty cold mirror says nothing about the profiles
 /// (deciding "none" on it is exactly how junk profiles were minted). So this
-/// screen holds a spinner until the repository is warm, then either forwards
-/// itself to the band setup (a genuinely fresh account — no extra screen to
-/// notice) or lists what the account already has. The spinner is bounded:
-/// the sign-in just crossed the network, so a snapshot is close — and if it
-/// still never lands, the deadline falls through to the band setup rather
-/// than trapping onboarding.
+/// screen holds a spinner until it has an ANSWER — a warm mirror, or the bands
+/// the app is already holding ([_known]) — then either forwards itself to the
+/// band setup (a genuinely fresh account — no extra screen to notice) or lists
+/// what the account already has. The spinner is bounded, and bounded EVERY time
+/// it comes up ([_arm]): the sign-in just crossed the network, so a snapshot is
+/// close — and if it still never lands, the deadline falls through to the band
+/// setup rather than trapping onboarding.
 ///
 /// [asRoot], it is RootGate's landing for a cloud account whose band question
 /// is open — no navigation stack under it, nothing pushed on top:
@@ -83,15 +84,56 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
   bool _forwarded = false;
 
   @override
-  void initState() {
-    super.initState();
-    if (!widget.asRoot) _timer = Timer(_deadline, _forward);
-  }
-
-  @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  /// A deadline for as long as this screen is WAITING — re-armed every time it
+  /// goes back to waiting, and cancelled the moment it has an answer.
+  ///
+  /// It used to be armed ONCE, in initState, and cancelled in [build] the first
+  /// time the mirror spoke. A screen that went back to its spinner afterwards
+  /// had no deadline left at all — and going back to the spinner is exactly
+  /// what a repository rebuilt COLD does to it (see [_known]). No deadline, and
+  /// no snapshot coming either (the new repository's listener is its own): the
+  /// spinner span until the artist reloaded the page. That was the sign-in that
+  /// never completed (#54).
+  void _arm() {
+    if (widget.asRoot || _forwarded) return;
+    if (_timer?.isActive ?? false) return;
+    _timer = Timer(_deadline, _forward);
+  }
+
+  void _disarm() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  /// The profiles this screen can vouch for — or NULL while it has no answer
+  /// from anywhere, which is the only thing that means "wait".
+  ///
+  /// The repository is the source, and a cold cloud mirror is SILENT: it says
+  /// nothing about the account's profiles, and deciding "none" on it is how
+  /// junk profiles got minted. That rule stands — the fallback below may only
+  /// ever ADD profiles that are known to exist, never conclude that there are
+  /// none. A cache proves what exists; it never proves what is absent.
+  ///
+  /// But a repository that is cold is not the same thing as an account nobody
+  /// knows anything about. [accountDataRepositoryProvider] builds a BRAND-NEW,
+  /// cold [FirestoreRepository] every time the session/auth/directory graph
+  /// moves under it — which is routinely, in the beats right after the sign-in
+  /// that lands the artist here — and the bands the app is already holding
+  /// ([AppState.accounts]) do not stop existing because the object that read
+  /// them was replaced. They are the very bands RootGate routed here ON.
+  ///
+  /// So: the warm mirror answers when there is one, and the app's own bands
+  /// answer when there is not. Waiting on the WARMTH OF AN OBJECT rather than
+  /// on the ANSWER was the bug — the object can go cold again, and the answer
+  /// cannot.
+  List<BandAccount>? _known(AccountDataRepository repo, AppState app) {
+    if (repo.isWarm) return repo.listBands();
+    return app.accounts.isNotEmpty ? app.accounts : null;
   }
 
   /// On to the band setup — the account has nothing to offer (or the mirror
@@ -102,7 +144,8 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     // The deadline may fire in the same beat a snapshot lands — profiles
     // that exist always win over the fallback.
     final repo = ref.read(accountDataRepositoryProvider);
-    if (repo.isWarm && repo.listBands().any((b) => _real(repo, b))) return;
+    final known = _known(repo, ref.read(appStateProvider));
+    if (known != null && known.any((b) => _real(repo, b))) return;
     _forwarded = true;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => firstBandSetupScreen()),
@@ -190,12 +233,13 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     // into, and hiding it would leave the app asking about a list nobody can
     // see. The onboarding fork asks the narrower question — "is there
     // anything here worth re-entering?" — and ignores the placeholders.
-    final existing = repo.isWarm
-        ? [
-            for (final band in repo.listBands())
+    final known = _known(repo, app);
+    final existing = known == null
+        ? null
+        : [
+            for (final band in known)
               if (asRoot || _real(repo, band)) band,
-          ]
-        : null;
+          ];
 
     if (!asRoot && existing != null && existing.isEmpty && !_forwarded) {
       // A warm answer with nothing in it — a genuinely fresh account walks
@@ -203,6 +247,9 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _forward());
     }
     if (existing == null || (existing.isEmpty && !asRoot)) {
+      // Still waiting: a deadline runs for as long as that is true, however
+      // many times the answer is taken away again.
+      _arm();
       return Scaffold(
         appBar: AppBar(title: Text(s.t('onboarding.profile_pick.title'))),
         body: Center(
@@ -229,7 +276,7 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
       );
     }
 
-    _timer?.cancel(); // the mirror spoke — the deadline has done its job
+    _disarm(); // there is an answer on the screen — nothing left to wait for
     // The band this device last had open in this account. It says which row
     // to mark, and nothing more: the app opening it unasked is the bug this
     // screen exists for.
