@@ -239,6 +239,21 @@ class SongRequestSettings {
 
   final List<SongEntry> songs;
 
+  /// Payment-link id → the song its checkout sessions request, for every
+  /// song holding a link record — what the Stripe poller matches request
+  /// payments with (the device-side twin of the webhook's `requestLinks`
+  /// map). The title is the RECORD's title — what the link was minted FOR —
+  /// not the song's current one, so a renamed-but-not-reminted song still
+  /// attributes exactly as it was sold.
+  Map<String, ({String songId, String title})> get stripeLinkTargets => {
+        for (final song in songs)
+          if (song.stripe != null)
+            song.stripe!.paymentLinkId: (
+              songId: song.id,
+              title: song.stripe!.title,
+            ),
+      };
+
   SongRequestSettings copyWith({
     bool? enabled,
     int? defaultPriceMinor,

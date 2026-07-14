@@ -38,6 +38,7 @@ Future<({LocalStore store, FakeCallables backend})> _pump(
   WidgetTester tester, {
   RelayJar jar = _relayJar,
   bool withStripe = false,
+  bool? withKey,
 }) async {
   await tester.binding.setSurfaceSize(const Size(600, 1400));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -52,7 +53,7 @@ Future<({LocalStore store, FakeCallables backend})> _pump(
         localStoreProvider.overrideWithValue(store),
         secureStoreProvider.overrideWithValue(FakeSecureStore()),
         initialApiKeyProvider.overrideWithValue(
-          withStripe ? 'rk_test_0123456789abcd' : null,
+          (withKey ?? withStripe) ? 'rk_test_0123456789abcd' : null,
         ),
         initialRelaySecretProvider.overrideWithValue('sec'),
         relayClientProvider.overrideWithValue(fakeRelayClient(backend)),
@@ -159,6 +160,32 @@ void main() {
     await _pump(tester, withStripe: true);
     expect(find.text('Card'), findsOneWidget);
     expect(find.byType(Checkbox), findsNWidgets(3));
+    // The key is on this device, so no custody hint.
+    expect(
+        find.text("Card request links are created with your Stripe key, "
+            "and this device doesn't hold it."),
+        findsNothing);
+  });
+
+  testWidgets('a Stripe jar WITHOUT the key on this device hints that card '
+      'requests need it — the row stays, links just can\'t be minted here',
+      (tester) async {
+    // The band has a tip jar (synced settings), but the restricted key never
+    // reached this device — cloud key custody, or a linked follower.
+    await _pump(tester, withStripe: true, withKey: false);
+
+    expect(find.text('Card'), findsOneWidget);
+    expect(
+        find.text("Card request links are created with your Stripe key, "
+            "and this device doesn't hold it."),
+        findsOneWidget);
+    // The checkbox itself is still tickable: the choice belongs to the
+    // band, and a device that does hold the key will honour it.
+    expect(
+        tester
+            .widgetList<Checkbox>(find.byType(Checkbox))
+            .every((box) => box.onChanged != null),
+        isTrue);
   });
 
   testWidgets('a non-EUR jar offers MobilePay disabled, with the reason',

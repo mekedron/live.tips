@@ -1129,6 +1129,10 @@ final tipSourceFactoryProvider = Provider<TipSourceFactory>(
     return StripeTipSource(
       StripeRequests(client),
       paymentLinkId: jar.paymentLinkId,
+      // The band's minted song links (#64), so a payment through one lands
+      // as a request tip with its song attached. Read at session start,
+      // like the jar — the poller keeps snapshot semantics throughout.
+      songLinks: ref.read(appStateProvider).band.songRequests.stripeLinkTargets,
       onDispose: client.close,
     );
   },

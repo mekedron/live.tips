@@ -161,4 +161,30 @@ void main() {
       expect(requestMethodEligible('paypal', 'eur'), isFalse);
     });
   });
+
+  group('stripeLinkTargets', () {
+    test('maps only linked songs, keyed by payment link, titled as minted',
+        () {
+      const linked = SongEntry(
+        id: 'sng_a',
+        title: 'Wonderwall (live)',
+        stripe: StripeSongLink(
+          productId: 'prod_1',
+          priceId: 'price_1',
+          paymentLinkId: 'plink_1',
+          url: 'https://buy.stripe.com/x',
+          priceMinor: 500,
+          title: 'Wonderwall',
+        ),
+      );
+      const bare = SongEntry(id: 'sng_b', title: 'Yesterday');
+      const settings = SongRequestSettings(songs: [linked, bare]);
+
+      expect(settings.stripeLinkTargets, {
+        // The record's title — what the link was minted FOR — not the
+        // song's current one: a rename must not rewrite attribution.
+        'plink_1': (songId: 'sng_a', title: 'Wonderwall'),
+      });
+    });
+  });
 }

@@ -1,3 +1,4 @@
+import '../../domain/song_request_settings.dart';
 import '../../domain/tip.dart';
 import '../../domain/tip_jar.dart';
 import 'stripe_client.dart';
@@ -208,6 +209,93 @@ class StripeRequests {
 
   Future<void> deactivatePaymentLink(String paymentLinkId) async {
     await client.post('payment_links/$paymentLinkId', {'active': 'false'});
+  }
+
+  /// Creates one song's request objects (issue #64): Product → fixed Price →
+  /// Payment Link with adjustable quantity 1–50 ("votes": `amount_total`
+  /// arrives pre-multiplied, so no reader ever parses quantities). Parameter
+  /// for parameter the call the server's stripeProxy `createSongLink` op
+  /// makes with a cloud-custody key — including `pay`, never `donate` (see
+  /// [createTipJar]) and the tip jar's nickname/message fields: a request is
+  /// a tip with a song attached, and the stage shows the same name + message.
+  ///
+  /// Recognition asymmetry, stated honestly: the server-minted twin also
+  /// stamps the link onto the band's `stripeConnections` doc, which is what
+  /// lets the WEBHOOK attribute payments. That doc is server-custody
+  /// (firestore.rules: `allow read, write: if false`) and no callable
+  /// registers an app-minted mapping — so a link minted HERE is recognized
+  /// only by the device poller (`StripeTipSource.songLinks`, fed from the
+  /// band doc's [SongEntry.stripe] records). For a local-key band that is
+  /// the whole story anyway: no connection doc means no webhook watches the
+  /// account at all.
+  Future<StripeSongLink> createSongLink({
+    required String songId,
+    required String title,
+    required int priceMinor,
+    required String currency,
+  }) async {
+    final product = await client.post('products', {
+      'name': 'Request — $title',
+      'metadata[managed_by]': 'live.tips',
+      'metadata[song_id]': songId,
+    });
+
+    final price = await client.post('prices', {
+      'product': product['id'] as String,
+      'currency': currency,
+      'unit_amount': '$priceMinor',
+      'metadata[managed_by]': 'live.tips',
+    });
+
+    final link = await client.post('payment_links', {
+      'line_items[0][price]': price['id'] as String,
+      'line_items[0][quantity]': '1',
+      'line_items[0][adjustable_quantity][enabled]': 'true',
+      'line_items[0][adjustable_quantity][minimum]': '1',
+      'line_items[0][adjustable_quantity][maximum]': '50',
+      'submit_type': 'pay',
+      'custom_fields[0][key]': 'nickname',
+      'custom_fields[0][label][type]': 'custom',
+      'custom_fields[0][label][custom]': 'Your name or nickname',
+      'custom_fields[0][type]': 'text',
+      'custom_fields[0][optional]': 'true',
+      'custom_fields[1][key]': 'message',
+      'custom_fields[1][label][type]': 'custom',
+      'custom_fields[1][label][custom]': 'Leave a message',
+      'custom_fields[1][type]': 'text',
+      'custom_fields[1][optional]': 'true',
+      'metadata[managed_by]': 'live.tips',
+      'metadata[song_id]': songId,
+    });
+
+    return StripeSongLink(
+      productId: product['id'] as String,
+      priceId: price['id'] as String,
+      paymentLinkId: link['id'] as String,
+      url: link['url'] as String,
+      priceMinor: priceMinor,
+      title: title,
+    );
+  }
+
+  /// Retires one song's link — it stops selling, its QR dies. The Product
+  /// and Price stay behind (prices are immutable and products with payments
+  /// can't be deleted anyway); the song's record is simply replaced or
+  /// dropped by the caller.
+  Future<void> deactivateSongLink(String paymentLinkId) =>
+      deactivatePaymentLink(paymentLinkId);
+
+  /// Renames a song link's product in place — the checkout page follows, the
+  /// link and its QR keep working. Parity with the proxy's `updateSongLink`,
+  /// and deliberately NOT what the editor sync uses for a title change: the
+  /// stored record title is what attribution was minted for, so a rename
+  /// that should reach the stage is deactivate + create, same as a price
+  /// change.
+  Future<void> renameSongProduct({
+    required String productId,
+    required String title,
+  }) async {
+    await client.post('products/$productId', {'name': 'Request — $title'});
   }
 
   /// Lists the [_tipEventTypes] success events, newest first.

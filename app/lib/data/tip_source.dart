@@ -31,10 +31,20 @@ abstract class TipSource {
 /// (~500 reads/transaction, 10k/month floor) is why the default tick is 4 s.
 class StripeTipSource extends TipSource {
   StripeTipSource(this._requests,
-      {required this.paymentLinkId, this.onDispose});
+      {required this.paymentLinkId,
+      this.songLinks = const {},
+      this.onDispose});
 
   final StripeRequests _requests;
   final String paymentLinkId;
+
+  /// Payment-link id → the song its checkout sessions request (#64) — the
+  /// device-side twin of the webhook's `requestLinks` gate, fed from the
+  /// band's `SongEntry.stripe` records at session start. App-minted song
+  /// links exist ONLY here: the server's connection doc is server-custody,
+  /// so the poller is what recognizes them. Snapshot semantics, like
+  /// [paymentLinkId]: a song minted mid-session is picked up next session.
+  final Map<String, ({String songId, String title})> songLinks;
 
   /// Owns-its-client hook: the session source must NEVER share an HTTP
   /// client with rebuildable providers (a provider rebuild used to close
@@ -112,8 +122,10 @@ class StripeTipSource extends TipSource {
   /// disjoint:
   ///
   /// * **Online (QR).** A Checkout Session against *our* payment link, paid.
-  ///   Unchanged, and still the only thing the checkout.session.* events can
-  ///   produce.
+  ///   Two-way now (#64): the tip jar's link is a plain tip, exactly as
+  ///   before; a link in [songLinks] is the same tip plus the song it
+  ///   requested. Any other link — the artist's unrelated business, or a
+  ///   song link this device re-minted and no longer knows — is still null.
   /// * **In person (tap).** A Charge, but ONLY a card-present one. This is the
   ///   trap: a Checkout Session payment also emits `charge.succeeded`, so
   ///   accepting charges naively would count every QR tip twice — once as the
@@ -132,9 +144,16 @@ class StripeTipSource extends TipSource {
   Tip? _tipOf(TipEvent event) {
     final object = event.object;
     if (event.isCheckoutSession) {
-      if (object['payment_link'] != paymentLinkId) return null;
       if (object['payment_status'] != 'paid') return null;
-      return Tip.fromCheckoutSession(object);
+      final link = object['payment_link'];
+      if (link == paymentLinkId) return Tip.fromCheckoutSession(object);
+      final song = link is String ? songLinks[link] : null;
+      if (song == null) return null;
+      // A request: the same verified tip, with the song stamped on. The
+      // title comes from the map — what the link was minted FOR — so a
+      // later library rename never rewrites what the fan paid for.
+      return Tip.fromCheckoutSession(object)
+          .copyWith(songId: song.songId, songTitle: song.title);
     }
     // charge.succeeded — the only other type we ask Stripe for.
     if (!Tip.isCardPresentCharge(object)) return null;

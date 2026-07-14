@@ -350,6 +350,70 @@ void main() {
     expect(source.cursor, 'evt_4', reason: 'the cursor still advances');
   });
 
+  // ------------------------------------------------- song request links ---
+
+  test(
+      'the two-way match: donation link → plain tip, mapped song link → '
+      'request tip with the song stamped on, unmapped link → dropped',
+      () async {
+    final requests = FakeRequests([
+      const TipEventsPage(events: [], hasMore: false),
+      TipEventsPage(
+        events: [
+          sessionEvent('evt_3',
+              created: 30,
+              session: paidSession('cs_stranger', link: 'plink_theirs')),
+          sessionEvent('evt_2',
+              created: 20, session: paidSession('cs_request', link: 'plink_song')),
+          sessionEvent('evt_1', created: 10, session: paidSession('cs_plain')),
+        ],
+        hasMore: false,
+      ),
+    ]);
+    final source = StripeTipSource(
+      requests,
+      paymentLinkId: 'plink_ours',
+      songLinks: {'plink_song': (songId: 'sng_1', title: 'Wonderwall')},
+    );
+    await source.prime(DateTime.now());
+
+    final fresh = await source.pollNew();
+    expect(fresh.map((d) => d.id).toList(), ['cs_plain', 'cs_request'],
+        reason: 'the stranger link is not ours and never reaches the stage');
+
+    final plain = fresh[0];
+    expect(plain.songId, isNull);
+    expect(plain.songTitle, isNull);
+
+    final request = fresh[1];
+    expect(request.songId, 'sng_1');
+    expect(request.songTitle, 'Wonderwall',
+        reason: 'the title comes from the map — what the link was minted for');
+    expect(request.amountMinor, 500);
+    expect(request.verified, isTrue, reason: 'Stripe saw the money move');
+  });
+
+  test('an unpaid session through a mapped song link is still not a tip',
+      () async {
+    final unpaid = paidSession('cs_pending', link: 'plink_song')
+      ..['payment_status'] = 'unpaid';
+    final requests = FakeRequests([
+      const TipEventsPage(events: [], hasMore: false),
+      TipEventsPage(
+        events: [sessionEvent('evt_1', created: 10, session: unpaid)],
+        hasMore: false,
+      ),
+    ]);
+    final source = StripeTipSource(
+      requests,
+      paymentLinkId: 'plink_ours',
+      songLinks: {'plink_song': (songId: 'sng_1', title: 'Wonderwall')},
+    );
+    await source.prime(DateTime.now());
+
+    expect(await source.pollNew(), isEmpty);
+  });
+
   test('demo source produces tips', () async {
     final source = DemoTipSource();
     await source.prime(DateTime.now());

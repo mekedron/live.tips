@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../data/relay/relay_client.dart';
+import '../../data/stripe/stripe_client.dart';
+import '../../data/stripe/stripe_requests.dart';
+import '../../data/stripe/stripe_song_link_sync.dart';
 import '../../domain/song_request_settings.dart';
 import '../../domain/tip_method.dart';
 import '../../l10n/app_localizations.dart';
@@ -27,13 +31,71 @@ class SongRequestsScreen extends ConsumerStatefulWidget {
 }
 
 class _SongRequestsScreenState extends ConsumerState<SongRequestsScreen> {
-  /// Persists [next] locally, then pushes the fresh config to the jar.
+  /// Persists [next] locally, mints/retires Stripe song links to match when
+  /// this device can, then pushes the fresh config to the jar — so the
+  /// publish carries the new `stripeUrl`s in the same save.
   Future<void> _apply(SongRequestSettings next) async {
     final band = ref.read(appStateProvider).band;
+    final previousSongs = band.songRequests.songs;
     await ref
         .read(appStateProvider.notifier)
         .updateBand(band.copyWith(songRequests: next));
-    await _publish(next);
+    final synced = await _syncStripeLinks(previousSongs, next);
+    await _publish(synced ?? next);
+  }
+
+  /// Makes the band's Stripe payment links match the library — only when the
+  /// feature is on, card is ticked, and THIS device holds the key (minting is
+  /// a direct Stripe call with the artist's own key; a device without one —
+  /// cloud key custody, a linked follower — skips it, and the card checkbox
+  /// row says so). The diff itself lives in [StripeSongLinkSync]; this is
+  /// the glue: persist what landed, surface what didn't, once.
+  Future<SongRequestSettings?> _syncStripeLinks(
+    List<SongEntry> previousSongs,
+    SongRequestSettings next,
+  ) async {
+    final app = ref.read(appStateProvider);
+    final apiKey = app.demo ? null : app.apiKey;
+    if (apiKey == null ||
+        !next.enabled ||
+        !next.methods.contains(TipMethod.stripe.wire)) {
+      return null;
+    }
+    // Links are priced in the currency the editor showed the artist —
+    // the number they typed must be the number the checkout charges.
+    final currency = app.relayJar?.currency ?? app.currency;
+    // Own client, closed when done: never borrow stripeRequestsProvider's —
+    // a provider rebuild would close it under an in-flight mint.
+    final client = StripeClient(apiKey);
+    SongLinkSyncOutcome outcome;
+    try {
+      outcome = await StripeSongLinkSync(StripeRequests(client)).sync(
+        previousSongs: previousSongs,
+        next: next,
+        currency: currency,
+      );
+    } finally {
+      client.close();
+    }
+
+    var result = next;
+    if (!listEquals(outcome.songs, next.songs)) {
+      result = next.copyWith(songs: outcome.songs);
+      final band = ref.read(appStateProvider).band;
+      await ref
+          .read(appStateProvider.notifier)
+          .updateBand(band.copyWith(songRequests: result));
+    }
+    if (mounted && (outcome.capReached || outcome.failures > 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.s.t(outcome.capReached
+              ? 'settings.requests.stripe_limit_reached'
+              : 'settings.requests.stripe_sync_failed')),
+        ),
+      );
+    }
+    return result;
   }
 
   /// Best-effort copy to the fan page — only when a relay jar exists to
@@ -285,16 +347,23 @@ class _SongRequestsScreenState extends ConsumerState<SongRequestsScreen> {
     String currency,
   ) {
     final eligible = requestMethodEligible(method.wire, currency);
+    // Card request links are minted right here, with the artist's own key —
+    // a device that doesn't hold it (cloud key custody, a linked follower)
+    // can tick the box but can't create the links, and must say so.
+    final needsKey = method == TipMethod.stripe &&
+        ref.read(appStateProvider).apiKey == null;
     return LtRow(
       icon: method.icon,
       title: method.l10nLabel(context),
       // Say WHY a method the band offers can't take requests: fixed-price
       // request links only exist for the currency these services settle in.
-      subtitle: eligible
-          ? null
-          : context.s.t(
+      subtitle: !eligible
+          ? context.s.t(
               'settings.requests.currency_excluded_${method.wire}',
-            ),
+            )
+          : needsKey
+              ? context.s.t('settings.requests.stripe_hint_no_key')
+              : null,
       trailing: Checkbox(
         value: eligible && requests.methods.contains(method.wire),
         onChanged: eligible
