@@ -14,7 +14,15 @@ class LiveSession {
     List<Tip>? tips,
     this.bankedMinor = 0,
     this.bankedJars = 0,
-  }) : tips = List.of(tips ?? const []);
+    this.requestsOpen = false,
+    Map<String, String>? songStatuses,
+  })  : tips = List.of(tips ?? const []),
+        _songStatuses = {...?songStatuses};
+
+  /// A song request marked as performed / passed over (#64). Absent from
+  /// [songStatuses] means queued — the default every request starts in.
+  static const statusPlayed = 'p';
+  static const statusSkipped = 'k';
 
   final String id;
   final DateTime startedAt;
@@ -32,6 +40,42 @@ class LiveSession {
 
   /// How many jars have been filled to the brim and retired.
   int bankedJars;
+
+  /// Whether this set is taking song requests RIGHT NOW (#64) — the artist's
+  /// mid-session pause/resume, distinct from the band's master toggle in
+  /// settings. Rides the session json so it survives a crash resume.
+  bool requestsOpen;
+
+  /// Per-song request status: songId → [statusPlayed] | [statusSkipped].
+  /// A song absent here is queued. Kept sparse on purpose: "queued" is not
+  /// stored, so the map stays empty for the overwhelmingly common set.
+  final Map<String, String> _songStatuses;
+
+  /// Read-only view — mutate through [setSongStatus]/[clearSongStatus] so
+  /// every write path stays in one place.
+  Map<String, String> get songStatuses => Map.unmodifiable(_songStatuses);
+
+  /// Marks a song played/skipped. Anything but the two known statuses is
+  /// dropped — a garbled remote value must not poison the map.
+  void setSongStatus(String songId, String status) {
+    if (status != statusPlayed && status != statusSkipped) return;
+    _songStatuses[songId] = status;
+  }
+
+  /// Back to queued (the artist un-sinks a card).
+  void clearSongStatus(String songId) => _songStatuses.remove(songId);
+
+  /// Replaces the whole status map — the remote-wins path when another
+  /// device's edit lands. Unknown status values are dropped per entry.
+  void replaceSongStatuses(Map<String, String> statuses) {
+    _songStatuses
+      ..clear()
+      ..addAll({
+        for (final e in statuses.entries)
+          if (e.value == statusPlayed || e.value == statusSkipped)
+            e.key: e.value,
+      });
+  }
 
   final List<Tip> tips;
   final Set<String> _ids = {};
@@ -135,6 +179,20 @@ class LiveSession {
     );
   }
 
+  /// Swaps a tip already in the session for [tip] (matched by id), keeping
+  /// its position; `_ids` stays consistent because the id is the match key.
+  /// No-op (false) for an unknown id — an update for a tip we never had is
+  /// not an insert. This is how "verified elsewhere" reaches a session copy.
+  bool replaceTip(Tip tip) {
+    for (var i = 0; i < tips.length; i++) {
+      if (tips[i].id == tip.id) {
+        tips[i] = tip;
+        return true;
+      }
+    }
+    return false;
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'startedAt': startedAt.millisecondsSinceEpoch,
@@ -143,6 +201,10 @@ class LiveSession {
         'goalMinor': goalMinor,
         'bankedMinor': bankedMinor,
         'bankedJars': bankedJars,
+        // Written only when set so a pre-requests session re-saves
+        // byte-identically (pinned by a test, like Tip.toJson's song keys).
+        if (requestsOpen) 'requestsOpen': true,
+        if (_songStatuses.isNotEmpty) 'songStatuses': {..._songStatuses},
         'tips': tips.map((d) => d.toJson()).toList(),
       };
 
@@ -164,6 +226,15 @@ class LiveSession {
         goalMinor: (json['goalMinor'] as num).toInt(),
         bankedMinor: (json['bankedMinor'] as num?)?.toInt() ?? 0,
         bankedJars: (json['bankedJars'] as num?)?.toInt() ?? 0,
+        requestsOpen: json['requestsOpen'] == true,
+        songStatuses: json['songStatuses'] is Map
+            ? {
+                for (final e in (json['songStatuses'] as Map).entries)
+                  if (e.key is String &&
+                      (e.value == statusPlayed || e.value == statusSkipped))
+                    e.key as String: e.value as String,
+              }
+            : null,
         tips: (json['tips'] as List? ?? const [])
             .map((d) => Tip.fromJson(Map<String, dynamic>.from(d as Map)))
             .toList(),

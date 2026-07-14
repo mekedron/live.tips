@@ -36,6 +36,12 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   late int _goalMinor;
 
+  /// Tonight's word on song requests, handed to start(). Defaults on: the
+  /// band enabled the feature in settings, so a set that takes requests is
+  /// the expected night — the switch is the exception lever. Not persisted;
+  /// pausing mid-set lives in the Requests tab.
+  bool _takeRequests = true;
+
   /// Dev convenience: `flutter run --dart-define=AUTO_RESUME=1` jumps
   /// straight back into a stored session — no clicking through the UI.
   static const _autoResume = bool.fromEnvironment(
@@ -78,10 +84,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _startSession() async {
+    // The switch only exists while the feature is enabled; with it disabled
+    // the controller's default (off) is the truth.
+    final requestsEnabled =
+        ref.read(appStateProvider).band.songRequests.enabled;
     try {
-      await ref
-          .read(liveSessionProvider.notifier)
-          .start(goalMinor: _goalMinor);
+      await ref.read(liveSessionProvider.notifier).start(
+            goalMinor: _goalMinor,
+            requestsOpen: requestsEnabled ? _takeRequests : null,
+          );
     } on SessionAlreadyActiveException catch (e) {
       _showAlreadyLive(e);
       return;
@@ -137,6 +148,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       goalMinor: _goalMinor,
       currency: app.currency,
       live: live,
+      requestsEnabled: app.band.songRequests.enabled,
+      takeRequests: _takeRequests,
+      onTakeRequests: (v) => setState(() => _takeRequests = v),
       onEditGoal: () => _editGoal(app.currency),
       onBump: _setGoal,
       onStart: _startSession,
@@ -359,6 +373,9 @@ class _GoalCard extends ConsumerWidget {
     required this.goalMinor,
     required this.currency,
     required this.live,
+    required this.requestsEnabled,
+    required this.takeRequests,
+    required this.onTakeRequests,
     required this.onEditGoal,
     required this.onBump,
     required this.onStart,
@@ -369,6 +386,15 @@ class _GoalCard extends ConsumerWidget {
   final int goalMinor;
   final String currency;
   final LiveState? live;
+
+  /// The band's song-request master switch (settings). When off, the
+  /// take-requests row is not rendered at all — the card stays exactly as
+  /// it was before the feature existed.
+  final bool requestsEnabled;
+
+  /// The per-session Go-live choice, held by the screen state.
+  final bool takeRequests;
+  final ValueChanged<bool> onTakeRequests;
   final VoidCallback onEditGoal;
   final ValueChanged<int> onBump;
   final VoidCallback onStart;
@@ -429,6 +455,12 @@ class _GoalCard extends ConsumerWidget {
       children: [
         _StageLookRow(onTap: () => showStageLookSheet(context)),
         const SizedBox(height: 12),
+        // Only while the band has the feature on, and only before Go live —
+        // the mid-set pause lives in the Requests tab.
+        if (requestsEnabled && live == null) ...[
+          _TakeRequestsRow(value: takeRequests, onChanged: onTakeRequests),
+          const SizedBox(height: 12),
+        ],
         if (live != null)
           LtPrimaryButton(
             label: context.s.t('home.return_to_session', {
@@ -649,6 +681,48 @@ class _StageLookRow extends ConsumerWidget {
                 ),
               ),
               Icon(Icons.chevron_right_rounded, size: 20, color: c.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The Go-live companion to [_StageLookRow]: whether tonight's set takes
+/// song requests. Rendered only when the band enabled the feature.
+class _TakeRequestsRow extends StatelessWidget {
+  const _TakeRequestsRow({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Material(
+      color: c.bg,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          child: Row(
+            children: [
+              Icon(Icons.queue_music_rounded, size: 20, color: c.accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  context.s.t('home.take_requests'),
+                  style: outfitStyle(13.5, c.text),
+                ),
+              ),
+              Switch(
+                value: value,
+                onChanged: onChanged,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ],
           ),
         ),

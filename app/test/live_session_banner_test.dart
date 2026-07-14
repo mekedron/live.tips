@@ -39,6 +39,15 @@ class FakeCoordinator implements SessionCoordinator {
   void onGoalEdited(LiveSession session) {}
 
   @override
+  void onRequestsEdited(LiveSession session) {}
+
+  @override
+  void onTipVerified(LiveSession session, Tip tip) {}
+
+  @override
+  bool get publishesRequests => false;
+
+  @override
   Future<void> stop(LiveSession session, {bool durable = false}) async {}
 
   @override

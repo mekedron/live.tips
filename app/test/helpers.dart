@@ -306,7 +306,10 @@ class FakeCallables {
     calls.add((name: name, args: args));
     if (enforceTextCaps) {
       _checkProfile(args);
-      if (name == 'setJarRequests') _checkRequestsConfig(args);
+      if (name == 'setJarRequests') {
+        _checkRequestsConfig(args);
+        _checkRequestsQueue(args);
+      }
     }
     final route = routes[name];
     return route == null ? const {} : route(args);
@@ -367,6 +370,49 @@ class FakeCallables {
         throw FakeFunctionsException('invalid-argument', 'bad song id');
       }
       _checkText(song['title'], 'title', 60, 240);
+    }
+  }
+
+  /// The `queue` contract (validate.ts validateRequestsQueue), verbatim
+  /// where it counts: a flat songId → {t, c, s} map, at most 150 entries,
+  /// server-bounded totals, and NOTHING else per entry — an app that ships
+  /// an over-cap or misshapen queue must fail in this suite, not on stage.
+  static void _checkRequestsQueue(Map<String, dynamic> args) {
+    final queue = args['queue'];
+    if (queue is! Map) return;
+    if (queue.length > 150) {
+      throw FakeFunctionsException(
+          'invalid-argument', 'queue must not exceed 150 entries');
+    }
+    for (final e in queue.entries) {
+      if (e.key is! String || !_songId.hasMatch(e.key as String)) {
+        throw FakeFunctionsException(
+            'invalid-argument', 'queue song id is not valid');
+      }
+      final entry = e.value;
+      if (entry is! Map) {
+        throw FakeFunctionsException(
+            'invalid-argument', 'each queue entry must be an object');
+      }
+      if (entry.keys.any((k) => k != 't' && k != 'c' && k != 's')) {
+        throw FakeFunctionsException(
+            'invalid-argument', 'queue entry has unknown keys');
+      }
+      final t = entry['t'];
+      if (t is! int || t < 0 || t > 100000000) {
+        throw FakeFunctionsException('invalid-argument',
+            'queue entry t must be an integer between 0 and 100000000');
+      }
+      final c = entry['c'];
+      if (c is! int || c < 0 || c > 10000) {
+        throw FakeFunctionsException('invalid-argument',
+            'queue entry c must be an integer between 0 and 10000');
+      }
+      final s = entry['s'];
+      if (s != 'q' && s != 'p' && s != 'k') {
+        throw FakeFunctionsException(
+            'invalid-argument', 'queue entry s must be q, p or k');
+      }
     }
   }
 

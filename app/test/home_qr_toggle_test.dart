@@ -6,7 +6,9 @@ import 'package:live_tips/app.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/domain/app_settings.dart';
+import 'package:live_tips/domain/band_settings.dart';
 import 'package:live_tips/domain/relay_jar.dart';
+import 'package:live_tips/domain/song_request_settings.dart';
 import 'package:live_tips/domain/tip_jar.dart';
 import 'package:live_tips/state/providers.dart';
 
@@ -107,5 +109,59 @@ void main() {
 
     expect(find.text('All methods'), findsNothing);
     expect(find.text('Stripe only'), findsNothing);
+  });
+
+  testWidgets(
+      'song requests OFF: no take-requests row, no Requests tab — the page '
+      'stays exactly as it was before the feature', (tester) async {
+    final localStore = await seededStore(accountValues: {
+      LocalStore.kRelayJarBase: jsonEncode(_relayJar.toJson()),
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localStoreProvider.overrideWithValue(localStore),
+          secureStoreProvider.overrideWithValue(SecureStore()),
+          initialApiKeyProvider.overrideWithValue(null),
+        ],
+        child: const LiveTipsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Take song requests'), findsNothing);
+    expect(find.text('Requests'), findsNothing);
+  });
+
+  testWidgets(
+      'song requests ON: the go-live switch row appears (on by default) and '
+      'the Requests tab joins the nav', (tester) async {
+    final localStore = await seededStore(accountValues: {
+      LocalStore.kRelayJarBase: jsonEncode(_relayJar.toJson()),
+      LocalStore.kBandSettingsBase: jsonEncode(const BandSettings(
+        songRequests: SongRequestSettings(enabled: true),
+      ).toJson()),
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localStoreProvider.overrideWithValue(localStore),
+          secureStoreProvider.overrideWithValue(SecureStore()),
+          initialApiKeyProvider.overrideWithValue(null),
+        ],
+        child: const LiveTipsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Take song requests'), findsOneWidget);
+    expect(find.text('Requests'), findsOneWidget);
+
+    // The nav tab opens the queue screen.
+    await tester.tap(find.text('Requests'));
+    await tester.pumpAndSettle();
+    expect(find.text('No live set right now'), findsOneWidget);
   });
 }

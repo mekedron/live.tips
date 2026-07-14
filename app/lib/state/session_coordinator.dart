@@ -73,6 +73,8 @@ class SessionEvents {
     required this.onPollError,
     required this.onRelayHealth,
     required this.onRemoteGoal,
+    required this.onRemoteRequests,
+    required this.onTipsUpdated,
     required this.onRemoteEnded,
   });
 
@@ -91,6 +93,18 @@ class SessionEvents {
 
   /// The goal changed on ANOTHER device (cloud sessions only).
   final void Function(int goalMinor) onRemoteGoal;
+
+  /// Song-request state (the open flag + played/skipped statuses) from the
+  /// coordination doc (cloud sessions only). Echoes of this device's own
+  /// edits arrive here too — the controller drops equal values, exactly
+  /// like [onRemoteGoal].
+  final void Function(bool open, Map<String, String> statuses)
+      onRemoteRequests;
+
+  /// Tips ALREADY in the session whose docs were rewritten (cloud sessions
+  /// only) — a "Mark verified" on another device, typically. Not new money:
+  /// the controller replaces in place, no confetti, no newTips batch.
+  final void Function(List<Tip> updated) onTipsUpdated;
 
   /// The session was stopped on ANOTHER device (cloud sessions only) — the
   /// controller tears down without a summary; the stopping device owns it.
@@ -182,6 +196,23 @@ abstract interface class SessionCoordinator {
   /// The goal changed on THIS device — persist it (and, on cloud, tell the
   /// other devices).
   void onGoalEdited(LiveSession session);
+
+  /// The request state (open flag / song statuses) changed on THIS device —
+  /// persist it (and, on cloud, tell the other devices). The [onGoalEdited]
+  /// mold, reading both values off [session].
+  void onRequestsEdited(LiveSession session);
+
+  /// The artist verified [tip] here ([session] already holds the replaced
+  /// copy) — persist the snapshot and, on cloud, rewrite the tip's doc so
+  /// every device's listener sees the flip.
+  void onTipVerified(LiveSession session, Tip tip);
+
+  /// Whether THIS device is the one that publishes jar request state (the
+  /// open window + live queue) to the relay. Local sessions always do;
+  /// cloud sessions publish from the LEADER only — a follower's flips ride
+  /// `live/current` and the leader republishes, so the fan page has exactly
+  /// one voice per session.
+  bool get publishesRequests;
 
   /// Ends the session: tears the transports down, archives [session]
   /// (endedAt already set), and clears the crash snapshot. The coordinator
@@ -307,6 +338,22 @@ class LocalSessionCoordinator implements SessionCoordinator {
   void onGoalEdited(LiveSession session) {
     unawaited(_repo.saveActiveSession(_accountId, session, _source.cursor));
   }
+
+  // Request state and verified flips live inside the session object itself;
+  // with no other device to tell, persisting the crash snapshot is the whole
+  // job here.
+  @override
+  void onRequestsEdited(LiveSession session) {
+    unawaited(_repo.saveActiveSession(_accountId, session, _source.cursor));
+  }
+
+  @override
+  void onTipVerified(LiveSession session, Tip tip) {
+    unawaited(_repo.saveActiveSession(_accountId, session, _source.cursor));
+  }
+
+  @override
+  bool get publishesRequests => true;
 
   // [durable] is a no-op here: prefs are the store, the write is awaited, and
   // there is no queue between this device and it.

@@ -10,6 +10,7 @@ import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../home/setup_home_screen.dart';
 import '../poster/poster_screen.dart';
+import '../requests/requests_screen.dart';
 import '../settings/settings_screen.dart';
 
 /// Above this width the bottom tab bar becomes a 240px side rail.
@@ -33,6 +34,11 @@ class ShellTabRequest extends Notifier<ShellTab?> {
 enum ShellTab {
   home('Home', Icons.home_rounded, Icons.home_outlined),
   history('History', Icons.receipt_long_rounded, Icons.receipt_long_outlined),
+  // In nav only while the band's song-request feature is enabled — the
+  // build() below filters it out otherwise (a dead queue tab teaches
+  // nothing). Enum order is the IndexedStack index, so it sits here for
+  // good whatever the filter says.
+  requests('Requests', Icons.queue_music_rounded, Icons.queue_music_outlined),
   // Poster still lives in the shell (so the bottom nav / rail stay visible while
   // you design it), but it has no nav item of its own — it's reached only from
   // Home's tip-link "Poster" button. inNav: false keeps it out of the bars.
@@ -133,8 +139,16 @@ class _AppShellState extends ConsumerState<AppShell> {
     // the poster have nothing to show for such a profile, so they step aside
     // until there is a jar to show.
     final connected = ref.watch(appStateProvider.select((s) => s.connected));
+    // The Requests tab exists only for bands that turned the feature on —
+    // everyone else keeps yesterday's nav. Selection survives the filter:
+    // `tab` falls back to Home when the current tab leaves the set.
+    final requestsEnabled = ref.watch(
+        appStateProvider.select((s) => s.band.songRequests.enabled));
     final tabs = connected
-        ? ShellTab.navTabs
+        ? [
+            for (final t in ShellTab.navTabs)
+              if (t != ShellTab.requests || requestsEnabled) t,
+          ]
         : const [ShellTab.home, ShellTab.settings];
     final tab = tabs.contains(_tab) ? _tab : ShellTab.home;
     final stack = IndexedStack(
@@ -146,6 +160,7 @@ class _AppShellState extends ConsumerState<AppShell> {
               ShellTab.home =>
                 connected ? const HomeScreen() : const SetupHomeScreen(),
               ShellTab.history => const HistoryScreen(),
+              ShellTab.requests => const RequestsScreen(),
               ShellTab.poster => const PosterScreen(),
               ShellTab.settings => const SettingsScreen(),
             }

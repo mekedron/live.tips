@@ -203,15 +203,21 @@ void main() {
   test('setJarRequests carries open/queue when the session hands them in',
       () async {
     final backend = FakeCallables();
+    // A wire-real queue entry — the fake holds it to the server's schema
+    // (flat songId → {t, c, s}), so a placeholder shape can't pass here.
     await fakeRelayClient(backend).setJarRequests(
       jar: _jar,
       secret: 's',
       open: true,
-      queue: const {'items': []},
+      queue: const {
+        'sng_a1': {'t': 700, 'c': 2, 's': 'q'},
+      },
     );
     final args = backend.argsFor('setJarRequests');
     expect(args['open'], isTrue);
-    expect(args['queue'], {'items': []});
+    expect(args['queue'], {
+      'sng_a1': {'t': 700, 'c': 2, 's': 'q'},
+    });
     expect(args.containsKey('config'), isFalse);
   });
 

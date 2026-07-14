@@ -7,10 +7,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/tip_channel.dart';
+import 'package:live_tips/domain/song_request_settings.dart';
 import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/state/auth_providers.dart';
+import 'package:live_tips/state/jar_requests_publisher.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
 
@@ -91,14 +93,21 @@ void main() {
   late ProviderContainer container;
   late LocalStore store;
   late FakeRelayChannel channel;
+  late FakeCallables backend;
 
-  /// Relay-only install: a relay jar + secret, NO Stripe key, NO demo.
-  Future<void> setUpContainer(
-      {List<List<Tip>> stripeBatches = const []}) async {
+  /// Relay-only install: a relay jar + secret, NO Stripe key, NO demo. The
+  /// jar callables land in [backend]; the request publisher is the REAL one
+  /// over it, with a test-sized throttle so the trailing edge fits a test.
+  Future<void> setUpContainer({
+    List<List<Tip>> stripeBatches = const [],
+    Map<String, Map<String, dynamic> Function(Map<String, dynamic>)>
+        callableRoutes = const {},
+  }) async {
     store = await seededStore(accountValues: {
       LocalStore.kRelayJarBase: jsonEncode(relayJar.toJson()),
     });
     channel = FakeRelayChannel();
+    backend = FakeCallables(callableRoutes);
     container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
       initialRelaySecretProvider.overrideWithValue('sec_1'),
@@ -107,8 +116,22 @@ void main() {
               ScriptedSource(stripeBatches)),
       relayChannelFactoryProvider.overrideWithValue(
           ({required demo, required jar, required secret}) => channel),
+      jarRequestsPublisherFactoryProvider
+          .overrideWithValue(() => JarRequestsPublisher(
+                client: fakeRelayClient(backend),
+                jar: relayJar,
+                secret: 'sec_1',
+                throttle: const Duration(milliseconds: 200),
+              )),
     ]);
     addTearDown(container.dispose);
+  }
+
+  /// The band's song-request master switch, on.
+  Future<void> enableRequests() async {
+    final app = container.read(appStateProvider);
+    await container.read(appStateProvider.notifier).updateBand(app.band
+        .copyWith(songRequests: const SongRequestSettings(enabled: true)));
   }
 
   test(
@@ -307,6 +330,109 @@ void main() {
           reason: 'the demo tip still plays on the stage');
       expect(store.readRelayHistory(kTestAccountId), isEmpty,
           reason: 'pretend money must never enter the real archive');
+    });
+  });
+
+  group('song requests over the relay (#64)', () {
+    Tip requestTip(int serial, {int amountMinor = 700}) => Tip.relayTip(
+          amountMinor: amountMinor,
+          currency: 'eur',
+          method: TipMethod.mobilepay,
+          name: 'Maya',
+          ts: 1751500000000,
+          serial: serial,
+          songId: 'sng_1',
+          songTitle: 'Wonderwall',
+        );
+
+    List<RelayCall> requestCalls() =>
+        [for (final c in backend.calls) if (c.name == 'setJarRequests') c];
+
+    test('going live arms the window; a request tip publishes the queue '
+        'in the server\'s exact wire shape', () async {
+      await setUpContainer();
+      await enableRequests();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+
+      // Begin: open:true armed, queue along for the ride (still empty).
+      final armed = requestCalls().single;
+      expect(armed.args['open'], isTrue);
+      expect(armed.args['queue'], isEmpty);
+      expect(armed.args['jarId'], 'jar_relay');
+
+      // Two request tips inside one throttle window coalesce into ONE
+      // trailing-edge publish carrying the latest state — and FakeCallables
+      // holds the payload to the relay's real schema.
+      channel.tipsCtrl.add(requestTip(0));
+      await settle();
+      channel.tipsCtrl.add(requestTip(1, amountMinor: 300));
+      await settle();
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await settle();
+
+      final publishes = requestCalls();
+      expect(publishes, hasLength(2),
+          reason: 'begin + one coalesced queue publish, not one per tip');
+      final queued = publishes.last.args;
+      expect(queued.containsKey('open'), isFalse,
+          reason: 'a queue tick must not re-write the open flag');
+      expect(queued['queue'], {
+        'sng_1': {'t': 1000, 'c': 2, 's': 'q'},
+      });
+    });
+
+    test('marking played reaches the wire as s:"p"; stop closes the window',
+        () async {
+      await setUpContainer();
+      await enableRequests();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+
+      channel.tipsCtrl.add(requestTip(0));
+      await settle();
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      controller.setSongStatus('sng_1', 'p');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await settle();
+
+      final statuses = [
+        for (final c in requestCalls())
+          if (c.args['queue'] is Map && (c.args['queue'] as Map).isNotEmpty)
+            ((c.args['queue'] as Map)['sng_1'] as Map)['s'],
+      ];
+      expect(statuses.last, 'p');
+
+      await controller.stop();
+      await settle();
+      final closing = requestCalls().last.args;
+      expect(closing['open'], isFalse);
+      expect(closing.containsKey('queue'), isFalse,
+          reason: 'stop says only that the window is shut');
+    });
+
+    test('a relay refusal is swallowed — the set never feels the fan page',
+        () async {
+      await setUpContainer(callableRoutes: {
+        'setJarRequests': (_) => throw FakeFunctionsException('internal'),
+      });
+      await enableRequests();
+
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+      channel.tipsCtrl.add(requestTip(0));
+      await settle();
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await settle();
+
+      final state = container.read(liveSessionProvider);
+      expect(state, isNotNull);
+      expect(state!.session.totalMinor, 700,
+          reason: 'the tip landed; only the fan page mirror went stale');
+      expect(state.lastError, isNull);
     });
   });
 

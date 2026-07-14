@@ -9,6 +9,7 @@ import '../domain/tip.dart';
 import '../domain/fx_rates.dart';
 import '../domain/live_session.dart';
 import '../domain/rollover_math.dart';
+import 'jar_requests_publisher.dart';
 import 'providers.dart';
 import 'session_coordinator.dart';
 
@@ -79,6 +80,10 @@ class LiveState {
 /// [sessionCoordinatorFactoryProvider].
 class LiveSessionController extends Notifier<LiveState?> {
   SessionCoordinator? _coordinator;
+
+  /// Keeps the fan page's request state truthful (open window + queue).
+  /// Created per session alongside the coordinator; dies with it.
+  JarRequestsPublisher? _publisher;
   ProviderSubscription<FxRates?>? _fxSub;
 
   /// WHERE this session persists, snapshotted at [_begin] alongside its key
@@ -98,7 +103,10 @@ class LiveSessionController extends Notifier<LiveState?> {
   /// Starts a brand-new session. Throws [SessionAlreadyActiveException]
   /// when the account already runs one on another device (cloud profiles) —
   /// the caller points the artist at the Join banner.
-  Future<void> start({required int goalMinor}) async {
+  /// [requestsOpen] is the Go-live toggle's word on taking song requests
+  /// tonight; null falls back to the band's master switch — a band that
+  /// enabled the feature starts open, everyone else starts (and stays) shut.
+  Future<void> start({required int goalMinor, bool? requestsOpen}) async {
     final app = ref.read(appStateProvider);
     // Demo, Stripe, or a relay jar — any of them can host a session; only a
     // fully unconfigured app has nothing to run one against. A band switch
@@ -110,6 +118,7 @@ class LiveSessionController extends Notifier<LiveState?> {
       startedAt: now,
       currency: app.currency,
       goalMinor: goalMinor,
+      requestsOpen: requestsOpen ?? app.band.songRequests.enabled,
     );
     unawaited(ref
         .read(appStateProvider.notifier)
@@ -181,10 +190,13 @@ class LiveSessionController extends Notifier<LiveState?> {
         onPollError: _reportError,
         onRelayHealth: (health) => state = state?.copyWith(relay: health),
         onRemoteGoal: _applyRemoteGoal,
+        onRemoteRequests: _applyRemoteRequests,
+        onTipsUpdated: _applyUpdatedTips,
         onRemoteEnded: _onRemoteEnded,
       ),
     );
     _coordinator = coordinator;
+    _publisher = ref.read(jarRequestsPublisherFactoryProvider)();
 
     state = LiveState(session: session, relay: coordinator.relayHealthSeed);
     try {
@@ -203,6 +215,16 @@ class LiveSessionController extends Notifier<LiveState?> {
       return false;
     }
     ref.read(storedSessionProvider.notifier).refresh();
+    // Tell the fan page where tonight's requests stand — arm (or re-arm)
+    // the open window after a fresh start or a resume, and close a leftover
+    // one when the artist went live with requests off. Only the publishing
+    // device speaks (local: this one; cloud: the leader — a joining
+    // follower stays quiet). Bands that never enabled the feature skip the
+    // relay round-trip entirely: their fan page shows no request UI anyway.
+    if ((session.requestsOpen || app.band.songRequests.enabled) &&
+        coordinator.publishesRequests) {
+      _publisher?.onOpenChanged(session);
+    }
     return true;
   }
 
@@ -248,6 +270,24 @@ class LiveSessionController extends Notifier<LiveState?> {
           .appendRelayHistory(_accountId, relayTips));
       ref.read(relayHistoryProvider.notifier).refresh();
     }
+    // A request tip moved the queue — the fan page should follow (throttled;
+    // a publishing storm never outruns the relay's quota).
+    if (tips.any((t) => t.tip.songId != null)) _publishQueue();
+  }
+
+  /// Publishes the current queue if this device is the session's voice on
+  /// the relay (see [SessionCoordinator.publishesRequests]).
+  void _publishQueue() {
+    final current = state;
+    if (current == null || !(_coordinator?.publishesRequests ?? false)) return;
+    _publisher?.onQueueChanged(current.session);
+  }
+
+  /// Same, for open-flag flips — immediate, no throttle.
+  void _publishOpen() {
+    final current = state;
+    if (current == null || !(_coordinator?.publishesRequests ?? false)) return;
+    _publisher?.onOpenChanged(current.session);
   }
 
   void _markPollOk() {
@@ -297,6 +337,90 @@ class LiveSessionController extends Notifier<LiveState?> {
     state = current.copyWith(session: current.session);
   }
 
+  /// The mid-set pause/resume for song requests. Session state first, then
+  /// the other devices (coordination doc), then the fan page — immediately,
+  /// because "we stopped taking requests" must not wait out a throttle.
+  void toggleRequestsOpen() {
+    final current = state;
+    if (current == null) return;
+    current.session.requestsOpen = !current.session.requestsOpen;
+    state = current.copyWith(session: current.session);
+    _coordinator?.onRequestsEdited(current.session);
+    _publishOpen();
+  }
+
+  /// Marks a request played/skipped ([LiveSession.statusPlayed]/
+  /// [LiveSession.statusSkipped]); null puts it back in the queue.
+  void setSongStatus(String songId, String? status) {
+    final current = state;
+    if (current == null) return;
+    if (status == null) {
+      current.session.clearSongStatus(songId);
+    } else {
+      current.session.setSongStatus(songId, status);
+    }
+    state = current.copyWith(session: current.session);
+    _coordinator?.onRequestsEdited(current.session);
+    _publishQueue();
+  }
+
+  /// The artist vouched for a fan-declared (relay) tip: flip it to verified
+  /// in place. Survives a crash via the snapshot the coordinator persists,
+  /// and reaches other devices through the rewritten tip doc.
+  void markVerified(String tipId) {
+    final current = state;
+    if (current == null) return;
+    Tip? match;
+    for (final tip in current.session.tips) {
+      if (tip.id == tipId) {
+        match = tip;
+        break;
+      }
+    }
+    if (match == null || match.verified) return;
+    final verified = match.copyWith(verified: true);
+    current.session.replaceTip(verified);
+    state = current.copyWith(session: current.session);
+    _coordinator?.onTipVerified(current.session, verified);
+    _publishQueue();
+  }
+
+  /// Request state landed from another device (LWW through the coordination
+  /// doc). Echoes of our own edits arrive here too — equal state is dropped,
+  /// the same discipline as [_applyRemoteGoal]. When THIS device is the
+  /// publisher (the leader), a follower's flip is republished to the fan
+  /// page from here — that is the only road a follower's edit has to it.
+  void _applyRemoteRequests(bool open, Map<String, String> statuses) {
+    final current = state;
+    if (current == null) return;
+    final session = current.session;
+    final openChanged = session.requestsOpen != open;
+    if (!openChanged && mapEquals(session.songStatuses, statuses)) return;
+    session.requestsOpen = open;
+    session.replaceSongStatuses(statuses);
+    state = current.copyWith(session: session);
+    if (openChanged) {
+      _publishOpen();
+    } else {
+      _publishQueue();
+    }
+  }
+
+  /// Rewritten tip docs from the cloud listener — the same money the
+  /// session already holds, updated in place. Deliberately NOT the ingest
+  /// path: no confetti, no newTips batch, no relay archive append.
+  void _applyUpdatedTips(List<Tip> updated) {
+    final current = state;
+    if (current == null) return;
+    var changed = false;
+    for (final tip in updated) {
+      changed = current.session.replaceTip(tip) || changed;
+    }
+    if (!changed) return;
+    state = current.copyWith(session: current.session);
+    _publishQueue();
+  }
+
   void setLocked(bool locked) {
     state = state?.copyWith(locked: locked);
   }
@@ -313,6 +437,14 @@ class LiveSessionController extends Notifier<LiveState?> {
     if (current == null) return null;
     final coordinator = _coordinator;
     _coordinator = null;
+    // Best-effort, fire-and-forget like everything about the fan page: the
+    // set is over and must not wait on the relay. Ungated on leadership —
+    // ANY device may stop the whole session, and the leader learns of it
+    // through onRemoteEnded, which never sends the close. A no-op without a
+    // jar; if the call is lost the 12h window lapses on its own.
+    final publisher = _publisher;
+    _publisher = null;
+    publisher?.onStop();
     _fxSub?.close();
     _fxSub = null;
     final session = current.session..endedAt = DateTime.now();
@@ -359,6 +491,10 @@ class LiveSessionController extends Notifier<LiveState?> {
   void _teardown() {
     _fxSub?.close();
     _fxSub = null;
+    // The abandon path: cancel any pending publish WITHOUT closing the
+    // window — a session ended elsewhere is the stopping device's to close.
+    _publisher?.dispose();
+    _publisher = null;
     final coordinator = _coordinator;
     _coordinator = null;
     if (coordinator != null) unawaited(coordinator.dispose());

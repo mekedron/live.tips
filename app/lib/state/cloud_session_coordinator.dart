@@ -228,6 +228,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
         'currency': session.currency,
         'goalMinor': session.goalMinor,
         'goalUpdatedAtMs': now,
+        'requests': _requestsField(session, now),
         'leaderDeviceId': _deviceId,
         'leaderLeaseUntilMs': now + leaseMs,
       });
@@ -336,15 +337,27 @@ class CloudSessionCoordinator implements SessionCoordinator {
   void _onTipsSnapshot(QuerySnapshot<Map<String, dynamic>> snap) {
     if (_disposed) return;
     final fresh = <Tip>[];
+    final updated = <Tip>[];
     for (final change in snap.docChanges) {
-      if (change.type != DocumentChangeType.added) continue;
       final tip = _decodeTip(change.doc.data());
-      if (tip != null) fresh.add(tip);
+      if (tip == null) continue;
+      switch (change.type) {
+        case DocumentChangeType.added:
+          fresh.add(tip);
+        case DocumentChangeType.modified:
+          // A rewritten doc (onTipVerified here or elsewhere) — the same
+          // money the session already holds, so it must NOT re-enter the
+          // ingest path: replace-in-place, no confetti, no archive write.
+          updated.add(tip);
+        case DocumentChangeType.removed:
+          break; // tips are never deleted mid-session; ignore defensively
+      }
     }
     // The listener flowing IS the follower's feed health; the leader's
     // health belongs to its Stripe poll.
     if (!_isLeader) _events.onPollOk();
     if (fresh.isNotEmpty) _events.onTips(fresh);
+    if (updated.isNotEmpty) _events.onTipsUpdated(updated);
   }
 
   void _onLiveDoc(DocumentSnapshot<Map<String, dynamic>> snap) {
@@ -396,6 +409,15 @@ class CloudSessionCoordinator implements SessionCoordinator {
     // are deterministic from tips + goal.
     final goal = (data['goalMinor'] as num?)?.toInt() ?? 0;
     if (goal > 0) _events.onRemoteGoal(goal);
+
+    // Request state rides the doc the same way — LWW, echo-dropped by the
+    // controller. A doc without the field (an old build's session) stays
+    // silent rather than resetting anything.
+    final requests = data['requests'];
+    if (requests is Map) {
+      _events.onRemoteRequests(
+          requests['open'] == true, _decodeStatuses(requests['statuses']));
+    }
 
     // Event-driven staleness check on top of the follower timer: a doc
     // update that reveals a long-dead lease shouldn't wait for the tick.
@@ -461,6 +483,62 @@ class CloudSessionCoordinator implements SessionCoordinator {
         }, SetOptions(merge: true))
         .catchError(_ignore));
   }
+
+  /// The `requests` field on `live/current`, whole: written at claim and on
+  /// every edit — always the FULL state, LWW like the goal.
+  ///
+  /// Statuses go on the wire as a LIST of `songId:status` strings, not a
+  /// map, deliberately: Firestore deep-merges map fields under merge writes
+  /// (and the test fake does so even under update()), which would
+  /// RESURRECT a status this device just cleared (played → back to queued)
+  /// from the doc's old map. A list value is replaced atomically under
+  /// every write mode, real and fake alike, so a clear really clears.
+  static Map<String, dynamic> _requestsField(LiveSession session, int now) => {
+        'open': session.requestsOpen,
+        'statuses': [
+          for (final e in session.songStatuses.entries) '${e.key}:${e.value}',
+        ],
+        'updatedAtMs': now,
+      };
+
+  /// Decodes [_requestsField]'s statuses list; garbage entries cost only
+  /// themselves ([LiveSession.replaceSongStatuses] re-checks the values).
+  static Map<String, String> _decodeStatuses(Object? raw) => {
+        if (raw is List)
+          for (final s in raw)
+            if (s is String && s.contains(':'))
+              s.substring(0, s.indexOf(':')): s.substring(s.indexOf(':') + 1),
+      };
+
+  @override
+  void onRequestsEdited(LiveSession session) {
+    unawaited(_repo.saveActiveSession(
+        _bandId, session, _isLeader ? _source.cursor : null));
+    // update(), not set+merge — and the doc exists for as long as the
+    // session does (the claim wrote it). A failure is absorbed like every
+    // other coordination write: the next edit repeats the full state.
+    unawaited(_liveDoc
+        .update({'requests': _requestsField(session, _nowMs)})
+        .catchError(_ignore));
+  }
+
+  @override
+  void onTipVerified(LiveSession session, Tip tip) {
+    unawaited(_repo.saveActiveSession(
+        _bandId, session, _isLeader ? _source.cursor : null));
+    // A PLAIN set, deliberately NOT merge: Tip.toJson omits `verified` when
+    // true (old history must stay byte-identical), so a merge would leave
+    // the doc's stale `verified: false` in place — and every device reading
+    // the "verified" tip back would see it unverified forever. Overwriting
+    // the whole doc with the fresh toJson is the only honest write.
+    unawaited(_tipsCol
+        .doc(tip.id)
+        .set({...tip.toJson(), 'updatedAtMs': _nowMs})
+        .catchError(_ignore));
+  }
+
+  @override
+  bool get publishesRequests => _isLeader;
 
   @override
   Future<void> stop(LiveSession session, {bool durable = false}) async {

@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/local_store.dart';
+import 'package:live_tips/domain/song_request_settings.dart';
 import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/domain/relay_jar.dart';
+import 'package:live_tips/state/jar_requests_publisher.dart';
 import 'package:live_tips/state/live_session_controller.dart';
 import 'package:live_tips/state/providers.dart';
 
@@ -45,21 +47,52 @@ Future<void> settle() async {
   }
 }
 
+/// Records the controller's publish seams instead of talking to any relay —
+/// what matters here is WHEN the controller speaks, not the wire (the wire
+/// shape is jar_requests_publisher_test.dart's and the relay variant's job).
+class RecordingPublisher extends JarRequestsPublisher {
+  RecordingPublisher()
+      : super(
+            client: fakeRelayClient(FakeCallables()), jar: null, secret: null);
+
+  final events = <String>[];
+
+  @override
+  void onQueueChanged(LiveSession session) => events.add('queue');
+
+  @override
+  void onOpenChanged(LiveSession session) =>
+      events.add('open:${session.requestsOpen}');
+
+  @override
+  void onStop() => events.add('stop');
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late ProviderContainer container;
+  late RecordingPublisher publisher;
 
   Future<void> setUpContainer(List<List<Tip>> batches) async {
     final store = await seededStore();
+    publisher = RecordingPublisher();
     container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(store),
       tipSourceFactoryProvider.overrideWithValue(
           ({required demo, required apiKey, required jar}) =>
               ScriptedSource(batches)),
+      jarRequestsPublisherFactoryProvider.overrideWithValue(() => publisher),
     ]);
     addTearDown(container.dispose);
     container.read(appStateProvider.notifier).enterDemo();
+  }
+
+  /// Flips the band's song-request master switch (the start() default).
+  Future<void> enableRequests() async {
+    final app = container.read(appStateProvider);
+    await container.read(appStateProvider.notifier).updateBand(app.band
+        .copyWith(songRequests: const SongRequestSettings(enabled: true)));
   }
 
   test('a multi-tip poll tick surfaces EVERY tip in newTips',
@@ -219,6 +252,154 @@ void main() {
         reason: 'no Stripe, no demo — nothing may appear on its own');
     expect(state.confettiTick, 0);
     expect(state.lastError, isNull);
+  });
+
+  group('song requests (#64)', () {
+    Tip requestTip(String id, int amount) => Tip(
+          id: id,
+          amountMinor: amount,
+          currency: 'usd',
+          createdAt: DateTime.utc(2026, 7, 3),
+          livemode: false,
+          songId: 'sng_1',
+          songTitle: 'Wonderwall',
+        );
+
+    test('start() defaults requestsOpen to the band\'s master switch', () async {
+      await setUpContainer([[]]);
+      final controller = container.read(liveSessionProvider.notifier);
+
+      // Feature off (the default): sessions start with requests shut, and
+      // nothing at all is said to the fan page.
+      await controller.start(goalMinor: 10000);
+      expect(container.read(liveSessionProvider)!.session.requestsOpen,
+          isFalse);
+      expect(publisher.events, isEmpty,
+          reason: 'a band without the feature costs no relay call per set');
+      await controller.stop();
+
+      // Feature on: open by default, and the window is armed at begin.
+      await enableRequests();
+      publisher.events.clear();
+      await controller.start(goalMinor: 10000);
+      expect(
+          container.read(liveSessionProvider)!.session.requestsOpen, isTrue);
+      expect(publisher.events, ['open:true']);
+      await controller.stop();
+
+      // The Go-live toggle overrides the default, and going live with
+      // requests OFF still publishes — it closes a leftover window.
+      publisher.events.clear();
+      await controller.start(goalMinor: 10000, requestsOpen: false);
+      expect(
+          container.read(liveSessionProvider)!.session.requestsOpen, isFalse);
+      expect(publisher.events, ['open:false']);
+    });
+
+    test('toggleRequestsOpen flips the session and speaks immediately',
+        () async {
+      await setUpContainer([[]]);
+      await enableRequests();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      publisher.events.clear();
+
+      controller.toggleRequestsOpen();
+      expect(
+          container.read(liveSessionProvider)!.session.requestsOpen, isFalse);
+      expect(publisher.events, ['open:false']);
+
+      controller.toggleRequestsOpen();
+      expect(
+          container.read(liveSessionProvider)!.session.requestsOpen, isTrue);
+      expect(publisher.events, ['open:false', 'open:true']);
+    });
+
+    test('a plain (non-request) tip never publishes the queue', () async {
+      // The request-tip → queue-publish half lives in the relay variant
+      // (live_session_controller_relay_test.dart), where a channel tip can
+      // be pushed mid-session and the REAL publisher's wire is asserted.
+      await setUpContainer([
+        [d('cs_plain', 500)],
+      ]);
+      await enableRequests();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+      expect(container.read(liveSessionProvider)!.session.count, 1);
+      expect(publisher.events, isNot(contains('queue')),
+          reason: 'a plain tip moves no request queue');
+    });
+
+    test('setSongStatus updates the session, persists, and publishes',
+        () async {
+      await setUpContainer([
+        [requestTip('cs_req', 700)],
+      ]);
+      await enableRequests();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+      publisher.events.clear();
+
+      controller.setSongStatus('sng_1', LiveSession.statusPlayed);
+      expect(container.read(liveSessionProvider)!.session.songStatuses,
+          {'sng_1': LiveSession.statusPlayed});
+      expect(publisher.events, ['queue']);
+
+      controller.setSongStatus('sng_1', null);
+      expect(container.read(liveSessionProvider)!.session.songStatuses,
+          isEmpty);
+
+      // The status rides the crash snapshot (demo namespace — see above).
+      controller.setSongStatus('sng_1', LiveSession.statusSkipped);
+      await settle();
+      final stored = container
+          .read(localStoreProvider)
+          .readActiveSession(LocalStore.kDemoAccountId)!;
+      expect(stored.songStatuses, {'sng_1': LiveSession.statusSkipped});
+    });
+
+    test('markVerified flips the tip in place and survives a restore',
+        () async {
+      final unverified = requestTip('relay_1', 700).copyWith(verified: false);
+      await setUpContainer([
+        [unverified],
+      ]);
+      await enableRequests();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      await settle();
+      publisher.events.clear();
+
+      controller.markVerified('relay_1');
+      final session = container.read(liveSessionProvider)!.session;
+      expect(session.tips.single.verified, isTrue);
+      expect(session.count, 1, reason: 'replace, never a duplicate');
+      expect(publisher.events, ['queue']);
+
+      // A second call is a no-op — already verified.
+      controller.markVerified('relay_1');
+      expect(publisher.events, ['queue']);
+
+      // The flip is in the crash snapshot: a restart cannot unverify it.
+      await settle();
+      final stored = container
+          .read(localStoreProvider)
+          .readActiveSession(LocalStore.kDemoAccountId)!;
+      expect(stored.tips.single.verified, isTrue);
+    });
+
+    test('stop() tells the fan page the window is closed', () async {
+      await setUpContainer([[]]);
+      await enableRequests();
+      final controller = container.read(liveSessionProvider.notifier);
+      await controller.start(goalMinor: 10000);
+      publisher.events.clear();
+
+      await controller.stop();
+      expect(publisher.events, ['stop']);
+    });
   });
 
   group('storedSessionProvider (resume/discard banner reactivity)', () {

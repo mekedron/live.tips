@@ -7,6 +7,7 @@ import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/secure_store.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/domain/app_account.dart';
+import 'package:live_tips/domain/live_session.dart';
 import 'package:live_tips/domain/tip.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/cloud_session_coordinator.dart';
@@ -371,6 +372,106 @@ void main() {
     a.read(liveSessionProvider.notifier).editGoal(15000);
     await settle();
     expect(b.read(liveSessionProvider)!.session.goalMinor, 15000);
+  });
+
+  group('song requests across devices (#64)', () {
+    Tip requestTip(String id, int amountMinor, {bool verified = true}) => Tip(
+          id: id,
+          amountMinor: amountMinor,
+          currency: 'usd',
+          createdAt: DateTime.utc(2026, 7, 12),
+          livemode: false,
+          verified: verified,
+          songId: 'sng_1',
+          songTitle: 'Wonderwall',
+        );
+
+    test(
+        'requests state round-trips live/current both ways: the leader\'s '
+        'toggle reaches the follower, the follower\'s status reaches the '
+        'leader — and echoes never loop', () async {
+      final a = await device('dev_a', batches: [
+        [requestTip('cs_1', 500)],
+      ]);
+      final b = await device('dev_b');
+
+      await a
+          .read(liveSessionProvider.notifier)
+          .start(goalMinor: 10000, requestsOpen: true);
+      await settle();
+      await b.read(liveSessionProvider.notifier).join(await readInfo());
+      await settle();
+      expect(b.read(liveSessionProvider)!.session.requestsOpen, isTrue,
+          reason: 'the claim wrote the initial requests state to the doc');
+
+      // Leader pauses → the follower's copy follows through the doc.
+      a.read(liveSessionProvider.notifier).toggleRequestsOpen();
+      await settle();
+      expect((await liveDoc().get()).data()!['requests'],
+          containsPair('open', false));
+      expect(b.read(liveSessionProvider)!.session.requestsOpen, isFalse);
+
+      // Follower marks the song played → the leader's copy follows.
+      b
+          .read(liveSessionProvider.notifier)
+          .setSongStatus('sng_1', LiveSession.statusPlayed);
+      await settle();
+      expect(a.read(liveSessionProvider)!.session.songStatuses,
+          {'sng_1': LiveSession.statusPlayed});
+
+      // …and clearing it must not be resurrected by a deep merge (the
+      // update-vs-merge distinction this feature's writes hinge on).
+      b.read(liveSessionProvider.notifier).setSongStatus('sng_1', null);
+      await settle();
+      expect(a.read(liveSessionProvider)!.session.songStatuses, isEmpty);
+      final docRequests =
+          (await liveDoc().get()).data()!['requests'] as Map;
+      expect(docRequests['statuses'], isEmpty,
+          reason: 'the statuses map is REPLACED wholesale, never merged');
+    });
+
+    test(
+        'a verified flip on one device reaches the other as a MODIFIED doc — '
+        'replaced in place, no re-ingest, no leftover verified field',
+        () async {
+      final a = await device('dev_a', batches: [
+        [requestTip('relay_1', 700, verified: false)],
+      ]);
+      final b = await device('dev_b');
+
+      await a.read(liveSessionProvider.notifier).start(goalMinor: 10000);
+      await settle();
+      await b.read(liveSessionProvider.notifier).join(await readInfo());
+      await settle();
+      final ticksBefore = a.read(liveSessionProvider)!.confettiTick;
+      expect(b.read(liveSessionProvider)!.session.tips.single.verified,
+          isFalse);
+
+      // The FOLLOWER vouches for the tip; its write is the plain doc set.
+      b.read(liveSessionProvider.notifier).markVerified('relay_1');
+      await settle();
+
+      final stateA = a.read(liveSessionProvider)!;
+      expect(stateA.session.tips.single.verified, isTrue,
+          reason: 'the modified doc reached the leader via onTipsUpdated');
+      expect(stateA.session.count, 1, reason: 'replaced, not re-ingested');
+      expect(stateA.confettiTick, ticksBefore,
+          reason: 'an update is not new money — no celebration');
+
+      // The raw doc: toJson omits `verified` when true, so a merge would
+      // have left the stale `verified: false` behind. Assert the plain set
+      // really removed it.
+      final raw = (await sessionsCol()
+              .doc(stateA.session.id)
+              .collection('tips')
+              .doc('relay_1')
+              .get())
+          .data()!;
+      expect(raw.containsKey('verified'), isFalse,
+          reason: 'a lingering verified:false would unverify the tip on '
+              'every device that reads it back');
+      expect(raw['songId'], 'sng_1');
+    });
   });
 
   test(
