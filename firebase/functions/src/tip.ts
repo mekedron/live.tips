@@ -60,21 +60,22 @@ function sendHtml(res: Response, body: string, status: number): void {
 }
 
 export async function tipHandler(req: Request, res: Response): Promise<void> {
-  // The rewrite forwards the original path (/t/:jarId[/tips]); a direct
+  // The rewrite forwards the original path (/t/:jarId[/tips|/queue]); a direct
   // function-URL call carries the same suffix after the function name.
-  const match = req.path.match(/\/t\/([^/]+?)(\/tips)?\/?$/);
+  const match = req.path.match(/\/t\/([^/]+?)(\/tips|\/queue)?\/?$/);
   if (!match) {
     sendHtml(res, renderNotFoundPage(), 404);
     return;
   }
   const jarId = match[1]!;
   const isTips = match[2] === "/tips";
+  const isQueue = match[2] === "/queue";
   const now = Date.now();
 
   const firestore = db();
 
   // ------------------------------------------------------------- tip page
-  if (!isTips && (req.method === "GET" || req.method === "HEAD")) {
+  if (!isTips && !isQueue && (req.method === "GET" || req.method === "HEAD")) {
     // Reject junk ids before they ever touch Firestore.
     if (!isValidJarId(jarId)) {
       sendHtml(res, renderNotFoundPage(), 404);
@@ -86,7 +87,45 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
       sendHtml(res, renderNotFoundPage(), 404);
       return;
     }
-    sendHtml(res, renderTipPage(jar.profile, TURNSTILE_SITE_KEY.value()), 200);
+    sendHtml(res, renderTipPage(jar.profile, TURNSTILE_SITE_KEY.value(), jar.requestsConfig, jar.requestsLive), 200);
+    return;
+  }
+
+  // -------------------------------------------------------- request queue
+  // Polled by the tip page every 15s while its song-request section shows.
+  // Unknown/expired/junk jars get the SAME HTML 404 the page itself serves:
+  // a JSON "no such jar" here would be the enumeration oracle the page path
+  // went out of its way not to be.
+  if (isQueue && req.method === "GET") {
+    if (!isValidJarId(jarId)) {
+      sendHtml(res, renderNotFoundPage(), 404);
+      return;
+    }
+    const snap = await jarRef(firestore, jarId).get();
+    const jar = snap.data() as JarDoc | undefined;
+    if (!jarIsLive(jar, now)) {
+      sendHtml(res, renderNotFoundPage(), 404);
+      return;
+    }
+    const live = jar.requestsLive;
+    // Closed is one uniform shape whatever the reason — disabled config,
+    // lapsed window, or a jar that never published one. No song data leaks
+    // out of an ended sale; the page hides the whole section on open:false.
+    if (jar.requestsConfig?.enabled !== true || live === undefined || live.openUntilMs <= now) {
+      sendJson(res, { open: false, songs: [] });
+      return;
+    }
+    sendJson(res, {
+      open: true,
+      currency: live.currency,
+      updatedAtMs: live.updatedAtMs,
+      songs: Object.entries(live.songs).map(([id, e]) => ({
+        id,
+        totalMinor: e.t,
+        count: e.c,
+        status: e.s,
+      })),
+    });
     return;
   }
 
@@ -277,7 +316,7 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if (isTips) {
+  if (isTips || isQueue) {
     sendJson(res, { error: "method not allowed" }, 405);
     return;
   }

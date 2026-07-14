@@ -347,6 +347,110 @@ describe("tip POST: song requests", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// GET /t/:jarId/queue — the poll the tip page runs while its section shows.
+
+/** A bare GET as the Hosting rewrite forwards it. */
+function getReq(path: string): never {
+  return {
+    path,
+    method: "GET",
+    protocol: "https",
+    get: () => undefined,
+    headers: {},
+    socket: { remoteAddress: "169.254.8.129" },
+  } as never;
+}
+
+/** Like fakeRes, but keeps the raw payload and headers: the 404 comparison
+ * below is about BYTES (HTML page vs JSON body), not parsed shapes. */
+function rawRes() {
+  return {
+    statusCode: 0,
+    headers: {} as Record<string, string>,
+    payload: "",
+    status(code: number) { this.statusCode = code; return this; },
+    set(h: Record<string, string>) { Object.assign(this.headers, h); return this; },
+    send(payload: string) { this.payload = payload; },
+  };
+}
+
+describe("GET /t/:jarId/queue", () => {
+  it("returns the live standings of an open jar, uncacheable", async () => {
+    jar = requestsJar();
+    (jar["requestsLive"] as Doc)["updatedAtMs"] = 42;
+    (jar["requestsLive"] as Doc)["songs"] = {
+      s1: { t: 900, c: 3, s: "q" },
+      s2: { t: 500, c: 1, s: "p" },
+    };
+    const res = rawRes();
+
+    await tipHandler(getReq(`/t/${JAR_ID}/queue`), res as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["Cache-Control"]).toBe("no-store");
+    expect(JSON.parse(res.payload)).toEqual({
+      open: true,
+      currency: "eur",
+      updatedAtMs: 42,
+      songs: [
+        { id: "s1", totalMinor: 900, count: 3, status: "q" },
+        { id: "s2", totalMinor: 500, count: 1, status: "p" },
+      ],
+    });
+  });
+
+  it("reports a lapsed window as closed, with no song data", async () => {
+    jar = requestsJar();
+    (jar["requestsLive"] as Doc)["openUntilMs"] = Date.now() - 1;
+    const res = rawRes();
+
+    await tipHandler(getReq(`/t/${JAR_ID}/queue`), res as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.payload)).toEqual({ open: false, songs: [] });
+  });
+
+  it("reports a disabled config — and a jar with none — as the same closed shape", async () => {
+    jar = requestsJar();
+    (jar["requestsConfig"] as Doc)["enabled"] = false;
+    const res = rawRes();
+    await tipHandler(getReq(`/t/${JAR_ID}/queue`), res as never);
+    expect(JSON.parse(res.payload)).toEqual({ open: false, songs: [] });
+
+    jar = plainJar();
+    const res2 = rawRes();
+    await tipHandler(getReq(`/t/${JAR_ID}/queue`), res2 as never);
+    expect(res2.statusCode).toBe(200);
+    expect(JSON.parse(res2.payload)).toEqual({ open: false, songs: [] });
+  });
+
+  it("serves the page's own 404 for an unknown jar — no enumeration oracle", async () => {
+    jar = undefined;
+    const page = rawRes();
+    const queue = rawRes();
+
+    await tipHandler(getReq(`/t/${JAR_ID}`), page as never);
+    await tipHandler(getReq(`/t/${JAR_ID}/queue`), queue as never);
+
+    expect(queue.statusCode).toBe(404);
+    expect(queue.statusCode).toBe(page.statusCode);
+    expect(queue.payload).toBe(page.payload); // the identical HTML body
+    expect(queue.headers["Content-Type"]).toBe(page.headers["Content-Type"]);
+  });
+
+  it("serves that same 404 for a junk jarId, before Firestore is ever asked", async () => {
+    const page = rawRes();
+    const queue = rawRes();
+
+    await tipHandler(getReq("/t/NOT-A-JAR"), page as never);
+    await tipHandler(getReq("/t/NOT-A-JAR/queue"), queue as never);
+
+    expect(queue.statusCode).toBe(404);
+    expect(queue.payload).toBe(page.payload);
+  });
+});
+
 describe("tip POST: plain tips are untouched by the requests feature", () => {
   it("queues a plain tip with no request fields, even while requests are open", async () => {
     jar = requestsJar(); // open window, but this fan just tips
