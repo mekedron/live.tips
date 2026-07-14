@@ -46,7 +46,7 @@ void main() {
 
     expect(find.text('Sign in with Apple'), findsOneWidget);
     expect(find.text('Sign in with Google'), findsOneWidget);
-    expect(find.text('Use without sign-in'), findsOneWidget);
+    expect(find.text('Anonymous cloud account'), findsOneWidget);
     expect(find.text('Continue without an account'), findsOneWidget);
   });
 
@@ -71,7 +71,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Use without sign-in'));
+    await tester.tap(find.text('Anonymous cloud account'));
     await tester.pumpAndSettle();
 
     expect(find.byType(AccountNameScreen), findsOneWidget);

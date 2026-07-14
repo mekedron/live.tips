@@ -62,7 +62,7 @@ Future<ProviderContainer> _bootFresh(WidgetTester tester) async {
       listen: false);
 }
 
-/// Fresh install → Get started → the account step → "Use without sign-in": the
+/// Fresh install → Get started → the account step → "Anonymous cloud account": the
 /// guest account exists from here on, and the name step is on screen.
 Future<ProviderContainer> _signInAsGuest(WidgetTester tester) async {
   final container = await _bootFresh(tester);
@@ -70,7 +70,7 @@ Future<ProviderContainer> _signInAsGuest(WidgetTester tester) async {
 
   await tester.tap(find.text('Get started'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Use without sign-in'));
+  await tester.tap(find.text('Anonymous cloud account'));
   await tester.pumpAndSettle();
 
   expect(find.byType(AccountNameScreen), findsOneWidget);

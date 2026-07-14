@@ -158,7 +158,7 @@ void main() {
     expect(find.text('First, an account'), findsOneWidget);
     expectNoStep();
 
-    await tester.tap(find.text('Use without sign-in'));
+    await tester.tap(find.text('Anonymous cloud account'));
     await tester.pumpAndSettle();
 
     // The naming step — the screen whose existence nobody could have promised.

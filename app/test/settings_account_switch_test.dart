@@ -142,7 +142,7 @@ void main() {
     // local artist could never start a guest account afterwards.
     expect(find.text('Sign in with Apple'), findsOneWidget);
     expect(find.text('Sign in with Google'), findsOneWidget);
-    expect(find.text('Use without sign-in'), findsOneWidget);
+    expect(find.text('Anonymous cloud account'), findsOneWidget);
   });
 
   testWidgets('signed out: no account row to switch between — and the profile '
