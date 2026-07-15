@@ -1,8 +1,8 @@
 ---
 title: Bruksvilkår
 description: live.tips er gratis programvare med åpen kildekode. Vi er ingen betalingsformidler, vi holder aldri pengene dine, og vi lover ingenting om tips vi ikke kan se. Detaljene, med rene ord.
-updated: 2026-07-13
-updated_label: Sist oppdatert 13. juli 2026
+updated: 2026-07-15
+updated_label: Sist oppdatert 15. juli 2026
 ---
 
 Disse vilkårene dekker live.tips-appen, dette nettstedet, den valgfrie live.tips-**kontoen** og det
@@ -69,6 +69,9 @@ Hvis du har en konto:
 - **Å legge til en enhet krever bekreftelsen din** på en enhet som allerede er innlogget. Ikke
   bekreft en enhet du ikke har bedt om, og ikke la noen fotografere QR-koden og så trykke bekreft
   likevel.
+- **Push-varsler er valgfrie.** En innlogget konto kan slå på push-varsler, per enhet, for å høre
+  om tips og sangønsker som kommer mens ingen sett kjører. De er av til du slår dem på, og kan slås
+  av igjen når som helst; en gjestekonto og en enhet uten konto får ingen.
 - **Vi kan suspendere eller slette en konto** — se *Å avslutte*, nedenfor.
 
 ## Hvis du er artist
@@ -84,10 +87,13 @@ Du er ansvarlig for:
   lokalt.
 - **Det du publiserer.** Artistnavnet og hilsenen din vises på en offentlig tipsside; hold dem
   lovlige og dine egne.
-- **Stripe-nøkkelen din.** Den er en begrenset nøkkel du selv har laget, og den bor på enheten din
-  — og, hvis du logger inn, også i kontoens private lagring, slik at de andre enhetene dine kan
-  bruke den. Uansett er den din: behandle enheten som du ville behandlet kontanter, og tilbakekall
-  nøkkelen i Stripe-dashbordet ditt hvis en enhet blir borte.
+- **Stripe-nøkkelen din.** Den er en begrenset nøkkel du selv har laget. **Uten konto bor den bare
+  på enheten din.** Logger du inn, flytter den til serveren vår, kryptert slik at ingen — ikke en
+  annen konto, ikke vi i klartekst, og ikke engang du — kan lese den tilbake; fra da av rapporterer
+  Stripe tipsene dine til serveren vår, og de andre enhetene dine bruker nøkkelen bare gjennom oss.
+  Uansett er den din: behandle en enhet som holder den som du ville behandlet kontanter, og
+  tilbakekall nøkkelen i Stripe-dashbordet ditt hvis en enhet blir borte. Personvernerklæringen
+  forklarer dette før du logger inn.
 - **Bandene dine, og fanshilsenene du setter opp på skjermen.** Et navn og en hilsen vises for et
   rom fullt av folk. Det som dukker opp på den skjermen, er ditt å moderere.
 
@@ -99,6 +105,9 @@ Du er ansvarlig for:
   behandlet den. Vi har ingen registrering av den og ingen makt over den.
 - Hold navnet og hilsenen du legger ved, lovlig og sivilisert. De vises på en skjerm, på scenen,
   foran et rom fullt av folk.
+- **Et sangønske er et tips, ikke en bestilling.** Har artisten slått på sangønsker, kan du gi tips
+  til en sang — men pengene er et frivillig tips som ethvert annet, og det å betale, eller å betale
+  mest, **garanterer ikke** at sangen spilles. Det er artistens avgjørelse.
 
 ## Uverifiserte tips — les denne
 
@@ -117,9 +126,12 @@ det er derfor Stripe er den anbefalte metoden.
 
 Tipssidene ligger på `tip.live.tips` og serveres av et lite relé vi driver på Firebase. Det tilbys
 **gratis, som en tjeneste, uten noen form for garanti**. Det er «beste forsøk»: det kan bli
-frekvensbegrenset, det kan være utilgjengelig, tips kan bli forsinket eller gå tapt, og det
-beholder bevisst ingenting som ville latt noen gjenopprette dem i etterkant — et levert tips
-slettes i det øyeblikket artistens skjerm viser det, og et ulevert slettes etter en time.
+frekvensbegrenset, det kan være utilgjengelig, og tips kan bli forsinket eller gå tapt. Hvor lenge
+et tips beholdes avhenger av om artisten er innlogget: for en **tipsside uten konto bak seg**
+beholder reléet bevisst ingenting som ville latt noen gjenopprette et tips i etterkant — et levert
+tips slettes i det øyeblikket artistens skjerm viser det, og et ulevert feies bort innen timen. For
+en **innlogget konto** skrives tipset inn i den artistens egen historikk og beholdes så lenge
+bandet. Personvernerklæringen redegjør for begge tilfellene i sin helhet.
 
 - En tipsside **uten konto bak seg slettes etter 90 dager uten aktivitet**.
 - Vi kan **frekvensbegrense, blokkere eller slette enhver tipsside**, når som helst, uten varsel

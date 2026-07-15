@@ -1,8 +1,8 @@
 ---
 title: Felhasználási feltételek
 description: A live.tips ingyenes, nyílt forráskódú szoftver. Nem vagyunk fizetési szolgáltató, soha nem tartjuk a pénzedet, és nem ígérünk semmit olyan borravalókról, amelyeket nem látunk. A részletek, egyszerű szavakkal.
-updated: 2026-07-13
-updated_label: Utoljára frissítve 2026. július 13-án
+updated: 2026-07-15
+updated_label: Utoljára frissítve 2026. július 15-én
 ---
 
 Ezek a feltételek a live.tips alkalmazásra, erre a weboldalra, az opcionális
@@ -71,6 +71,10 @@ Ha van fiókod:
 - **Készülék hozzáadásához meg kell erősítened** egy már bejelentkezett készüléken. Ne erősíts
   meg olyan készüléket, amit nem te kértél, és ne hagyd, hogy valaki lefényképezze a QR-kódot,
   te pedig aztán mégis rákoppints a megerősítésre.
+- **A push-értesítések opcionálisak.** Egy bejelentkezett fiók készülékenként bekapcsolhatja a
+  push-értesítéseket, hogy értesüljön a borravalókról és a dalkérésekről, amelyek akkor
+  érkeznek, amikor nem fut fellépés. Alapból ki vannak kapcsolva, amíg be nem kapcsolod, és
+  bármikor újra kikapcsolhatók; egy vendégfiók és egy fiók nélküli készülék egyet sem kap.
 - **Felfüggeszthetünk vagy törölhetünk egy fiókot** — lásd *A vége* alább.
 
 ## Ha előadó vagy
@@ -87,10 +91,13 @@ Te felelsz a következőkért:
   minden egyéb helyi előírás.
 - **Amit közzéteszel.** Az előadói neved és üzeneted egy nyilvános borravalóoldalon jelenik meg;
   tartsd őket törvényesnek és sajátodnak.
-- **A Stripe-kulcsod.** Ez egy korlátozott kulcs, amelyet te magad hoztál létre, és a
-  készülékeden él — és ha bejelentkezel, a fiókod privát tárhelyén is, hogy a többi készüléked is
-  használhassa. Bárhogy is: a tiéd. Úgy bánj a készülékkel, ahogy a készpénzzel bánnál, és vond
-  vissza a kulcsot a Stripe-irányítópultodon, ha valamelyik elveszik.
+- **A Stripe-kulcsod.** Ez egy korlátozott kulcs, amelyet te magad hoztál létre. **Fiók nélkül
+  kizárólag a készülékeden él.** Ha bejelentkezel, a szerverünkre kerül, titkosítva, hogy senki
+  — sem egy másik fiók, sem mi nyílt szemmel, még te magad sem — ne tudja visszaolvasni; onnantól
+  a Stripe a szerverünknek jelenti a borravalóidat, a többi készüléked pedig kizárólag rajtunk
+  keresztül használja a kulcsot. Bárhogy is: a tiéd. Úgy bánj a kulcsot tároló készülékkel, ahogy
+  a készpénzzel bánnál, és vond vissza a kulcsot a Stripe-irányítópultodon, ha valamelyik elveszik.
+  Az adatvédelmi tájékoztató ezt részletesen kifejti, mielőtt bejelentkezel.
 - **A zenekaraidért és a rajongói üzenetekért, amelyeket kiteszel a képernyőre.** Egy nevet és
   egy üzenetet egy teremnyi ember lát. Ami arra a képernyőre kerül, azt neked kell moderálnod.
 
@@ -102,6 +109,9 @@ Te felelsz a következőkért:
   szolgáltatóhoz, amely feldolgozta. Nekünk nincs róla feljegyzésünk, és nincs felette hatalmunk.
 - Kérjük, tartsd törvényesnek és tisztességesnek a nevet és az üzenetet, amit csatolsz. Ezek egy
   képernyőn jelennek meg, a színpadon, egy teremnyi ember előtt.
+- **A dalkérés borravaló, nem rendelés.** Ha az előadó bekapcsolta a dalkéréseket, borravalót
+  adhatsz egy dalra — de a pénz ugyanolyan önkéntes borravaló, mint bármelyik másik, és a fizetés,
+  vagy a legtöbb fizetése **nem garantálja**, hogy a dal elhangzik. Ez az előadó döntése.
 
 ## Ellenőrizetlen borravalók — ezt olvasd el
 
@@ -122,9 +132,13 @@ egyetlenek, amelyeket a live.tips valóban meg tud erősíteni, ezért a Stripe 
 A borravalóoldalak a `tip.live.tips` címen élnek, egy kis továbbító szolgálja ki őket, amelyet a
 Firebase-en üzemeltetünk. **Ingyenesen, szívességből, bármiféle garancia nélkül** kínáljuk.
 Legjobb szándékú próbálkozás: lehet korlátozva, lehet elérhetetlen, a borravalók késhetnek vagy
-elveszhetnek, és szándékosan semmit nem őriz meg, ami alapján bárki utólag visszaszerezhetné őket
-— a kézbesített borravaló abban a pillanatban törlődik, amikor az előadó képernyője megjeleníti,
-a kézbesítetlen pedig egy óra után törlődik.
+elveszhetnek. Hogy egy borravalót meddig őrzünk meg, az attól függ, be van-e jelentkezve az
+előadó: egy **fiók nélküli borravalóoldal** esetében a továbbító szándékosan semmit nem őriz meg,
+ami alapján bárki utólag visszaszerezhetné a borravalót — a kézbesített abban a pillanatban
+törlődik, amikor az előadó képernyője megjeleníti, a kézbesítetlen pedig egy órán belül
+elsöprődik. Egy **bejelentkezett fiók** esetében a borravaló bekerül az adott előadó saját
+előzményeibe, és addig marad meg, ameddig a zenekar. Az adatvédelmi tájékoztató mindkét esetet
+részletesen kifejti.
 
 - Az a borravalóoldal, amely mögött **nincs fiók, 90 nap inaktivitás után törlődik**.
 - **Bármely borravalóoldalt bármikor, előzetes értesítés nélkül korlátozhatunk, blokkolhatunk
@@ -209,3 +223,4 @@ változás után is használod a szolgáltatást, azzal elfogadod azt.
 
 Ezeket a feltételeket az oldal által támogatott minden nyelven közzétesszük, a kényelmed
 érdekében. Ha egy fordítás és az angol változat eltér egymástól, **az angol változat az irányadó**.
+</content>

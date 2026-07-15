@@ -1,8 +1,8 @@
 ---
 title: Privatlivspolitik
 description: live.tips har ingen cookies, ingen analyseværktøjer og ingen sporing, og virker helt uden konto. Vælger du at logge ind, står her præcis, hvad der gemmes, hvor, af hvem og hvor længe.
-updated: 2026-07-13
-updated_label: Sidst opdateret 13. juli 2026
+updated: 2026-07-15
+updated_label: Sidst opdateret 15. juli 2026
 ---
 
 live.tips er en open source-drikkepengekrukke til optrædende kunstnere. Den drives af
@@ -10,23 +10,29 @@ live.tips er en open source-drikkepengekrukke til optrædende kunstnere. Den dri
 for dig, så skriv til **[contact@live.tips](mailto:contact@live.tips)** — den adresse når
 frem til et menneske.
 
-Denne politik er ærlig om de kedelige dele. Vi siger hellere “vi gemmer dit navn i op til
-en time” end at påstå, at vi ikke gemmer noget, og tage fejl.
+Denne politik er ærlig om de kedelige dele. Vi siger hellere “vi gemmer dit navn, så længe
+du beholder bandet” end at påstå, at vi ikke gemmer noget, og tage fejl.
 
 ## Den korte version
 
 - **En konto er valgfri.** Appen virker helt uden konto, og det er stadig standarden. Vil
   du have dine bands og din historik på en enhed nummer to, kan du logge ind — og så bliver
-  noget af det gemt på en server. Hvad der er hvad, står herunder.
+  noget af det gemt på en server, og mere af det end før. Hvad der er hvad, står herunder.
 - **Ingen cookies.** Ikke én, ingen steder.
 - **Ingen analyseværktøjer, ingen sporing, ingen reklamer, ingen tredjepartsscripts** på
   dette website.
 - **Vi rører aldrig dine penge.** Drikkepenge går direkte fra fanen til kunstnerens egen
-  Stripe-, Revolut-, MobilePay- eller Monzo-konto. Vi er ikke i den vej.
-- **I standardopsætningen taler appen kun med Stripe** — ikke med nogen live.tips-server.
-- Den eneste server, vi overhovedet driver, er et lille relæ på Googles Firebase. Det
-  findes, hvis en kunstner slår Revolut, MobilePay eller Monzo til — eller hvis de logger
-  ind.
+  Stripe-, Revolut-, MobilePay- eller Monzo-konto. Der findes ingen live.tips-saldo,
+  nogensinde.
+- **Uden en konto taler appen kun med Stripe** — ikke med nogen live.tips-server. Logger du
+  ind, ændrer det sig: din Stripe-nøgle flytter til vores server, og Stripe rapporterer dine
+  drikkepenge til os, så vi kan lægge dem på dine andre enheder. Det er den ærlige pris for
+  at logge ind, og den står i sin helhed herunder.
+- **Push-notifikationer er nye, valgfrie og kun for konti, man er logget ind på.** Intet
+  pushes til en enhed, der aldrig har slået dem til, og en enhed uden konto får aldrig én
+  overhovedet.
+- De servere, vi driver, kører på Googles Firebase. De findes, hvis en kunstner slår
+  Revolut, MobilePay eller Monzo til — eller hvis de logger ind.
 
 ## Dette website
 
@@ -62,15 +68,16 @@ Appen kører **på kunstnerens egen enhed**, og alt, hvad den ved, bor der:
 
 - Den **begrænsede Stripe-nøgle** gemmes i enhedens nøglering (iOS/macOS Keychain,
   Android Keystore) og sendes kun nogensinde til `api.stripe.com`.
-- **Drikkepengehistorik, sessionshistorik, målet og appens indstillinger** gemmes i lokal
-  lagring på enheden. Det inkluderer de navne og hilsner, som fans knytter til deres
-  drikkepenge.
+- **Drikkepengehistorik, sessionshistorik, målet, listen over sangønsker og appens
+  indstillinger** gemmes i lokal lagring på enheden. Det inkluderer de navne og hilsner,
+  som fans knytter til deres drikkepenge.
 - Afinstallerer du appen, slettes det hele. Der er ingen cloud-backup hos os, fordi der i
   denne tilstand ikke er nogen cloud hos os.
 
 **Vi modtager aldrig noget af dette.** Appen leveres uden analyse-SDK, uden
-crash-rapportering, uden push-notifikationer og uden reklamekode — ingen, heller ikke
-deaktiverede.
+crash-rapportering og uden reklamekode — ingen, heller ikke deaktiverede.
+(Push-notifikationer findes, men de er en funktion for indloggede og slået fra, indtil du
+selv slår dem til — se *Tilstand to*. En enhed uden konto får aldrig én.)
 
 To præciseringer, så påstanden om, at appen “taler med ingen”, forbliver præcis sand:
 
@@ -96,10 +103,13 @@ Serveren er **Firebase**, som er Google. Der er tre måder at have en konto på:
 
 - **Log ind med Apple** eller **log ind med Google** — Firebase Auth modtager, hvad end
   udbyderen udleverer: et bruger-id (uid) og som regel en e-mailadresse og et navn. (Hos
-  Apple kan du skjule din e-mail; Apple giver os så en videresendelsesadresse i stedet.)
+  Apple kan du skjule din e-mail; Apple giver os så en videresendelsesadresse i stedet og
+  udleverer kun dit navn allerførste gang, du logger ind.)
 - **En gæstekonto** — en anonym konto uden e-mail og uden navn. Den synkroniserer, og den
   kan tilbagekaldes, men der er intet at gendanne den med, hvis du mister enheden. Den er
-  et uid og ikke andet.
+  et uid og ikke andet. En gæstekonto kan ikke bruge den serverbaserede opbevaring af
+  Stripe-nøglen eller de push-notifikationer, der beskrives nedenfor, fordi begge kræver en
+  konto, vi kan give tilbage til dig.
 
 Når du først er logget ind, får kontoen sit eget private hjørne af Googles
 **Cloud Firestore**-database, på `users/<your uid>/`. Sikkerhedsreglerne giver det hjørne
@@ -108,24 +118,53 @@ gætte URL'er. Indeni:
 
 | Hvad | Hvorfor det er der |
 | --- | --- |
-| Dine **bands** — navne, indstillinger for drikkepengekrukke og betalingsmetoder, plakattekst, mål | så et band findes på hver enhed, du logger ind på |
-| Din **begrænsede Stripe-nøgle** og hemmeligheden til drikkepengesiden i relæet | i et hemmelighedsdokument, som kun dit uid kan læse, og cachet i nøgleringen på hver af dine enheder |
-| **Appens indstillinger** | så en enhed, du tilføjer, allerede er sat op |
-| **Sessionsregistreringer og drikkepengehistorik** — herunder **de navne og hilsner, fans knytter til deres drikkepenge** | fordi netop den historik er det, du bad om at kunne se på den anden enhed |
+| Dine **bands** — navne, indstillinger for drikkepengekrukke og betalingsmetoder, plakattekst, mål og din **liste over sangønsker** | så et band findes på hver enhed, du logger ind på |
+| **Appens indstillinger**, herunder dine notifikationspræferencer | så en enhed, du tilføjer, allerede er sat op |
+| **Sessionsregistreringer og drikkepengehistorik** — herunder **de navne og hilsner, fans knytter til deres drikkepenge**, og enhver **sang, en fan har ønsket** | fordi netop den historik er det, du bad om at kunne se på den anden enhed |
 | Den **live-session**, der kører lige nu | så en skærm nummer to kan slutte sig til aftenens sæt |
-| Dine **enheder** — det navn, hver enkelt giver sig selv (“Nikitas iPhone”), dens platform og model, hvornår den blev set første og sidste gang | så Indstillinger → Sikkerhed kan liste dem, og du kan tilbagekalde en |
+| Dine **enheder** — det navn, hver enkelt giver sig selv (“Nikitas iPhone”), dens platform og model, dens brugerfladesprog, hvornår den blev set første og sidste gang, og (hvis du slog notifikationer til) et **push-token** | så Indstillinger → Sikkerhed kan liste dem, så en notifikation når den rette enhed på det rette sprog, og så du kan tilbagekalde en |
 | Et lille **profildokument** — det kontonavn, du valgte, og hvilken udbyder du brugte | så kontovælgeren kan sætte navn på den |
+| Et **klokke-feed** — en begrænset liste over nylige drikkepenge og sangønsker, der ankom, mens intet sæt kørte | så du kan indhente det, du gik glip af |
 
 Og så det vigtige, ligeud: **uden en konto forlader en fans navn og hilsen aldrig
 kunstnerens enhed. Med en konto gemmes de på Googles servere under kunstnerens uid, som en
-del af den kunstners egen synkroniserede historik.** Ingen anden konto kan læse dem, vi
-kigger ikke på dem, og der udledes intet af dem — men de er der, og det bør du vide, før du
-logger ind.
+del af den kunstners egen synkroniserede historik**, og — som de næste to afsnit forklarer —
+**er det nu vores server, der skriver dem dertil.** Ingen anden konto kan læse dem, vi
+kigger ikke på dem, og der udledes intet af dem — men de er der, og de bliver der, så længe
+bandet gør, og det bør du vide, før du logger ind.
 
 Logger du ud, går enheden tilbage til den lokale tilstand. Det sletter ikke kontoens data —
 se *At slette ting* nedenfor.
 
-### At tilføje en enhed med en QR-kode
+#### Din Stripe-nøgle flytter til vores server, når du logger ind
+
+Dette er den største ændring og den, der er mest værd at læse.
+
+**Uden en konto forlader din begrænsede Stripe-nøgle aldrig din enhed.** Det er Tilstand
+ét, og det er uændret.
+
+**Når du logger ind, forlader den den — til os.** Nøglen krypteres (en AES-256-nøgle pr.
+hemmelighed, som selv er pakket ind af Google Cloud KMS) og gemmes på serveren et sted,
+**ingen kan læse tilbage — ikke en anden konto, og ikke engang dig.** Den åbnes kun inde i
+vores Cloud Functions, bruges til at tale med Stripe på dine vegne og gives aldrig til en
+enhed igen.
+
+Fordi nøglen nu bor hos os, **rapporterer Stripe dine drikkepenge direkte til vores
+server**: vi registrerer en webhook på din egen Stripe-konto, og Stripe fortæller den
+webhook, hver gang der betales drikkepenge. Vores funktion skriver drikkepengene ind i din
+kontos historik (se nedenfor). Din app poller ikke længere Stripe for en konto, man er
+logget ind på; den når kun Stripe gennem en snæver, fast liste af operationer på vores
+server (at oprette dit drikkepengelink, at udstede et sangønske-link og at læse dine egne
+drikkepenge tilbage til afstemning).
+
+Så, sagt uden eufemisme: **for en konto, man er logget ind på, står der nu en
+live.tips-server i vejen mellem Stripe og din historik.** Vi rører stadig aldrig pengene —
+et kort-tip oprettes på din Stripe-konto, lander i din Stripe-saldo og udbetales efter din
+Stripe-plan, præcis som før. Det, der ændrede sig, er *data*-vejen, ikke *penge*-vejen.
+Logger du aldrig ind, gælder intet af dette, og appen taler stadig direkte med
+`api.stripe.com` og ikke med nogen anden.
+
+#### At tilføje en enhed med en QR-kode
 
 For at tilføje en enhed viser du en QR-kode fra en enhed, der allerede er logget ind. Koden
 er tilfældig, **kan kun bruges én gang og udløber om to minutter**, og den nye enhed får
@@ -133,29 +172,68 @@ intet, før du trykker *bekræft* på den gamle. Så længe det håndtryk står 
 koden, det navn den nye enhed gav sig selv, og dens platform — og posten slettes, når den
 udløber. En fotograferet QR-kode er værdiløs uden dit bekræftende tryk.
 
+## Sangønsker
+
+Et band kan slå **sangønsker** til: fans vælger så en sang fra kunstnerens liste og betaler
+eventuelt for at skubbe den op i køen. Et ønske er blot drikkepenge, der også bærer,
+**hvilken sang** der blev bedt om — så det samme navn og den samme hilsen, en fan kan knytte
+til drikkepenge, gælder også her, og de gemmes og opbevares præcis som alle andre drikkepenge
+(nedenfor). Den offentlige kø, en fan ser, viser kun **totaler pr. sang** — hvor meget en
+sang har trukket, og hvor den ligger — og bærer **ingen fan-navne**. Uden en konto lever
+hele listen over sangønsker og dens historik kun på enheden.
+
+## Push-notifikationer
+
+Når du er logget ind, kan appen sende dig en **push-notifikation** — men kun hvis du slår
+det til, pr. enhed, og kun efter at din enheds styresystem har givet tilladelse. Den findes
+af én grund: drikkepenge eller et sangønske, der lander, **mens du ikke kører et sæt**, så
+du hører om de drikkepenge, du ellers ville have gået glip af. Drikkepenge, der ankommer,
+mens din scene er live, sender intet — du ser jo allerede på dem.
+
+- For at levere en push har Googles **Firebase Cloud Messaging (FCM)** brug for et
+  **push-token** til enheden. Vi gemmer det token og enhedens brugerfladesprog på enhedens
+  egen post under din konto, og det slettes i det øjeblik, du slår notifikationer fra,
+  tilbagekalder enheden eller logger ud. Døde tokens luges væk automatisk.
+- Selve notifikationen fortæller, hvad der ankom — et beløb og en fans navn eller en
+  sangtitel, hvis vedkommende efterlod ét. Den samme korte liste opbevares i din kontos
+  **klokke-feed**, begrænset til de seneste hundrede poster, så du kan rulle tilbage gennem
+  det, der kom ind, mens du var væk.
+- På nettet kræver levering af en push en lille **service worker** i sidens rod og
+  Firebase-messaging-SDK'et, som din browser henter fra Google (`gstatic.com`) første gang.
+  Web-push bæres derefter af din browsers egen push-tjeneste (for Chrome er det Googles).
+  Intet af dette indlæses, medmindre du slog notifikationer til.
+- **En gæstekonto og en enhed uden konto får ingen push-notifikationer**, fordi en push
+  kræver en konto, vi kan levere til, og et token, du valgte at give.
+
 ## Hvor alt dette fysisk bor
 
-Firebase Auth, Cloud Firestore og vores Cloud Functions kører i **Den Europæiske Union** —
-databasen i Googles `eur3`-multiregion, funktionerne i `europe-west1`. Google fungerer som
-vores databehandler under
+Firebase Auth, Cloud Firestore, vores Cloud Functions og den Cloud KMS-nøgle, der pakker din
+Stripe-hemmelighed ind, kører alle i **Den Europæiske Union** — databasen i Googles
+`eur3`-multiregion, funktionerne og nøgleringen i `europe-west1`. Google fungerer som vores
+databehandler under
 [Firebases privatlivs- og sikkerhedsvilkår](https://firebase.google.com/support/privacy) og
 sin egen [privatlivspolitik](https://policies.google.com/privacy). Som enhver stor udbyder
 kan Google inddrage infrastruktur uden for EU til support og sikkerhed; det er reguleret af
-de vilkår, ikke af os.
+de vilkår, ikke af os. Push-notifikationer rejser, når de først er overdraget til Firebase
+Cloud Messaging og din browsers eller telefons push-tjeneste, over de selskabers
+infrastruktur for at nå din enhed.
 
 ## Stripe
 
 Når en fan betaler med kort, er vedkommende på **Stripes** betalingsside, ikke vores.
 Stripe indsamler og behandler deres betalingsdata som selvstændig dataansvarlig under
-[Stripes privatlivspolitik](https://stripe.com/privacy). Vi ser aldrig kortnumre, og vi har
-ingen adgang til kunstnerens Stripe-konto.
+[Stripes privatlivspolitik](https://stripe.com/privacy). Vi ser aldrig kortnumre.
 
-Kunstnerens app læser kunstnerens egne drikkepenge fra Stripe med kunstnerens egen
-begrænsede nøgle — direkte fra enheden til `api.stripe.com`. **Der er ingen
-live.tips-server i den vej, og det har der aldrig været.** En fans navn og hilsen, hvis der
-er efterladt nogen, rejser fra Stripe til kunstnerens enhed og stopper der — medmindre
-kunstneren har logget ind, og så gemmer enheden dem også i den kunstners egen
-Firestore-historik, som beskrevet ovenfor.
+Hvordan dine drikkepenge når frem til dig afhænger af tilstanden:
+
+- **Uden en konto** læser kunstnerens app deres egne drikkepenge fra Stripe med kunstnerens
+  egen begrænsede nøgle — direkte fra enheden til `api.stripe.com`. **Der er ingen
+  live.tips-server i den vej.**
+- **Når du er logget ind**, bor nøglen på vores server (krypteret, som ovenfor), og Stripe
+  rapporterer hver drikkepengebetaling til vores webhook, som skriver den ind i den
+  kunstners egen Firestore-historik. **I denne tilstand er der en live.tips-server i vejen**
+  — for drikkepengedataene, aldrig for pengene. En fans navn og hilsen, hvis der er efterladt
+  nogen, rejser med drikkepengene ind i den kunstners egen historik og stopper der.
 
 ## Relæet — kun hvis Revolut, MobilePay eller Monzo er slået til
 
@@ -171,7 +249,8 @@ håndterer.
 
 At oprette en drikkepengeside gemmer kunstnerens **visningsnavn, deres offentlige hilsen,
 deres valuta og de betalingsoplysninger, de har valgt at offentliggøre** (deres
-Stripe-betalingslink, Revolut-brugernavn, MobilePay Box-ID, Monzo-brugernavn). Det hele er
+Stripe-betalingslink, Revolut-brugernavn, MobilePay Box-ID, Monzo-brugernavn) og, hvis
+sangønsker er slået til, **deres offentlige sangliste og priserne pr. sang**. Det hele er
 oplysninger, som kunstneren alligevel bevidst offentliggør over for sine fans.
 
 - **Opbevaring: en drikkepengeside uden en konto bag sig slettes automatisk efter 90 dages
@@ -184,26 +263,31 @@ oplysninger, som kunstneren alligevel bevidst offentliggør over for sine fans.
 
 ### Hvad en fan sender
 
-Drikkepengeformularen beder om et **beløb** og valgfrit et **navn** og en **hilsen**. Det er
-hele formularen. Ingen e-mail, intet telefonnummer, ingen konto.
+Drikkepengeformularen beder om et **beløb** og valgfrit et **navn** og en **hilsen** — og,
+for et sangønske, hvilken sang. Det er hele formularen. Ingen e-mail, intet telefonnummer,
+ingen konto.
 
-- Drikkepengene skrives til en **leveringskø** — et enkelt dokument, der findes for at blive
-  overleveret til kunstnerens skærm. Når skærmen viser drikkepengene, **sletter kunstnerens
-  enhed det dokument.** Sletningen *er* kvitteringen; der er intet “leveret”-flag, fordi der
-  ikke er nogen post tilbage at sætte flag på.
-- Er kunstnerens skærm offline — telefonen låst, intet signal — **venter drikkepengene i den
-  kø i op til en time**, så de ikke bare går tabt, og går over i det øjeblik, skærmen
-  forbinder igen. Forbinder ingen igen, **slettes de uset**, fejet væk efter en fast plan,
-  uanset om nogen nogensinde kom tilbage efter dem.
-- **Den kø er det eneste sted, fan-skrevet tekst nogensinde gemmes på vores server, og en
-  time er dens absolutte grænse.** Er kunstneren logget ind, beholder deres enhed derefter
-  drikkepengene i *deres* Firestore-historik — for det er deres historik, og det er det, de
-  loggede ind for.
+Hvor den fan-skrevne tekst havner, og hvor længe, afhænger af, om kunstneren er logget ind:
+
+- **Har drikkepengesiden ingen konto bag sig**, skrives drikkepengene til en **leveringskø**
+  — et enkelt dokument, der findes for at blive overleveret til kunstnerens skærm. Når
+  skærmen viser drikkepengene, **sletter kunstnerens enhed det dokument.** Sletningen *er*
+  kvitteringen. Er kunstnerens skærm offline — telefonen låst, intet signal — **venter
+  drikkepengene i den kø i op til en time**, så de ikke bare går tabt, og går over i det
+  øjeblik, skærmen forbinder igen. Forbinder ingen igen, **slettes de uset**, fejet væk
+  efter en fast plan. For en kunstner uden konto er **den kø det eneste sted, fan-skrevet
+  tekst nogensinde gemmes på vores server, og en time er dens absolutte grænse.**
+- **Hører drikkepengesiden til en konto, man er logget ind på**, er der ingen kø. Vores
+  server skriver drikkepengene **direkte ind i den kunstners egen historik** under deres uid
+  — ind i aftenens session, hvis et sæt kører, eller ind i bandets eget arkiv, hvis ikke.
+  Der bliver de, **så længe bandet gør**; det er kunstnerens egen historik, og det er det,
+  de loggede ind for. Det er den samme historik, som Stripe-webhooken skriver til ovenfor.
 - Dit navn og din hilsen placeres også i den **betalingsnote**, der åbner i Revolut,
   MobilePay eller Monzo — det er sådan, kunstneren ved, hvem der gav drikkepenge. De
   selskaber behandler det derefter under deres egne privatlivspolitikker.
-- Relæet gemmer **ingen drikkepengehistorik**. Det kan ikke vise dig, os eller nogen anden
-  en liste over, hvem der har givet drikkepenge til hvem.
+- Relæet fører **ingen drikkepengehistorik på tværs af kunstnere**. Det kan ikke vise dig,
+  os eller nogen anden en liste over, hvem der har givet drikkepenge til hvem på tværs af
+  kunstnere.
 
 ### IP-adresser og misbrugsbeskyttelse
 
@@ -233,10 +317,12 @@ indeholder ingen fan-data.
 
 | Hvem | Hvad de får | Hvorfor |
 | --- | --- | --- |
-| **Google (Firebase)** | Konti, en indlogget kunstners synkroniserede data, relæet, serverlogfiler | Den valgfrie konto og det valgfrie relæ |
-| **Stripe** | Fanens betalingsdata, som selvstændig dataansvarlig | Drikkepenge med kort |
+| **Google (Firebase)** | Konti, en indlogget kunstners synkroniserede data, den krypterede Stripe-nøgle, relæet, push-tokens og levering, serverlogfiler | Den valgfrie konto, det valgfrie relæ og push-notifikationer |
+| **Google Cloud KMS** | Nøglen, der pakker en indlogget kunstners Stripe-hemmelighed ind (aldrig hemmeligheden i klartekst) | At holde den gemte Stripe-nøgle ulæselig i hvile |
+| **Stripe** | Fanens betalingsdata, som selvstændig dataansvarlig; og, for en indlogget kunstner, drikkepenge-hændelser sendt til vores webhook | Drikkepenge med kort |
 | **Cloudflare** | Fanens IP-adresse, til Turnstile-tjekket på drikkepengesiden. Og vores DNS. | At holde bots væk fra drikkepengeformularen |
 | **GitHub** | IP-adressen og user-agenten på alle, der indlæser dette website | Hosting af websitet |
+| **Din browsers / telefons push-tjeneste** (f.eks. Googles for Chrome) | Et push-token og notifikationens indhold, hvis du slog notifikationer til | Levering af push-notifikationer |
 | **Revolut / MobilePay / Monzo** | Hvad end fanen gør i deres egen app, betalingsnoten inklusive | Disse betalingsmetoder |
 
 Vi sælger intet til nogen, og der er ingen andre på den liste.
@@ -244,8 +330,10 @@ Vi sælger intet til nogen, og der er ingen andre på den liste.
 ## Retsgrundlag, hvis du har brug for et (GDPR)
 
 - At drive en konto, du har bedt om, at synkronisere dine egne data til dine egne enheder,
-  at drive relæet for en kunstner, der har slået det til, og at levere en fans drikkepenge
-  til den skærm, de var rettet mod: **opfyldelse af en tjeneste, du har bedt om**.
+  at holde din Stripe-nøgle, så dine drikkepenge når frem til din historik, at drive relæet
+  for en kunstner, der har slået det til, at levere en fans drikkepenge til den skærm, de
+  var rettet mod, og at sende en push, du har slået til: **opfyldelse af en tjeneste, du har
+  bedt om**.
 - Rate limiting, Turnstile, kvoter baseret på hashede IP-adresser og tilbagekaldelse af
   enheder: **legitim interesse** i at forhindre, at en gratis, åben tjeneste ødelægges af
   bots og svindel, og i at holde kunstneres konti sikre.
@@ -262,6 +350,8 @@ i dag — inklusive hvad der ikke gør.
   på enheden.
 - **En drikkepengeside**: slet eller gendan den i appen, og den bliver øjeblikkeligt visket
   ud af relæet, eventuelle ventende drikkepenge inklusive.
+- **Push-notifikationer**: slå dem fra på en enhed, og dens push-token slettes. Klokke-feedet
+  ryddes sammen med bandet eller kontoen.
 - **En enhed**: Indstillinger → Sikkerhed lister dine enheder. Du kan tilbagekalde en eller
   logge ud alle andre steder — hvilket afslutter alle andre enheders session med det samme,
   ikke på et tidspunkt.
@@ -269,7 +359,7 @@ i dag — inklusive hvad der ikke gør.
   end at lade som om noget andet. Indtil den findes, så skriv til
   **[contact@live.tips](mailto:contact@live.tips)**, så sletter vi kontoen og alt under den,
   i hånden. I mellemtiden kan du allerede slette hvert eneste band, hvilket fjerner alt af
-  substans og efterlader en tom konto.
+  substans — herunder den gemte Stripe-nøgle — og efterlader en tom konto.
 
 ## Dine rettigheder
 
@@ -297,3 +387,5 @@ kan se præcis, hvad der ændrede sig, og hvornår.
 Denne politik udgives på alle de sprog, siden understøtter, som en service. Hvis en
 oversættelse og den engelske version er uenige, er **det den engelske version, der
 gælder**.
+</content>
+</invoke>

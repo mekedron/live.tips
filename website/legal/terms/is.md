@@ -1,8 +1,8 @@
 ---
 title: Notkunarskilmálar
 description: live.tips er frjáls hugbúnaður með opnum kóða. Við erum ekki greiðsluþjónusta, við geymum peningana þína aldrei og við lofum engu um þjórfé sem við sjáum ekki. Smáatriðin, á mannamáli.
-updated: 2026-07-13
-updated_label: Síðast uppfært 13. júlí 2026
+updated: 2026-07-15
+updated_label: Síðast uppfært 15. júlí 2026
 ---
 
 Þessir skilmálar ná yfir live.tips-appið, þessa vefsíðu, valfrjálsa live.tips-**aðganginn**
@@ -70,6 +70,10 @@ Ef þú átt aðgang:
 - **Að bæta við tæki krefst staðfestingar þinnar** í tæki sem er þegar innskráð. Ekki
   staðfesta tæki sem þú baðst ekki um, og ekki láta einhvern ljósmynda QR-kóðann og ýta svo
   samt á staðfesta.
+- **Ýtitilkynningar eru valfrjálsar.** Innskráður aðgangur má kveikja á ýtitilkynningum, í
+  hverju tæki, til að frétta af þjórfé og lagabeiðnum sem berast meðan ekkert sett er í
+  gangi. Þær eru óvirkar þar til þú kveikir á þeim og hægt er að slökkva á þeim aftur
+  hvenær sem er; gestaaðgangur og tæki án aðgangs fá engar.
 - **Við getum lokað fyrir eða eytt aðgangi** — sjá *Að hætta* hér að neðan.
 
 ## Ef þú ert listamaður
@@ -86,11 +90,14 @@ Ef þú átt aðgang:
   staðbundnu.
 - **Því sem þú birtir.** Listamannsnafn þitt og skilaboð birtast á opinberri þjórfjársíðu;
   hafðu þau lögleg og þín eigin.
-- **Stripe-lyklinum þínum.** Hann er takmarkaður lykill sem þú bjóst til sjálf(ur), og hann
-  býr í tækinu þínu — og, ef þú skráir þig inn, einnig í einkageymslu aðgangsins þíns, svo
-  hin tækin þín geti notað hann. Hvort heldur sem er: hann er þinn. Farðu með tækið eins og
-  þú færir með reiðufé, og afturkallaðu lykilinn í Stripe-stjórnborðinu þínu ef eitthvert
-  þeirra týnist.
+- **Stripe-lyklinum þínum.** Hann er takmarkaður lykill sem þú bjóst til sjálf(ur). **Án
+  aðgangs býr hann aðeins í tækinu þínu.** Ef þú skráir þig inn færist hann yfir á þjóninn
+  okkar, dulkóðaður svo að enginn — hvorki annar aðgangur, né við fyrir opnum tjöldum, né
+  einu sinni þú — geti lesið hann til baka; upp frá því tilkynnir Stripe þjórféð þitt til
+  þjónsins okkar og hin tækin þín nota lykilinn aðeins gegnum okkur. Hvort heldur sem er:
+  hann er þinn. Farðu með tæki sem geymir hann eins og þú færir með reiðufé, og afturkallaðu
+  lykilinn í Stripe-stjórnborðinu þínu ef eitthvert þeirra týnist. Persónuverndarstefnan
+  útlistar þetta áður en þú skráir þig inn.
 - **Hljómsveitunum þínum, og skilaboðum aðdáenda sem þú setur á skjáinn.** Nafn og skilaboð
   eru sýnd fullum sal af fólki. Það sem birtist á þeim skjá er þitt að ritstýra.
 
@@ -103,6 +110,10 @@ Ef þú átt aðgang:
   yfir henni.
 - Hafðu nafnið og skilaboðin sem þú lætur fylgja lögleg og kurteisleg. Þau birtast á skjá,
   á sviði, frammi fyrir fullum sal af fólki.
+- **Lagabeiðni er þjórfé, ekki pöntun.** Ef listamaðurinn hefur kveikt á lagabeiðnum
+  geturðu gefið þjórfé í átt að lagi — en peningarnir eru valfrjálst þjórfé eins og hvert
+  annað, og að borga, eða að borga mest, **tryggir ekki** að lagið sé spilað. Það er
+  ákvörðun listamannsins.
 
 ## Óstaðfest þjórfé — lestu þennan kafla
 
@@ -121,10 +132,14 @@ live.tips getur í raun staðfest, og þess vegna er Stripe leiðin sem við mæ
 
 Þjórfjársíður búa á `tip.live.tips`, afhentar af litlum millilið sem við rekum á Firebase.
 Hann er boðinn **án endurgjalds, sem greiði, án nokkurrar ábyrgðar**. Hann gerir sitt besta
-og ekki meira: hann kann að vera tíðnitakmarkaður, hann kann að vera óaðgengilegur, þjórfé
-kann að seinka eða glatast, og hann geymir vísvitandi ekkert sem gerði nokkrum kleift að
-endurheimta það eftir á — afhentu þjórfé er eytt um leið og skjár listamannsins sýnir það,
-og óafhentu þjórfé er eytt eftir klukkustund.
+og ekki meira: hann kann að vera tíðnitakmarkaður, hann kann að vera óaðgengilegur, og
+þjórfé kann að seinka eða glatast. Hversu lengi þjórfé er geymt fer eftir því hvort
+listamaðurinn er innskráður: fyrir **þjórfjársíðu sem enginn aðgangur stendur að baki**
+geymir milliliðurinn vísvitandi ekkert sem gerði nokkrum kleift að endurheimta þjórfé eftir
+á — afhentu þjórfé er eytt um leið og skjár listamannsins sýnir það, og óafhentu er sópað
+burt innan klukkustundar. Fyrir **innskráðan aðgang** er þjórféð skrifað inn í hans eigin
+sögu listamannsins og geymt svo lengi sem hljómsveitin er til. Persónuverndarstefnan
+útlistar bæði tilvikin að fullu.
 
 - Þjórfjársíðu sem **enginn aðgangur stendur að baki er eytt eftir 90 daga án virkni**.
 - Við getum **takmarkað tíðni, lokað á eða eytt hvaða þjórfjársíðu sem er**, hvenær sem er,

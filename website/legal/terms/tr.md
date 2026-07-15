@@ -1,8 +1,8 @@
 ---
 title: Kullanım Koşulları
 description: live.tips ücretsiz ve açık kaynaklı bir yazılımdır. Ödeme sağlayıcısı değiliz, paranızı asla elimizde tutmayız ve göremediğimiz bahşişler hakkında söz vermeyiz. Ayrıntılar, sade bir dille.
-updated: 2026-07-13
-updated_label: Son güncelleme 13 Temmuz 2026
+updated: 2026-07-15
+updated_label: Son güncelleme 15 Temmuz 2026
 ---
 
 Bu koşullar live.tips uygulamasını, bu web sitesini, isteğe bağlı live.tips **hesabını** ve
@@ -71,6 +71,10 @@ Bir hesabınız varsa:
 - **Cihaz eklemek, zaten oturum açmış bir cihazda onayınızı gerektirir.** İstemediğiniz bir
   cihazı onaylamayın ve birinin QR kodunuzun fotoğrafını çekmesine izin verip ardından yine de
   onaya dokunmayın.
+- **Anlık bildirimler isteğe bağlıdır.** Oturum açmış bir hesap, hiçbir set çalışmazken gelen
+  bahşişleri ve şarkı isteklerini haber almak için cihaz başına anlık bildirimleri açabilir.
+  Siz açana kadar kapalıdırlar ve istediğiniz zaman yeniden kapatılabilirler; bir misafir
+  hesabı ve hesapsız bir cihaz hiçbirini almaz.
 - **Bir hesabı askıya alabilir veya silebiliriz** — aşağıdaki *Sona erdirmek* bölümüne bakın.
 
 ## Sanatçıysanız
@@ -86,10 +90,13 @@ Bir hesabınız varsa:
   diğer tüm yerel düzenlemeler.
 - **Yayımladıklarınız.** Sanatçı adınız ve mesajınız herkese açık bir bahşiş sayfasında görünür;
   bunları hukuka uygun ve size ait tutun.
-- **Stripe anahtarınız.** O, kendi oluşturduğunuz kısıtlı bir anahtardır ve cihazınızda durur —
-  oturum açarsanız, diğer cihazlarınız da kullanabilsin diye hesabınızın özel deposunda da
-  durur. Her hâlükârda o sizindir: cihaza, nakde davrandığınız gibi davranın ve bir cihaz
-  kaybolursa anahtarı Stripe panelinizden iptal edin.
+- **Stripe anahtarınız.** O, kendi oluşturduğunuz kısıtlı bir anahtardır. **Hesap yokken
+  yalnızca cihazınızda durur.** Oturum açarsanız, sunucumuza taşınır; hiç kimsenin — başka bir
+  hesabın, açıkça bakan bizim ve sizin bile — geri okuyamayacağı şekilde şifrelenir; o andan
+  itibaren Stripe bahşişlerinizi sunucumuza bildirir ve diğer cihazlarınız anahtarı yalnızca
+  bizim aracılığımızla kullanır. Her hâlükârda o sizindir: onu tutan bir cihaza, nakde
+  davrandığınız gibi davranın ve bir cihaz kaybolursa anahtarı Stripe panelinizden iptal edin.
+  Gizlilik Politikası, oturum açmadan önce bunu ayrıntılı olarak açıklar.
 - **Gruplarınız ve ekrana koyduğunuz hayran mesajları.** Bir ad ve bir mesaj, insan dolu bir
   salona gösterilir. O ekranda ne belirdiğini denetlemek size düşer.
 
@@ -102,6 +109,10 @@ Bir hesabınız varsa:
   bulunmaz.
 - Lütfen eklediğiniz adı ve mesajı hukuka uygun ve nezaketli tutun. Bunlar bir ekranda,
   sahnede, insan dolu bir salonun önünde gösterilir.
+- **Bir şarkı isteği bir bahşiştir, bir sipariş değil.** Sanatçı şarkı isteklerini açmışsa, bir
+  şarkı için bahşiş verebilirsiniz — ama para, diğerleri gibi gönüllü bir bahşiştir ve
+  ödemeniz ya da en çok ödemeniz, şarkının çalınacağını **garanti etmez**. Bu, sanatçının
+  kararıdır.
 
 ## Doğrulanmamış bahşişler — bunu mutlaka okuyun
 
@@ -121,11 +132,14 @@ nedeni budur.
 
 Bahşiş sayfaları `tip.live.tips` adresinde durur ve Firebase üzerinde işlettiğimiz küçük bir
 aktarıcı tarafından sunulur. Aktarıcı, **ücretsiz olarak, bir nezaket olarak ve hiçbir türde
-garanti verilmeksizin** sunulur. En iyi çaba esasına dayanır — hız sınırlamasına takılabilir,
-erişilemez olabilir, bahşişler gecikebilir veya kaybolabilir ve sonrasında herhangi birinin
-onları kurtarmasına imkân verecek hiçbir şeyi bilerek saklamaz: teslim edilen bir bahşiş,
-sanatçının ekranı onu gösterdiği anda silinir; teslim edilmeyen bir bahşiş ise bir saat sonra
-silinir.
+garanti verilmeksizin** sunulur. En iyi çaba esasına dayanır: hız sınırlamasına takılabilir,
+erişilemez olabilir ve bahşişler gecikebilir veya kaybolabilir. Bir bahşişin ne kadar
+saklandığı, sanatçının oturum açıp açmadığına bağlıdır: **arkasında hesap olmayan bir bahşiş
+sayfası** için aktarıcı, sonrasında herhangi birinin bir bahşişi kurtarmasına imkân verecek
+hiçbir şeyi bilerek saklamaz — teslim edilen bir bahşiş, sanatçının ekranı onu gösterdiği anda
+silinir; teslim edilmeyen bir bahşiş ise bir saat içinde süpürülür. **Oturum açmış bir hesap**
+için bahşiş, o sanatçının kendi geçmişine yazılır ve grup yaşadığı sürece saklanır. Gizlilik
+Politikası her iki durumu da eksiksiz açıklar.
 
 - Arkasında **hesap olmayan bir bahşiş sayfası, 90 gün hareketsizlikten sonra silinir**.
 - **Herhangi bir bahşiş sayfasını**, herhangi bir zamanda ve bildirimde bulunmadan **hız

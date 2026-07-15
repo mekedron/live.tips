@@ -1,24 +1,37 @@
 # Architecture
 
-One Flutter app, serverless by default. In the default Stripe-only mode the
+One Flutter app, serverless by default. With **no account** (the default) the
 artist's device talks straight to `api.stripe.com` with a restricted key
 created by the artist — there is no live.tips backend. An **optional connected
 mode** adds Revolut/MobilePay via a minimal relay (`firebase/`,
 `tip.live.tips`); it is described in [Optional relay](#optional-relay-firebasetiplivetips)
-below and keeps no tip history. An **optional account** (Firebase Auth) syncs
-bands, keys, settings and history across an artist's devices and lets several
-of them watch one live session — see
-[Accounts](#accounts-optional-and-what-signing-in-changes); without one, the
-app is as device-local as it ever was. This document explains the moving parts
-and the reasoning.
+below and keeps no tip history for a no-account jar. An **optional account**
+(Firebase Auth) syncs bands, settings and history across an artist's devices and
+lets several of them watch one live session — see
+[Accounts](#accounts-optional-and-what-signing-in-changes). Signing in also
+**moves the Stripe key off the device to the server** (envelope-encrypted under
+Cloud KMS) so Stripe can deliver that account's tips to a server webhook, and
+turns on push notifications; the details are in
+[Signing in moves the key and the ingestion path](#signing-in-moves-the-key-and-the-ingestion-path).
+Without an account, the app is as device-local as it ever was. This document
+explains the moving parts and the reasoning.
 
 ## The core loop: polling instead of webhooks
+
+> **This section describes the no-account (device-local) path.** A tablet on a
+> stage has no public HTTPS endpoint, so a no-account setup polls Stripe from the
+> device. **Once the artist signs in, the key lives on the server**, which *does*
+> have an endpoint — so Stripe delivers that account's tips to a server webhook
+> and the app stops polling entirely. See
+> [Signing in moves the key and the ingestion path](#signing-in-moves-the-key-and-the-ingestion-path).
+> The event-shape and dedupe reasoning below is identical on both paths; only who
+> makes the Stripe call moves.
 
 Webhooks need a public HTTPS endpoint — a tablet on a stage doesn't have one.
 Stripe recommends webhooks and does **not** document polling as a sanctioned
 alternative; `/v1/events` is a documented endpoint that we poll deliberately,
 accepting the trade-off, which is what `StripeTipSource` does during a live
-session:
+session for a no-account jar:
 
 Two limits this buys us, and they set the poll interval:
 
@@ -215,28 +228,62 @@ arrives from cache. Another device's edit lands as a mirror update plus an
 `onChanged` nudge, which is how it reaches the UI.
 
 Synced under the account: the band list, each band's Stripe tip jar and relay
-jar, band settings, app settings, session history, and the relay-tip archive.
-Deliberately **not** synced, in every implementation: which band is active
-(what a device is looking at is a device's business) and the in-flight session
-crash snapshot (two devices' half-finished sets must never overwrite each
-other). Both stay in prefs.
+jar, band settings, app settings, session history, the relay-tip archive, and
+the song-request library. Deliberately **not** synced, in every implementation:
+which band is active (what a device is looking at is a device's business) and the
+in-flight session crash snapshot (two devices' half-finished sets must never
+overwrite each other). Both stay in prefs.
 
-Secrets stay **keychain-first**. The Stripe restricted key and the relay jar
-secret live in `users/{uid}/bands/{bandId}/secrets/v1`, a doc no other uid can
-read, and every snapshot of it is written *through* to the device keychain
-under the same key names the local profile uses. The keychain is therefore both
-the fast path and the cloud profile's cache — it is what the app trusts while
-offline, and everything downstream of `SecureStore` keeps working unchanged.
+The **relay jar secret** stays keychain-first: it lives under the account (hashed
+in the relay's own `jars/{jarId}/private/auth`, and mirrored to the device
+keychain for the fast path) so any device can serve the tip page offline. The
+**Stripe restricted key does not** — it moves to a separate, harder custody, next.
+
+### Signing in moves the key and the ingestion path
+
+Two things change the moment a real (Apple/Google) account owns a band. Both are
+new since the device-local era, and both are why a signed-in account has a server
+in its data path where the local profile has none.
+
+- **Key custody.** On connect, the key is validated, then sealed with envelope
+  encryption — a per-secret AES-256-GCM data key wrapped by **Cloud KMS**
+  (`europe-west1`, key ring `livetips/stripe-secrets`) — and stored in a top-level
+  `stripeConnections/{connectionId}` doc. The Firestore rules deny that doc to
+  **every** principal, the owning artist included (`allow read, write: if false`):
+  it is unsealed only inside Cloud Functions, used, and **never handed back to a
+  device**. A guest (anonymous) account cannot use this — a key sealed under an
+  unrecoverable uid would strand its live webhook — so Stripe custody is
+  Apple/Google-only.
+- **Ingestion.** Because the key lives server-side, each connected band registers
+  a webhook on the artist's own Stripe account pointing at
+  `tip.live.tips/stripe/webhook/{connectionId}`. Stripe pushes tip / song-request /
+  card-present events there; the function verifies the signature against that
+  connection's sealed signing secret and writes the tip **straight into the
+  account** via the shared destination router (`tip-destination.ts`) — into
+  `sessions/{id}/tips` if a set is live, else the band's `relayTips` archive. The
+  app no longer polls Stripe for a signed-in account; it reaches Stripe only
+  through the strict-allowlist `stripeProxy` callable (create tip link, mint a
+  song-request link, list tips/taps for reconciliation) — the device never sees
+  the key.
+
+The **relay** money path converges on the same router: for a **cloud** jar
+(carrying `ownerUid` + `bandId`) a Revolut/MobilePay/Monzo tip is written directly
+into the account too, with **no consume-once queue and no one-hour TTL** — those
+collections are the artist's own history, kept as long as the band. The
+`pendingTips` delivery queue described under [Optional relay](#optional-relay-firebasetiplivetips)
+is now taken **only** for a jar without a complete route — i.e. no-account jars
+(forever) and old cloud jars until their next claim installs the route.
 
 **Signing in changes the privacy story, and the change deserves to be said out
 loud.** In the local profile the device is the only witness: tips, fan names and
-fan messages never leave it. In a signed-in account they do — a night's tips,
-messages included, are stored in Firestore under the artist's own uid, because
-that is what makes them appear on the second device. No other account can read
-them: the rules grant `users/{uid}/**` to that uid alone, so cross-account reads
-(URL-guessing included) are impossible by construction. But "no server ever sees
-a tip" holds only for the local profile now. That is the price of the second
-device, and it is the artist's to pay or refuse.
+fan messages never leave it, and the Stripe key never leaves the keychain. In a
+signed-in account both do — a night's tips (messages included) are written **by the
+server** into Firestore under the artist's own uid, and the key is sealed on the
+server. No other account can read any of it: the rules grant `users/{uid}/**` to
+that uid alone, and `stripeConnections/*` to nobody, so cross-account reads
+(URL-guessing included) are impossible by construction. But "no server ever sees a
+tip" holds only for the local profile now. That is the price of the second device,
+and it is the artist's to pay or refuse.
 
 ## Sessions & persistence
 
@@ -275,17 +322,30 @@ coordination doc sits at a *fixed* path — `users/{uid}/live/current` — so tw
 exactly one through. The loser is told which band is already live, and the shell
 shows "Live session running in {band}" with a Join button instead.
 
+> **Tip ingestion is now server-side for a cloud jar.** Stripe tips arrive by
+> webhook and relay tips are written straight into the account (see
+> [Signing in moves the key and the ingestion path](#signing-in-moves-the-key-and-the-ingestion-path)),
+> so for a signed-in account the leader no longer polls Stripe to fill the session.
+> The server writes into the same `sessions/{sessionId}/tips` subcollection the
+> devices listen to, and it reads the leader lease to decide *live session vs.
+> archive*. What the leader still owns is coordination and publishing the fan-page
+> request-queue aggregate; presentation ("shown", confetti) is device-local. A jar
+> that predates this — or a no-account jar — still ingests through a polling/relay
+> **leader** exactly as below.
+
 Two roles:
 
-- The **leader** (the device that started, or resumed, the session) is the only
-  one that runs the Stripe poll and the relay listener. It writes every fresh
-  tip to `users/{uid}/bands/{bandId}/sessions/{sessionId}/tips/{tipId}` —
-  doc id = tip id, and Stripe and relay ids are both stable, so redeliveries and
-  racing writers overwrite instead of duplicating.
+- The **leader** (the device that started, or resumed, the session) coordinates
+  the set and, for a jar not yet on the server-direct path, runs the Stripe poll
+  and the relay listener and writes every fresh tip to
+  `users/{uid}/bands/{bandId}/sessions/{sessionId}/tips/{tipId}` — doc id = tip id,
+  and Stripe and relay ids are both stable, so redeliveries and racing writers
+  (a device or the server webhook) overwrite instead of duplicating.
 - **Every** device, the leader included, *ingests* only from a listener on that
-  subcollection. One code path, identical ordering everywhere. The leader's own
-  tips come back through Firestore's latency-compensated local echo, so nothing
-  is delayed, and the dedupe-by-id makes the echo free.
+  subcollection. One code path, identical ordering everywhere, whether the writer
+  was a device or the server. The leader's own tips come back through Firestore's
+  latency-compensated local echo, so nothing is delayed, and the dedupe-by-id makes
+  the echo free.
 
 The leader holds a **lease**: `leaderLeaseUntilMs = now + 45 s`, stamped on
 every poll tick — and stamped *before* the poll, so a failing Stripe call still
@@ -340,6 +400,35 @@ token. Codes are single-use, attempt-capped, and expire in two minutes. Without
 that confirm tap a code shoulder-surfed off a screen would be a silent account
 takeover; with it, it is a request the artist can refuse.
 
+## Push notifications (signed-in accounts, opt-in)
+
+Push exists for one case: a tip or song request that lands **while no set is
+running** — the artist isn't watching the stage, so tell them. A tip that arrives
+during a live set pushes nothing.
+
+- **Chokepoint.** `recordTipNotification` (`notifications.ts`) is called from both
+  money paths (`tip.ts`, `stripe-webhook.ts`) and fires **only when the routed tip
+  is not live**. It appends `users/{uid}/notifications/{tipId}` — a
+  server-written-only bell feed capped at 100 entries, holding kind, band, amount,
+  currency, and the fan's name / song title if present.
+- **Fan-out.** An `onDocumentCreated` trigger reads the account's device rows,
+  localizes the message per device (`push-strings.ts`, 20 languages, keyed on the
+  device's stored `locale`), and sends via **Firebase Cloud Messaging**. Dead
+  tokens (`registration-token-not-registered`) are pruned from the device doc on
+  send.
+- **Tokens** live on `users/{uid}/devices/{deviceId}.fcmToken` (+ `fcmTokenAtMs`,
+  `locale`), written only after the user enables notifications on that device and
+  the OS grants permission. Sign-out, revocation, and toggling off all delete the
+  field. A guest account and a no-account device never register one, so they never
+  get a push.
+- **Web** registers `firebase-messaging-sw.js` at the **origin root** (the FCM SDK
+  ignores the `/app/` base href), which `pages.yml` copies to `_site/`. The SW
+  pulls the Firebase messaging SDK from `gstatic.com` on first use. iOS/macOS/
+  Android native blocks are wired but inert until the APNs auth key is uploaded.
+- **Read state** is a watermark in `users/{uid}/settings/notifications`
+  (`markAllRead(newestSeenMs:)` — the newest entry *shown*, not device-now, or the
+  badge never clears); per-type opt-out flags live there too (absent = send).
+
 ## The stage (live-screen visualization)
 
 The live screen renders through one seam — `JarStageView` — with three
@@ -385,14 +474,16 @@ thing. The screen stays awake during sessions via `wakelock_plus`.
   connect time with clear errors. Nothing the key can do moves money: no
   refunds, no balance, no payouts.
 - `sk_live_…` keys are refused outright; test keys get a loud banner.
-- No analytics, no third-party services. In Stripe-only mode on the local
+- No analytics, no ad tech, no crash reporter. In Stripe-only mode on the local
   profile the app makes no network calls except `api.stripe.com` and Stripe's
   own checkout page; connected mode adds the relay, and a signed-in account
-  adds Firebase Auth + Firestore (see below).
-- Signing in moves data off the device on purpose: an account's bands, secrets,
-  settings and tip history (fan names and messages included) live in Firestore
-  under its own uid, readable by that uid alone. The local profile stores none
-  of it anywhere but the device.
+  adds Firebase Auth + Firestore, the server-side Stripe custody (Cloud KMS +
+  webhook), and — if turned on — Firebase Cloud Messaging for push (see below).
+- Signing in moves data off the device on purpose: an account's bands, settings
+  and tip history (fan names and messages included) live in Firestore under its
+  own uid, readable by that uid alone. The **Stripe key is stricter still** — it
+  lives in `stripeConnections/*`, KMS-sealed and readable by no principal, the
+  owner included. The local profile stores none of it anywhere but the device.
 - Pinned `Stripe-Version: 2024-06-20` so parsing is stable regardless of the
   account's default API version.
 
@@ -413,15 +504,18 @@ the smallest server that makes this possible: Cloud Functions (2nd gen, Node
   Revolut/MobilePay show a Turnstile-gated form (amount, name, message).
   Submitting writes the tip to the jar and redirects the fan to the payment
   deep link. Fans never touch Firestore from the browser.
-- **Delivery is deletion.** A tip is written to `jars/{jarId}/pendingTips/{id}`
-  and the artist's device listens to that collection; showing a tip means
-  deleting its document, and that delete is the only acknowledgement there is.
-  The device emits the tip *before* it deletes, so a crash in between
-  redelivers rather than loses — the app dedupes by document id. The queue is
-  bounded (`MAX_PENDING`) and swept after `PENDING_TTL_MS` = 1 h whether or not
-  anyone came back for it. This queue is the *only* place fan-written text is
-  ever stored server-side, and nothing in it is a tip history: it is a delivery
-  buffer that empties itself.
+- **Delivery is deletion — for a no-account jar.** A tip on an unrouted jar is
+  written to `jars/{jarId}/pendingTips/{id}` and the artist's device listens to
+  that collection; showing a tip means deleting its document, and that delete is
+  the only acknowledgement there is. The device emits the tip *before* it deletes,
+  so a crash in between redelivers rather than loses — the app dedupes by document
+  id. The queue is bounded (`MAX_PENDING`) and swept after `PENDING_TTL_MS` = 1 h
+  whether or not anyone came back for it. For a no-account jar this queue is the
+  *only* place fan-written text is stored server-side, and nothing in it is a tip
+  history: it is a delivery buffer that empties itself. **A cloud jar skips the
+  queue entirely** — the server writes the tip straight into the account's own
+  kept history (see [Signing in moves the key and the ingestion path](#signing-in-moves-the-key-and-the-ingestion-path)),
+  which is fan-written text at rest with no TTL, under the artist's uid.
 - Jar lifecycle runs through six callables — `createJar`, `claimJar`,
   `updateJarProfile`, `rotateJarSecret`, `jarSeen`, `deleteJar`. The secret
   remains the root credential; `claimJar` exchanges it for read access by

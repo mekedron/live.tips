@@ -12,47 +12,68 @@ Bei live.tips lautet die Antwort: Sie müsste neu gebaut werden. Das ist kein
 Versprechen über unsere Absichten, sondern eine Beschreibung dessen, wohin das
 Geld geht.
 
-## Karten-Trinkgeld läuft nie über uns
+## Geld läuft nie über uns
 
-Wenn ein Fan auf einen Kartenbetrag tippt, spricht sein Browser mit
-`api.stripe.com`. Nicht mit einem live.tips-Server – in diesem Pfad gibt es keinen.
-Die Zahlung wird auf **deinem** Stripe-Konto angelegt, landet in **deinem**
-Stripe-Guthaben und wird nach **deinem** Stripe-Zeitplan ausgezahlt. Die einzige
-Gebühr ist Stripes eigene Standard-Bearbeitungsgebühr, die Stripe dir direkt
-berechnet – genau so, wie es wäre, wenn du Stripe selbst eingebunden hättest.
+Wenn ein Fan auf einen Kartenbetrag tippt, wird die Zahlung auf **deinem**
+Stripe-Konto angelegt, landet in **deinem** Stripe-Guthaben und wird nach **deinem**
+Stripe-Zeitplan ausgezahlt. Die einzige Gebühr ist Stripes eigene
+Standard-Bearbeitungsgebühr, die Stripe dir direkt berechnet – genau so, wie es
+wäre, wenn du Stripe selbst eingebunden hättest.
 
 Auf unserer Seite gibt es kein Kassenbuch, weil es nichts zu verbuchen gibt. Wir
-könnten keinen Prozentsatz abschöpfen, ohne zuerst das zu bauen, was das Geld hält.
+könnten keinen Prozentsatz abschöpfen, ohne zuerst das zu bauen, was das Geld hält –
+und so etwas gibt es nicht.
 
-## Deine Schlüssel bleiben deine
+Das gilt, ob du dich anmeldest oder nicht. Was die Anmeldung ändert, ist der
+*Daten*pfad, nicht der *Geld*pfad, und die nächsten beiden Abschnitte sind ehrlich
+darüber, wie genau.
+
+## Deine Schlüssel, und wo sie liegen
 
 Die Einrichtung verlangt einen *eingeschränkten* Stripe-API-Schlüssel, keinen
-Live-Secret-Key – die lehnen wir rundweg ab. Er wird im Schlüsselbund deines
-eigenen Geräts gespeichert und nur über TLS an Stripe gesendet.
-
-Eingeschränkt heißt, der Schlüssel kann zwei Dinge: den
-Zahl-was-du-willst-Trinkgeld-Link erstellen und beobachten, wie Trinkgeld
-eintrifft. Er kann dein Guthaben nicht lesen, keine Auszahlungen auslösen, keine
-Rückerstattungen veranlassen und keine Kundendaten anrühren. Würde er morgen
+Live-Secret-Key – die lehnen wir rundweg ab. Eingeschränkt heißt, der Schlüssel kann
+zwei Dinge: den Zahl-was-du-willst-Trinkgeld-Link erstellen und beobachten, wie
+Trinkgeld eintrifft. Er kann dein Guthaben nicht lesen, keine Auszahlungen auslösen,
+keine Rückerstattungen veranlassen und keine Kundendaten anrühren. Würde er morgen
 durchsickern, reicht der Schaden gerade bis zu einem Trinkgeld-Link.
 
-## Der eine Server im Zahlungsweg
+**Ohne Konto verlässt dieser Schlüssel niemals dein Gerät.** Er sitzt im
+Schlüsselbund deines eigenen Geräts und wird nur über TLS an `api.stripe.com`
+gesendet. Kein live.tips-Server ist überhaupt im Spiel.
 
-Revolut und MobilePay lassen sich nicht so aus einem Browser steuern wie Stripe,
-deshalb schaltet ihre Aktivierung ein minimales Relay ein – eine Handvoll
-Firebase-Funktionen, die deine Trinkgeld-Seite unter `tip.live.tips` ausliefern.
-Es lohnt sich, genau zu sein, was dieses Relay tut, denn „wir haben ein Backend
-hinzugefügt" ist meist die Stelle, an der solche Geschichten schieflaufen.
+**Meldest du dich an, wandert der Schlüssel zu uns** – denn ein Schlüssel, der nur
+auf einem Telefon existiert, kann nicht auch das Tablet auf der Bühne bedienen. Wir
+verschlüsseln ihn (ein eigener AES-256-Schlüssel je Geheimnis, der seinerseits von
+Google Cloud KMS umschlossen wird) und speichern ihn dort, wo ihn nichts zurücklesen
+kann: kein anderes Konto, nicht wir mit einem Blick in eine Datenbank, nicht einmal
+du. Er wird nur innerhalb unserer Funktionen entsiegelt, dort in deinem Namen für die
+Kommunikation mit Stripe genutzt und nie wieder an ein Gerät herausgegeben. Sag es
+klar: Die Anmeldung setzt einen live.tips-Server in den Pfad zwischen Stripe und
+deiner Trinkgeld-Historie. Nie das Geld – die Daten.
 
+## Die Server, und was sie nicht können
+
+Es sind zwei, und beide sind minimal.
+
+**Das Relay** existiert, weil sich Revolut und MobilePay nicht so aus einem Browser
+steuern lassen wie Stripe. Ihre Aktivierung schaltet eine Handvoll
+Firebase-Funktionen ein, die deine Trinkgeld-Seite unter `tip.live.tips` ausliefern.
 Es speichert dein öffentliches Trinkgeld-Seiten-Profil – den Anzeigenamen und die
-Zahlungs-Handles, die du veröffentlichen wolltest. Mehr nicht. Es führt keine
-Trinkgeld-Historie, sieht kein Geld, hält keine Schlüssel und löscht sich nach
-90 Tagen Inaktivität selbst. Ein Revolut- oder MobilePay-Trinkgeld wartet dort nur,
-bis dein Bühnengerät es abholt: Es anzuzeigen löscht es, und was niemand abgeholt
-hat, wird binnen einer Stunde weggeräumt. Das Geld bewegt sich weiterhin direkt
-zwischen der Revolut- oder MobilePay-App deines Fans und deiner.
+Zahlungs-Handles, die du veröffentlichen wolltest – und führt für eine Seite ohne
+Konto dahinter keine Trinkgeld-Historie: Ein Trinkgeld wartet nur, bis dein
+Bühnengerät es anzeigt, und was niemand abgeholt hat, wird binnen einer Stunde
+weggeräumt. Es sieht kein Geld und löscht sich nach 90 Tagen Inaktivität selbst. Wenn
+du nur Stripe nutzt und dich nie anmeldest, wird das Relay überhaupt nie kontaktiert.
 
-Wenn du nur Stripe nutzt, wird das Relay überhaupt nie kontaktiert.
+**Der Webhook** existiert erst, sobald du dich anmeldest. Weil dein Schlüssel jetzt
+bei uns liegt, meldet Stripe jedes Trinkgeld an eine kleine Funktion von uns, die es
+in deine eigene Historie schreibt, damit deine anderen Geräte es anzeigen können. Es
+ist eine Kopie eines Ereignisses, keine Kopie des Geldes. Sie kann keinen Cent
+bewegen, und sie kann immer nur in das eine Konto schreiben, zu dem sie gehört.
+
+Keiner der beiden Server kann einen Anteil nehmen, weil keiner auch nur in die Nähe
+des Geldes kommt. Das Höchste, was einer von beiden tun kann, ist auszufallen – und
+eine reine Stripe-Konfiguration ohne Konto hängt von keinem ab.
 
 ## Das Konto, das du nicht anlegen musst
 
@@ -64,13 +85,14 @@ Sich anzumelden – mit Apple, mit Google oder als Gast – ist jetzt möglich, 
 gibt das aus genau einem Grund: ein zweites Gerät. Wenn das Tablet auf der Bühne und
 das Telefon in deiner Tasche denselben Abend zeigen sollen, muss etwas dazwischen
 sitzen, und dieses Etwas ist Firestore, unter einer Nutzer-ID, die nur du lesen
-kannst. Deine Bands, Einstellungen, der eingeschränkte Schlüssel und die
-Trinkgeld-Historie werden dorthin synchronisiert. Das ist eine echte Änderung an der
+kannst. Deine Bands, Einstellungen, Trinkgeld-Historie – und, verschlüsselt wie oben,
+dein Stripe-Schlüssel – liegen dort. Das ist eine echte Änderung an der
 Datenschutz-Geschichte, und sie gehört klar gesagt statt entdeckt: Ohne Konto sieht
-nie ein Server ein Trinkgeld; mit Konto sieht es deine eigene Ecke von unserem. Das
-ist der Preis für das zweite Gerät, und es liegt bei dir, ihn zu zahlen oder
-abzulehnen. Was es nie anrührt, ist das Geld – ein Konto verschiebt deine Daten,
-nicht dein Guthaben, und einen Anteil gibt es weiterhin nicht.
+nie ein Server ein Trinkgeld; mit Konto sieht es deine eigene Ecke von unserem, und
+unser Webhook ist es, der es dorthin schreibt. Das ist der Preis für das zweite
+Gerät, und es liegt bei dir, ihn zu zahlen oder abzulehnen. Was es nie anrührt, ist
+das Geld – ein Konto verschiebt deine Daten, nicht dein Guthaben, und einen Anteil
+gibt es weiterhin nicht.
 
 ## Warum du uns nicht einfach glauben solltest
 
@@ -82,3 +104,4 @@ sind weniger, als du erwartest.
 
 Das ist das eigentliche Produktversprechen. Nicht, dass wir vertrauenswürdig sind,
 sondern dass wir es nicht sein müssen.
+</content>

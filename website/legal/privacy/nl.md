@@ -1,29 +1,35 @@
 ---
 title: Privacybeleid
 description: live.tips heeft geen cookies, geen analytics en geen tracking, en werkt helemaal zonder account. Kies je er toch voor om in te loggen, dan staat hier precies wat er wordt bewaard, waar, door wie, en hoe lang.
-updated: 2026-07-13
-updated_label: Laatst bijgewerkt op 13 juli 2026
+updated: 2026-07-15
+updated_label: Laatst bijgewerkt op 15 juli 2026
 ---
 
 live.tips is een open-source fooienpot voor artiesten. Hij wordt beheerd door **Nikita Rabykin**, een
 individuele ontwikkelaar, geen bedrijf. Als iets hieronder voor jou van belang is, schrijf dan naar
 **[contact@live.tips](mailto:contact@live.tips)** — op dat adres zit een mens.
 
-Dit beleid is eerlijk over de saaie delen. We zeggen liever "we bewaren je naam maximaal
-één uur" dan te beweren dat we niets bewaren en er dan naast te zitten.
+Dit beleid is eerlijk over de saaie delen. We zeggen liever "we bewaren je naam zolang je de band
+houdt" dan te beweren dat we niets bewaren en er dan naast te zitten.
 
 ## De korte versie
 
 - **Een account is optioneel.** De app werkt helemaal zonder account, en dat is nog steeds de
   standaard. Wil je je bands en je geschiedenis op een tweede apparaat, dan kun je inloggen — en
-  dan wordt een deel ervan op een server bewaard. Wat wat is, staat hieronder.
+  dan wordt een deel ervan op een server bewaard, en meer ervan dan voorheen. Wat wat is, staat
+  hieronder.
 - **Geen cookies.** Geen enkele, nergens.
 - **Geen analytics, geen tracking, geen advertenties, geen scripts van derden** op deze website.
 - **We raken je geld nooit aan.** Fooien gaan rechtstreeks van de fan naar het eigen
-  Stripe-, Revolut-, MobilePay- of Monzo-account van de artiest. Wij zitten niet in dat pad.
-- **In de standaardopzet praat de app alleen met Stripe** — niet met enige live.tips-server.
-- De enige server die we überhaupt draaien is een klein relay op Firebase van Google. Dat bestaat
-  alleen als een artiest Revolut, MobilePay of Monzo aanzet — of als hij inlogt.
+  Stripe-, Revolut-, MobilePay- of Monzo-account van de artiest. Er is nooit een live.tips-saldo.
+- **Zonder account praat de app alleen met Stripe** — niet met enige live.tips-server. Log je in,
+  dan verandert dat: je Stripe-sleutel verhuist naar onze server en Stripe meldt je fooien aan ons,
+  zodat we ze op je andere apparaten kunnen zetten. Dat is de eerlijke prijs van inloggen, en het
+  staat hieronder volledig uiteengezet.
+- **Pushmeldingen zijn nieuw, optioneel, en alleen voor ingelogde accounts.** Er wordt niets gepusht
+  naar een apparaat dat ze nooit heeft aangezet, en een apparaat zonder account krijgt er nooit een.
+- De servers die we draaien staan op Firebase van Google. Ze bestaan als een artiest Revolut,
+  MobilePay of Monzo aanzet — of als hij inlogt.
 
 ## Deze website
 
@@ -59,13 +65,16 @@ De app draait **op het eigen apparaat van de artiest**, en alles wat hij weet, s
 
 - De **beperkte Stripe-sleutel** wordt bewaard in de sleutelhanger van het apparaat (iOS/macOS Keychain,
   Android Keystore) en wordt uitsluitend naar `api.stripe.com` gestuurd.
-- **Fooiengeschiedenis, sessiegeschiedenis, het doel en de app-instellingen** worden bewaard in de lokale
-  opslag van het apparaat. Daaronder vallen de namen en berichten die fans aan hun fooien hangen.
+- **Fooiengeschiedenis, sessiegeschiedenis, het doel, de lijst met verzoeknummers en de
+  app-instellingen** worden bewaard in de lokale opslag van het apparaat. Daaronder vallen de namen
+  en berichten die fans aan hun fooien hangen.
 - De app verwijderen wist dat allemaal. Er is geen cloudback-up aan onze kant, want
   in deze modus is er geen cloud aan onze kant.
 
 **Wij ontvangen hier niets van.** De app wordt geleverd zonder analytics-SDK, zonder crash
-reporter, zonder pushmeldingen en zonder advertentiecode — helemaal geen, ook geen uitgeschakelde.
+reporter en zonder advertentiecode — helemaal geen, ook geen uitgeschakelde. (Pushmeldingen bestaan
+wel, maar zijn een functie voor ingelogde accounts en staan uit tot je ze aanzet — zie *Modus twee*.
+Een apparaat zonder account krijgt er nooit een.)
 
 Twee verduidelijkingen, zodat de bewering "praat met niemand" precies waar blijft:
 
@@ -90,10 +99,13 @@ De server is **Firebase**, en dat is Google. Er zijn drie manieren om een accoun
 
 - **Inloggen met Apple** of **Inloggen met Google** — Firebase Auth ontvangt wat de aanbieder
   doorgeeft: een gebruikers-id (uid) en meestal een e-mailadres en een naam. (Bij Apple mag je je
-  e-mailadres verbergen; Apple geeft ons dan in plaats daarvan een relay-adres.)
+  e-mailadres verbergen; Apple geeft ons dan in plaats daarvan een relay-adres, en het geeft je naam
+  alleen de allereerste keer dat je inlogt door.)
 - **Een gastaccount** — een anoniem account zonder e-mailadres en zonder naam. Het synchroniseert
   en het kan worden ingetrokken, maar er is niets om het mee terug te halen als je je apparaat
-  kwijtraakt. Het is een uid en niets meer.
+  kwijtraakt. Het is een uid en niets meer. Een gastaccount kan het server-side Stripe-beheer of de
+  hieronder beschreven pushmeldingen niet gebruiken, want beide hebben een account nodig dat we aan
+  je kunnen teruggeven.
 
 Zodra je bent ingelogd, krijgt het account zijn eigen privéhoekje in Googles **Cloud
 Firestore**-database, op `users/<your uid>/`. De beveiligingsregels geven dat hoekje aan die uid
@@ -102,24 +114,52 @@ Daarin staat:
 
 | Wat | Waarom het er staat |
 | --- | --- |
-| Je **bands** — namen, instellingen voor de fooienpot en de betaalmethoden, postertekst, doelen | zodat een band bestaat op elk apparaat waarop je inlogt |
-| Je **beperkte Stripe-sleutel** en het geheim van de fooienpagina van het relay | in een geheimendocument dat alleen jouw uid kan lezen, en gecachet in de sleutelhanger van elk van je apparaten |
-| **App-instellingen** | zodat een apparaat dat je toevoegt al is ingesteld |
-| **Sessieregistraties en fooiengeschiedenis** — inclusief **de namen en de berichten die fans aan hun fooien hangen** | omdat die geschiedenis precies is wat je op dat andere apparaat wilde zien |
+| Je **bands** — namen, instellingen voor de fooienpot en de betaalmethoden, postertekst, doelen, en je **lijst met verzoeknummers** | zodat een band bestaat op elk apparaat waarop je inlogt |
+| **App-instellingen**, inclusief je meldingsvoorkeuren | zodat een apparaat dat je toevoegt al is ingesteld |
+| **Sessieregistraties en fooiengeschiedenis** — inclusief **de namen en de berichten die fans aan hun fooien hangen**, en elk **nummer dat een fan aanvroeg** | omdat die geschiedenis precies is wat je op dat andere apparaat wilde zien |
 | De **live sessie** die op dit moment loopt | zodat een tweede scherm kan aanhaken bij de set van vanavond |
-| Je **apparaten** — de naam die elk zichzelf geeft ("Nikita's iPhone"), het platform en het model, wanneer het voor het eerst en het laatst is gezien | zodat Instellingen → Beveiliging ze kan opsommen, en jij er een kunt intrekken |
+| Je **apparaten** — de naam die elk zichzelf geeft ("Nikita's iPhone"), het platform en het model, de interfacetaal, wanneer het voor het eerst en het laatst is gezien, en (als je meldingen hebt aangezet) een **pushtoken** | zodat Instellingen → Beveiliging ze kan opsommen, zodat een melding het juiste apparaat in de juiste taal bereikt, en jij er een kunt intrekken |
 | Een klein **profieldocument** — de accountnaam die je koos, en welke aanbieder je gebruikte | zodat de accountwisselaar het kan labelen |
+| Een **belfeed** — een begrensde lijst van recente fooien en verzoeknummers die binnenkwamen terwijl er geen set liep | zodat je kunt bijlezen wat je hebt gemist |
 
 En nu het belangrijke deel, ronduit: **zonder account verlaten de naam en het bericht van een fan
 nooit het apparaat van de artiest. Met een account worden ze bewaard op Googles servers onder de
-uid van de artiest, als onderdeel van de eigen gesynchroniseerde geschiedenis van die artiest.**
+uid van de artiest, als onderdeel van de eigen gesynchroniseerde geschiedenis van die artiest**, en
+— zoals de volgende twee secties uitleggen — **is het nu onze server die ze daar wegschrijft.**
 Geen enkel ander account kan ze lezen, wij kijken er niet naar, en er wordt niets uit afgeleid —
-maar ze staan er, en dat mag je weten voordat je inlogt.
+maar ze staan er, en ze blijven er zolang de band bestaat, en dat mag je weten voordat je inlogt.
 
 Uitloggen zet het apparaat terug in de lokale modus. Het verwijdert de gegevens van het account
 niet — zie *Dingen verwijderen*, hieronder.
 
-### Een apparaat toevoegen met een QR-code
+#### Je Stripe-sleutel verhuist naar onze server als je inlogt
+
+Dit is de grootste verandering, en de meest lezenswaardige.
+
+**Zonder account verlaat je beperkte Stripe-sleutel nooit je apparaat.** Dat is Modus één, en die
+is onveranderd.
+
+**Als je inlogt, verlaat hij het apparaat wél — naar ons.** De sleutel wordt versleuteld (een
+AES-256-sleutel per geheim, die zelf door Google Cloud KMS wordt ingepakt) en server-side bewaard op
+een plek waar **niemand hem kan teruglezen — geen ander account, en zelfs jij niet.** Hij wordt
+alleen binnen onze Cloud Functions ontzegeld, gebruikt om namens jou met Stripe te praten, en nooit
+meer aan een apparaat gegeven.
+
+Omdat de sleutel nu bij ons woont, **meldt Stripe je fooien rechtstreeks aan onze server**: we
+registreren een webhook op je eigen Stripe-account, en Stripe vertelt die webhook telkens wanneer er
+een fooi wordt betaald. Onze functie schrijft de fooi weg in de geschiedenis van je account (zie
+hieronder). Je app pollt Stripe niet meer voor een ingelogd account; hij bereikt Stripe alleen via
+een smalle, vaste lijst met bewerkingen op onze server (het aanmaken van je fooienlink, het aanmaken
+van een verzoeknummerlink, en het teruglezen van je eigen fooien voor afstemming).
+
+Dus, zonder eufemisme gezegd: **voor een ingelogd account staat er nu een live.tips-server in het
+pad tussen Stripe en je geschiedenis.** We raken het geld nog steeds nooit aan — een kaartfooi wordt
+aangemaakt op je Stripe-account, komt terecht in je Stripe-saldo en wordt uitbetaald volgens je
+Stripe-schema, precies zoals voorheen. Wat veranderde is het *gegevens*pad, niet het *geld*pad. Log
+je nooit in, dan geldt niets hiervan en praat de app nog steeds rechtstreeks met `api.stripe.com` en
+met niemand anders.
+
+#### Een apparaat toevoegen met een QR-code
 
 Om een apparaat toe te voegen toon je een QR-code op een apparaat dat al is ingelogd. De code is
 willekeurig, **eenmalig te gebruiken, en verloopt na twee minuten**, en het nieuwe apparaat krijgt
@@ -127,29 +167,67 @@ niets tot je op het oude op *bevestigen* tikt. Zolang die handdruk openstaat bew
 de naam die het nieuwe apparaat zichzelf gaf, en het platform — en de registratie wordt verwijderd
 zodra hij verloopt. Een gefotografeerde QR-code is waardeloos zonder jouw bevestigende tik.
 
+## Verzoeknummers
+
+Een band kan **verzoeknummers** aanzetten: fans kiezen dan een nummer uit de lijst van de artiest en
+betalen, optioneel, om het hoger in de wachtrij te zetten. Een verzoek is gewoon een fooi die ook
+meedraagt **welk nummer** werd aangevraagd — dus dezelfde naam en hetzelfde bericht die een fan aan
+een fooi kan hangen, gelden hier ook, en het wordt opgeslagen en bewaard precies zoals elke andere
+fooi (hieronder). De openbare wachtrij die een fan ziet, toont alleen **totalen per nummer** —
+hoeveel een nummer heeft opgehaald en waar het staat — en draagt **geen fannamen**. Zonder account
+leven de hele lijst met verzoeknummers en de geschiedenis ervan alleen op het apparaat.
+
+## Pushmeldingen
+
+Als je bent ingelogd, kan de app je een **pushmelding** sturen — maar alleen als je het aanzet, per
+apparaat, en alleen nadat het besturingssysteem van je apparaat toestemming geeft. Het bestaat voor
+één ding: een fooi of een verzoeknummer dat binnenkomt **terwijl je geen set draait**, zodat je
+hoort van de fooi die je anders zou zijn misgelopen. Een fooi die binnenkomt terwijl je podium live
+is, stuurt niets — je kijkt er al naar.
+
+- Om een push af te leveren heeft Googles **Firebase Cloud Messaging (FCM)** een **pushtoken** voor
+  het apparaat nodig. We bewaren dat token, en de interfacetaal van het apparaat, op de eigen
+  registratie van het apparaat onder je account, en het wordt verwijderd op het moment dat je
+  meldingen uitzet, het apparaat intrekt, of uitlogt. Dode tokens worden automatisch opgeruimd.
+- De melding zelf zegt wat er binnenkwam — een bedrag, en de naam van een fan of een nummertitel als
+  die is achtergelaten. Dezelfde korte lijst wordt bewaard in de **belfeed** van je account,
+  begrensd op de honderd meest recente items, zodat je kunt terugscrollen door wat er binnenkwam
+  terwijl je weg was.
+- Op het web vereist het afleveren van een push een kleine **service worker** in de root van de site
+  en de Firebase-messaging-SDK, die je browser de eerste keer bij Google ophaalt (`gstatic.com`).
+  Web-push wordt daarna gedragen door de eigen pushdienst van je browser (voor Chrome is dat die van
+  Google). Niets hiervan wordt geladen tenzij je meldingen hebt aangezet.
+- **Een gastaccount en een apparaat zonder account krijgen geen pushes**, want een push heeft een
+  account nodig waaraan we kunnen afleveren en een token dat je ervoor koos te geven.
+
 ## Waar dit alles fysiek staat
 
-Firebase Auth, Cloud Firestore en onze Cloud Functions draaien in de **Europese Unie** — de
-database in Googles `eur3`-multiregio, de functions in `europe-west1`. Google treedt op als onze
-verwerker onder de
+Firebase Auth, Cloud Firestore, onze Cloud Functions en de Cloud KMS-sleutel die je Stripe-geheim
+inpakt, draaien allemaal in de **Europese Unie** — de database in Googles `eur3`-multiregio, de
+functions en de sleutelring in `europe-west1`. Google treedt op als onze verwerker onder de
 [privacy- en beveiligingsvoorwaarden van Firebase](https://firebase.google.com/support/privacy) en
 zijn eigen [privacybeleid](https://policies.google.com/privacy). Zoals elke grote aanbieder kan
 Google infrastructuur buiten de EU inschakelen voor ondersteuning en beveiliging; dat wordt door
-die voorwaarden geregeld, niet door ons.
+die voorwaarden geregeld, niet door ons. Pushmeldingen reizen, zodra ze zijn overhandigd aan
+Firebase Cloud Messaging en de pushdienst van je browser of telefoon, over de infrastructuur van die
+bedrijven om je apparaat te bereiken.
 
 ## Stripe
 
 Als een fan met kaart betaalt, staat hij op de afrekenpagina van **Stripe**, niet op de onze. Stripe
 verzamelt en verwerkt zijn betaalgegevens als zelfstandige verwerkingsverantwoordelijke onder het
-[privacybeleid van Stripe](https://stripe.com/privacy). Wij zien nooit kaartnummers, en we
-hebben geen toegang tot het Stripe-account van de artiest.
+[privacybeleid van Stripe](https://stripe.com/privacy). Wij zien nooit kaartnummers.
 
-De app van de artiest leest zijn eigen fooien uit Stripe met de eigen beperkte sleutel van de
-artiest — rechtstreeks van het apparaat naar `api.stripe.com`. **Er staat geen live.tips-server in
-dat pad, en die heeft er ook nooit gestaan.** De naam en het bericht van een fan, als hij die heeft
-achtergelaten, reizen van Stripe naar het apparaat van de artiest en stoppen daar — tenzij de
-artiest is ingelogd, in welk geval het apparaat ze ook opslaat in de eigen Firestore-geschiedenis
-van die artiest, zoals hierboven beschreven.
+Hoe je fooien je bereiken, hangt af van de modus:
+
+- **Zonder account** leest de app van de artiest zijn eigen fooien uit Stripe met de eigen beperkte
+  sleutel van de artiest — rechtstreeks van het apparaat naar `api.stripe.com`. **Er staat geen
+  live.tips-server in dat pad.**
+- **Als je bent ingelogd**, woont de sleutel op onze server (versleuteld, zoals hierboven), en meldt
+  Stripe elke fooi aan onze webhook, die hem wegschrijft in de eigen Firestore-geschiedenis van die
+  artiest. **In deze modus staat er wél een live.tips-server in het pad** — voor de fooigegevens,
+  nooit voor het geld. De naam en het bericht van een fan, als hij die achterliet, reizen met de
+  fooi mee naar de eigen geschiedenis van die artiest en stoppen daar.
 
 ## Het relay — alleen als Revolut, MobilePay of Monzo aanstaan
 
@@ -164,7 +242,8 @@ Functions en Firestore in `europe-west1`, met de fooienpagina voor de fan geserv
 
 Het aanmaken van een fooienpagina slaat de **weergavenaam van de artiest, zijn openbare bericht, zijn
 valuta en de betaalgegevens die hij heeft gekozen om te publiceren** op (zijn Stripe-betaallink,
-Revolut-gebruikersnaam, MobilePay Box ID, Monzo-gebruikersnaam). Dat is allemaal informatie die de artiest
+Revolut-gebruikersnaam, MobilePay Box ID, Monzo-gebruikersnaam), en, als verzoeknummers aanstaan,
+**zijn openbare nummerlijst en de prijzen per nummer**. Dat is allemaal informatie die de artiest
 sowieso bewust aan fans publiceert.
 
 - **Bewaartermijn: een fooienpagina zonder account erachter wordt automatisch verwijderd na 90
@@ -177,27 +256,32 @@ sowieso bewust aan fans publiceert.
 
 ### Wat een fan verstuurt
 
-Het fooienformulier vraagt om een **bedrag**, en optioneel om een **naam** en een **bericht**. Dat is
-het hele formulier. Geen e-mail, geen telefoonnummer, geen account.
+Het fooienformulier vraagt om een **bedrag**, en optioneel om een **naam** en een **bericht** — en,
+voor een verzoeknummer, welk nummer. Dat is het hele formulier. Geen e-mail, geen telefoonnummer,
+geen account.
 
-- De fooi wordt weggeschreven naar een **afleverwachtrij** — één enkel document dat bestaat om aan
-  het scherm van de artiest te worden overhandigd. Zodra het scherm de fooi toont, **verwijdert het
-  apparaat van de artiest dat document.** Het verwijderen *is* de ontvangstbevestiging; er is geen
-  "afgeleverd"-vlaggetje, want er blijft geen registratie over om te vlaggen.
-- Als het scherm van de artiest offline is — telefoon vergrendeld, geen bereik — **wacht de fooi
-  maximaal één uur in die wachtrij**, zodat hij niet zomaar verloren gaat, en gaat hij eroverheen
-  op het moment dat het scherm weer verbinding maakt. Als niemand opnieuw verbinding maakt, wordt
-  hij **ongezien verwijderd**, volgens een vast schema opgeruimd, of iemand er nu ooit nog voor
-  terugkwam of niet.
-- **Die wachtrij is de enige plek waar door fans geschreven tekst ooit op onze server wordt
-  opgeslagen, en één uur is de harde grens.** Is de artiest ingelogd, dan bewaart zijn apparaat de
-  fooi vervolgens in *zijn* Firestore-geschiedenis — want dat is zijn geschiedenis, en daarvoor is
-  hij ingelogd.
+Waar die door de fan geschreven tekst heen gaat, en hoe lang, hangt ervan af of de artiest is
+ingelogd:
+
+- **Als er geen account achter de fooienpagina zit**, wordt de fooi weggeschreven naar een
+  **afleverwachtrij** — één enkel document dat bestaat om aan het scherm van de artiest te worden
+  overhandigd. Zodra het scherm de fooi toont, **verwijdert het apparaat van de artiest dat
+  document.** Het verwijderen *is* de ontvangstbevestiging. Is het scherm van de artiest offline —
+  telefoon vergrendeld, geen bereik — dan **wacht de fooi maximaal één uur in die wachtrij**, zodat
+  hij niet zomaar verloren gaat, en gaat hij eroverheen op het moment dat het scherm weer verbinding
+  maakt. Als niemand opnieuw verbinding maakt, wordt hij **ongezien verwijderd**, volgens een vast
+  schema opgeruimd. Voor een artiest zonder account is **die wachtrij de enige plek waar door fans
+  geschreven tekst ooit op onze server wordt opgeslagen, en één uur is de harde grens.**
+- **Hoort de fooienpagina bij een ingelogd account**, dan is er geen wachtrij. Onze server schrijft
+  de fooi **rechtstreeks weg in de eigen geschiedenis van die artiest** onder zijn uid — in de
+  sessie van vanavond als er een set loopt, of anders in het eigen archief van de band. Daar blijft
+  hij **zolang de band bestaat**; het is de eigen geschiedenis van de artiest, en het is waarvoor hij
+  is ingelogd. Dit is dezelfde geschiedenis waar de Stripe-webhook hierboven naartoe schrijft.
 - Je naam en bericht worden ook geplaatst in de **betaalomschrijving** die opent in Revolut,
   MobilePay of Monzo — zo weet de artiest wie er een fooi gaf. Die bedrijven
   verwerken het vervolgens onder hun eigen privacybeleid.
-- Het relay houdt **geen fooiengeschiedenis** bij. Het kan jou, ons of wie dan ook geen lijst tonen van
-  wie wie een fooi gaf.
+- Het relay houdt **geen fooienboek over artiesten heen** bij. Het kan jou, ons of wie dan ook geen
+  lijst tonen van wie aan wie een fooi gaf, over verschillende artiesten heen.
 
 ### IP-adressen en misbruikbestrijding
 
@@ -227,10 +311,12 @@ weten of het ding überhaupt wordt gebruikt. Het is een getal. Het bevat geen fa
 
 | Wie | Wat ze krijgen | Waarom |
 | --- | --- | --- |
-| **Google (Firebase)** | Accounts, de gesynchroniseerde gegevens van een ingelogde artiest, het relay, serverlogs | Het optionele account en het optionele relay |
-| **Stripe** | De betaalgegevens van de fan, als zelfstandige verwerkingsverantwoordelijke | Fooien met kaart |
+| **Google (Firebase)** | Accounts, de gesynchroniseerde gegevens van een ingelogde artiest, de versleutelde Stripe-sleutel, het relay, pushtokens en aflevering, serverlogs | Het optionele account, het optionele relay, en pushmeldingen |
+| **Google Cloud KMS** | De sleutel die het Stripe-geheim van een ingelogde artiest inpakt (nooit het geheim in leesbare vorm) | Het opgeslagen Stripe-geheim onleesbaar houden in rust |
+| **Stripe** | De betaalgegevens van de fan, als zelfstandige verwerkingsverantwoordelijke; en, voor een ingelogde artiest, fooigebeurtenissen die naar onze webhook worden gestuurd | Fooien met kaart |
 | **Cloudflare** | Het IP-adres van de fan, voor de Turnstile-controle op de fooienpagina. En onze DNS. | Bots weghouden bij het fooienformulier |
 | **GitHub** | Het IP-adres en de user-agent van iedereen die deze website laadt | Het hosten van de website |
+| **De pushdienst van je browser / telefoon** (bijv. die van Google voor Chrome) | Een pushtoken en de inhoud van de melding, als je meldingen hebt aangezet | Pushmeldingen afleveren |
 | **Revolut / MobilePay / Monzo** | Wat de fan ook doet in hun eigen app, betaalomschrijving inbegrepen | Die betaalmethoden |
 
 We verkopen niets aan niemand, en er staat verder niemand op die lijst.
@@ -238,9 +324,10 @@ We verkopen niets aan niemand, en er staat verder niemand op die lijst.
 ## Rechtsgrondslag, als je die nodig hebt (AVG)
 
 - Een account draaien waar je om hebt gevraagd, je eigen gegevens naar je eigen apparaten
-  synchroniseren, het relay draaien voor een artiest die het heeft aangezet, en de fooi van een fan
-  afleveren op het scherm waarvoor hij bedoeld was: **uitvoering van een dienst waar je om hebt
-  gevraagd**.
+  synchroniseren, je Stripe-sleutel bewaren zodat je fooien je geschiedenis bereiken, het relay
+  draaien voor een artiest die het heeft aangezet, de fooi van een fan afleveren op het scherm
+  waarvoor hij bedoeld was, en een push sturen die je hebt aangezet: **uitvoering van een dienst
+  waar je om hebt gevraagd**.
 - Rate limiting, Turnstile, quota op gehashte IP-adressen en het intrekken van apparaten:
   **gerechtvaardigd belang** om te voorkomen dat een gratis, open dienst wordt gesloopt door bots
   en fraude, en om de accounts van artiesten veilig te houden.
@@ -257,13 +344,16 @@ er vandaag bestaat — inclusief wat er niet bestaat.
   apparaat.
 - **Een fooienpagina**: verwijder of vernieuw hem in de app en hij wordt meteen van het relay
   geveegd, inclusief eventuele wachtende fooien.
+- **Pushmeldingen**: zet ze uit op een apparaat en het pushtoken ervan wordt verwijderd. De belfeed
+  wordt gewist met de band of het account.
 - **Een apparaat**: Instellingen → Beveiliging somt je apparaten op. Je kunt er een intrekken, of
   overal elders uitloggen — wat de sessie van elk ander apparaat onmiddellijk beëindigt, niet ooit
   een keer.
 - **Je hele account, met één tik: die knop heeft de app nog niet.** We geven dat liever toe dan te
   doen alsof. Tot hij er is, schrijf naar **[contact@live.tips](mailto:contact@live.tips)** en dan
   verwijderen we het account en alles eronder met de hand. Ondertussen kun je nu al elke band
-  verwijderen, wat alles van betekenis weghaalt en een leeg account achterlaat.
+  verwijderen, wat alles van betekenis weghaalt — inclusief de opgeslagen Stripe-sleutel — en een
+  leeg account achterlaat.
 
 ## Jouw rechten
 

@@ -1,8 +1,8 @@
 ---
 title: Termini di utilizzo
 description: live.tips è software libero e open source. Non siamo un fornitore di servizi di pagamento, non deteniamo mai il tuo denaro e non facciamo promesse su mance che non possiamo vedere. I dettagli, in parole semplici.
-updated: 2026-07-13
-updated_label: Ultimo aggiornamento 13 luglio 2026
+updated: 2026-07-15
+updated_label: Ultimo aggiornamento 15 luglio 2026
 ---
 
 Questi termini riguardano l'app live.tips, questo sito, l'**account** live.tips facoltativo e il
@@ -69,6 +69,11 @@ Se hai un account:
 - **Aggiungere un dispositivo richiede la tua conferma** su un dispositivo che ha già effettuato
   l'accesso. Non confermare un dispositivo che non hai richiesto, e non lasciare che qualcuno
   fotografi il QR code per poi toccare comunque «conferma».
+- **Le notifiche push sono facoltative.** Un account con accesso effettuato può attivare le
+  notifiche push, dispositivo per dispositivo, per essere avvisato delle mance e delle richieste
+  di brani che arrivano quando non è in corso alcun set. Sono disattivate finché non le attivi e
+  possono essere disattivate di nuovo in qualsiasi momento; un account ospite e un dispositivo
+  senza account non ne ricevono nessuna.
 - **Possiamo sospendere o cancellare un account** — vedi *Chiudere tutto*, qui sotto.
 
 ## Se sei un artista
@@ -84,10 +89,13 @@ Sei responsabile di:
   e qualsiasi altra norma locale.
 - **Ciò che pubblichi.** Il tuo nome d'arte e il tuo messaggio compaiono su una pagina delle mance
   pubblica; fa' in modo che siano leciti e tuoi.
-- **La tua chiave Stripe.** È una chiave con permessi limitati che hai creato tu stesso, e vive sul
-  tuo dispositivo — e, se effettui l'accesso, anche nell'archiviazione privata del tuo account,
-  così che gli altri tuoi dispositivi possano usarla. In ogni caso è tua: tratta il dispositivo
-  come tratteresti dei contanti, e revoca la chiave nella tua dashboard Stripe se ne perdi uno.
+- **La tua chiave Stripe.** È una chiave con permessi limitati che hai creato tu stesso. **Senza
+  account vive soltanto sul tuo dispositivo.** Se effettui l'accesso, si sposta sul nostro server,
+  cifrata così che nessuno — né un altro account, né noi in chiaro, e nemmeno tu — possa
+  rileggerla; da quel momento Stripe segnala le tue mance al nostro server e i tuoi altri
+  dispositivi usano la chiave soltanto tramite noi. In ogni caso è tua: tratta un dispositivo che
+  la contiene come tratteresti dei contanti, e revoca la chiave nella tua dashboard Stripe se ne
+  perdi uno. L'Informativa sulla privacy lo spiega nel dettaglio prima che tu acceda.
 - **Le tue band e i messaggi dei fan che mandi sullo schermo.** Un nome e un messaggio vengono
   mostrati a una sala piena di gente. Ciò che compare su quello schermo sta a te moderarlo.
 
@@ -99,6 +107,10 @@ Sei responsabile di:
   di pagamento che l'ha elaborato. Noi non ne abbiamo traccia e non abbiamo alcun potere su di esso.
 - Ti preghiamo di mantenere leciti e civili il nome e il messaggio che alleghi. Vengono mostrati su
   uno schermo, sul palco, davanti a una sala piena di gente.
+- **Una richiesta di brano è una mancia, non un ordine.** Se l'artista ha attivato le richieste di
+  brani, puoi lasciare una mancia per un brano — ma il denaro è una mancia volontaria come
+  qualsiasi altra, e pagare, o pagare di più, **non garantisce** che il brano venga suonato. Quella
+  è una scelta dell'artista.
 
 ## Mance non verificate — leggi questa parte
 
@@ -118,10 +130,13 @@ live.tips può davvero confermare, ed è per questo che Stripe è il metodo cons
 Le pagine delle mance vivono su `tip.live.tips`, servite da un piccolo relay che gestiamo su
 Firebase. È offerto **gratuitamente, per cortesia, senza garanzie di alcun tipo**. Funziona secondo
 il principio del massimo impegno: può essere soggetto a limiti di frequenza, può non essere
-disponibile, le mance possono subire ritardi o andare perse, e non memorizza deliberatamente nulla
-che consenta a chiunque di recuperarle in seguito — una mancia consegnata viene cancellata
-nell'istante stesso in cui lo schermo dell'artista la mostra, e una non consegnata viene cancellata
-dopo un'ora.
+disponibile, le mance possono subire ritardi o andare perse. Per quanto tempo una mancia venga
+conservata dipende dal fatto che l'artista abbia effettuato l'accesso: per una **pagina delle mance
+senza un account dietro**, il relay non conserva deliberatamente nulla che consenta a chiunque di
+recuperare una mancia in seguito — una consegnata viene cancellata nell'istante stesso in cui lo
+schermo dell'artista la mostra, e una non consegnata viene cancellata entro un'ora. Per un **account
+con accesso effettuato**, la mancia viene scritta nello storico di quell'artista e conservata quanto
+la band. L'Informativa sulla privacy illustra per intero entrambi i casi.
 
 - Una pagina delle mance **senza un account dietro viene cancellata dopo 90 giorni di inattività**.
 - Possiamo **limitare la frequenza, bloccare o cancellare qualsiasi pagina delle mance**, in

@@ -1,8 +1,8 @@
 ---
 title: Brugsvilkår
 description: live.tips er gratis open source-software. Vi er ikke en betalingsudbyder, vi holder aldrig dine penge, og vi lover intet om drikkepenge, vi ikke kan se. Detaljerne, i almindelige ord.
-updated: 2026-07-13
-updated_label: Sidst opdateret 13. juli 2026
+updated: 2026-07-15
+updated_label: Sidst opdateret 15. juli 2026
 ---
 
 Disse vilkår dækker live.tips-appen, dette website, den valgfrie live.tips-**konto** og det
@@ -69,6 +69,10 @@ Har du en konto:
 - **At tilføje en enhed kræver din bekræftelse** på en enhed, der allerede er logget ind.
   Bekræft ikke en enhed, du ikke selv har bedt om, og lad ikke nogen fotografere QR-koden for
   så alligevel at trykke bekræft.
+- **Push-notifikationer er valgfrie.** En konto, man er logget ind på, kan slå
+  push-notifikationer til, pr. enhed, for at høre om drikkepenge og sangønsker, der ankommer,
+  mens intet sæt kører. De er slået fra, indtil du slår dem til, og kan slås fra igen når som
+  helst; en gæstekonto og en enhed uden konto får ingen.
 - **Vi kan suspendere eller slette en konto** — se *At sætte punktum* nedenfor.
 
 ## Hvis du er kunstner
@@ -85,10 +89,13 @@ Du er ansvarlig for:
   alt andet lokalt.
 - **Det, du offentliggør.** Dit kunstnernavn og din hilsen vises på en offentlig
   drikkepengeside; hold dem lovlige og dine egne.
-- **Din Stripe-nøgle.** Det er en begrænset nøgle, du selv har oprettet, og den bor på din
-  enhed — og, hvis du logger ind, også i din kontos private lagring, så dine andre enheder
-  kan bruge den. Uanset hvad er den din: behandl enheden, som du ville behandle kontanter, og
-  tilbagekald nøglen i dit Stripe-dashboard, hvis en enhed forsvinder.
+- **Din Stripe-nøgle.** Det er en begrænset nøgle, du selv har oprettet. **Uden en konto bor
+  den kun på din enhed.** Logger du ind, flytter den til vores server, krypteret, så ingen —
+  ikke en anden konto, ikke os for åbent skue, og ikke engang dig — kan læse den tilbage; fra
+  da af rapporterer Stripe dine drikkepenge til vores server, og dine andre enheder bruger
+  nøglen kun gennem os. Uanset hvad er den din: behandl en enhed, der holder den, som du ville
+  behandle kontanter, og tilbagekald nøglen i dit Stripe-dashboard, hvis en forsvinder.
+  Privatlivspolitikken redegør for dette, før du logger ind.
 - **Dine bands og de fan-hilsner, du sætter på skærmen.** Et navn og en hilsen vises for et
   lokale fuldt af mennesker. Hvad der kommer op på den skærm, er dit at moderere.
 
@@ -101,6 +108,10 @@ Du er ansvarlig for:
   den.
 - Hold venligst det navn og den hilsen, du vedhæfter, lovlig og anstændig. De vises på en
   skærm, på en scene, foran et lokale fuldt af mennesker.
+- **Et sangønske er drikkepenge, ikke en ordre.** Har kunstneren slået sangønsker til, kan
+  du give drikkepenge til en sang — men pengene er frivillige drikkepenge som alle andre, og
+  at betale, eller at betale mest, **garanterer ikke**, at sangen bliver spillet. Det er
+  kunstnerens afgørelse.
 
 ## Uverificerede drikkepenge — læs lige den her
 
@@ -120,10 +131,13 @@ live.tips rent faktisk kan bekræfte, og det er derfor, Stripe er den anbefalede
 
 Drikkepengesider bor på `tip.live.tips` og serveres af et lille relæ, vi driver på Firebase.
 Det tilbydes **gratis, som en venlig gestus, uden nogen form for garanti**. Det er
-best effort: det kan blive rate-limitet, det kan være utilgængeligt, drikkepenge kan blive
-forsinket eller gå tabt, og det gemmer med vilje intet, der ville lade nogen genskabe dem
-bagefter — leverede drikkepenge slettes i det øjeblik, kunstnerens skærm viser dem, og
-ikke-leverede slettes efter en time.
+best effort: det kan blive rate-limitet, det kan være utilgængeligt, og drikkepenge kan blive
+forsinket eller gå tabt. Hvor længe drikkepenge gemmes, afhænger af, om kunstneren er logget
+ind: for en **drikkepengeside uden en konto bag sig** gemmer relæet med vilje intet, der ville
+lade nogen genskabe drikkepenge bagefter — leverede drikkepenge slettes i det øjeblik,
+kunstnerens skærm viser dem, og ikke-leverede fejes væk inden for en time. For en **konto, man
+er logget ind på**, skrives drikkepengene ind i den kunstners egen historik og gemmes, så
+længe bandet består. Privatlivspolitikken redegør for begge tilfælde i sin helhed.
 
 - En drikkepengeside **uden en konto bag sig slettes efter 90 dages inaktivitet**.
 - Vi kan **rate-limite, blokere eller slette enhver drikkepengeside**, når som helst, uden
@@ -208,3 +222,4 @@ accepterer den.
 Disse vilkår udgives på alle de sprog, siden understøtter, som en service. Hvis en
 oversættelse og den engelske version er uenige, er **det den engelske version, der
 gælder**.
+</content>

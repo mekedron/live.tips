@@ -24,6 +24,7 @@ We will confirm receipt, tell you whether we can reproduce it, and keep you post
 ## What is in scope
 
 - The Cloud Functions behind `tip.live.tips` and `auth.live.tips` (`firebase/functions/`)
+- The server-side Stripe key custody — KMS envelope encryption and the `stripeConnections/*` store — and the Stripe webhook that ingests tips for signed-in accounts
 - Firestore security rules (`firebase/firestore.rules`)
 - The Flutter app's handling of Stripe keys, device identity, and account data (`app/lib/data/`, `app/lib/state/`)
 - The device-linking and venue sign-in ceremonies

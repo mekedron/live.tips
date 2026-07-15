@@ -36,12 +36,13 @@ at once — see [Accounts](#accounts-optional) below.
 - The app creates a **Product + pay-what-you-want Price + Payment Link** in the
   artist's account. The Payment Link URL becomes their QR code — print it, tape it to
   the guitar case, put it on the merch table.
-- During a **live session**, the app polls Stripe's
-  [`/v1/events`](https://docs.stripe.com/api/events) endpoint and shows each new
-  tip in real time against tonight's goal, which can be edited mid-set.
-  Stripe recommends webhooks; a tablet on a stage has no public HTTPS endpoint to
-  receive one, so this polls a documented endpoint instead — a deliberate trade-off,
-  not a blessed path. See [architecture notes](docs/architecture.md).
+- During a **live session**, tips show in real time against tonight's goal, which can be
+  edited mid-set. **With no account**, the app polls Stripe's
+  [`/v1/events`](https://docs.stripe.com/api/events) endpoint directly from the device —
+  a tablet on a stage has no public HTTPS endpoint to receive a webhook, so this polls a
+  documented endpoint instead. **Once the artist signs in**, the key lives on the server,
+  so Stripe delivers tips to a server **webhook** instead and the app stops polling. See
+  [architecture notes](docs/architecture.md).
 - **Stage lock** blocks the screen from casual tampering while the device sits on
   stage; unlocking uses Face ID / Touch ID / device passcode, with an in-app PIN as
   fallback.
@@ -89,19 +90,26 @@ An artist who wants a second device can sign in with **Apple**, **Google**, or a
 lost). An account owns the artist's **bands** — the per-gig profiles, each with its own
 Stripe key, tip jar and QR code.
 
-- **What syncs:** bands, the Stripe restricted key and relay jar secret (kept in each
-  device's keychain, mirrored through an owner-only Firestore doc), settings, and tip +
-  session history.
+- **What syncs:** bands, settings, and tip + session history. The **Stripe restricted
+  key** moves to the server on sign-in — envelope-encrypted (a per-secret AES-256 key
+  wrapped by Cloud KMS) in a `stripeConnections/*` doc readable by **no principal at all,
+  the owner included** — and Stripe delivers tips to a per-account webhook from then on.
+  The relay jar secret is kept under the account (hashed) so any device can serve the tip
+  page. The key never rides back down to a device.
 - **One live session per account**, enforced by a single Firestore doc rather than by
-  policy. The device that starts it polls Stripe; every other device joins from a
-  "Live session running in <band>" banner and follows the same tip feed.
+  policy. Every device joins from a "Live session running in <band>" banner and follows
+  the same tip feed — fed by the server webhook (or, for a no-account jar, by the
+  polling device).
 - **Devices** are listed in Settings → Security: revoke one, or sign out everywhere
   else. A new device is added by scanning a QR — and the signed-in device has to
   confirm the request before anything is issued.
+- **Push notifications** are available to signed-in accounts, per device and off until
+  turned on: a tip or song request that lands while no set is running is delivered via
+  Firebase Cloud Messaging. Guests and no-account devices get none.
 - **The trade-off, stated plainly:** a signed-in account's tips (names and messages
-  included) are stored in Firestore under the artist's own uid, where no other account
-  can read them. The local profile stores them nowhere but the device. Syncing is
-  opt-in for exactly that reason.
+  included) are written by the server into Firestore under the artist's own uid, where no
+  other account can read them, and kept as long as the band. The local profile stores them
+  nowhere but the device. Syncing is opt-in for exactly that reason.
 
 See [architecture notes](docs/architecture.md) for how any of this holds together.
 
@@ -131,8 +139,11 @@ tips — useful for UI work and for trying the app before connecting Stripe.
 
 ## Security model
 
-- **Bring your own key, keep your own key.** The restricted key never leaves the
-  device (keychain/keystore) and is only sent to `api.stripe.com` over TLS.
+- **Bring your own key.** With no account the restricted key never leaves the device
+  (keychain/keystore) and is only sent to `api.stripe.com` over TLS. When the artist
+  signs in it moves to the server, envelope-encrypted under Cloud KMS and readable by no
+  one — not another account, not the owner — and Stripe reaches it only through the
+  server, never a device.
 - **Least privilege.** The key needs only: Checkout Sessions *Read*, Events *Read*,
   Charges *Read* (to see in-person taps), Payment Links *Write*, Products *Write*,
   Prices *Write*. It cannot touch balances, payouts, refunds, or customer data

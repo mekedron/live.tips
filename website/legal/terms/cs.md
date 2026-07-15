@@ -1,8 +1,8 @@
 ---
 title: Podmínky použití
 description: live.tips je svobodný, open-source software. Nejsme poskytovatel platebních služeb, nikdy nedržíme vaše peníze a nedáváme sliby o spropitném, které nevidíme. Podrobnosti, srozumitelně.
-updated: 2026-07-13
-updated_label: Naposledy aktualizováno 13. července 2026
+updated: 2026-07-15
+updated_label: Naposledy aktualizováno 15. července 2026
 ---
 
 Tyto podmínky se vztahují na aplikaci live.tips, na tento web, na volitelný **účet**
@@ -69,6 +69,10 @@ Pokud máte účet:
 - **Přidání zařízení vyžaduje vaše potvrzení** na zařízení, které už je přihlášené.
   Nepotvrzujte zařízení, o které jste nežádali, a nenechte si někoho vyfotit QR kód, abyste
   pak potvrzení stejně klepli.
+- **Push notifikace jsou volitelné.** Přihlášený účet si může zapnout push notifikace, na
+  každém zařízení zvlášť, aby se dozvěděl o spropitném a žádostech o písničky, které dorazí,
+  když neběží žádný set. Jsou vypnuté, dokud si je nezapnete, a kdykoli je lze zase vypnout;
+  účet hosta a zařízení bez účtu žádné nedostanou.
 - **Účet můžeme pozastavit nebo smazat** — viz *Konec*, níže.
 
 ## Pokud jste umělec
@@ -84,10 +88,13 @@ Odpovídáte za:
   a cokoli dalšího místního.
 - **To, co zveřejňujete.** Vaše umělecké jméno a vzkaz se objeví na veřejné stránce pro
   spropitné; držte je v mezích zákona a ať jsou vaše vlastní.
-- **Svůj klíč ke Stripe.** Je to omezený klíč, který jste si vytvořili sami, a žije na
-  vašem zařízení — a pokud se přihlásíte, i v soukromém úložišti vašeho účtu, aby ho mohla
-  používat vaše další zařízení. Tak či tak je váš: zacházejte s tím zařízením jako s
-  hotovostí a když se některé ztratí, klíč ve svém dashboardu Stripe zrušte.
+- **Svůj klíč ke Stripe.** Je to omezený klíč, který jste si vytvořili sami. **Bez účtu
+  žije jen na vašem zařízení.** Pokud se přihlásíte, přesune se na náš server, zašifrovaný
+  tak, že ho **nikdo — žádný jiný účet, ani my při pohledu do databáze, ani vy sami —
+  nepřečte zpět**; od té chvíle Stripe hlásí vaše spropitné na náš server a vaše další
+  zařízení klíč používají jen přes nás. Tak či tak je váš: se zařízením, které ho drží,
+  zacházejte jako s hotovostí a když se některé ztratí, klíč ve svém dashboardu Stripe
+  zrušte. Zásady ochrany osobních údajů to před přihlášením rozvádějí.
 - **Své kapely a vzkazy fanoušků, které pustíte na obrazovku.** Jméno a vzkaz se ukazují
   sálu plnému lidí. Co se na té obrazovce objeví, je na vás moderovat.
 
@@ -100,6 +107,10 @@ Odpovídáte za:
   žádnou moc.
 - Prosíme, ať jsou jméno a vzkaz, které připojíte, v mezích zákona a slušné. Zobrazují se
   na obrazovce, na pódiu, před sálem plným lidí.
+- **Žádost o písničku je spropitné, ne objednávka.** Pokud umělec zapnul žádosti o
+  písničky, můžete přihodit na písničku — ale ty peníze jsou dobrovolné spropitné jako každé
+  jiné a zaplacení, nebo zaplacení nejvíc, **nezaručuje**, že se písnička zahraje. To je na
+  umělci.
 
 ## Neověřené spropitné — tohle si přečtěte
 
@@ -118,10 +129,13 @@ které live.tips umí skutečně potvrdit, a proto je Stripe doporučovanou meto
 
 Stránky pro spropitné žijí na `tip.live.tips` a servíruje je malé relé, které provozujeme
 na Firebase. Je nabízeno **zdarma, jako laskavost, bez jakékoli záruky**. Funguje v režimu
-nejlepší snahy: může být omezováno co do četnosti požadavků, může být nedostupné,
-spropitné se může opozdit nebo ztratit a záměrně neuchovává nic, co by komukoli umožnilo
-ho poté obnovit — doručené spropitné se maže v okamžiku, kdy ho umělcova obrazovka zobrazí,
-a nedoručené se maže po hodině.
+nejlepší snahy: může být omezováno co do četnosti požadavků, může být nedostupné a
+spropitné se může opozdit nebo ztratit. Jak dlouho se spropitné uchovává, závisí na tom,
+jestli je umělec přihlášený: u **stránky pro spropitné, za kterou nestojí žádný účet**, relé
+záměrně neuchovává nic, co by komukoli umožnilo spropitné poté obnovit — doručené se maže v
+okamžiku, kdy ho umělcova obrazovka zobrazí, a nedoručené se do hodiny smete. U
+**přihlášeného účtu** se spropitné zapíše do umělcovy vlastní historie a uchovává se tak
+dlouho jako kapela. Zásady ochrany osobních údajů oba případy rozvádějí v plném znění.
 
 - Stránka pro spropitné, za kterou **nestojí žádný účet, se maže po 90 dnech nečinnosti**.
 - Můžeme **omezit četnost požadavků, zablokovat nebo smazat jakoukoli stránku pro

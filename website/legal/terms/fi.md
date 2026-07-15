@@ -1,8 +1,8 @@
 ---
 title: Käyttöehdot
 description: live.tips on ilmaista, avoimen lähdekoodin ohjelmistoa. Emme ole maksupalvelu, emme koskaan pidä hallussamme rahojasi, emmekä lupaa mitään tipeistä, joita emme voi nähdä. Yksityiskohdat, selkokielellä.
-updated: 2026-07-13
-updated_label: Päivitetty viimeksi 13. heinäkuuta 2026
+updated: 2026-07-15
+updated_label: Päivitetty viimeksi 15. heinäkuuta 2026
 ---
 
 Nämä ehdot koskevat live.tips-sovellusta, tätä sivustoa, valinnaista live.tips-**tiliä** ja
@@ -71,6 +71,10 @@ Jos sinulla on tili:
 - **Laitteen lisääminen vaatii vahvistuksesi** laitteella, joka on jo kirjautuneena. Älä
   vahvista laitetta, jota et pyytänyt, äläkä anna kenenkään valokuvata QR-koodia ja napauta
   sitten silti vahvistusta.
+- **Push-ilmoitukset ovat valinnaisia.** Kirjautunut tili voi kytkeä päälle push-ilmoitukset
+  laitekohtaisesti kuullakseen tipeistä ja biisitoiveista, jotka saapuvat, kun mikään setti ei
+  ole käynnissä. Ne ovat pois päältä, kunnes kytket ne, ja ne voi kytkeä pois milloin tahansa;
+  vierastili ja tilitön laite eivät saa niitä.
 - **Voimme keskeyttää tai poistaa tilin** — katso *Lopettaminen* alta.
 
 ## Jos olet artisti
@@ -86,10 +90,13 @@ Olet vastuussa seuraavista:
   paikallinen.
 - **Se, mitä julkaiset.** Artistinimesi ja viestisi näkyvät julkisella tippisivulla; pidä ne
   laillisina ja ominasi.
-- **Stripe-avaimesi.** Se on rajoitettu avain, jonka loit itse, ja se sijaitsee laitteellasi —
-  ja, jos kirjaudut sisään, myös tilisi yksityisessä tallennustilassa, jotta muut laitteesi
-  voivat käyttää sitä. Kummassakin tapauksessa se on sinun: kohtele laitetta kuin kohtelisit
-  käteistä, ja peru avain Stripe-hallintapaneelissasi, jos jokin laite katoaa.
+- **Stripe-avaimesi.** Se on rajoitettu avain, jonka loit itse. **Ilman tiliä se sijaitsee vain
+  laitteellasi.** Jos kirjaudut sisään, se siirtyy palvelimellemme salattuna niin, ettei kukaan —
+  ei toinen tili, emme me paljain silmin emmekä edes sinä — voi lukea sitä takaisin; siitä
+  eteenpäin Stripe raportoi tippisi palvelimellemme ja muut laitteesi käyttävät avainta vain
+  meidän kauttamme. Kummassakin tapauksessa se on sinun: kohtele laitetta, jolla se on, kuin
+  kohtelisit käteistä, ja peru avain Stripe-hallintapaneelissasi, jos jokin laite katoaa.
+  Tietosuojaseloste avaa tämän ennen kuin kirjaudut sisään.
 - **Bändisi ja ne fanien viestit, jotka laitat näytölle.** Nimi ja viesti näytetään täydelle
   salilliselle ihmisiä. Se, mitä tuolla näytöllä näkyy, on sinun moderoitavanasi.
 
@@ -102,6 +109,9 @@ Olet vastuussa seuraavista:
   siihen.
 - Pidäthän liittämäsi nimen ja viestin laillisina ja asiallisina. Ne näytetään näytöllä,
   lavalla, täyden salin edessä.
+- **Biisitoive on tippi, ei tilaus.** Jos artisti on kytkenyt biisitoiveet päälle, voit tipata
+  biisin puolesta — mutta raha on vapaaehtoinen tippi kuten mikä tahansa muu, eikä maksaminen,
+  tai eniten maksaminen, **takaa**, että biisi soitetaan. Se on artistin päätös.
 
 ## Vahvistamattomat tipit — lue tämä
 
@@ -122,9 +132,13 @@ live.tips voi oikeasti vahvistaa, ja siksi Stripe on suositeltu tapa.
 Tippisivut sijaitsevat osoitteessa `tip.live.tips`, ja niitä tarjoilee pieni välitin, jota
 ylläpidämme Firebasessa. Se tarjotaan **maksutta, vastaantulona, ilman minkäänlaista takuuta**.
 Se toimii parhaan yrityksen periaatteella: sitä voidaan rajoittaa, se voi olla poissa käytöstä,
-tipit voivat viivästyä tai kadota, eikä se tarkoituksella säilytä mitään, minkä avulla kukaan
-voisi jälkikäteen palauttaa ne — toimitettu tippi poistetaan sillä hetkellä, kun artistin näyttö
-näyttää sen, ja toimittamatta jäänyt poistetaan tunnin kuluttua.
+ja tipit voivat viivästyä tai kadota. Se, kuinka kauan tippi säilytetään, riippuu siitä, onko
+artisti kirjautunut sisään: **tippisivun, jonka takana ei ole tiliä**, kohdalla välitin ei
+tarkoituksella säilytä mitään, minkä avulla kukaan voisi jälkikäteen palauttaa tipin —
+toimitettu poistetaan sillä hetkellä, kun artistin näyttö näyttää sen, ja toimittamatta jäänyt
+pyyhitään tunnin sisällä. **Kirjautuneen tilin** kohdalla tippi kirjoitetaan kyseisen artistin
+omaan historiaan ja säilytetään niin kauan kuin bändikin. Tietosuojaseloste kuvaa molemmat
+tapaukset kokonaisuudessaan.
 
 - Tippisivu, jonka **takana ei ole tiliä, poistetaan 90 päivän käyttämättömyyden jälkeen**.
 - Voimme **rajoittaa, estää tai poistaa minkä tahansa tippisivun**, milloin tahansa, ilman

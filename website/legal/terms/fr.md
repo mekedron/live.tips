@@ -1,8 +1,8 @@
 ---
 title: Conditions d’utilisation
 description: live.tips est un logiciel libre et open source. Nous ne sommes pas un prestataire de paiement, nous ne détenons jamais votre argent, et nous ne promettons rien sur des pourboires que nous ne pouvons pas voir. Les détails, en mots simples.
-updated: 2026-07-13
-updated_label: Dernière mise à jour le 13 juillet 2026
+updated: 2026-07-15
+updated_label: Dernière mise à jour le 15 juillet 2026
 ---
 
 Ces conditions couvrent l’app live.tips, ce site, le **compte** live.tips facultatif et le
@@ -75,6 +75,11 @@ Si vous avez un compte :
 - **Ajouter un appareil nécessite votre confirmation** sur un appareil déjà connecté. Ne
   confirmez pas un appareil que vous n’avez pas demandé, et ne laissez pas quelqu’un
   photographier le QR code pour ensuite appuyer quand même sur confirmer.
+- **Les notifications push sont facultatives.** Un compte connecté peut activer les
+  notifications push, par appareil, pour être au courant des pourboires et des demandes de
+  chansons qui arrivent alors qu’aucun set n’est en cours. Elles sont désactivées tant que
+  vous ne les activez pas et peuvent être désactivées de nouveau à tout moment ; un compte
+  invité et un appareil sans compte n’en reçoivent aucune.
 - **Nous pouvons suspendre ou supprimer un compte** — voir *Mettre fin à tout ça*,
   ci-dessous.
 
@@ -92,11 +97,15 @@ Vous êtes responsable de :
   salles, et tout ce qui relève du local.
 - **Ce que vous publiez.** Votre nom d’artiste et votre message apparaissent sur une page
   de pourboires publique ; qu’ils restent licites et bien les vôtres.
-- **Votre clé Stripe.** C’est une clé restreinte que vous avez créée vous-même, et elle vit
-  sur votre appareil — et, si vous vous connectez, dans le stockage privé de votre compte
-  également, pour que vos autres appareils puissent l’utiliser. Dans les deux cas, elle est
-  à vous : traitez l’appareil comme vous traiteriez de l’argent liquide, et révoquez la clé
-  dans votre tableau de bord Stripe si l’un d’eux venait à disparaître.
+- **Votre clé Stripe.** C’est une clé restreinte que vous avez créée vous-même. **Sans
+  compte, elle ne vit que sur votre appareil.** Si vous vous connectez, elle passe sur
+  notre serveur, chiffrée de sorte que personne — ni un autre compte, ni nous à découvert,
+  ni même vous — ne puisse la relire ; à partir de là, Stripe rapporte vos pourboires à
+  notre serveur et vos autres appareils n’utilisent la clé qu’à travers nous. Dans les
+  deux cas, elle est à vous : traitez un appareil qui la détient comme vous traiteriez de
+  l’argent liquide, et révoquez la clé dans votre tableau de bord Stripe si l’un d’eux
+  venait à disparaître. La politique de confidentialité détaille tout cela avant que vous
+  ne vous connectiez.
 - **Vos groupes, et les messages de fans que vous affichez à l’écran.** Un nom et un
   message sont montrés à une salle pleine de monde. Ce qui apparaît sur cet écran, c’est à
   vous de le modérer.
@@ -111,6 +120,10 @@ Vous êtes responsable de :
   dessus.
 - Merci de garder le nom et le message que vous joignez licites et corrects. Ils sont
   affichés sur un écran, sur scène, devant une salle pleine de monde.
+- **Une demande de chanson est un pourboire, pas une commande.** Si l’artiste a activé les
+  demandes de chansons, vous pouvez laisser un pourboire en faveur d’une chanson — mais
+  l’argent est un pourboire volontaire comme un autre, et payer, ou payer le plus, **ne
+  garantit pas** que la chanson soit jouée. C’est à l’artiste d’en décider.
 
 ## Pourboires non vérifiés — lisez celui-ci
 
@@ -132,10 +145,14 @@ pourquoi Stripe est le moyen recommandé.
 Les pages de pourboires vivent sur `tip.live.tips`, servies par un petit relais que nous
 exploitons sur Firebase. Il est proposé **gratuitement, à titre de courtoisie, sans
 garantie d’aucune sorte**. Il fonctionne au mieux : il peut limiter le débit, il peut être
-indisponible, des pourboires peuvent être retardés ou perdus, et il ne conserve
-délibérément rien qui permettrait à quiconque de les récupérer ensuite — un pourboire
-livré est supprimé à l’instant où l’écran de l’artiste l’affiche, et un pourboire non
-livré est supprimé au bout d’une heure.
+indisponible, et des pourboires peuvent être retardés ou perdus. La durée de conservation
+d’un pourboire dépend de si l’artiste est connecté : pour une **page de pourboires sans
+compte derrière elle**, le relais ne conserve délibérément rien qui permettrait à
+quiconque de récupérer un pourboire ensuite — un pourboire livré est supprimé à l’instant
+où l’écran de l’artiste l’affiche, et un pourboire non livré est balayé dans l’heure. Pour
+un **compte connecté**, le pourboire est écrit dans l’historique propre à cet artiste et
+conservé aussi longtemps que le groupe. La politique de confidentialité expose les deux
+cas en entier.
 
 - Une page de pourboires **sans compte derrière elle est supprimée après 90 jours
   d’inactivité**.

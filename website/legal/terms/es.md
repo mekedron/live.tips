@@ -1,8 +1,8 @@
 ---
 title: Condiciones de uso
 description: live.tips es software libre y de código abierto. No somos un proveedor de pagos, nunca retenemos tu dinero y no hacemos promesas sobre propinas que no podemos ver. Los detalles, en lenguaje claro.
-updated: 2026-07-13
-updated_label: Última actualización 13 de julio de 2026
+updated: 2026-07-15
+updated_label: Última actualización 15 de julio de 2026
 ---
 
 Estas condiciones cubren la app de live.tips, este sitio web, la **cuenta** opcional de
@@ -69,6 +69,11 @@ Si tienes una cuenta:
 - **Añadir un dispositivo requiere tu confirmación** en un dispositivo que ya tenga la sesión
   iniciada. No confirmes un dispositivo que no has pedido, y no dejes que alguien fotografíe el
   código QR y luego toques confirmar de todos modos.
+- **Las notificaciones push son opcionales.** Una cuenta con sesión iniciada puede activar las
+  notificaciones push, por dispositivo, para enterarse de las propinas y las peticiones de
+  canciones que llegan mientras no hay ninguna sesión en marcha. Están apagadas hasta que las
+  activas y pueden volver a apagarse en cualquier momento; una cuenta de invitado y un
+  dispositivo sin cuenta no reciben ninguna.
 - **Podemos suspender o borrar una cuenta** — véase *Poner fin a esto*, más abajo.
 
 ## Si eres artista
@@ -83,10 +88,13 @@ Eres responsable de:
 - **La ley del lugar donde actúas** — permisos de música callejera, normas del local y cualquier otra cosa local.
 - **Lo que publicas.** Tu nombre artístico y tu mensaje aparecen en una página de propinas
   pública; mantenlos lícitos y propios.
-- **Tu clave de Stripe.** Es una clave restringida que creaste tú mismo, y vive en tu
-  dispositivo — y, si inicias sesión, también en el almacenamiento privado de tu cuenta, para
-  que tus otros dispositivos puedan usarla. En cualquier caso es tuya: trata el dispositivo
-  como tratarías el efectivo, y revoca la clave en tu panel de Stripe si pierdes alguno.
+- **Tu clave de Stripe.** Es una clave restringida que creaste tú mismo. **Sin cuenta vive solo
+  en tu dispositivo.** Si inicias sesión, se traslada a nuestro servidor, cifrada de modo que
+  nadie — ni otra cuenta, ni nosotros a la vista, ni siquiera tú — pueda volver a leerla; a
+  partir de entonces Stripe informa de tus propinas a nuestro servidor y tus otros dispositivos
+  usan la clave solo a través de nosotros. En cualquier caso es tuya: trata un dispositivo que
+  la contenga como tratarías el efectivo, y revoca la clave en tu panel de Stripe si pierdes
+  alguno. La Política de privacidad lo detalla antes de que inicies sesión.
 - **Tus bandas, y los mensajes de fans que pones en pantalla.** Un nombre y un mensaje se
   muestran a una sala llena de gente. Lo que aparece en esa pantalla es tuyo, y tuya es la
   moderación.
@@ -99,6 +107,10 @@ Eres responsable de:
   proveedor de pagos que lo procesó. Nosotros no tenemos registro de ello ni poder sobre ello.
 - Por favor, mantén lícitos y civilizados el nombre y el mensaje que adjuntes. Se muestran en una
   pantalla, en el escenario, delante de una sala llena de gente.
+- **Una petición de canción es una propina, no un pedido.** Si el artista ha activado las
+  peticiones de canciones, puedes dejar propina por una canción — pero el dinero es una propina
+  voluntaria como cualquier otra, y pagar, o pagar más que nadie, **no garantiza** que la
+  canción se toque. Eso lo decide el artista.
 
 ## Propinas no verificadas — lee esta parte
 
@@ -117,10 +129,14 @@ confirmar de verdad, y por eso Stripe es el método recomendado.
 
 Las páginas de propinas viven en `tip.live.tips`, servidas por un pequeño relé que ejecutamos en
 Firebase. Se ofrece **de forma gratuita, como cortesía, sin garantía de ningún tipo**. Funciona
-en régimen de mejor esfuerzo: puede estar limitado en frecuencia, puede no estar disponible, las
-propinas pueden retrasarse o perderse, y deliberadamente no guarda nada que permita a nadie
-recuperarlas después — una propina entregada se borra en el instante en que la pantalla del
-artista la muestra, y una no entregada se borra al cabo de una hora.
+en régimen de mejor esfuerzo: puede estar limitado en frecuencia, puede no estar disponible, y
+las propinas pueden retrasarse o perderse. Cuánto tiempo se conserva una propina depende de si
+el artista ha iniciado sesión: para una **página de propinas sin ninguna cuenta detrás**, el
+relé deliberadamente no guarda nada que permita a nadie recuperar una propina después — una
+entregada se borra en el instante en que la pantalla del artista la muestra, y una no entregada
+se barre al cabo de una hora. Para una **cuenta con sesión iniciada**, la propina se escribe en
+el propio historial de ese artista y se conserva mientras exista la banda. La Política de
+privacidad expone ambos casos por completo.
 
 - Una página de propinas **sin ninguna cuenta detrás se borra tras 90 días de inactividad**.
 - Podemos **limitar la frecuencia, bloquear o borrar cualquier página de propinas**, en cualquier momento y sin previo aviso — en
@@ -203,3 +219,4 @@ servicio después de un cambio significa que lo aceptas.
 
 Estas condiciones se publican en todos los idiomas que admite el sitio, por comodidad. Si una
 traducción y la versión en inglés no coinciden, **la versión en inglés es la que cuenta**.
+</content>

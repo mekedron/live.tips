@@ -1,8 +1,8 @@
 ---
 title: Warunki korzystania
 description: live.tips to darmowe oprogramowanie open source. Nie jesteśmy dostawcą płatności, nigdy nie przechowujemy Twoich pieniędzy i nie składamy obietnic co do napiwków, których nie widzimy. Szczegóły, prostymi słowami.
-updated: 2026-07-13
-updated_label: Ostatnia aktualizacja 13 lipca 2026
+updated: 2026-07-15
+updated_label: Ostatnia aktualizacja 15 lipca 2026
 ---
 
 Niniejsze warunki obejmują aplikację live.tips, tę stronę, opcjonalne **konto** live.tips
@@ -69,6 +69,11 @@ Jeśli masz konto:
 - **Dodanie urządzenia wymaga Twojego potwierdzenia** na urządzeniu, które jest już
   zalogowane. Nie potwierdzaj urządzenia, o które nie prosiłeś, i nie pozwól, żeby ktoś
   sfotografował kod QR, a Ty i tak nacisnąłeś „potwierdź”.
+- **Powiadomienia push są opcjonalne.** Zalogowane konto może włączyć powiadomienia
+  push, osobno na każdym urządzeniu, żeby dowiadywać się o napiwkach i prośbach o
+  piosenki, które przychodzą, gdy nie trwa żaden koncert. Są wyłączone, dopóki ich nie
+  włączysz, i można je znów wyłączyć w dowolnym momencie; konto gościa i urządzenie bez
+  konta nie dostają żadnych.
 - **Możemy zawiesić lub usunąć konto** — patrz *Zakończenie*, poniżej.
 
 ## Jeśli jesteś artystą
@@ -84,11 +89,14 @@ Odpowiadasz za:
   wszystko inne, co lokalne.
 - **To, co publikujesz.** Twoja nazwa artystyczna i wiadomość pojawiają się na publicznej
   stronie napiwków; niech będą zgodne z prawem i będą Twoje własne.
-- **Swój klucz Stripe.** To ograniczony klucz, który sam utworzyłeś, i mieszka on na Twoim
-  urządzeniu — a jeśli się zalogujesz, także w prywatnej pamięci Twojego konta, żeby mogły z
-  niego korzystać Twoje pozostałe urządzenia. Tak czy inaczej jest Twój: traktuj urządzenie
-  tak, jak traktowałbyś gotówkę, a jeśli któreś zaginie, unieważnij klucz w swoim panelu
-  Stripe.
+- **Swój klucz Stripe.** To ograniczony klucz, który sam utworzyłeś. **Bez konta mieszka
+  wyłącznie na Twoim urządzeniu.** Jeśli się zalogujesz, przenosi się na nasz serwer,
+  zaszyfrowany tak, że nikt — ani inne konto, ani my na widoku, ani nawet Ty — nie może go
+  odczytać z powrotem; od tej chwili Stripe zgłasza Twoje napiwki na nasz serwer, a Twoje
+  pozostałe urządzenia korzystają z klucza wyłącznie przez nas. Tak czy inaczej jest Twój:
+  traktuj urządzenie, które go przechowuje, tak, jak traktowałbyś gotówkę, a jeśli któreś
+  zaginie, unieważnij klucz w swoim panelu Stripe. Polityka prywatności rozpisuje to, zanim
+  się zalogujesz.
 - **Swoje zespoły i wiadomości fanów, które wyświetlasz na ekranie.** Imię i wiadomość są
   pokazywane pełnej sali ludzi. To, co pojawia się na tym ekranie, moderujesz Ty.
 
@@ -100,6 +108,10 @@ Odpowiadasz za:
   który ją obsłużył. Nie mamy jej zapisu ani żadnej władzy nad nią.
 - Zadbaj o to, by dołączone imię i wiadomość były zgodne z prawem i kulturalne. Wyświetlają się
   na ekranie, na scenie, przed pełną salą ludzi.
+- **Prośba o piosenkę to napiwek, a nie zamówienie.** Jeśli artysta włączył prośby o
+  piosenki, możesz dać napiwek na rzecz piosenki — ale pieniądze są dobrowolnym napiwkiem jak
+  każdy inny, a zapłacenie, albo zapłacenie najwięcej, **nie gwarantuje**, że piosenka
+  zostanie zagrana. To decyzja artysty.
 
 ## Napiwki niezweryfikowane — to przeczytaj
 
@@ -120,9 +132,13 @@ które live.tips potrafi faktycznie potwierdzić — i dlatego Stripe jest zalec
 Strony napiwków mieszkają pod adresem `tip.live.tips` i są serwowane przez niewielki
 przekaźnik, który prowadzimy na Firebase. Jest udostępniany **bezpłatnie, jako uprzejmość,
 bez żadnej gwarancji**. Działa na zasadzie najlepszych starań: może ograniczać liczbę żądań,
-może być niedostępny, napiwki mogą się opóźnić lub zaginąć, a celowo nie przechowuje niczego,
-co pozwoliłoby komukolwiek je później odzyskać — dostarczony napiwek jest usuwany w chwili,
-gdy pokaże go ekran artysty, a niedostarczony jest usuwany po godzinie.
+może być niedostępny, a napiwki mogą się opóźnić lub zaginąć. To, jak długo napiwek jest
+przechowywany, zależy od tego, czy artysta jest zalogowany: w przypadku **strony napiwków, za
+którą nie stoi żadne konto**, przekaźnik celowo nie przechowuje niczego, co pozwoliłoby
+komukolwiek później odzyskać napiwek — dostarczony jest usuwany w chwili, gdy pokaże go ekran
+artysty, a niedostarczony jest usuwany w ciągu godziny. W przypadku **zalogowanego konta**
+napiwek jest zapisywany we własnej historii artysty i przechowywany tak długo, jak zespół.
+Polityka prywatności rozpisuje oba przypadki w całości.
 
 - Strona napiwków, za którą **nie stoi żadne konto, jest usuwana po 90 dniach braku
   aktywności**.

@@ -1,8 +1,8 @@
 ---
 title: Användarvillkor
 description: live.tips är fri programvara med öppen källkod. Vi är inte en betaltjänst, vi håller aldrig dina pengar, och vi lovar inget om dricks vi inte kan se. Detaljerna, i klarspråk.
-updated: 2026-07-13
-updated_label: Senast uppdaterad 13 juli 2026
+updated: 2026-07-15
+updated_label: Senast uppdaterad 15 juli 2026
 ---
 
 Dessa villkor omfattar live.tips-appen, den här webbplatsen, det valfria live.tips-**kontot**
@@ -69,6 +69,9 @@ Om du har ett konto:
 - **Att lägga till en enhet kräver din bekräftelse** på en enhet som redan är inloggad. Bekräfta
   inte en enhet du inte bett om, och låt inte någon fotografera QR-koden och tryck sedan bekräfta
   ändå.
+- **Pushnotiser är valfria.** Ett inloggat konto kan slå på pushnotiser, per enhet, för att höra
+  om dricks och låtönskningar som kommer in medan inget set pågår. De är avstängda tills du slår
+  på dem och kan stängas av igen när som helst; ett gästkonto och en enhet utan konto får inga.
 - **Vi kan stänga av eller radera ett konto** — se *Att avsluta det*, nedan.
 
 ## Om du är artist
@@ -83,10 +86,13 @@ Du ansvarar för:
 - **Lagen där du uppträder** — gatumusiktillstånd, lokalens regler och allt annat lokalt.
 - **Vad du publicerar.** Ditt artistnamn och din hälsning visas på en publik drickssida; håll dem
   lagliga och dina egna.
-- **Din Stripe-nyckel.** Det är en begränsad nyckel du själv skapat, och den bor på din enhet — och,
-  om du loggar in, i ditt kontos privata lagring också, så att dina andra enheter kan använda den.
-  Hur som helst är den din: behandla enheten som du skulle behandla kontanter, och återkalla nyckeln
-  i din Stripe-panel om en enhet försvinner.
+- **Din Stripe-nyckel.** Det är en begränsad nyckel du själv skapat. **Utan konto bor den bara på
+  din enhet.** Om du loggar in flyttas den till vår server, krypterad så att ingen — inte ett annat
+  konto, inte vi i klartext, och inte ens du — kan läsa tillbaka den; från och med då rapporterar
+  Stripe dina dricksar till vår server och dina andra enheter använder nyckeln bara genom oss.
+  Hur som helst är den din: behandla en enhet som håller den som du skulle behandla kontanter, och
+  återkalla nyckeln i din Stripe-panel om en enhet försvinner. Integritetspolicyn förklarar detta
+  innan du loggar in.
 - **Dina band, och fanhälsningarna du sätter upp på skärmen.** Ett namn och en hälsning visas för
   ett rum fullt av människor. Vad som dyker upp på den skärmen är ditt att moderera.
 
@@ -98,6 +104,10 @@ Du ansvarar för:
   betaltjänstleverantör som behandlade den. Vi har ingen uppgift om den och ingen makt över den.
 - Håll namnet och hälsningen du bifogar lagliga och hyfsade. De visas på en
   skärm, på scenen, framför ett rum fullt av människor.
+- **En låtönskning är en dricks, inte en beställning.** Om artisten har slagit på låtönskningar
+  kan du ge dricks till en låt — men pengarna är en frivillig dricks som vilken annan som helst,
+  och att betala, eller att betala mest, **garanterar inte** att låten spelas. Det är artistens
+  beslut.
 
 ## Overifierad dricks — läs den här
 
@@ -115,11 +125,14 @@ kan bekräfta, och det är därför Stripe är den rekommenderade metoden.
 ## Reläet och drickssidorna
 
 Drickssidor ligger på `tip.live.tips` och serveras av ett litet relä vi kör på Firebase. Det
-erbjuds **kostnadsfritt, som en gentjänst, utan någon som helst garanti**.
-Det är best-effort: det kan bli hastighetsbegränsat, det kan vara otillgängligt, dricks kan bli försenad eller
-gå förlorad, och det behåller med avsikt inget som skulle låta någon återskapa den efteråt — en
-levererad dricks raderas i samma ögonblick som artistens skärm visar den, och en ej levererad
-raderas efter en timme.
+erbjuds **kostnadsfritt, som en gentjänst, utan någon som helst garanti**. Det är best-effort:
+det kan bli hastighetsbegränsat, det kan vara otillgängligt, och dricks kan bli försenad eller
+gå förlorad. Hur länge en dricks behålls beror på om artisten är inloggad: för en **drickssida
+utan konto bakom sig** behåller reläet med avsikt inget som skulle låta någon återskapa en dricks
+efteråt — en levererad raderas i samma ögonblick som artistens skärm visar den, och en ej
+levererad sopas bort inom en timme. För ett **inloggat konto** skrivs dricksen in i den artistens
+egen historik och behålls så länge som bandet. Integritetspolicyn redogör för båda fallen i sin
+helhet.
 
 - En drickssida **utan konto bakom sig raderas efter 90 dagars inaktivitet**.
 - Vi kan **hastighetsbegränsa, blockera eller radera vilken drickssida som helst**, när som helst, utan förvarning — i

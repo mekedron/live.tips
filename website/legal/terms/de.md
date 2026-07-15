@@ -1,8 +1,8 @@
 ---
 title: Nutzungsbedingungen
 description: live.tips ist kostenlose Open-Source-Software. Wir sind kein Zahlungsdienstleister, wir halten dein Geld nie, und wir versprechen nichts über Trinkgelder, die wir nicht sehen können. Die Einzelheiten, in klaren Worten.
-updated: 2026-07-13
-updated_label: Zuletzt aktualisiert am 13. Juli 2026
+updated: 2026-07-15
+updated_label: Zuletzt aktualisiert am 15. Juli 2026
 ---
 
 Diese Bedingungen gelten für die live.tips-App, diese Website, das optionale
@@ -72,6 +72,11 @@ Wenn du ein Konto hast:
 - **Ein Gerät hinzuzufügen braucht deine Bestätigung** auf einem Gerät, das bereits
   angemeldet ist. Bestätige kein Gerät, um das du nicht gebeten hast, und lass niemanden den
   QR-Code abfotografieren und tippe dann trotzdem auf bestätigen.
+- **Push-Benachrichtigungen sind optional.** Ein angemeldetes Konto darf
+  Push-Benachrichtigungen pro Gerät einschalten, um von Trinkgeldern und Songwünschen zu
+  erfahren, die eintreffen, während kein Set läuft. Sie sind aus, bis du sie einschaltest,
+  und lassen sich jederzeit wieder ausschalten; ein Gastkonto und ein Gerät ohne Konto
+  bekommen keine.
 - **Wir dürfen ein Konto sperren oder löschen** — siehe *Schluss machen*, weiter unten.
 
 ## Wenn du Künstlerin oder Künstler bist
@@ -89,10 +94,13 @@ Du bist verantwortlich für:
 - **Was du veröffentlichst.** Dein Künstlername und deine Nachricht erscheinen auf einer
   öffentlichen Trinkgeldseite; halte sie rechtmäßig und mach sie dir zu eigen.
 - **Deinen Stripe-Schlüssel.** Es ist ein eingeschränkter Schlüssel, den du dir selbst
-  erstellt hast, und er liegt auf deinem Gerät — und, wenn du dich anmeldest, auch im
-  privaten Speicher deines Kontos, damit deine anderen Geräte ihn nutzen können. So oder so
-  gehört er dir: Behandle das Gerät so, wie du Bargeld behandeln würdest, und widerrufe den
-  Schlüssel in deinem Stripe-Dashboard, wenn eines abhandenkommt.
+  erstellt hast. **Ohne Konto liegt er nur auf deinem Gerät.** Meldest du dich an, wandert er
+  auf unseren Server, verschlüsselt, sodass ihn **niemand — kein anderes Konto, nicht wir im
+  Klartext und nicht einmal du — zurücklesen kann**; von da an meldet Stripe deine Trinkgelder
+  an unseren Server, und deine anderen Geräte nutzen den Schlüssel nur über uns. So oder so
+  gehört er dir: Behandle ein Gerät, das ihn hält, so, wie du Bargeld behandeln würdest, und
+  widerrufe den Schlüssel in deinem Stripe-Dashboard, wenn eines abhandenkommt. Die
+  Datenschutzerklärung legt das dar, bevor du dich anmeldest.
 - **Deine Bands und die Fan-Nachrichten, die du auf den Bildschirm bringst.** Ein Name und
   eine Nachricht werden einem Raum voller Menschen gezeigt. Was auf diesem Bildschirm
   erscheint, ist deine Sache zu moderieren.
@@ -106,6 +114,10 @@ Du bist verantwortlich für:
   keinerlei Einfluss darauf.
 - Bitte halte den Namen und die Nachricht, die du beifügst, rechtmäßig und anständig. Sie
   werden auf einem Bildschirm gezeigt, auf der Bühne, vor einem Raum voller Menschen.
+- **Ein Songwunsch ist ein Trinkgeld, keine Bestellung.** Hat der Künstler Songwünsche
+  eingeschaltet, kannst du Trinkgeld auf einen Song geben — aber das Geld ist ein freiwilliges
+  Trinkgeld wie jedes andere, und Zahlen, oder am meisten zu zahlen, **garantiert nicht**,
+  dass der Song gespielt wird. Das entscheidet der Künstler.
 
 ## Unverifizierte Trinkgelder — lies diesen Abschnitt
 
@@ -127,10 +139,14 @@ empfohlene Methode.
 Trinkgeldseiten liegen unter `tip.live.tips` und werden von einem kleinen Relay ausgeliefert,
 das wir auf Firebase betreiben. Es wird **kostenlos, als Gefälligkeit und ohne jede Garantie**
 angeboten. Es arbeitet nach bestem Bemühen: Es kann ratenbegrenzt sein, es kann nicht
-verfügbar sein, Trinkgelder können sich verzögern oder verloren gehen, und es speichert
-bewusst nichts, womit sie sich nachträglich wiederherstellen ließen — ein zugestelltes
-Trinkgeld wird in dem Moment gelöscht, in dem der Bildschirm des Künstlers es anzeigt, und
-ein nicht zugestelltes nach einer Stunde.
+verfügbar sein, Trinkgelder können sich verzögern oder verloren gehen. Wie lange ein Trinkgeld
+aufbewahrt wird, hängt davon ab, ob der Künstler angemeldet ist: Bei einer **Trinkgeldseite
+ohne Konto dahinter** behält das Relay bewusst nichts, womit sich ein Trinkgeld nachträglich
+wiederherstellen ließe — ein zugestelltes wird in dem Moment gelöscht, in dem der Bildschirm
+des Künstlers es anzeigt, und ein nicht zugestelltes wird binnen einer Stunde weggeräumt. Bei
+einem **angemeldeten Konto** wird das Trinkgeld in die eigene Historie dieses Künstlers
+geschrieben und so lange aufbewahrt wie die Band. Die Datenschutzerklärung führt beide Fälle
+in voller Länge aus.
 
 - Eine Trinkgeldseite **ohne Konto dahinter wird nach 90 Tagen Inaktivität gelöscht**.
 - Wir dürfen **jede Trinkgeldseite jederzeit und ohne Ankündigung ratenbegrenzen, sperren oder
@@ -161,7 +177,7 @@ Ratenbegrenzungen oder die Bot-Prüfung zu umgehen oder den Dienst anzugreifen.
 
 ## Keine Gewährleistung
 
-live.tips wird **„wie besehen“ und ohne jegliche Gewährleistung** bereitgestellt, weder
+live.tips wird **„wie besehen" und ohne jegliche Gewährleistung** bereitgestellt, weder
 ausdrücklich noch stillschweigend, einschließlich jeder Gewährleistung der Marktgängigkeit,
 der Eignung für einen bestimmten Zweck oder der Nichtverletzung von Rechten Dritter. Das ist
 die übliche MIT-Position, und sie ist wörtlich gemeint.
@@ -218,3 +234,4 @@ den Dienst nach einer Änderung weiter nutzt, akzeptiert sie damit.
 Diese Bedingungen werden der Bequemlichkeit halber in allen Sprachen veröffentlicht, die die
 Seite unterstützt. Wenn eine Übersetzung und die englische Fassung voneinander abweichen, **gilt
 die englische Fassung**.
+</content>

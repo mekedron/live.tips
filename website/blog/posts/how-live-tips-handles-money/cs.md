@@ -11,46 +11,64 @@ kolik z toho bys viděl.
 U live.tips je odpověď: musel by se přestavět od základu. To není slib o našich
 úmyslech, je to popis toho, kam peníze putují.
 
-## Spropitné kartou přes nás nikdy neprochází
+## Peníze přes nás nikdy neprocházejí
 
-Když fanoušek ťukne na částku u karty, jeho prohlížeč mluví s `api.stripe.com`.
-Ne se serverem live.tips — na téhle cestě žádný není. Platba se vytvoří na
-**tvém** účtu Stripe, připíše se na **tvůj** zůstatek Stripe a vyplatí se podle
-**tvého** kalendáře Stripe. Jediným poplatkem je standardní zpracovatelský
-poplatek samotného Stripe, který ti Stripe účtuje přímo, přesně tak, jako by to
-udělal, kdyby sis Stripe integroval sám.
+Když fanoušek ťukne na částku u karty, platba se vytvoří na **tvém** účtu Stripe,
+připíše se na **tvůj** zůstatek Stripe a vyplatí se podle **tvého** kalendáře Stripe.
+Jediným poplatkem je standardní zpracovatelský poplatek samotného Stripe, který ti
+Stripe účtuje přímo, přesně tak, jako by to udělal, kdyby sis Stripe integroval sám.
 
 Na naší straně žádná účetní kniha není, protože není co zaznamenávat. Nemohli
-bychom si strhnout procenta, aniž bychom nejdřív postavili to, co peníze drží.
+bychom si strhnout procenta, aniž bychom nejdřív postavili to, co peníze drží — a nic
+takového neexistuje.
 
-## Tvé klíče zůstávají tvé
+To platí, ať už se přihlásíš, nebo ne. Co přihlášení mění, je cesta *dat*, ne cesta
+*peněz*, a další dvě sekce jsou upřímné přesně v tom, jak.
+
+## Tvé klíče a kde žijí
 
 Nastavení si vyžádá *omezený* API klíč Stripe, ne živý tajný klíč — ty odmítáme
-rovnou. Ukládá se do klíčenky tvého vlastního zařízení a odesílá se do Stripe
-výhradně přes TLS.
-
-Omezený znamená, že klíč umí dvě věci: vytvořit odkaz na spropitné „zaplať, kolik
-chceš" a sledovat příchozí spropitné. Nemůže číst tvůj zůstatek, spouštět
+rovnou. Omezený znamená, že klíč umí dvě věci: vytvořit odkaz na spropitné „zaplať,
+kolik chceš" a sledovat příchozí spropitné. Nemůže číst tvůj zůstatek, spouštět
 výplaty, vystavovat refundace ani se dotknout dat zákazníků. Kdyby zítra unikl,
 poloměr zásahu je jeden odkaz na spropitné.
 
-## Jediný server v platební cestě
+**Bez účtu ten klíč nikdy neopustí tvé zařízení.** Sedí v klíčence tvého vlastního
+zařízení a odesílá se výhradně na `api.stripe.com` přes TLS. Žádný server live.tips
+v tom není vůbec.
 
-Revolut a MobilePay nejde z prohlížeče řídit tak jako Stripe, takže jejich
-zapnutí spustí minimální přenašeč — hrstku funkcí Firebase, které obsluhují tvou
-stránku se spropitným na `tip.live.tips`. Vyplatí se být přesný v tom, co ten
-přenašeč dělá, protože „přidali jsme backend" bývá obvykle místo, kde se tyhle
-příběhy zvrtnou.
+**Když se přihlásíš, klíč se přesune k nám** — protože klíč, který existuje jen na
+jednom telefonu, nemůže obsloužit i tablet na pódiu. Zašifrujeme ho (klíčem AES-256
+zvlášť pro každé tajemství, který je sám obalený přes Google Cloud KMS) a uložíme
+tam, kde ho nic nepřečte zpět: žádný jiný účet, ani my při mrknutí do databáze, ani
+ty sám. Rozpečetí se jen uvnitř našich funkcí, použije se ke komunikaci se Stripe
+tvým jménem a už nikdy se nepředá zpět do zařízení. Řekněme to na rovinu: přihlášení
+staví server live.tips do cesty mezi Stripe a tvou historii spropitného. Nikdy ne
+peníze — data.
 
-Ukládá veřejný profil tvé stránky se spropitným — zobrazované jméno a platební
-identifikátory, které ses rozhodl zveřejnit. Nic víc. Nevede žádnou historii
-spropitného, nevidí žádné peníze, nedrží žádné klíče a po 90 dnech nečinnosti se sám
-smaže. Spropitné přes Revolut nebo MobilePay tam čeká jen do chvíle, než si ho
-vyzvedne tvoje pódiové zařízení: jakmile se zobrazí, smaže se, a co si nikdo
-nevyzvedl, je do hodiny smeteno pryč. Peníze se stále pohybují přímo mezi aplikací
-Revolut nebo MobilePay tvého fanouška a tou tvou.
+## Servery a co nedokážou
 
-Pokud používáš jen Stripe, přenašeč se nikdy vůbec nekontaktuje.
+Jsou dva a oba jsou minimální.
+
+**Přenašeč** existuje, protože Revolut a MobilePay nejde z prohlížeče řídit tak jako
+Stripe. Jejich zapnutí spustí hrstku funkcí Firebase, které obsluhují tvou stránku
+se spropitným na `tip.live.tips`. Ukládá veřejný profil tvé stránky se spropitným —
+zobrazované jméno a platební identifikátory, které ses rozhodl zveřejnit — a u
+stránky, za kterou nestojí žádný účet, nevede žádnou historii spropitného: spropitné
+čeká jen do chvíle, než ho zobrazí tvoje pódiové zařízení, a co si nikdo nevyzvedl,
+je do hodiny smeteno pryč. Nevidí žádné peníze a po 90 dnech nečinnosti se sám smaže.
+Pokud používáš jen Stripe a nikdy se nepřihlásíš, přenašeč se nikdy vůbec
+nekontaktuje.
+
+**Webhook** existuje, teprve když se přihlásíš. Protože tvůj klíč teď žije u nás,
+Stripe hlásí každé spropitné naší malé funkci, která ho zapíše do tvé vlastní
+historie, aby ho tvá další zařízení mohla ukázat. Je to kopie události, ne kopie
+peněz. Nemůže pohnout ani centem a vždy může zapisovat jen do toho jednoho účtu,
+kterému patří.
+
+Ani jeden server si nemůže vzít podíl, protože ani jeden není nikde blízko penězům.
+Nejvíc, co který z nich dokáže, je selhat — a nastavení jen se Stripe a bez účtu
+nezávisí ani na jednom.
 
 ## Účet, který si nemusíš zakládat
 
@@ -61,13 +79,13 @@ a nikde jinde. Není se kam registrovat.
 Přihlásit se — přes Apple, přes Google nebo jako host — teď jde a existuje to z
 jediného důvodu: druhé zařízení. Má-li tablet na pódiu a telefon v tvojí kapse
 ukazovat tentýž večer, něco mezi nimi stát musí, a tím něčím je Firestore, pod
-uživatelským id, které si můžeš přečíst jen ty. Synchronizují se tam tvoje kapely,
-nastavení, omezený klíč i historie spropitného. To je skutečná změna v příběhu o
-soukromí a zaslouží si být řečena na rovinu, ne objevena: bez účtu žádný server
-spropitné nikdy nevidí; s účtem ho vidí tvůj vlastní kout toho našeho. To je cena
-za druhé zařízení a je jen na tobě, jestli ji zaplatíš, nebo odmítneš. Čeho se to
-nikdy nedotkne, jsou peníze — účet přesouvá tvoje data, ne tvůj zůstatek, a podíl
-si pořád nebereme.
+uživatelským id, které si můžeš přečíst jen ty. Žijí tam tvoje kapely, nastavení,
+historie spropitného — a, zašifrovaný jak výše, tvůj klíč ke Stripe. To je skutečná
+změna v příběhu o soukromí a zaslouží si být řečena na rovinu, ne objevena: bez účtu
+žádný server spropitné nikdy nevidí; s účtem ho vidí tvůj vlastní kout toho našeho, a
+je to náš webhook, kdo ho tam zapíše. To je cena za druhé zařízení a je jen na tobě,
+jestli ji zaplatíš, nebo odmítneš. Čeho se to nikdy nedotkne, jsou peníze — účet
+přesouvá tvoje data, ne tvůj zůstatek, a podíl si pořád nebereme.
 
 ## Proč bys nám neměl věřit na slovo
 

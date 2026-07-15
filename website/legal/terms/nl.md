@@ -1,8 +1,8 @@
 ---
 title: Gebruiksvoorwaarden
 description: live.tips is gratis, open-source software. We zijn geen betaaldienstverlener, we houden je geld nooit vast, en we doen geen beloftes over fooien die we niet kunnen zien. De details, in gewone taal.
-updated: 2026-07-13
-updated_label: Laatst bijgewerkt op 13 juli 2026
+updated: 2026-07-15
+updated_label: Laatst bijgewerkt op 15 juli 2026
 ---
 
 Deze voorwaarden gelden voor de live.tips-app, deze website, het optionele live.tips-**account** en
@@ -69,6 +69,10 @@ Als je een account hebt:
 - **Een apparaat toevoegen vraagt om jouw bevestiging** op een apparaat dat al is ingelogd.
   Bevestig geen apparaat waar je niet om hebt gevraagd, en laat niemand de QR-code fotograferen om
   daarna toch op bevestigen te tikken.
+- **Pushmeldingen zijn optioneel.** Een ingelogd account mag pushmeldingen aanzetten, per apparaat,
+  om te horen van fooien en verzoeknummers die binnenkomen terwijl er geen set loopt. Ze staan uit
+  tot je ze aanzet en kunnen op elk moment weer worden uitgezet; een gastaccount en een apparaat
+  zonder account krijgen er geen.
 - **We mogen een account opschorten of verwijderen** — zie *Ermee stoppen*, hieronder.
 
 ## Als je artiest bent
@@ -83,10 +87,13 @@ Jij bent verantwoordelijk voor:
 - **De wet op de plek waar je optreedt** — vergunningen voor straatoptredens, huisregels van de locatie, en al het andere dat lokaal geldt.
 - **Wat je publiceert.** Je artiestennaam en bericht verschijnen op een openbare fooienpagina; hou
   ze rechtmatig en van jezelf.
-- **Je Stripe-sleutel.** Het is een beperkte sleutel die je zelf hebt aangemaakt, en hij staat op je
-  apparaat — en, als je inlogt, ook in de privéopslag van je account, zodat je andere apparaten hem
-  kunnen gebruiken. Hoe dan ook is hij van jou: behandel het apparaat zoals je contant geld zou
-  behandelen, en trek de sleutel in via je Stripe-dashboard als er een zoekraakt.
+- **Je Stripe-sleutel.** Het is een beperkte sleutel die je zelf hebt aangemaakt. **Zonder account
+  leeft hij alleen op je apparaat.** Als je inlogt, verhuist hij naar onze server, versleuteld zodat
+  niemand — geen ander account, wij niet in het volle zicht, en zelfs jij niet — hem kan teruglezen;
+  van dan af meldt Stripe je fooien aan onze server en gebruiken je andere apparaten de sleutel
+  alleen via ons. Hoe dan ook is hij van jou: behandel een apparaat dat hem bevat zoals je contant
+  geld zou behandelen, en trek de sleutel in via je Stripe-dashboard als er een zoekraakt. Het
+  Privacybeleid legt dit uit voordat je inlogt.
 - **Je bands, en de fanberichten die je op het scherm zet.** Een naam en een bericht worden getoond
   aan een zaal vol mensen. Wat er op dat scherm verschijnt, is aan jou om te modereren.
 
@@ -98,6 +105,10 @@ Jij bent verantwoordelijk voor:
   betaaldienstverlener die de betaling verwerkte. Wij hebben er geen registratie van en geen zeggenschap over.
 - Hou de naam en het bericht die je toevoegt rechtmatig en fatsoenlijk. Ze worden getoond op een
   scherm, op het podium, voor een zaal vol mensen.
+- **Een verzoeknummer is een fooi, geen bestelling.** Als de artiest verzoeknummers heeft aangezet,
+  kun je voor een nummer fooien — maar het geld is een vrijwillige fooi als elke andere, en betalen,
+  of het meest betalen, **garandeert niet** dat het nummer wordt gespeeld. Dat is de keuze van de
+  artiest.
 
 ## Niet-geverifieerde fooien — lees deze
 
@@ -116,10 +127,13 @@ daadwerkelijk kan bevestigen, en daarom is Stripe de aanbevolen methode.
 
 Fooienpagina's staan op `tip.live.tips`, geserveerd door een klein relay dat we op Firebase
 draaien. Het wordt **gratis aangeboden, uit coulance, zonder enige garantie**.
-Het is best-effort: het kan in aantal worden beperkt, het kan onbeschikbaar zijn, fooien kunnen vertraagd of
-verloren raken, en het bewaart bewust niets waarmee iemand ze achteraf zou kunnen terughalen — een
-afgeleverde fooi wordt verwijderd op het moment dat het scherm van de artiest hem toont, en een
-niet-afgeleverde na een uur.
+Het is best-effort: het kan in aantal worden beperkt, het kan onbeschikbaar zijn, en fooien kunnen
+vertraagd of verloren raken. Hoe lang een fooi wordt bewaard, hangt ervan af of de artiest is
+ingelogd: voor een **fooienpagina zonder account erachter** bewaart het relay bewust niets waarmee
+iemand een fooi achteraf zou kunnen terughalen — een afgeleverde wordt verwijderd op het moment dat
+het scherm van de artiest hem toont, en een niet-afgeleverde wordt binnen het uur opgeruimd. Voor een
+**ingelogd account** wordt de fooi in de eigen geschiedenis van die artiest weggeschreven en bewaard
+zolang de band. Het Privacybeleid zet beide gevallen volledig uiteen.
 
 - Een fooienpagina **zonder account erachter wordt verwijderd na 90 dagen inactiviteit**.
 - We mogen **elke fooienpagina in aantal beperken, blokkeren of verwijderen**, op elk moment, zonder aankondiging — in

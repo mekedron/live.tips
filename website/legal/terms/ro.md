@@ -1,8 +1,8 @@
 ---
 title: Termeni de utilizare
 description: live.tips este software gratuit și open-source. Nu suntem furnizor de plăți, nu îți deținem niciodată banii și nu facem promisiuni despre bacșișuri pe care nu le putem vedea. Detaliile, pe scurt și pe șleau.
-updated: 2026-07-13
-updated_label: Ultima actualizare 13 iulie 2026
+updated: 2026-07-15
+updated_label: Ultima actualizare 15 iulie 2026
 ---
 
 Acești termeni acoperă aplicația live.tips, acest site, **contul** live.tips opțional și releul
@@ -69,6 +69,10 @@ Dacă ai un cont:
 - **Adăugarea unui dispozitiv are nevoie de confirmarea ta** pe un dispozitiv deja autentificat. Nu
   confirma un dispozitiv pe care nu l-ai cerut și nu lăsa pe cineva să fotografieze codul QR, ca apoi
   să apeși oricum „confirmă”.
+- **Notificările push sunt opționale.** Un cont autentificat poate activa notificările push,
+  per dispozitiv, ca să afle despre bacșișurile și cererile de melodii care sosesc atunci când nu
+  rulează niciun concert. Sunt dezactivate până când le pornești și pot fi oprite din nou oricând;
+  un cont de invitat și un dispozitiv fără cont nu primesc niciuna.
 - **Putem suspenda sau șterge un cont** — vezi *Cum se încheie*, mai jos.
 
 ## Dacă ești artist
@@ -84,10 +88,13 @@ Ești responsabil pentru:
   regulile locale.
 - **Ce publici.** Numele tău de artist și mesajul tău apar pe o pagină de bacșiș publică; ține-le legale
   și ale tale.
-- **Cheia ta Stripe.** Este o cheie restricționată pe care ți-ai creat-o singur și stă pe dispozitivul
-  tău — iar dacă te autentifici, și în spațiul privat de stocare al contului tău, ca să o poată folosi
-  și celelalte dispozitive ale tale. Oricum ar fi, este a ta: tratează dispozitivul așa cum ai trata
-  banii gheață și revocă cheia în panoul tău Stripe dacă vreunul dispare.
+- **Cheia ta Stripe.** Este o cheie restricționată pe care ți-ai creat-o singur. **Fără cont, ea
+  trăiește doar pe dispozitivul tău.** Dacă te autentifici, se mută pe serverul nostru, criptată
+  astfel încât nimeni — niciun alt cont, nici noi la vedere, nici măcar tu — să nu o poată citi
+  înapoi; de atunci încolo Stripe raportează bacșișurile tale către serverul nostru, iar celelalte
+  dispozitive ale tale folosesc cheia doar prin noi. Oricum ar fi, este a ta: tratează un dispozitiv
+  care o ține așa cum ai trata banii gheață și revocă cheia în panoul tău Stripe dacă vreunul dispare.
+  Politica de confidențialitate detaliază acest lucru înainte să te autentifici.
 - **Trupele tale și mesajele fanilor pe care le pui pe ecran.** Un nume și un mesaj sunt arătate unei
   săli pline de oameni. Ce apare pe acel ecran ține de tine să moderezi.
 
@@ -99,6 +106,9 @@ Ești responsabil pentru:
   Noi nu avem nicio evidență a ei și nicio putere asupra ei.
 - Te rugăm să păstrezi legale și civilizate numele și mesajul pe care le atașezi. Ele sunt afișate pe un
   ecran, pe scenă, în fața unei săli pline de oameni.
+- **O cerere de melodie este un bacșiș, nu o comandă.** Dacă artistul a activat cererile de melodii,
+  poți lăsa bacșiș pentru o melodie — dar banii sunt un bacșiș voluntar ca oricare altul, iar plata,
+  sau plata cea mai mare, **nu garantează** că melodia va fi cântată. Asta ține de decizia artistului.
 
 ## Bacșișurile neverificate — citește-l pe acesta
 
@@ -117,10 +127,13 @@ live.tips le poate confirma cu adevărat, motiv pentru care Stripe este metoda r
 
 Paginile de bacșiș se află la `tip.live.tips` și sunt servite de un mic releu pe care îl rulăm pe
 Firebase. Este oferit **gratuit, ca o curtoazie, fără nicio garanție de niciun fel**.
-Funcționează pe principiul „cel mai bun efort”: poate fi limitat ca rată, poate fi indisponibil,
-bacșișurile pot fi întârziate sau pierdute, iar el nu stochează în mod deliberat nimic care să permită
-cuiva să le recupereze ulterior — un bacșiș livrat este șters în clipa în care ecranul artistului îl
-afișează, iar unul nelivrat este șters după o oră.
+Funcționează pe principiul „cel mai bun efort”: poate fi limitat ca rată, poate fi indisponibil, iar
+bacșișurile pot fi întârziate sau pierdute. Cât timp este păstrat un bacșiș depinde de dacă artistul
+este autentificat: pentru o **pagină de bacșiș în spatele căreia nu stă niciun cont**, releul nu
+păstrează în mod deliberat nimic care să permită cuiva să recupereze ulterior un bacșiș — unul livrat
+este șters în clipa în care ecranul artistului îl afișează, iar unul nelivrat este măturat în decurs de
+o oră. Pentru un **cont autentificat**, bacșișul este scris în istoricul propriu al acelui artist și
+păstrat atâta timp cât trăiește trupa. Politica de confidențialitate detaliază pe larg ambele cazuri.
 
 - O pagină de bacșiș în spatele căreia **nu stă niciun cont este ștearsă după 90 de zile de
   inactivitate**.

@@ -11,46 +11,66 @@ una parte, y cuánto de ello podrías ver.
 Para live.tips la respuesta es: habría que reconstruirlo. Eso no es una promesa sobre
 nuestras intenciones, es una descripción de adónde va el dinero.
 
-## Las propinas con tarjeta nunca pasan por nosotros
+## El dinero nunca pasa por nosotros
 
-Cuando un fan toca un importe con tarjeta, su navegador habla con `api.stripe.com`. No
-con un servidor de live.tips: no hay ninguno en esa ruta. El pago se crea contra **tu**
-cuenta de Stripe, se asienta en **tu** saldo de Stripe y se abona según **tu**
-calendario de Stripe. La única comisión es la tarifa de procesamiento estándar de la
-propia Stripe, que Stripe te cobra directamente, exactamente como lo haría si hubieras
-integrado Stripe tú mismo.
+Cuando un fan toca un importe con tarjeta, el pago se crea contra **tu** cuenta de
+Stripe, se asienta en **tu** saldo de Stripe y se abona según **tu** calendario de
+Stripe. La única comisión es la tarifa de procesamiento estándar de la propia Stripe,
+que Stripe te cobra directamente, exactamente como lo haría si hubieras integrado Stripe
+tú mismo.
 
 No hay libro de cuentas de nuestro lado porque no hay nada que registrar. No podríamos
-quedarnos con un porcentaje sin construir primero aquello que retiene el dinero.
+quedarnos con un porcentaje sin construir primero aquello que retiene el dinero — y no
+existe tal cosa.
 
-## Tus claves siguen siendo tuyas
+Eso es cierto tanto si inicias sesión como si no. Lo que cambia al iniciar sesión es el
+camino de los *datos*, no el del dinero, y las dos secciones siguientes son honestas
+sobre cómo exactamente.
 
-La configuración pide una clave de API de Stripe *restringida*, no una clave secreta
-de producción: esas las rechazamos de plano. Se guarda en el llavero de tu propio
-dispositivo y solo se envía a Stripe, siempre por TLS.
+## Tus claves, y dónde viven
 
-Restringida significa que la clave sabe hacer dos cosas: crear el enlace de propina de
-paga-lo-que-quieras y vigilar la llegada de las propinas. No puede leer tu saldo,
-iniciar pagos, emitir reembolsos ni tocar datos de clientes. Si se filtrara mañana, el
-radio de la explosión es un enlace de propina.
+La configuración pide una clave de API de Stripe *restringida*, no una clave secreta de
+producción — esas las rechazamos de plano. Restringida significa que la clave sabe hacer
+dos cosas: crear el enlace de propina de paga-lo-que-quieras y vigilar la llegada de las
+propinas. No puede leer tu saldo, iniciar pagos, emitir reembolsos ni tocar datos de
+clientes. Si se filtrara mañana, el radio de la explosión es un enlace de propina.
 
-## El único servidor en la ruta del pago
+**Sin cuenta, esa clave nunca sale de tu dispositivo.** Se aloja en el llavero del propio
+dispositivo y solo se envía a `api.stripe.com`, siempre por TLS. No hay ningún servidor
+de live.tips en escena en absoluto.
 
-Revolut y MobilePay no se pueden manejar desde un navegador como sí se puede con
-Stripe, así que activarlos enciende un relé mínimo: un puñado de funciones de Firebase
-que sirven tu página de propinas en `tip.live.tips`. Vale la pena ser preciso sobre lo
-que hace ese relé, porque «añadimos un backend» suele ser el punto donde estas
-historias se tuercen.
+**Al iniciar sesión, la clave se traslada a nosotros** — porque una clave que solo existe
+en un móvil no puede servir también a la tablet del escenario. La ciframos (una clave
+AES-256 por secreto, envuelta a su vez por Google Cloud KMS) y la guardamos donde nada
+pueda volver a leerla: ni otra cuenta, ni nosotros echando un vistazo a una base de
+datos, ni siquiera tú. Solo se descifra dentro de nuestras funciones, se usa para hablar
+con Stripe en tu nombre, y no se vuelve a entregar nunca a un dispositivo. Dígase con
+claridad: iniciar sesión pone un servidor de live.tips en el camino entre Stripe y tu
+historial de propinas. Nunca el dinero — los datos.
 
-Almacena el perfil público de tu página de propinas: el nombre visible y los
-identificadores de pago que elegiste publicar. Eso es todo. No guarda historial de
-propinas, no ve dinero, no retiene claves y se autoelimina tras 90 días de
-inactividad. Una propina por Revolut o MobilePay espera ahí solo hasta que el
-dispositivo que tienes en el escenario la recoge: mostrarla la borra, y lo que nadie
-vino a buscar se barre antes de que pase una hora. El dinero sigue moviéndose
-directamente entre la aplicación Revolut o MobilePay de tu fan y la tuya.
+## Los servidores, y lo que no pueden hacer
 
-Si solo usas Stripe, nunca se contacta con el relé en absoluto.
+Son dos, y ambos son mínimos.
+
+**El relé** existe porque Revolut y MobilePay no se pueden manejar desde un navegador
+como sí se puede con Stripe. Activarlos enciende un puñado de funciones de Firebase que
+sirven tu página de propinas en `tip.live.tips`. Almacena el perfil público de tu página
+de propinas — el nombre visible y los identificadores de pago que elegiste publicar — y,
+para una página sin ninguna cuenta detrás, no guarda historial de propinas: una propina
+espera solo hasta que el dispositivo que tienes en el escenario la muestra, y lo que nadie
+vino a buscar se barre antes de que pase una hora. No ve dinero y se autoelimina tras 90
+días de inactividad. Si solo usas Stripe y nunca inicias sesión, nunca se contacta con el
+relé en absoluto.
+
+**El webhook** existe solo en cuanto inicias sesión. Como tu clave vive ahora con
+nosotros, Stripe informa de cada propina a una pequeña función nuestra, que la escribe en
+tu propio historial para que tus otros dispositivos puedan mostrarla. Es una copia de un
+evento, no una copia del dinero. No puede mover ni un céntimo, y solo puede escribir en la
+única cuenta a la que pertenece.
+
+Ninguno de los dos servidores puede llevarse una parte, porque ninguno está ni cerca del
+dinero. Lo máximo que cualquiera de ellos puede hacer es fallar — y una configuración que
+solo usa Stripe y sin cuenta no depende de ninguno.
 
 ## La cuenta que no tienes que crear
 
@@ -62,12 +82,12 @@ Iniciar sesión —con Apple, con Google o como invitado— ya es posible, y exi
 sola razón: un segundo dispositivo. Si la tablet del escenario y el móvil de tu
 bolsillo han de mostrar la misma noche, algo tiene que situarse entre ellos, y ese algo
 es Firestore, bajo un identificador de usuario que solo tú puedes leer. Tus grupos, tus
-ajustes, la clave restringida y el historial de propinas se sincronizan ahí. Eso es un
-cambio real en la historia de la privacidad y merece decirse con claridad en vez de
-descubrirse: sin cuenta, ningún servidor ve jamás una propina; con cuenta, la ve tu
-propio rincón del nuestro. Es el precio del segundo dispositivo, y está en tu mano
-pagarlo o rechazarlo. Lo que nunca toca es el dinero: una cuenta mueve tus datos, no tu
-saldo, y sigue sin haber comisión.
+ajustes, tu historial de propinas — y, cifrada como se ha dicho, tu clave de Stripe —
+viven ahí. Eso es un cambio real en la historia de la privacidad y merece decirse con
+claridad en vez de descubrirse: sin cuenta, ningún servidor ve jamás una propina; con
+cuenta, la ve tu propio rincón del nuestro, y es nuestro webhook el que la escribe ahí. Es
+el precio del segundo dispositivo, y está en tu mano pagarlo o rechazarlo. Lo que nunca
+toca es el dinero: una cuenta mueve tus datos, no tu saldo, y sigue sin haber comisión.
 
 ## Por qué no deberías creernos sin más
 
@@ -78,3 +98,4 @@ una propina de demostración y lee las peticiones. Hay menos de las que esperas.
 
 Esa es la verdadera promesa del producto. No que seamos de fiar, sino que no necesitas
 que lo seamos.
+</content>

@@ -1,8 +1,8 @@
 ---
 title: Termos de Utilização
 description: O live.tips é software livre e open source. Não somos um prestador de serviços de pagamento, nunca detemos o seu dinheiro e não fazemos promessas sobre gorjetas que não conseguimos ver. Os detalhes, em palavras simples.
-updated: 2026-07-13
-updated_label: Última atualização em 13 de julho de 2026
+updated: 2026-07-15
+updated_label: Última atualização em 15 de julho de 2026
 ---
 
 Estes termos abrangem a app live.tips, este site, a **conta** live.tips opcional e o relé
@@ -70,6 +70,11 @@ Se tiver uma conta:
 - **Acrescentar um dispositivo exige a sua confirmação** num dispositivo que já tenha sessão
   iniciada. Não confirme um dispositivo que não pediu, e não deixe que alguém fotografe o
   código QR e toque em confirmar à mesma.
+- **As notificações push são opcionais.** Uma conta com sessão iniciada pode ativar as
+  notificações push, por dispositivo, para ficar a saber das gorjetas e dos pedidos de música
+  que chegam enquanto não está a decorrer nenhum concerto. Estão desligadas até que as ative e
+  podem voltar a ser desligadas a qualquer momento; uma conta de convidado e um dispositivo
+  sem conta não recebem nenhuma.
 - **Podemos suspender ou apagar uma conta** — ver *Acabar com isto*, mais abaixo.
 
 ## Se é artista
@@ -85,10 +90,13 @@ Se tiver uma conta:
   que seja local.
 - **O que publica.** O seu nome de artista e a sua mensagem aparecem numa página de gorjetas
   pública; mantenha-os legais e seus.
-- **A sua chave Stripe.** É uma chave restrita que criou você mesmo, e vive no seu dispositivo
-  — e, se iniciar sessão, também no armazenamento privado da sua conta, para que os seus
-  outros dispositivos a possam usar. De qualquer forma é sua: trate o dispositivo como
-  trataria dinheiro vivo, e revogue a chave no seu painel Stripe se algum desaparecer.
+- **A sua chave Stripe.** É uma chave restrita que criou você mesmo. **Sem conta, vive apenas
+  no seu dispositivo.** Se iniciar sessão, passa para o nosso servidor, cifrada de forma a que
+  ninguém — nem outra conta, nem nós à vista de todos, nem sequer você — a consiga voltar a
+  ler; a partir daí a Stripe comunica as suas gorjetas ao nosso servidor e os seus outros
+  dispositivos usam a chave apenas através de nós. De qualquer forma é sua: trate um
+  dispositivo que a contenha como trataria dinheiro vivo, e revogue a chave no seu painel
+  Stripe se algum desaparecer. A Política de Privacidade expõe isto antes de iniciar sessão.
 - **As suas bandas, e as mensagens de fãs que põe no ecrã.** Um nome e uma mensagem são
   mostrados a uma sala cheia de gente. O que aparece nesse ecrã é a si que compete moderar.
 
@@ -100,6 +108,10 @@ Se tiver uma conta:
   serviços de pagamento que o processou. Não temos registo dele nem poder sobre ele.
 - Por favor, mantenha o nome e a mensagem que juntar legais e civilizados. São mostrados num
   ecrã, em palco, à frente de uma sala cheia de gente.
+- **Um pedido de música é uma gorjeta, não uma encomenda.** Se o artista tiver ativado os
+  pedidos de música, pode dar gorjeta a favor de uma música — mas o dinheiro é uma gorjeta
+  voluntária como qualquer outra, e pagar, ou pagar mais do que todos, **não garante** que a
+  música seja tocada. Essa é a decisão do artista.
 
 ## Gorjetas não verificadas — leia esta
 
@@ -121,9 +133,13 @@ recomendado.
 As páginas de gorjetas vivem em `tip.live.tips`, servidas por um pequeno relé que mantemos na
 Firebase. É oferecido **gratuitamente, por cortesia, sem garantia de qualquer espécie**.
 Funciona na base do melhor esforço: pode ser limitado no número de pedidos, pode estar
-indisponível, as gorjetas podem atrasar-se ou perder-se, e ele não guarda deliberadamente
-nada que permitisse a alguém recuperá-las depois — uma gorjeta entregue é apagada no instante
-em que o ecrã do artista a mostra, e uma não entregue é apagada ao fim de uma hora.
+indisponível, e as gorjetas podem atrasar-se ou perder-se. Quanto tempo uma gorjeta é
+conservada depende de o artista ter ou não sessão iniciada: para uma **página de gorjetas sem
+conta por trás**, o relé não guarda deliberadamente nada que permitisse a alguém recuperar uma
+gorjeta depois — uma gorjeta entregue é apagada no instante em que o ecrã do artista a mostra,
+e uma não entregue é apagada dentro da hora. Para uma **conta com sessão iniciada**, a gorjeta
+é escrita no histórico do próprio artista e conservada tanto tempo quanto a banda. A Política
+de Privacidade expõe ambos os casos por completo.
 
 - Uma página de gorjetas **sem conta por trás é apagada após 90 dias de inatividade**.
 - Podemos **limitar, bloquear ou apagar qualquer página de gorjetas**, a qualquer momento,
@@ -206,3 +222,4 @@ usar o serviço após uma alteração significa que a aceita.
 
 Estes termos são publicados em todos os idiomas que o site suporta, por conveniência. Se uma
 tradução e a versão em inglês divergirem, **a versão em inglês é a que conta**.
+</content>

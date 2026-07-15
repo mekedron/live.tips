@@ -11,45 +11,64 @@ andel, og hvor meget af det du ville kunne se.
 For live.tips er svaret: den skulle bygges om. Det er ikke et løfte om vores
 hensigter, det er en beskrivelse af, hvor pengene går hen.
 
-## Kortdrikkepenge passerer aldrig gennem os
+## Penge passerer aldrig gennem os
 
-Når et fan trykker på et kortbeløb, taler dens browser med `api.stripe.com`. Ikke
-med en live.tips-server – der er ingen i den sti. Betalingen oprettes på **din**
-Stripe-konto, lander i **din** Stripe-saldo og udbetales efter **din** Stripe-plan.
-Det eneste gebyr er Stripes eget standardgebyr for behandling, som Stripe opkræver
-dig direkte, præcis som hvis du selv havde integreret Stripe.
+Når et fan trykker på et kortbeløb, oprettes betalingen på **din** Stripe-konto,
+lander i **din** Stripe-saldo og udbetales efter **din** Stripe-plan. Det eneste
+gebyr er Stripes eget standardgebyr for behandling, som Stripe opkræver dig direkte,
+præcis som hvis du selv havde integreret Stripe.
 
 Der er ingen kassebog hos os, fordi der ikke er noget at bogføre. Vi kunne ikke
-skumme en procentdel af uden først at bygge det, der holder pengene.
+skumme en procentdel af uden først at bygge det, der holder pengene – og det findes
+ikke.
 
-## Dine nøgler forbliver dine
+Det gælder, uanset om du logger ind eller ej. Det, som det at logge ind ændrer, er
+*data*-vejen, ikke penge-vejen, og de næste to afsnit er ærlige om præcis hvordan.
+
+## Dine nøgler, og hvor de bor
 
 Opsætningen beder om en *begrænset* Stripe-API-nøgle, ikke en live secret key – dem
-afviser vi blankt. Den gemmes i din egen enheds nøglering og sendes kun nogensinde
-til Stripe over TLS.
-
-Begrænset betyder, at nøglen kan to ting: oprette
+afviser vi blankt. Begrænset betyder, at nøglen kan to ting: oprette
 betal-hvad-du-vil-drikkepengelinket og se drikkepenge komme ind. Den kan ikke læse
 din saldo, udløse udbetalinger, foretage refusioner eller røre kundedata. Hvis den
 lækkede i morgen, når skaden ikke længere end til et drikkepengelink.
 
-## Den ene server i betalingsvejen
+**Uden en konto forlader den nøgle aldrig din enhed.** Den sidder i enhedens egen
+nøglering og sendes kun nogensinde til `api.stripe.com` over TLS. Der er slet ingen
+live.tips-server i billedet.
 
-Revolut og MobilePay kan ikke styres fra en browser på samme måde som Stripe, så
-det at slå dem til aktiverer et minimalt relæ – en håndfuld Firebase-funktioner,
-der serverer din drikkepengeside på `tip.live.tips`. Det er værd at være præcis om,
-hvad det relæ gør, for „vi tilføjede en backend" er som regel dér, disse historier
-går galt.
+**Når du logger ind, flytter nøglen til os** – fordi en nøgle, der kun findes på én
+telefon, ikke også kan betjene tabletten på scenen. Vi krypterer den (en
+AES-256-nøgle pr. hemmelighed, som selv er pakket ind af Google Cloud KMS) og gemmer
+den et sted, hvor intet kan læse den tilbage: ikke en anden konto, ikke os med et
+blik i en database, ikke engang dig. Den åbnes kun inde i vores funktioner, bruges
+til at tale med Stripe på dine vegne og gives aldrig til en enhed igen. Sig det
+ligeud: at logge ind sætter en live.tips-server i vejen mellem Stripe og din
+drikkepengehistorik. Aldrig pengene – dataene.
 
-Det gemmer din offentlige drikkepengesideprofil – visningsnavnet og de
-betalings-handles, du valgte at offentliggøre. Mere er det ikke. Det fører ingen
-drikkepengehistorik, ser ingen penge, holder ingen nøgler og sletter sig selv efter
-90 dages inaktivitet. Et Revolut- eller MobilePay-tip venter der kun, indtil din
-sceneenhed henter det: at vise det sletter det, og alt, som ingen kom tilbage efter,
-fejes væk inden for en time. Pengene bevæger sig stadig direkte mellem dit fans
-Revolut- eller MobilePay-app og din.
+## Serverne, og hvad de ikke kan
 
-Hvis du kun bruger Stripe, kontaktes relæet aldrig overhovedet.
+Der er to, og begge er minimale.
+
+**Relæet** findes, fordi Revolut og MobilePay ikke kan styres fra en browser på
+samme måde som Stripe. At slå dem til aktiverer en håndfuld Firebase-funktioner, der
+serverer din drikkepengeside på `tip.live.tips`. Det gemmer din offentlige
+drikkepengesideprofil – visningsnavnet og de betalings-handles, du valgte at
+offentliggøre – og fører, for en side uden en konto bag sig, ingen
+drikkepengehistorik: drikkepenge venter kun, indtil din sceneenhed viser dem, og
+alt, som ingen kom tilbage efter, fejes væk inden for en time. Det ser ingen penge
+og sletter sig selv efter 90 dages inaktivitet. Bruger du kun Stripe og logger
+aldrig ind, kontaktes relæet aldrig overhovedet.
+
+**Webhooken** findes først, når du logger ind. Fordi din nøgle nu bor hos os,
+rapporterer Stripe hver drikkepengebetaling til en lille funktion hos os, som
+skriver den ind i din egen historik, så dine andre enheder kan vise den. Det er en
+kopi af en hændelse, ikke en kopi af pengene. Den kan ikke flytte en øre, og den kan
+kun nogensinde skrive ind i den ene konto, den hører til.
+
+Ingen af de to servere kan tage en andel, fordi ingen af dem er i nærheden af
+pengene. Det mest, nogen af dem kan gøre, er at fejle – og en opsætning med kun
+Stripe og uden konto er afhængig af ingen af dem.
 
 ## Kontoen, du ikke behøver at oprette
 
@@ -60,13 +79,14 @@ og ingen andre steder. Der er ikke noget at melde sig til.
 At logge ind – med Apple, med Google eller som gæst – er nu muligt, og det findes af
 én grund: en enhed nummer to. Hvis tabletten på scenen og telefonen i din lomme skal
 vise den samme aften, må noget sidde mellem dem, og det noget er Firestore, under et
-bruger-id, som kun du kan læse. Dine bands, indstillinger, begrænsede nøgle og
-drikkepengehistorik synkroniseres dertil. Det er en reel ændring af
+bruger-id, som kun du kan læse. Dine bands, indstillinger, drikkepengehistorik – og,
+krypteret som ovenfor, din Stripe-nøgle – bor der. Det er en reel ændring af
 privatlivsfortællingen, og den fortjener at blive sagt lige ud frem for at blive
 opdaget: uden en konto ser ingen server nogensinde et tip; med en konto gør dit eget
-hjørne af vores. Det er prisen for enhed nummer to, og det er dig, der vælger at
-betale den eller lade være. Det, den aldrig rører, er pengene – en konto flytter
-dine data, ikke din saldo, og der er stadig ingen andel.
+hjørne af vores, og det er vores webhook, der skriver det dertil. Det er prisen for
+enhed nummer to, og det er dig, der vælger at betale den eller lade være. Det, den
+aldrig rører, er pengene – en konto flytter dine data, ikke din saldo, og der er
+stadig ingen andel.
 
 ## Hvorfor du ikke bare skal tage os på ordet
 
@@ -77,3 +97,4 @@ demodrikkepenge og læs forespørgslerne. Der er færre, end du tror.
 
 Det er det egentlige produktløfte. Ikke at vi er til at stole på, men at du ikke
 har brug for, at vi er det.
+</content>
