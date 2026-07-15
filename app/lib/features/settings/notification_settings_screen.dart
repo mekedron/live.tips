@@ -101,6 +101,23 @@ class _NotificationSettingsScreenState
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
               // ------------------------------------------- this device ---
+              // A venue tablet never carries a token — whose tips would it
+              // announce, to whom at the counter? The toggle stays, dead
+              // and off, with the honest reason and the one way out (the
+              // device-kind change in Settings, which wipes the device).
+              if (ref.watch(pushDeviceIsVenueProvider))
+                LtRowGroup(
+                  header: s.t('settings.notifications.device_header'),
+                  children: [
+                    LtRow(
+                      icon: Icons.storefront_rounded,
+                      title: s.t('settings.notifications.venue_title'),
+                      subtitle: s.t('settings.notifications.venue_subtitle'),
+                      trailing: const Switch(value: false, onChanged: null),
+                    ),
+                  ],
+                )
+              else
               LtRowGroup(
                 header: s.t('settings.notifications.device_header'),
                 children: [

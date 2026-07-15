@@ -560,6 +560,8 @@ const Map<String, String> kEnStrings = {
   "settings.notifications.this_device": "Notify on this device",
   "settings.notifications.this_device_subtitle": "Tips and requests that arrive while you're not live",
   "settings.notifications.title": "Notifications",
+  "settings.notifications.venue_subtitle": "This device is set up for a venue, so it never receives notifications. To make it a personal device again, use Settings → This device — that resets it.",
+  "settings.notifications.venue_title": "Not on a venue device",
   "settings.profile_details.saved_snack": "Profile details updated",
   "settings.profile_details.title": "Profile details",
   "settings.relay_method.cancel": "Cancel",

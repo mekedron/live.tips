@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/firebase/device_registry.dart';
+import 'package:live_tips/domain/device_kind.dart';
 import 'package:live_tips/data/firebase/push_service.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/features/notifications/notifications_bell.dart';
@@ -37,12 +38,14 @@ void main() {
     WidgetTester tester, {
     required FirebaseFirestore db,
     bool signedIn = true,
+    bool venueDevice = false,
     Widget home = const Scaffold(
       body: Align(alignment: Alignment.topRight, child: NotificationsBell()),
     ),
     List<Override> extra = const [],
   }) async {
     final local = await seededStore();
+    if (venueDevice) await local.saveDeviceKind(DeviceKind.venue);
     final container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(local),
       secureStoreProvider.overrideWithValue(FakeSecureStore()),
@@ -318,6 +321,41 @@ void main() {
     // And no token was minted — "Not now" means no.
     final doc = (await db.doc('users/$uid/devices/$deviceId').get()).data();
     expect(doc?['fcmToken'], isNull);
+  });
+
+  testWidgets(
+      'a venue device is never nudged, and its settings toggle is dead, off '
+      'and honest about why', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final push = _FakePushService();
+
+    // The nudge, on a venue tablet: nothing, whatever the permission state.
+    await pump(
+      tester,
+      db: db,
+      venueDevice: true,
+      home: const Scaffold(body: PushNudgeCard()),
+      extra: [pushServiceProvider.overrideWithValue(push)],
+    );
+    expect(find.text("Don't miss a tip"), findsNothing);
+
+    // The settings page: the switch is there, permanently off and disabled,
+    // with the venue explanation underneath.
+    await pump(
+      tester,
+      db: db,
+      venueDevice: true,
+      home: const NotificationSettingsScreen(),
+      extra: [
+        pushServiceProvider.overrideWithValue(push),
+        pushStatusProvider.overrideWith((ref) async => PushStatus.canRequest),
+      ],
+    );
+    expect(find.text('Not on a venue device'), findsOneWidget);
+    expect(find.text('Enable notifications'), findsNothing);
+    final deviceSwitch = tester.widgetList<Switch>(find.byType(Switch)).first;
+    expect(deviceSwitch.value, isFalse);
+    expect(deviceSwitch.onChanged, isNull);
   });
 
   testWidgets(

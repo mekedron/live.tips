@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/firebase/notifications_service.dart';
 import '../data/firebase/push_service.dart';
+import '../domain/device_kind.dart';
 import '../domain/notification_item.dart';
 import 'auth_providers.dart';
 import 'device_providers.dart';
 import 'providers.dart';
+import 'venue_providers.dart';
 
 /// The bell and its feed (issue: push notifications for cloud accounts).
 /// Everything hangs off the ACTIVE account, exactly like device_providers:
@@ -149,14 +151,23 @@ class PushNudgeDismissed extends Notifier<bool> {
 final pushNudgeDismissedProvider =
     NotifierProvider<PushNudgeDismissed, bool>(PushNudgeDismissed.new);
 
+/// A shared bar tablet is nobody's phone: it must never carry a push token
+/// (whose tips would it announce, and to whom at the counter?), so the nudge
+/// and the settings toggle both stand down on it.
+final pushDeviceIsVenueProvider = Provider<bool>(
+  (ref) => ref.watch(deviceKindProvider) == DeviceKind.venue,
+);
+
 /// Whether Home should offer to turn notifications on. Only when the offer's
 /// button can actually deliver in one tap: a cloud account is signed in, the
 /// OS permission is still unasked (canRequest — blocked/unsupported/install-
 /// first cases stay in Settings where the full ladder lives), push isn't
-/// already on here, and the artist never said "Not now".
+/// already on here, this isn't a venue tablet, and the artist never said
+/// "Not now".
 final pushNudgeVisibleProvider = Provider<bool>((ref) {
   final uid = ref.watch(authControllerProvider.select((s) => s.user?.uid));
   if (uid == null) return false;
+  if (ref.watch(pushDeviceIsVenueProvider)) return false;
   if (ref.watch(pushNudgeDismissedProvider)) return false;
   if (ref.watch(thisDevicePushEnabledProvider)) return false;
   return ref.watch(pushStatusProvider).value == PushStatus.canRequest;

@@ -953,5 +953,7 @@
   "notifications.clear_all_cancel": "Cancel",
   "notifications.delete_label": "Delete notification",
   "widgets.copy_song.tooltip": "Copy song title",
-  "widgets.copy_song.done": "Copied “{title}”"
+  "widgets.copy_song.done": "Copied “{title}”",
+  "settings.notifications.venue_title": "Not on a venue device",
+  "settings.notifications.venue_subtitle": "This device is set up for a venue, so it never receives notifications. To make it a personal device again, use Settings → This device — that resets it."
 }
