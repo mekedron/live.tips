@@ -274,6 +274,7 @@ export async function sendTestPushHandler(
   const snap = await ref.get();
   const token = snap.get("fcmToken");
   if (typeof token !== "string" || token === "") {
+    console.log(`sendTestPush: no token on ${uid}/${deviceId}`);
     return { sent: false, reason: "no-token" };
   }
   const locale = snap.get("locale");
@@ -296,11 +297,12 @@ export async function sendTestPushHandler(
       apns: { payload: { aps: { sound: "default" } } },
       android: { notification: { channelId: "tips" } },
     });
+    console.log(`sendTestPush: sent to ${uid}/${deviceId}`);
     return { sent: true };
   } catch (e) {
     const code = (e as { code?: string }).code;
     if (code === "messaging/registration-token-not-registered" || code === "messaging/invalid-argument") {
-      console.warn(`sendTestPush: token rejected (${code})`);
+      console.warn(`sendTestPush: token rejected (${code}) on ${uid}/${deviceId}`);
       return { sent: false, reason: "dead-token" };
     }
     console.error("sendTestPush: send failed", e instanceof Error ? e.message : "");
