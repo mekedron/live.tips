@@ -18,17 +18,13 @@ final stageCapabilityProvider = Provider<bool>((ref) {
 /// Reset at every session start so a transient failure doesn't banish the
 /// jar forever. The PERSISTED style preference is never mutated by this.
 class StageHealth {
-  const StageHealth({this.webViewBroken = false, this.jar3dUnfit = false});
+  const StageHealth({this.webViewBroken = false});
 
   /// The WebView never became ready / kept dying → both jar styles unusable.
   final bool webViewBroken;
 
-  /// 3D specifically can't hold a frame rate here → step down to the 2D jar.
-  final bool jar3dUnfit;
-
-  StageHealth copyWith({bool? webViewBroken, bool? jar3dUnfit}) => StageHealth(
+  StageHealth copyWith({bool? webViewBroken}) => StageHealth(
         webViewBroken: webViewBroken ?? this.webViewBroken,
-        jar3dUnfit: jar3dUnfit ?? this.jar3dUnfit,
       );
 }
 
@@ -39,8 +35,6 @@ class StageHealthController extends Notifier<StageHealth> {
   void reportWebViewFailure() =>
       state = state.copyWith(webViewBroken: true);
 
-  void reportJar3dUnfit() => state = state.copyWith(jar3dUnfit: true);
-
   /// Called on session start — every session gets a fresh chance at 3D.
   void reset() => state = const StageHealth();
 }
@@ -50,7 +44,9 @@ final stageHealthProvider =
         StageHealthController.new);
 
 /// The style that actually renders, given the user's wish and reality.
-/// Fallback chain: jar3d → jar2d (perf) → classic (no/na WebView).
+/// Fallback chain: jar → classic (no/broken WebView). The 3D jar never steps
+/// itself down to 2D — a 3D scene that runs a little slow still beats the flat
+/// 2D jar, and the performer's quality pick (High/Low) is honored as-is.
 StageStyle resolveEffectiveStyle(
   StageStyle requested, {
   required bool webViewSupported,
@@ -58,8 +54,5 @@ StageStyle resolveEffectiveStyle(
 }) {
   if (requested == StageStyle.classic) return StageStyle.classic;
   if (!webViewSupported || health.webViewBroken) return StageStyle.classic;
-  if (requested == StageStyle.jar3d && health.jar3dUnfit) {
-    return StageStyle.jar2d;
-  }
   return requested;
 }

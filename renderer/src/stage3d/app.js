@@ -1311,14 +1311,13 @@ export function createStage(ctx) {
 
   // ---------------------------------------------------------------- bloom + render
 
-  // quality: 'high' forces bloom, 'low' disables, 'auto' sniffs the device;
-  // the fps monitor may still drop it later — spectacle never beats smoothness
+  // quality: 'low' disables bloom, anything else keeps it. The performer's
+  // pick stands as-is — no fps monitor second-guesses it. (A transient dip
+  // during a pour used to latch the whole stage into low quality.)
   function bloomFromQuality(q) {
-    if (q === 'high') return true;
-    if (q === 'low') return false;
-    return (devicePixelRatio || 1) >= 1.5 && (navigator.hardwareConcurrency || 4) >= 4;
+    return q !== 'low';
   }
-  let quality = config.quality || 'auto';
+  let quality = config.quality || 'high';
   let bloomOn = bloomFromQuality(quality);
 
   const bloomFx = createBloom(renderer);
@@ -1377,7 +1376,7 @@ export function createStage(ctx) {
   addEventListener('resize', resize);
 
   let clockTime = 0, lastT = performance.now();
-  let emaDt = 1 / 60, degraded = false;
+  let emaDt = 1 / 60;
   let twinkleAcc = 0, twinkleNext = 0.5;
   let settle = null, settleAcc = 0, settleNext = 6; // overflow-mound micro-settle
   let celebrated = false, celebrated200 = false;
@@ -1538,15 +1537,9 @@ export function createStage(ctx) {
     updateCamera(clockTime);
     renderFrame();
 
-    // auto-degrade for weak tablets: drop below native DPR if we can't hold ~36fps
+    // smoothed frame time, kept only for the perf() readout the host polls —
+    // quality never auto-drops from it (the performer's pick stands).
     emaDt += (dt - emaDt) * 0.05;
-    if (!degraded && clockTime > 5 && emaDt > 0.028) {
-      degraded = true;
-      bloomOn = false; // quality tier is the first thing to go
-      renderer.setPixelRatio(1);
-      resize();
-      emit({ type: 'perf', fps: Math.round(1 / emaDt), quality: 'degraded' });
-    }
   };
 
   // ------------------------------------------------------------ container / scene switch
@@ -1671,7 +1664,7 @@ export function createStage(ctx) {
     if (cfg.tipSound !== undefined) sound.setFanfare(!!cfg.tipSound);
     if (cfg.quality !== undefined) {
       quality = cfg.quality;
-      bloomOn = degraded ? false : bloomFromQuality(quality);
+      bloomOn = bloomFromQuality(quality);
     }
     if (cfg.notes !== undefined && !!cfg.notes !== billsOn) {
       billsOn = !!cfg.notes;
@@ -1711,7 +1704,7 @@ export function createStage(ctx) {
     jarPct: () => THREE.MathUtils.clamp(pctFromCount(targetN) / 100, 0, 2),
     perf: () => ({
       fps: paused ? 0 : Math.round(1 / emaDt),
-      quality: degraded ? 'degraded' : bloomOn ? 'high' : 'low',
+      quality: bloomOn ? 'high' : 'low',
     }),
   };
 }

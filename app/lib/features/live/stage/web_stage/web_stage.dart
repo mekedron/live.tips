@@ -51,7 +51,6 @@ class _WebStageState extends ConsumerState<WebStage> {
   var _seenTipSerial = 0;
   var _seenPulseTick = 0;
   var _trophyPulse = 0;
-  var _weakPerfStreak = 0;
   double _syncedJarPct = 0;
   int _syncedGoal = 0;
   double _sentRailInset = 0;
@@ -130,16 +129,12 @@ class _WebStageState extends ConsumerState<WebStage> {
           case StageEventKind.milestone:
             break; // per-tip haptics already fire at screen level
         }
-      case StagePerf(:final fps):
-        if (widget.renderer == '3d' && _ready && !_paused) {
-          if (fps > 0 && fps < 15) {
-            if (++_weakPerfStreak >= 3) {
-              ref.read(stageHealthProvider.notifier).reportJar3dUnfit();
-            }
-          } else {
-            _weakPerfStreak = 0;
-          }
-        }
+      case StagePerf():
+        // Perf reports are informational only — the 3D stage never steps
+        // itself down to 2D on a low frame rate (2D looks worse than a 3D
+        // scene that runs a little slow). WebView failure still falls back
+        // to classic via [_giveUp].
+        break;
       case StageError(:final message, :final fatal):
         debugPrint('stage error: $message');
         if (fatal) _fail(message);

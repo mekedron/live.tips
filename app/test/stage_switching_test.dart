@@ -108,14 +108,6 @@ void main() {
         resolveEffectiveStyle(
           StageStyle.jar3d,
           webViewSupported: true,
-          health: const StageHealth(jar3dUnfit: true),
-        ),
-        StageStyle.jar2d,
-      );
-      expect(
-        resolveEffectiveStyle(
-          StageStyle.jar3d,
-          webViewSupported: true,
           health: const StageHealth(webViewBroken: true),
         ),
         StageStyle.classic,

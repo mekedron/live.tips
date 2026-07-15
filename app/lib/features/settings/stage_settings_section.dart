@@ -86,7 +86,7 @@ class StageSettingsSection extends ConsumerWidget {
           final picked = await showLtPicker<StageStyle>(
             context: context,
             title: context.s.t('settings.stage.style_picker_title'),
-            values: StageStyle.values,
+            values: StageStyle.selectable,
             selected: stage.style,
             labelOf: (s) => s.l10nLabel(context),
           );

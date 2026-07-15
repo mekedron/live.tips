@@ -21,7 +21,7 @@ void main() {
         isTrue,
         reason: 'tip moments should be audible out of the box',
       );
-      expect(s.quality, StageQuality.auto);
+      expect(s.quality, StageQuality.high);
       expect(s.railWidth, kStageRailDefaultWidth);
     });
 
@@ -75,7 +75,24 @@ void main() {
       expect(JarScene.abstractGlow.wire, 'abstract');
       expect(JarTheme.goldenHour.wire, 'golden-hour');
       expect(JarVessel.stage.wire, 'stage');
-      expect(StageQuality.auto.wire, 'auto');
+      expect(StageQuality.high.wire, 'high');
+    });
+
+    test('the retired auto quality tier decodes to high', () {
+      // Old stages persisted `quality: auto`; that tier is gone (the renderer
+      // no longer auto-degrades) so it decodes to the new default, High.
+      expect(StageQuality.fromWire('auto'), StageQuality.high);
+      expect(StageSettings.fromJson({'quality': 'auto'}).quality,
+          StageQuality.high);
+    });
+
+    test('the 2D jar stays in the library but is hidden from the picker', () {
+      // Still decodes from the wire (already-saved stages keep working)...
+      expect(StageStyle.values, contains(StageStyle.jar2d));
+      expect(StageStyle.fromWire('jar2d'), StageStyle.jar2d);
+      // ...but performers can't pick it; 2D is never something we land on.
+      expect(StageStyle.selectable, isNot(contains(StageStyle.jar2d)));
+      expect(StageStyle.selectable, contains(StageStyle.jar3d));
     });
 
     test('the stage jar stays in the library but is hidden from the picker', () {

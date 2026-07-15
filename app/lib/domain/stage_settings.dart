@@ -11,7 +11,10 @@ enum StageStyle {
   /// works everywhere — also the terminal fallback when WebView is missing.
   classic('classic', 'Classic'),
 
-  /// The Canvas-2D jar — lightweight, for weak or old tablets.
+  /// The Canvas-2D jar. Kept in the library so already-saved stages and the
+  /// bridge keep resolving it, but hidden from the picker (see [selectable]):
+  /// the flat 2D jar reads worse than a 3D scene that runs a little slow, so
+  /// it's no longer something a performer lands on — by choice or by fallback.
   jar2d('jar2d', '2D jar'),
 
   /// The full three.js jar with backdrop scenes.
@@ -24,6 +27,11 @@ enum StageStyle {
   static StageStyle fromWire(String? wire,
           {StageStyle fallback = StageStyle.jar3d}) =>
       values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
+
+  /// Styles the picker offers. [jar2d] is intentionally left out — it stays a
+  /// valid library/wire value, just not something a performer can pick.
+  static List<StageStyle> get selectable =>
+      values.where((v) => v != jar2d).toList(growable: false);
 }
 
 /// Vessels the 3D renderer can stand on stage (real-world dimensions).
@@ -119,9 +127,11 @@ const double kStageRailMinWidth = 240;
 // (`maxWidth - 380`) applied where the rail is laid out.
 const double kStageRailMaxWidth = 760;
 
-/// Render-quality tier for the 3D renderer (bloom on/off/auto-detect).
+/// Render-quality tier for the 3D renderer: [high] keeps the bloom post-pass,
+/// [low] drops it for a lighter frame. The renderer never auto-degrades — the
+/// performer's pick stands, even if a device runs it a little slow. Old stages
+/// that stored the retired `auto` tier decode to [high] (see [fromWire]).
 enum StageQuality {
-  auto('auto', 'Auto'),
   high('high', 'High'),
   low('low', 'Low');
 
@@ -130,7 +140,7 @@ enum StageQuality {
   final String label;
 
   static StageQuality fromWire(String? wire,
-          {StageQuality fallback = StageQuality.auto}) =>
+          {StageQuality fallback = StageQuality.high}) =>
       values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
 }
 
@@ -144,7 +154,7 @@ class StageSettings {
     this.showNotes = false,
     this.soundEnabled = false,
     this.tipSoundEnabled = true,
-    this.quality = StageQuality.auto,
+    this.quality = StageQuality.high,
     this.railWidth = kStageRailDefaultWidth,
   });
 
