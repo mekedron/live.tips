@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 
 import '../data/firebase/device_registry.dart';
 import '../data/firebase/notifications_service.dart';
@@ -335,15 +337,43 @@ class PushRegistration {
     return TestPushOutcome.unreachable;
   }
 
+  /// Calls sendTestPush over PLAIN HTTP, deliberately not through the
+  /// functions SDK: on web that SDK decorates every callable with a fresh
+  /// messaging token minted from ITS OWN Firebase app (the account slot's)
+  /// once notification permission is granted — a SECOND FCM installation
+  /// registering the same browser push subscription, which invalidates the
+  /// token this very test is about to exercise. The button was murdering its
+  /// own registration on every press (found live, 2026-07-15). A bare POST
+  /// with the user's ID token is the same authenticated call, minus the
+  /// assassination.
   Future<_TestCallResult> _callTest() async {
-    final functions = ref.read(functionsProvider);
-    if (functions == null) return _TestCallResult.failed;
+    final auth = ref.read(firebaseAuthProvider);
+    final user = auth?.currentUser;
+    if (auth == null || user == null) return _TestCallResult.failed;
     try {
-      final result = await functions
-          .httpsCallable('sendTestPush')
-          .call<dynamic>({'deviceId': ref.read(deviceIdProvider)});
-      final data = result.data;
-      final map = data is Map ? data.cast<String, dynamic>() : const <String, dynamic>{};
+      final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) return _TestCallResult.failed;
+      const region = 'europe-west1'; // where index.ts pins the callables
+      final projectId = auth.app.options.projectId;
+      final response = await http.post(
+        Uri.https('$region-$projectId.cloudfunctions.net', '/sendTestPush'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({
+          'data': {'deviceId': ref.read(deviceIdProvider)},
+        }),
+      );
+      if (response.statusCode != 200) {
+        debugPrint('test push refused: HTTP ${response.statusCode}');
+        return _TestCallResult.failed;
+      }
+      final body = jsonDecode(response.body);
+      final result = body is Map ? body['result'] : null;
+      final map = result is Map
+          ? result.cast<String, dynamic>()
+          : const <String, dynamic>{};
       if (map['sent'] == true) return _TestCallResult.sent;
       return switch (map['reason']) {
         'no-token' => _TestCallResult.noToken,
