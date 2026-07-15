@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/local_store.dart';
-import 'package:live_tips/data/relay/firestore_tip_channel.dart';
-import 'package:live_tips/data/tip_channel.dart';
+import 'package:live_tips/data/relay/jar_claimer.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/domain/tip.dart';
+import 'package:live_tips/domain/tip_method.dart';
 import 'package:live_tips/domain/relay_jar.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/cloud_session_coordinator.dart';
@@ -20,22 +20,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers.dart';
 
-/// Who attaches the relay tip feed in a cloud session, proven end to end
+/// How a cloud session relates to the jar after #71, proven end to end
 /// through the real controller, the real [CloudSessionCoordinator] and the
-/// real [FirestoreTipChannel] — with devices that have NO Stripe API key,
-/// which is exactly the desktop a cloud account signs into fresh (the key
-/// lives on the phone's keychain, or in cloud custody; it never travels).
+/// real [JarClaimer] — with devices that have NO Stripe API key, which is
+/// exactly the desktop a cloud account signs into fresh.
 ///
-/// The ground truth these tests pin: leading is about SERVING THE JAR — the
-/// relay channel, the `jars/{jarId}/pendingTips` drain, the lease — and the
-/// Stripe key gates only the poller (a key-less leader polls
-/// [NullTipSource]). So the device that STARTS a session leads
-/// unconditionally, and a key-less follower may RESCUE a session whose
-/// leader died (#70): the leader is the queue's only reader, and the old
-/// key-gated takeover left fans' tips waiting out the 1-hour hold unseen
-/// while every surviving device showed a running set. Every other
-/// coordinator test seeds a leader-capable device, which is how both halves
-/// went unasked for so long.
+/// The ground truth these tests pin: for a cloud account the SERVER writes
+/// fan-page tips straight into the account's own collections (the session's
+/// tips subcollection during a set), so NO device runs a relay channel, no
+/// pendingTips queue is drained, and money no longer rides on leadership —
+/// the #70 failure mode ("a dead leader orphans the relay feed") is
+/// structurally impossible: there is no client feed to orphan. What is left
+/// of the jar relationship is the CLAIM: every device claims at attach,
+/// carrying `bandId` + `owned` (the route the server branches on), under
+/// the pinned contract that bandId never travels without owned. Leadership
+/// survives for what still needs one voice: the Stripe poll, the lease, the
+/// finalize, and the fan page's request-queue publish (#70's takeover
+/// semantics stay, re-pinned here).
 
 const _uid = 'uid_cloud';
 const _bandId = 'band_1';
@@ -152,16 +153,54 @@ void main() {
     });
   });
 
+  /// Writes a fan tip the way the SERVER now does (#71): straight into the
+  /// live session's tips subcollection, doc id = tip id, in the exact
+  /// `Tip.toJson` wire shape (the leader's `_publish` shape — the server
+  /// half is built against precisely this serializer).
+  Future<Tip> serverWritesSessionTip(
+    String sessionId, {
+    required String relayId,
+    int amountMinor = 700,
+    String? songId,
+    String? songTitle,
+  }) async {
+    final tip = Tip.relayTip(
+      amountMinor: amountMinor,
+      currency: 'usd',
+      method: TipMethod.revolut,
+      name: 'Sam',
+      message: 'Great set!',
+      ts: DateTime.now().millisecondsSinceEpoch,
+      serial: 0,
+      relayId: relayId,
+      songId: songId,
+      songTitle: songTitle,
+    );
+    await db
+        .doc('users/$_uid/bands/$_bandId/sessions/$sessionId/tips/${tip.id}')
+        .set({
+      ...tip.toJson(),
+      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
+    });
+    return tip;
+  }
+
   /// A cloud device WITHOUT a Stripe key (no secure-store seed, no initial
-  /// key): `app.apiKey == null` — the fresh-desktop shape. Its relay is the
-  /// real [FirestoreTipChannel] over the shared fake, and its request
-  /// publisher is the real [JarRequestsPublisher] over the same recorded
-  /// backend, so `backend.names` shows exactly which devices spoke to the
-  /// fan page (claimJar = attached the feed; setJarRequests = published the
-  /// request state).
-  Future<({ProviderContainer container, FakeCallables backend})> device(
-      String deviceId) async {
+  /// key): `app.apiKey == null` — the fresh-desktop shape. Its jar claim is
+  /// the real [JarClaimer] over a recorded backend whose [FakeRelayAuth]
+  /// says `ownsJars` (a signed-in real account), so `backend.names` shows
+  /// exactly which devices spoke to the fan page (claimJar = route install;
+  /// setJarRequests = published the request state) — and the relay CHANNEL
+  /// factory records every construction attempt, because for a cloud
+  /// session the honest count is zero.
+  Future<
+      ({
+        ProviderContainer container,
+        FakeCallables backend,
+        List<String> channelAsks,
+      })> device(String deviceId) async {
     final backend = FakeCallables();
+    final channelAsks = <String>[];
     final container = ProviderContainer(overrides: [
       repoRevisionProvider.overrideWith(_NoopRevision.new),
       localStoreProvider.overrideWithValue(store),
@@ -173,13 +212,18 @@ void main() {
       tipSourceFactoryProvider.overrideWithValue(
           ({required demo, required apiKey, required jar}) => _EmptySource()),
       relayChannelFactoryProvider.overrideWithValue(
-          ({required demo, required jar, required secret}) =>
-              FirestoreTipChannel(
-                db: db,
-                auth: FakeRelayAuth(),
-                client: fakeRelayClient(backend),
+          ({required demo, required jar, required secret}) {
+        channelAsks.add(deviceId);
+        return null;
+      }),
+      jarClaimerFactoryProvider.overrideWithValue(
+          ({required demo, required jar, required secret, required bandId}) =>
+              JarClaimer(
+                client: fakeRelayClient(backend,
+                    auth: FakeRelayAuth(owned: true)),
                 jarId: _jarId,
                 secret: 'sec',
+                bandId: bandId,
                 backoff: (_) => null,
               )),
       jarRequestsPublisherFactoryProvider
@@ -208,14 +252,20 @@ void main() {
     expect(container.read(appStateProvider).accountId, _bandId,
         reason: 'the device must land on the seeded cloud band');
     await _settle();
-    return (container: container, backend: backend);
+    return (
+      container: container,
+      backend: backend,
+      channelAsks: channelAsks,
+    );
   }
 
   test(
-      'a key-less device that STARTS the session leads anyway: the relay '
-      'channel attaches (claimJar), health reaches ok, and pendingTips are '
-      'drained into the session', () async {
-    final (container: a, backend: backend) = await device('dev_a');
+      'a cloud session runs NO relay channel at all: the claim installs the '
+      'route (bandId + owned, per the pinned contract), pendingTips is left '
+      'strictly alone, and a server-written session tip is what reaches the '
+      'stage — celebrated, with song fields intact', () async {
+    final (container: a, backend: backend, channelAsks: channelAsks) =
+        await device('dev_a');
     expect(a.read(appStateProvider).apiKey, isNull,
         reason: 'this is the fresh-desktop shape: no Stripe key on device');
 
@@ -225,70 +275,94 @@ void main() {
     // The starter leads unconditionally — no key check anywhere in _claim.
     final doc = (await liveDoc().get()).data()!;
     expect(doc['active'], isTrue);
-    expect(doc['leaderDeviceId'], 'dev_a',
-        reason: 'the session-starting device installs itself as leader '
-            'regardless of the Stripe key');
+    expect(doc['leaderDeviceId'], 'dev_a');
 
-    // Leading is what attaches the relay: the jar was claimed and the
-    // pendingTips listener is up.
+    // No channel was ever CONSTRUCTED, let alone attached — the factory
+    // seam is the proof that cloud sessions cannot drain a queue even by
+    // accident. And with no channel there is no second pill.
+    expect(channelAsks, isEmpty,
+        reason: 'a cloud session must never build a FirestoreTipChannel');
+    expect(a.read(liveSessionProvider)!.relay, isNull,
+        reason: 'the relay pill is retired for cloud sessions');
+
+    // The claim still happened, and it carried the ROUTE — bandId together
+    // with owned, exactly as the server half stores it (FakeCallables
+    // enforces the perimeter: junk bandId or bandId-without-owned throws).
     expect(backend.names, contains('claimJar'));
-    expect(a.read(liveSessionProvider)!.relay, RelayHealth.ok,
-        reason: 'the fan-page feed must come up for a key-less leader');
+    expect(backend.argsFor('claimJar'), {
+      'jarId': _jarId,
+      'secret': 'sec',
+      'owned': true,
+      'bandId': _bandId,
+    });
 
-    // A fan tip through the relay reaches the stage, and delivery deletes
-    // the queue doc (the relay keeps no tip history).
+    // A pendingTips doc (an unrouted jar's tip, or an old build's leftovers)
+    // is NOT this session's business: nothing listens, nothing deletes.
     await db.collection(_pendingPath).add({
       'method': 'revolut',
-      'amountMinor': 700,
+      'amountMinor': 400,
       'currency': 'USD',
-      'name': 'Sam',
-      'message': 'Great set!',
-      'tsMs': 1770000000000,
+      'tsMs': DateTime.now().millisecondsSinceEpoch,
     });
+    await _settle();
+    expect((await db.collection(_pendingPath).get()).docs, hasLength(1),
+        reason: 'no drain, no delete-ack — delivery-is-deletion is the '
+            'LOCAL mode\'s contract, never the cloud one\'s');
+    expect(a.read(liveSessionProvider)!.session.totalMinor, 0,
+        reason: 'a cloud session must not ingest from the queue either — '
+            'the switch keys on the session kind, not on what appears there');
+
+    // What DOES reach the stage: the server-written subcollection doc.
+    final sessionId = a.read(liveSessionProvider)!.session.id;
+    final tip = await serverWritesSessionTip(sessionId,
+        relayId: 'srv_1', songId: 'sng_1', songTitle: 'Wonderwall');
     await _settle();
 
     final state = a.read(liveSessionProvider)!;
-    expect(state.session.totalMinor, 700,
-        reason: 'the pendingTips queue drains into the session');
-    expect((await db.collection(_pendingPath).get()).docs, isEmpty,
-        reason: 'delivery IS deletion');
+    expect(state.session.totalMinor, 700);
+    expect(state.confettiTick, 1,
+        reason: 'a genuinely new tip celebrates exactly as before');
+    expect(state.session.tips.single.id, tip.id);
+    expect(state.session.tips.single.songId, 'sng_1');
+    expect(state.session.tips.single.songTitle, 'Wonderwall');
   });
 
   test(
-      'a key-less JOINER stays a follower while the lease is fresh — no '
-      'takeover bid, no relay pill at all (LiveState.relay is null, so '
-      '"Tip page connecting…" can only come from a device that leads)',
-      () async {
-    final (container: a, backend: _) = await device('dev_a');
+      'a JOINER claims too (any device may backfill an old jar\'s route — '
+      'same uid, idempotent), still builds no channel, shows no second pill, '
+      'and never bids while the lease is fresh', () async {
+    final (container: a, backend: _, channelAsks: _) = await device('dev_a');
     await a.read(liveSessionProvider.notifier).start(goalMinor: 10000);
     await _settle();
 
-    final (container: b, backend: backendB) = await device('dev_b');
-    final info =
-        ActiveSessionInfo.fromData((await liveDoc().get()).data())!;
+    final (container: b, backend: backendB, channelAsks: channelAsksB) =
+        await device('dev_b');
+    final info = ActiveSessionInfo.fromData((await liveDoc().get()).data())!;
     final joined = await b.read(liveSessionProvider.notifier).join(info);
     await _settle();
 
     expect(joined, isTrue);
     expect((await liveDoc().get()).data()!['leaderDeviceId'], 'dev_a',
         reason: 'a live lease is a live leader — nothing to rescue');
-    expect(b.read(liveSessionProvider)!.relay, isNull,
-        reason: 'a follower runs no relay channel and shows no second pill');
-    expect(backendB.names, isNot(contains('claimJar')),
-        reason: 'only the leader claims the jar');
+    expect(channelAsksB, isEmpty);
+    expect(b.read(liveSessionProvider)!.relay, isNull);
+    expect(backendB.names, contains('claimJar'),
+        reason: 'the claim is attach-time route maintenance now, not a '
+            'leader\'s prelude to draining a queue');
+    expect(backendB.argsFor('claimJar')['bandId'], _bandId);
   });
 
   test(
-      'a key-less follower RESCUES a dead leader (#70): takes the stale '
-      'lease over, attaches the relay, republishes the request state, and '
-      'the pendingTips queue has a reader again', () async {
-    final (container: a, backend: _) = await device('dev_a');
+      'money flows with NOBODY leading, and a key-less follower still '
+      'RESCUES the dead leader\'s remaining jobs (#70): republishes the '
+      'request state after taking the stale lease over', () async {
+    final (container: a, backend: _, channelAsks: _) = await device('dev_a');
     await a
         .read(liveSessionProvider.notifier)
         .start(goalMinor: 10000, requestsOpen: true);
     await _settle();
-    final info =
-        ActiveSessionInfo.fromData((await liveDoc().get()).data())!;
+    final info = ActiveSessionInfo.fromData((await liveDoc().get()).data())!;
+    final sessionId = info.sessionId;
 
     // The leader dies without stopping: its container goes away, the doc
     // keeps saying dev_a — and then two minutes of silence pass.
@@ -299,7 +373,12 @@ void main() {
           60000,
     }, SetOptions(merge: true));
 
-    final (container: b, backend: backendB) = await device('dev_b');
+    // A fan tips INTO the leaderless window: the server needs no leader —
+    // the tip lands in the subcollection while no device is even attached.
+    await serverWritesSessionTip(sessionId, relayId: 'srv_gap');
+
+    final (container: b, backend: backendB, channelAsks: channelAsksB) =
+        await device('dev_b');
     expect(b.read(appStateProvider).apiKey, isNull,
         reason: 'the rescuer has no Stripe key — the shape under key '
             'custody, where NO device holds one');
@@ -307,50 +386,46 @@ void main() {
     expect(joined, isTrue);
     await _settle();
 
+    // The tip that arrived while nobody led is on the stage of the device
+    // that came back — the whole stale-lease window costs no money.
+    expect(b.read(liveSessionProvider)!.session.totalMinor, 700);
+
     final doc = (await liveDoc().get()).data()!;
     expect(doc['active'], isTrue);
     expect(doc['leaderDeviceId'], 'dev_b',
-        reason: 'leading is serving the jar, not polling Stripe — a '
-            'key-less device may take a dead leader over');
-
-    // The takeover attached the relay: jar claimed, feed up, pill showing.
-    expect(backendB.names, contains('claimJar'));
-    expect(b.read(liveSessionProvider)!.relay, RelayHealth.ok,
-        reason: 'the fan-page feed must come back up under the new leader');
+        reason: 'leading is serving the session — the poll, the lease, the '
+            'fan page\'s one voice — and needs no Stripe key');
 
     // ...and the fan page heard its new voice: the request state was
     // republished on takeover (the joiner itself never published — the
     // old leader may have died with the last publish unsent).
     expect(backendB.names, contains('setJarRequests'));
+    // Still no channel anywhere in the takeover path.
+    expect(channelAsksB, isEmpty);
 
-    // The queue has a reader again: a fan tip drains into the session
-    // instead of waiting out the 1-hour hold unseen.
-    await db.collection(_pendingPath).add({
-      'method': 'revolut',
-      'amountMinor': 700,
-      'currency': 'USD',
-      'name': 'Sam',
-      'message': 'Great set!',
-      'tsMs': 1770000000000,
-    });
+    // And tips keep landing under the new leader — same one road.
+    await serverWritesSessionTip(sessionId,
+        relayId: 'srv_2', amountMinor: 500);
     await _settle();
-    expect(b.read(liveSessionProvider)!.session.totalMinor, 700);
+    expect(b.read(liveSessionProvider)!.session.totalMinor, 1200);
     expect((await db.collection(_pendingPath).get()).docs, isEmpty,
-        reason: 'delivery IS deletion');
+        reason: 'nothing ever flowed through the queue in this test');
   });
 
   test(
       'two key-less followers race a dead leader\'s lease: the transactional '
-      'claim lets exactly one through — one relay, one fan-page voice',
-      () async {
-    final (container: a, backend: _) = await device('dev_a');
-    await a.read(liveSessionProvider.notifier).start(goalMinor: 10000);
+      'claim lets exactly one through — one fan-page voice', () async {
+    final (container: a, backend: _, channelAsks: _) = await device('dev_a');
+    await a
+        .read(liveSessionProvider.notifier)
+        .start(goalMinor: 10000, requestsOpen: true);
     await _settle();
-    final info =
-        ActiveSessionInfo.fromData((await liveDoc().get()).data())!;
+    final info = ActiveSessionInfo.fromData((await liveDoc().get()).data())!;
 
-    final (container: b, backend: backendB) = await device('dev_b');
-    final (container: c, backend: backendC) = await device('dev_c');
+    final (container: b, backend: backendB, channelAsks: _) =
+        await device('dev_b');
+    final (container: c, backend: backendC, channelAsks: _) =
+        await device('dev_c');
     expect(await b.read(liveSessionProvider.notifier).join(info), isTrue);
     expect(await c.read(liveSessionProvider.notifier).join(info), isTrue);
     await _settle();
@@ -369,17 +444,15 @@ void main() {
     final leader =
         (await liveDoc().get()).data()!['leaderDeviceId'] as String;
     expect({'dev_b', 'dev_c'}, contains(leader));
-    final winner = leader == 'dev_b' ? b : c;
-    final loser = leader == 'dev_b' ? c : b;
     final winnerBackend = leader == 'dev_b' ? backendB : backendC;
     final loserBackend = leader == 'dev_b' ? backendC : backendB;
 
-    expect(winnerBackend.names, contains('claimJar'));
-    expect(winner.read(liveSessionProvider)!.relay, RelayHealth.ok);
-    expect(loserBackend.names, isNot(contains('claimJar')),
+    // The republish is the takeover's one relay job now — exactly one
+    // device performed it. (Both claimed at JOIN: the claim is attach-time
+    // route maintenance, deliberately leadership-blind.)
+    expect(winnerBackend.names, contains('setJarRequests'));
+    expect(loserBackend.names, isNot(contains('setJarRequests')),
         reason: 'the loser saw the winner\'s fresh lease inside its own '
             'transaction and stayed a quiet follower');
-    expect(loser.read(liveSessionProvider)!.relay, isNull,
-        reason: 'no second relay channel, no second pill');
   });
 }

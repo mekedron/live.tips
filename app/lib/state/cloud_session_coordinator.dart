@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../data/relay/jar_claimer.dart';
 import '../data/repository/account_data_repository.dart';
 import '../data/stripe/stripe_client.dart';
 import '../data/tip_channel.dart';
@@ -31,22 +32,31 @@ import 'session_coordinator.dart';
 ///   archive entry the history mirror reads — stop must NOT also append via
 ///   the repository, or the night would be archived twice.
 ///
-/// One device — the leader — runs the Stripe poll and the relay channel and
-/// writes every fresh tip to the tips subcollection. EVERY device (the
+/// One device — the leader — runs the Stripe poll and writes its fresh tips
+/// to the tips subcollection. Fan-page (relay) tips do NOT pass through the
+/// leader at all (#71): the SERVER writes them straight into the same
+/// subcollection, so no client runs a relay channel and no queue needs a
+/// reader — a dead leader can no longer strand fan money. EVERY device (the
 /// leader included) ingests from the subcollection listener only: one code
 /// path, identical ordering everywhere. The leader's own tips come back
 /// through Firestore's latency-compensated local echo, so nothing is
 /// delayed, and dedupe by tip id makes the echo safe.
 ///
+/// The one relay call left is the CLAIM ([JarClaimer]): it installs the
+/// jar's route (`ownerUid` + `bandId`) — what makes the server write direct
+/// in the first place — and keeps this uid in the jar's `readerUids`. Every
+/// device claims at attach; the call is idempotent and shared-uid, so the
+/// duplication costs a round trip, not correctness.
+///
 /// The lease: the leader stamps `leaderLeaseUntilMs = now + 45s` on every
 /// poll tick. ANY follower that watches the lease go stale by more than two
 /// minutes may take leadership over (transaction again) — leading is serving
-/// the jar (the relay channel, the tips subcollection, the lease itself),
-/// and the Stripe key gates only the poller: a key-less usurper polls
-/// [NullTipSource], exactly like the key-less device that STARTS a session
-/// does. A zombie leader returning from a long sleep keeps polling
-/// harmlessly: its tip writes are idempotent and its stop still flips the
-/// same doc.
+/// the session (the Stripe poll, the request-queue publish, the finalize,
+/// the lease itself), and the Stripe key gates only the poller: a key-less
+/// usurper polls [NullTipSource], exactly like the key-less device that
+/// STARTS a session does. A zombie leader returning from a long sleep keeps
+/// polling harmlessly: its tip writes are idempotent and its stop still
+/// flips the same doc.
 class CloudSessionCoordinator implements SessionCoordinator {
   CloudSessionCoordinator({
     required FirebaseFirestore db,
@@ -55,7 +65,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
     required String deviceId,
     required AccountDataRepository repository,
     required TipSource source,
-    required TipChannel? relay,
+    required JarClaimer? claimer,
     required int pollIntervalSec,
     required SessionEvents events,
   })  : _db = db,
@@ -64,7 +74,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
         _deviceId = deviceId,
         _repo = repository,
         _source = source,
-        _relay = relay,
+        _claimer = claimer,
         _pollIntervalSec = pollIntervalSec,
         _events = events;
 
@@ -95,7 +105,7 @@ class CloudSessionCoordinator implements SessionCoordinator {
   final String _deviceId;
   final AccountDataRepository _repo;
   final TipSource _source;
-  final TipChannel? _relay;
+  final JarClaimer? _claimer;
   final int _pollIntervalSec;
   final SessionEvents _events;
 
@@ -117,8 +127,6 @@ class CloudSessionCoordinator implements SessionCoordinator {
   Timer? _timer;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _docSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _tipsSub;
-  StreamSubscription<Tip>? _relayTipsSub;
-  StreamSubscription<RelayHealth>? _relayStatusSub;
 
   static int get _nowMs => DateTime.now().millisecondsSinceEpoch;
 
@@ -129,10 +137,18 @@ class CloudSessionCoordinator implements SessionCoordinator {
   CollectionReference<Map<String, dynamic>> get _tipsCol =>
       _sessionDoc.collection('tips');
 
-  // The relay pill appears once leadership is settled (see [_startLeading]);
-  // a follower runs no relay channel and shows no second pill.
+  // Retired for cloud sessions (#71): no device runs a relay channel, so
+  // there is no client-side fan feed for a second pill to be honest about.
+  // Feed health lives in the MAIN pill — the leader's Stripe poll, and the
+  // tips-subcollection listener's flow on followers (see [_onTipsSnapshot]).
   @override
   RelayHealth? get relayHealthSeed => null;
+
+  // The tips subcollection is durable and redelivers the whole session on
+  // every attach — the controller must gate celebration on the device-local
+  // presented watermark, not on arrival.
+  @override
+  bool get replaysTips => true;
 
   @override
   Future<void> start(
@@ -154,6 +170,14 @@ class CloudSessionCoordinator implements SessionCoordinator {
     // The crash snapshot works exactly like the local profile's: this
     // device's in-flight copy of the set, safe across a crash or restart.
     await _repo.saveActiveSession(_bandId, session, resumeCursor);
+
+    // Claim the jar (route install + readerUids) — every device, every
+    // mode, fire-and-forget: the session must not wait on the relay, and a
+    // claim that never lands only delays an OLD jar's route backfill (its
+    // tips keep flowing into pendingTips with today's semantics until a
+    // later claim converts it). Already-routed jars flow server-direct
+    // regardless of what this call does.
+    _claimer?.start();
 
     // Every device ingests from the tips listener — the leader's own polls
     // come back through it too (latency-compensated, so not delayed).
@@ -265,23 +289,15 @@ class CloudSessionCoordinator implements SessionCoordinator {
     }
   }
 
-  /// Brings the leader transports up: the relay channel, the Stripe poll,
-  /// and the heartbeat that rides on it.
+  /// Brings the leader transports up: the Stripe poll and the heartbeat
+  /// that rides on it. Fan-page tips are the server's to deliver (#71) —
+  /// no relay channel comes up here, for the leader or anyone else.
   Future<void> _startLeading(
     LiveSession session, {
     String? resumeCursor,
     required bool backfill,
   }) async {
     _timer?.cancel();
-    final relay = _relay;
-    if (relay != null) {
-      // Subscribe BEFORE start(): broadcast streams don't replay. Relay
-      // tips are published, not ingested — the listener echoes them back.
-      _events.onRelayHealth(RelayHealth.connecting);
-      _relayTipsSub = relay.tips.listen((tip) => _publish([tip]));
-      _relayStatusSub = relay.status.listen(_events.onRelayHealth);
-      relay.start();
-    }
     try {
       await _source.prime(session.startedAt,
           resumeCursor: resumeCursor, backfill: backfill);
@@ -425,13 +441,16 @@ class CloudSessionCoordinator implements SessionCoordinator {
   }
 
   /// Follower-side: claims leadership when the lease has been stale for
-  /// [staleMs]. ANY follower may bid — the leader is the only reader of the
-  /// jar's pendingTips queue, so a takeover refused is a fan-page feed
-  /// orphaned for the rest of the set (#70). This used to demand a Stripe
-  /// key ("someone's tablet on the merch table stays a follower forever"),
-  /// which conflated *can poll Stripe* with *can serve the jar*: a key-less
-  /// usurper leads exactly like a key-less starter already does — relay up,
-  /// [NullTipSource] for the poll, lease heartbeaten.
+  /// [staleMs]. ANY follower may bid — the leader is still the fan page's
+  /// one VOICE (the request-queue publish) and the account's Stripe poller,
+  /// so a takeover refused leaves the queue aggregate frozen and card tips
+  /// unpolled for the rest of the set (#70). Money no longer rides on it:
+  /// fan-page tips are server-written into the subcollection whoever leads,
+  /// or nobody does (#71). This used to demand a Stripe key ("someone's
+  /// tablet on the merch table stays a follower forever"), which conflated
+  /// *can poll Stripe* with *can serve the session*: a key-less usurper
+  /// leads exactly like a key-less starter already does — [NullTipSource]
+  /// for the poll, lease heartbeaten.
   void _maybeTakeOver() {
     if (_disposed || _isLeader || _takingOver) return;
     if (_lastLeaseUntilMs <= 0) return; // doc not seen yet
@@ -625,8 +644,10 @@ class CloudSessionCoordinator implements SessionCoordinator {
     }
   }
 
+  // The one push feed is the Firestore listener, which redials itself; the
+  // foreground courtesy goes to a claim still stuck in backoff instead.
   @override
-  void reconnectNow() => _relay?.reconnectNow();
+  void reconnectNow() => _claimer?.reconnectNow();
 
   @override
   Future<void> dispose() async => _teardown();
@@ -640,13 +661,8 @@ class CloudSessionCoordinator implements SessionCoordinator {
     _docSub = null;
     _tipsSub?.cancel();
     _tipsSub = null;
-    _relayTipsSub?.cancel();
-    _relayTipsSub = null;
-    _relayStatusSub?.cancel();
-    _relayStatusSub = null;
     _source.dispose();
-    final relay = _relay;
-    if (relay != null) unawaited(relay.dispose());
+    _claimer?.dispose();
     _polling = false;
     _skipTicks = 0;
   }

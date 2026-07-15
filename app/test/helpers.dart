@@ -310,9 +310,28 @@ class FakeCallables {
         _checkRequestsConfig(args);
         _checkRequestsQueue(args);
       }
+      if (name == 'claimJar') _checkClaim(args);
     }
     final route = routes[name];
     return route == null ? const {} : route(args);
+  }
+
+  static final _bandId = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
+
+  /// The claimJar route contract (#71), as the server pins it: `bandId`
+  /// must be a valid band id AND ride with `owned` — a refused claim writes
+  /// NOTHING server-side (not even the reader join), so a client that ships
+  /// a junk or orphaned bandId must fail HERE, not by silently locking a
+  /// device out of its jar in production.
+  static void _checkClaim(Map<String, dynamic> args) {
+    final bandId = args['bandId'];
+    if (bandId == null) return;
+    if (bandId is! String || !_bandId.hasMatch(bandId)) {
+      throw FakeFunctionsException('invalid-argument', 'bad bandId');
+    }
+    if (args['owned'] != true) {
+      throw FakeFunctionsException('invalid-argument', 'bandId requires owned');
+    }
   }
 
   /// The scrub `validate.ts` runs before counting (minus NFC normalization,

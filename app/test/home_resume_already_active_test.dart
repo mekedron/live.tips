@@ -36,6 +36,9 @@ class _AlreadyActiveCoordinator implements SessionCoordinator {
   RelayHealth? get relayHealthSeed => null;
 
   @override
+  bool get replaysTips => false;
+
+  @override
   Future<void> start(LiveSession session,
       {String? resumeCursor, SessionStartMode mode = SessionStartMode.fresh}) {
     throw const SessionAlreadyActiveException(kTestAccountId);

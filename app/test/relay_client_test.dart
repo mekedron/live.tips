@@ -138,6 +138,58 @@ void main() {
     );
   });
 
+  group('the claim route (#71: owned + bandId travel together or not at all)',
+      () {
+    test('a REAL account\'s claim with a band installs the route', () async {
+      final backend = FakeCallables();
+      final client =
+          fakeRelayClient(backend, auth: FakeRelayAuth(owned: true));
+
+      await client.claimJar(
+          jarId: 'jar_abc', secret: 'sec', bandId: 'acc_band1');
+
+      // FakeCallables enforces the server's perimeter here too: a bandId
+      // without owned, or a junk bandId, would have thrown.
+      expect(backend.argsFor('claimJar'), {
+        'jarId': 'jar_abc',
+        'secret': 'sec',
+        'owned': true,
+        'bandId': 'acc_band1',
+      });
+    });
+
+    test('a transport-anonymous uid (local profiles) never routes a jar — '
+        'the claim stays a plain reader join', () async {
+      final backend = FakeCallables();
+      final client =
+          fakeRelayClient(backend, auth: FakeRelayAuth(owned: false));
+
+      await client.claimJar(
+          jarId: 'jar_abc', secret: 'sec', bandId: 'acc_band1');
+
+      expect(backend.argsFor('claimJar'), {
+        'jarId': 'jar_abc',
+        'secret': 'sec',
+      });
+    });
+
+    test('an id the server\'s validator would refuse degrades to a reader '
+        'claim — a refused claim writes NOTHING server-side, so the junk '
+        'must never ride along and cost the reader join too', () async {
+      final backend = FakeCallables();
+      final client =
+          fakeRelayClient(backend, auth: FakeRelayAuth(owned: true));
+
+      await client.claimJar(
+          jarId: 'jar_abc', secret: 'sec', bandId: 'acc/evil id');
+
+      expect(backend.argsFor('claimJar'), {
+        'jarId': 'jar_abc',
+        'secret': 'sec',
+      });
+    });
+  });
+
   test('the authenticated calls carry the jar id and the secret', () async {
     final backend = FakeCallables({
       'rotateJarSecret': (_) => {'secret': 'new_secret'},

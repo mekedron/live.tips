@@ -101,6 +101,7 @@ class LocalStore {
   static const kRelayHistoryBase = 'relay_history_v1';
   static const kRelayLinkReplacedBase = 'relay_link_replaced_v1';
   static const kBandSettingsBase = 'band_settings_v1';
+  static const kTipsPresentedAtBase = 'tips_presented_at_v1';
 
   /// The namespace demo play owns. Demo is not a band, and it must not write
   /// into one: its "Go live" persists a crash snapshot, a goal, a QR mode, a
@@ -136,6 +137,7 @@ class LocalStore {
     kRelayHistoryBase,
     kRelayLinkReplacedBase,
     kBandSettingsBase,
+    kTipsPresentedAtBase,
   ];
 
   static String accountKey(String base, String accountId) =>
@@ -396,6 +398,55 @@ class LocalStore {
   Future<void> writeRelaySeenAt(String accountId, int ms) async {
     if (!_owned(accountId)) return;
     await _prefs.setInt(accountKey(kRelaySeenAtBase, accountId), ms);
+  }
+
+  /// The device-local presented-tips watermark (#71): the `createdAt` (ms)
+  /// of the newest tip THIS device has actually shown on stage for the band,
+  /// plus the ids of the tips sitting AT that exact millisecond.
+  ///
+  /// Cloud sessions ingest from a durable subcollection that redelivers the
+  /// whole session on every attach, so "new to this device" cannot be read
+  /// off arrival — it is durable-collection-vs-this. The contract, inherited
+  /// from the repo's cache-first discipline: the watermark advances ONLY
+  /// when tips are actually presented here (never on listener attach, and
+  /// never to "now" because a snapshot — least of all a from-cache one —
+  /// seemed to carry nothing new). Seeded to "now" when a cloud session
+  /// first runs on a band with no watermark, so a reinstalled device renders
+  /// the backlog without a stale confetti storm.
+  ///
+  /// The boundary ids exist because timestamps alone cannot referee their
+  /// own millisecond: Stripe stamps tips at SECOND resolution, so two tips
+  /// of a busy second routinely share a `createdAt` across two ingest
+  /// batches — a bare `<=` cut would mute the second one's celebration
+  /// mid-set (money silently appearing), and a bare `<` would re-celebrate
+  /// the newest presented tip on every rejoin. With the ids, a same-ms tip
+  /// is muted iff THIS device already presented that exact tip.
+  ({int ms, List<String> ids})? readTipsPresented(String accountId) {
+    if (!_owned(accountId)) return null;
+    final raw = _getString(accountKey(kTipsPresentedAtBase, accountId));
+    if (raw == null) return null;
+    try {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      final ms = json['ms'];
+      if (ms is! num) return null;
+      return (
+        ms: ms.toInt(),
+        ids: [
+          if (json['ids'] is List)
+            for (final id in json['ids'] as List)
+              if (id is String) id,
+        ],
+      );
+    } catch (_) {
+      return null; // a malformed mark re-seeds — one quiet backlog, no crash
+    }
+  }
+
+  Future<void> writeTipsPresented(
+      String accountId, int ms, List<String> ids) async {
+    if (!_owned(accountId)) return;
+    await _setString(accountKey(kTipsPresentedAtBase, accountId),
+        jsonEncode({'ms': ms, 'ids': ids}));
   }
 
   /// The tip URL of a jar that stopped working and was auto-replaced, kept

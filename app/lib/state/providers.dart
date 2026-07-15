@@ -6,6 +6,7 @@ import '../data/tip_source.dart';
 import '../data/fx_source.dart';
 import '../data/local_store.dart';
 import '../data/relay/firestore_tip_channel.dart';
+import '../data/relay/jar_claimer.dart';
 import '../data/relay/relay_auth.dart';
 import '../data/relay/relay_client.dart';
 import '../data/tip_channel.dart';
@@ -1187,6 +1188,33 @@ final relayChannelFactoryProvider = Provider<RelayChannelFactory>(
   },
 );
 
+/// Builds the claim-on-attach for a CLOUD session — a seam mirroring
+/// [relayChannelFactoryProvider] so coordinator tests can record (or omit)
+/// the claim. Cloud sessions attach no tip channel at all (#71: the server
+/// writes fan tips straight into the account), but the claim survives it:
+/// it installs the jar's route (`bandId` rides the call, `owned` under the
+/// same real-account gate as createJar) and keeps the account uid in
+/// `readerUids`. Null means "nothing to claim": demo (whose jar is pretend
+/// and must never reach the relay) or no jar/secret.
+typedef JarClaimerFactory = JarClaimer? Function({
+  required bool demo,
+  required RelayJar? jar,
+  required String? secret,
+  required String bandId,
+});
+
+final jarClaimerFactoryProvider = Provider<JarClaimerFactory>(
+  (ref) => ({required demo, required jar, required secret, required bandId}) {
+    if (demo || jar == null || secret == null || bandId.isEmpty) return null;
+    return JarClaimer(
+      client: ref.read(relayClientProvider),
+      jarId: jar.jarId,
+      secret: secret,
+      bandId: bandId,
+    );
+  },
+);
+
 /// Builds the fan-page request publisher for one session — a seam mirroring
 /// [relayChannelFactoryProvider] so controller tests can hand in a recorder.
 /// A null jar/secret (Stripe-only installs, demo — whose jar is pretend and
@@ -1225,12 +1253,17 @@ final sessionCoordinatorFactoryProvider =
       // source. Null relay means "this session has no push feed".
       final source = ref.read(tipSourceFactoryProvider)(
           demo: app.demo, apiKey: app.apiKey, jar: app.effectiveTipJar);
-      final relay = ref.read(relayChannelFactoryProvider)(
-          demo: app.demo, jar: app.effectiveRelayJar, secret: app.relaySecret);
       final profile = ref.read(accountsDirectoryProvider).active;
       final db = ref.read(firestoreProvider);
       final uid = ref.read(authControllerProvider).user?.uid;
       if (!profile.isLocal && db != null && uid == profile.id) {
+        // No relay channel here, by design (#71): the SESSION KIND decides.
+        // A cloud jar's fan tips are server-written into the account — the
+        // tips subcollection is the one live-ingestion path — and an old
+        // jar not yet routed keeps feeding pendingTips, which nothing on a
+        // cloud session may drain (delivery-is-deletion is the local mode's
+        // privacy promise, not this one's). The claim survives as its own
+        // attach: it is what routes the jar.
         return CloudSessionCoordinator(
           db: db,
           uid: uid!,
@@ -1238,11 +1271,17 @@ final sessionCoordinatorFactoryProvider =
           deviceId: ref.read(deviceIdProvider),
           repository: repo,
           source: source,
-          relay: relay,
+          claimer: ref.read(jarClaimerFactoryProvider)(
+              demo: app.demo,
+              jar: app.effectiveRelayJar,
+              secret: app.relaySecret,
+              bandId: app.accountId),
           pollIntervalSec: app.settings.pollIntervalSec,
           events: events,
         );
       }
+      final relay = ref.read(relayChannelFactoryProvider)(
+          demo: app.demo, jar: app.effectiveRelayJar, secret: app.relaySecret);
       return LocalSessionCoordinator(
         // storageId: the snapshot and the archive this coordinator writes
         // belong to demo when the set is a demo's, and to the band otherwise.

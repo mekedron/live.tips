@@ -295,6 +295,50 @@ void main() {
         reason: 'the newest survives; the oldest fall off the window');
   });
 
+  test(
+      'an OFF-SESSION server-written tip (#71) surfaces through the '
+      'existing relayTips listener — no new plumbing, fields intact',
+      () async {
+    // No set is running, every device of the artist may be off: the server
+    // routes the fan tip into the band\'s relayTips archive, in exactly the
+    // appendRelayHistory doc shape (Tip.toJson, doc id = tip id).
+    final tip = Tip.relayTip(
+      amountMinor: 700,
+      currency: 'eur',
+      method: TipMethod.revolut,
+      name: 'Sam',
+      message: 'From the 03:00 crowd',
+      ts: 1751500009999,
+      serial: 0,
+      relayId: 'srv_night',
+      songId: 'sng_1',
+      songTitle: 'Wonderwall',
+    );
+    await bandDoc()
+        .collection('relayTips')
+        .doc(tip.id)
+        .set({...tip.toJson(), 'updatedAtMs': 1});
+
+    // The next launch: the repository's lazy listener — the one History and
+    // the home Recent-tips card already read through — delivers it.
+    final repo = makeRepo();
+    repo.readRelayHistory(_bandId); // first read starts the listener
+    await pumpEventQueue();
+
+    final surfaced = repo.readRelayHistory(_bandId).single;
+    expect(surfaced.id, 'relay_srv_night');
+    expect(surfaced.amountMinor, 700);
+    expect(surfaced.method, TipMethod.revolut);
+    expect(surfaced.verified, isFalse,
+        reason: 'a fan-declared tip stays unverified until the artist says');
+    expect(surfaced.name, 'Sam');
+    expect(surfaced.message, 'From the 03:00 crowd');
+    expect(surfaced.songId, 'sng_1');
+    expect(surfaced.songTitle, 'Wonderwall');
+    expect(surfaced.livemode, isTrue,
+        reason: 'not swept at 04:00 — the tip is real, durable money now');
+  });
+
   test('session history appends and purgeSimulatedData drops demo/test '
       'sessions', () async {
     final repo = makeRepo();

@@ -187,6 +187,16 @@ abstract interface class SessionCoordinator {
   /// pill then).
   RelayHealth? get relayHealthSeed;
 
+  /// Whether this session's tip feed is a DURABLE collection that redelivers
+  /// every tip of the session on each attach — the cloud tips subcollection.
+  /// The controller then derives celebration from the device-local presented
+  /// watermark (#71): an at-least-once replay must not re-celebrate money
+  /// this device already showed, and a mid-set joiner's backfill must render
+  /// without a confetti storm. Local feeds are consume-once (pendingTips
+  /// delivery is deletion; the Stripe poll cursors forward), so every
+  /// arrival is genuinely new there and the watermark stays out of the way.
+  bool get replaysTips;
+
   /// Brings the transports up for [session]: persists the recovery snapshot,
   /// primes/attaches the tip feeds, and starts delivering [SessionEvents].
   /// Transport failures are reported through the events (the session still
@@ -286,6 +296,11 @@ class LocalSessionCoordinator implements SessionCoordinator {
   @override
   RelayHealth? get relayHealthSeed =>
       _relay == null ? null : RelayHealth.connecting;
+
+  // Consume-once feeds: the relay queue deletes on delivery, the poll only
+  // moves forward — nothing here replays a tip this device already showed.
+  @override
+  bool get replaysTips => false;
 
   @override
   Future<void> start(

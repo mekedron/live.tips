@@ -33,7 +33,10 @@ class LiveState {
 
   /// Health of the relay tip feed (MobilePay/Revolut fan page), or null
   /// when this session runs without a relay channel — the stage shows no
-  /// second pill then. Never returns to null within a session.
+  /// second pill then. Never returns to null within a session. Cloud
+  /// sessions are ALWAYS null here (#71): no device runs a relay channel —
+  /// the server writes fan tips into the account, and the tips-listener's
+  /// flow reports through [health] instead.
   final RelayHealth? relay;
 
   /// Stage lock: input is blocked until the artist authenticates.
@@ -93,6 +96,15 @@ class LiveSessionController extends Notifier<LiveState?> {
   /// under the active band put a night that never happened into the artist's
   /// own History (#52).
   String _accountId = '';
+
+  /// The device-local presented watermark (#71), loaded at [_begin] for
+  /// sessions whose feed replays ([SessionCoordinator.replaysTips]): the
+  /// `createdAt` ms of the newest tip THIS device has celebrated, plus the
+  /// ids sitting at that exact millisecond (Stripe timestamps are
+  /// second-resolution — see [LocalStore.readTipsPresented]). Null for
+  /// consume-once feeds (local profiles, demo) — every arrival is genuinely
+  /// new there and celebrates exactly as it always has.
+  ({int ms, Set<String> ids})? _presented;
 
   @override
   LiveState? build() {
@@ -199,6 +211,30 @@ class LiveSessionController extends Notifier<LiveState?> {
     _coordinator = coordinator;
     _publisher = ref.read(jarRequestsPublisherFactoryProvider)();
 
+    // Load the presented watermark BEFORE the coordinator starts: a cloud
+    // start attaches the tips listener inside start(), so the whole backlog
+    // can flow through _ingest before _begin returns. First run on this
+    // band (a fresh install, a brand-new device) seeds to NOW — the honest
+    // choice between two evils: a reinstalled device joining a running set
+    // must not throw a confetti storm over money it merely re-downloaded,
+    // and the price is that a tip landing within the device's clock skew of
+    // the seed renders quietly once. Seeding is a deliberate begin-time act,
+    // never a reaction to a snapshot — a snapshot (least of all a from-cache
+    // one) proves presence, not absence, and must not move the mark.
+    if (coordinator.replaysTips) {
+      final store = ref.read(localStoreProvider);
+      final stored = store.readTipsPresented(_accountId);
+      if (stored == null) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        unawaited(store.writeTipsPresented(_accountId, now, const []));
+        _presented = (ms: now, ids: <String>{});
+      } else {
+        _presented = (ms: stored.ms, ids: stored.ids.toSet());
+      }
+    } else {
+      _presented = null;
+    }
+
     state = LiveState(session: session, relay: coordinator.relayHealthSeed);
     try {
       await coordinator.start(session,
@@ -244,13 +280,39 @@ class LiveSessionController extends Notifier<LiveState?> {
       if (attributed != null) tips.add(attributed);
     }
     if (tips.isEmpty) return; // every one a duplicate — nothing changed
-    debugPrint('live ingest: +${tips.length} tip(s), '
-        'total ${current.session.totalMinor}');
-    state = current.copyWith(
-      lastTip: tips.last.tip,
-      confettiTick: current.confettiTick + tips.length,
-      newTips: tips,
-    );
+    // The celebration gate (#71): on a replaying feed, only tips this
+    // device has not presented yet — newer than the watermark, or at its
+    // exact millisecond without being among its ids — are NEW TO THIS
+    // DEVICE. A mid-set joiner's backfill (or a re-attach replaying the
+    // night) renders as money without a confetti storm. The mark advances
+    // exactly here, on actual presentation, to the newest createdAt just
+    // celebrated — never on snapshot arrival, so a from-cache snapshot can
+    // prove tips into the session but can never push the mark past money
+    // not yet shown.
+    final mark = _presented;
+    final unseen = mark == null
+        ? tips
+        : [
+            for (final t in tips)
+              if (t.tip.createdAt.millisecondsSinceEpoch > mark.ms ||
+                  (t.tip.createdAt.millisecondsSinceEpoch == mark.ms &&
+                      !mark.ids.contains(t.tip.id)))
+                t,
+          ];
+    debugPrint('live ingest: +${tips.length} tip(s) '
+        '(${unseen.length} unseen), total ${current.session.totalMinor}');
+    if (unseen.isEmpty) {
+      // Replayed money only: totals and the queue moved, the stage stays
+      // quiet — the same restraint _applyUpdatedTips shows a rewrite.
+      state = current.copyWith(session: current.session);
+    } else {
+      if (mark != null) _advancePresented(mark, unseen);
+      state = current.copyWith(
+        lastTip: unseen.last.tip,
+        confettiTick: current.confettiTick + unseen.length,
+        newTips: unseen,
+      );
+    }
     _coordinator?.onTipsIngested(
         current.session, [for (final t in tips) t.tip]);
     // Tip-page (relay) tips exist nowhere but this device — archive them so
@@ -274,6 +336,28 @@ class LiveSessionController extends Notifier<LiveState?> {
     // A request tip moved the queue — the fan page should follow (throttled;
     // a publishing storm never outruns the relay's quota).
     if (tips.any((t) => t.tip.songId != null)) _publishQueue();
+  }
+
+  /// Advances the presented watermark past [unseen] (all just celebrated):
+  /// the newest createdAt wins, and the ids at that exact millisecond ride
+  /// along — merged with the previous boundary when the millisecond stands
+  /// still (two same-second Stripe tips across two batches).
+  void _advancePresented(
+      ({int ms, Set<String> ids}) mark, List<JarTipAttribution> unseen) {
+    var newest = mark.ms;
+    for (final t in unseen) {
+      final ms = t.tip.createdAt.millisecondsSinceEpoch;
+      if (ms > newest) newest = ms;
+    }
+    final ids = <String>{
+      if (newest == mark.ms) ...mark.ids,
+      for (final t in unseen)
+        if (t.tip.createdAt.millisecondsSinceEpoch == newest) t.tip.id,
+    };
+    _presented = (ms: newest, ids: ids);
+    unawaited(ref
+        .read(localStoreProvider)
+        .writeTipsPresented(_accountId, newest, ids.toList()));
   }
 
   /// Publishes the current queue if this device is the session's voice on

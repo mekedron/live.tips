@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:live_tips/data/relay/firestore_tip_channel.dart';
 import 'package:live_tips/data/tip_source.dart';
 import 'package:live_tips/data/local_store.dart';
 import 'package:live_tips/data/tip_channel.dart';
@@ -434,6 +435,81 @@ void main() {
           reason: 'the tip landed; only the fan page mirror went stale');
       expect(state.lastError, isNull);
     });
+  });
+
+  test(
+      'LOCAL account end to end, unchanged forever (#71): the session '
+      'attaches a real FirestoreTipChannel, the claim stays a plain reader '
+      'join (no route, ever), pendingTips drains into the session, and '
+      'delivery IS deletion', () async {
+    final db = FakeFirebaseFirestore();
+    final localBackend = FakeCallables();
+    final store = await seededStore(accountValues: {
+      LocalStore.kRelayJarBase: jsonEncode(relayJar.toJson()),
+    });
+    final container = ProviderContainer(overrides: [
+      localStoreProvider.overrideWithValue(store),
+      initialRelaySecretProvider.overrideWithValue('sec_1'),
+      tipSourceFactoryProvider.overrideWithValue(
+          ({required demo, required apiKey, required jar}) =>
+              ScriptedSource(const [])),
+      relayChannelFactoryProvider.overrideWithValue(
+          ({required demo, required jar, required secret}) =>
+              FirestoreTipChannel(
+                db: db,
+                // A local profile's transport identity never owns jars —
+                // the gate that keeps pendingTips local accounts' forever.
+                auth: FakeRelayAuth(owned: false),
+                client: fakeRelayClient(localBackend),
+                jarId: relayJar.jarId,
+                secret: 'sec_1',
+                backoff: (_) => null,
+              )),
+      jarRequestsPublisherFactoryProvider
+          .overrideWithValue(() => JarRequestsPublisher(
+                client: fakeRelayClient(localBackend),
+                jar: relayJar,
+                secret: 'sec_1',
+              )),
+    ]);
+    addTearDown(container.dispose);
+
+    await container.read(liveSessionProvider.notifier).start(goalMinor: 5000);
+    for (var i = 0; i < 40; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    // The claim happened and asserted nothing about ownership or routes.
+    expect(localBackend.argsFor('claimJar'), {
+      'jarId': relayJar.jarId,
+      'secret': 'sec_1',
+    });
+    expect(container.read(liveSessionProvider)!.relay, RelayHealth.ok,
+        reason: 'the second pill lives on for local sessions');
+
+    // A fan tip lands in the queue; the leader drain shows it and acks it.
+    await db.collection('jars/${relayJar.jarId}/pendingTips').add({
+      'method': 'revolut',
+      'amountMinor': 700,
+      'currency': 'EUR',
+      'name': 'Sam',
+      'message': 'Great set!',
+      'tsMs': 1751500000000,
+    });
+    for (var i = 0; i < 40; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    final state = container.read(liveSessionProvider)!;
+    expect(state.session.totalMinor, 700);
+    expect(state.confettiTick, 1,
+        reason: 'a past-stamped queue tip celebrates — no watermark gates a '
+            'consume-once feed');
+    expect(
+        (await db.collection('jars/${relayJar.jarId}/pendingTips').get()).docs,
+        isEmpty,
+        reason: 'delivery IS deletion — the relay keeps no tip history for '
+            'a local jar, byte for byte today\'s behavior');
   });
 
   test(

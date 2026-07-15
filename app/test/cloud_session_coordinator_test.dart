@@ -237,6 +237,13 @@ void main() {
       activeAccountId: _uid,
     ));
     await store.saveActiveCloudBand(_uid, _bandId);
+    // The presented watermark (#71) pre-dates every fixture tip, so the
+    // fixed 2026-07-12 timestamps still celebrate on first presentation.
+    // Without it the first cloud session would SEED the mark to the test's
+    // wall-clock "now", muting them all — the deliberate reinstalled-device
+    // behavior, pinned in presented_watermark_test.dart, but noise here
+    // where the subject is the transport protocol.
+    await store.writeTipsPresented(_bandId, 1, const []);
     // The band already exists in the account's subtree.
     await db
         .doc('users/$_uid/bands/$_bandId')
@@ -554,6 +561,72 @@ void main() {
     final history = repo.readSessionHistory(_bandId);
     expect(history.map((s) => s.id), [summary.id]);
     expect(history.single.tips.length, 2);
+  });
+
+  test(
+      'a SERVER-written tip (#71) is folded into the stop\'s finalized '
+      'archive doc — and a set that never got a clean stop is rebuilt from '
+      'the subcollection, server-written tips included', () async {
+    final a = await device('dev_a', batches: [
+      [d('cs_1', 500)],
+    ]);
+    await a.read(liveSessionProvider.notifier).start(goalMinor: 10000);
+    await settle();
+    final sessionId = a.read(liveSessionProvider)!.session.id;
+
+    // The server routes a fan tip straight into the subcollection — no
+    // device wrote this doc, exactly the Tip.toJson shape the contract pins.
+    final serverTip = Tip(
+      id: 'relay_srv_1',
+      amountMinor: 700,
+      currency: 'usd',
+      createdAt: DateTime.utc(2026, 7, 12, 0, 1),
+      livemode: false,
+      viaService: true,
+    );
+    await sessionsCol().doc(sessionId).collection('tips').doc(serverTip.id).set(
+        {...serverTip.toJson(), 'updatedAtMs': 1});
+    await settle();
+    expect(a.read(liveSessionProvider)!.session.totalMinor, 1200,
+        reason: 'the listener ingested the server-written doc like any tip');
+
+    final summary = await a.read(liveSessionProvider.notifier).stop();
+    await settle();
+    // The finalized doc embeds BOTH: the leader's polled tip and the
+    // server-written one — the archive needs no queue drain to be whole.
+    final data = (await sessionsCol().doc(sessionId).get()).data()!;
+    expect(data['endedAt'], isNotNull);
+    expect([for (final t in data['tips'] as List) (t as Map)['id']],
+        containsAll(['cs_1', 'relay_srv_1']));
+    expect(summary!.totalMinor, 1200);
+
+    // And the no-clean-stop path: a fresh session whose device dies leaves
+    // the skeleton + subcollection; the history mirror rebuilds the money.
+    final b = await device('dev_b');
+    await b.read(liveSessionProvider.notifier).start(goalMinor: 10000);
+    await settle();
+    final secondId = b.read(liveSessionProvider)!.session.id;
+    await sessionsCol()
+        .doc(secondId)
+        .collection('tips')
+        .doc('relay_srv_2')
+        .set({
+      ...serverTip.copyWith(id: 'relay_srv_2', amountMinor: 900).toJson(),
+      'updatedAtMs': 1,
+    });
+    await settle();
+    b.dispose(); // dies mid-set: no finalize ever lands
+
+    final c = await device('dev_c');
+    final repo = c.read(accountDataRepositoryProvider);
+    repo.readSessionHistory(_bandId); // kick the lazy listener
+    await settle();
+    final orphan = repo
+        .readSessionHistory(_bandId)
+        .firstWhere((s) => s.id == secondId);
+    expect(orphan.totalMinor, 900,
+        reason: 'the _sessionTips backfill folds server-written tips into '
+            'a night whose finalize never landed — the safety net holds');
   });
 
   test(

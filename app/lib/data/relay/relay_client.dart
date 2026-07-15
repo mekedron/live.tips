@@ -210,15 +210,47 @@ class RelayClient {
   }
 
   /// Links this device's uid to [jarId] so the Firestore rules let it read
-  /// (and ack) the jar's pending tips. Idempotent — the tip channel calls it
-  /// once per attach, and re-calling it is how a device that was revoked by a
-  /// secret rotation gets back in.
+  /// (and ack) the jar's pending tips. Idempotent — called once per attach,
+  /// and re-calling it is how a device that was revoked by a secret rotation
+  /// gets back in.
+  ///
+  /// [bandId] installs the jar's ROUTE (#71): a jar that carries both an
+  /// `ownerUid` and a `bandId` is a cloud jar whose fan tips the server
+  /// writes straight into `users/{uid}/bands/{bandId}/…` — the live
+  /// session's tips subcollection during a set, the relayTips archive
+  /// otherwise — instead of the consume-once pendingTips queue. Gated
+  /// exactly like [createJar]'s `owned`: only a REAL account may own its
+  /// jar, so a local profile's anonymous transport uid can never route one,
+  /// and the pendingTips path stays local accounts' forever. Old cloud jars
+  /// convert organically: the next claim on a new build backfills the route.
+  ///
+  /// The server's claim contract, pinned: `bandId` without `owned` is an
+  /// `invalid-argument`, and so is an id outside [bandIdPattern] — and a
+  /// refused claim writes NOTHING, not even the reader join. So `owned` and
+  /// `bandId` travel together or not at all, and an id the validator would
+  /// spit out degrades to a plain reader claim instead of poisoning it.
   Future<void> claimJar({
     required String jarId,
     required String secret,
+    String? bandId,
   }) async {
-    await _send('claimJar', {'jarId': jarId, 'secret': secret});
+    final routed =
+        bandId != null && bandIdPattern.hasMatch(bandId) && _auth.ownsJars;
+    await _send('claimJar', {
+      'jarId': jarId,
+      'secret': secret,
+      if (routed) ...{
+        'owned': true,
+        'bandId': bandId,
+      },
+    });
   }
+
+  /// The server's `isValidBandId`, verbatim (no shared contract file between
+  /// the Dart app and the TypeScript functions — duplicated and test-pinned,
+  /// like the text caps above). Every real band id is `acc_<base36>` and
+  /// passes; this exists so nothing else ever rides the claim.
+  static final bandIdPattern = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
 
   /// Updates the jar's public details. The relay wants the full profile back,
   /// so the untouched methods are re-sent from [jar]; only the Stripe URL is
