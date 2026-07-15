@@ -12,6 +12,7 @@ import '../../state/providers.dart';
 import '../../state/session_coordinator.dart';
 import '../../widgets/live_session_banner.dart';
 import '../../widgets/lt_ui.dart';
+import '../../widgets/copy_song_title.dart';
 import '../../widgets/tip_tile.dart';
 
 /// The live request queue (#64): what fans are paying to hear, ranked by
@@ -354,7 +355,10 @@ class _RequestCard extends StatelessWidget {
                       _UnverifiedCountChip(count: entry.unverifiedCount),
                   ],
                 ),
-                const SizedBox(width: 6),
+                // Copy sits INSIDE the expand tap-target on purpose: the
+                // title's fastest route to the chords app is one tap, not
+                // expand-then-hunt.
+                CopySongButton(title: entry.title),
                 Icon(
                   expanded
                       ? Icons.expand_less_rounded

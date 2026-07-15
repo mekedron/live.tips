@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Override (the overrides-list element type) lives in misc, not the core barrel.
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:live_tips/core/theme.dart';
 import 'package:live_tips/data/firebase/auth_service.dart';
 import 'package:live_tips/data/firebase/device_registry.dart';
@@ -131,6 +132,12 @@ void main() {
     expect(find.text('Ada requested a song · €5'), findsOneWidget);
     expect(find.text('Ada tipped €5'), findsOneWidget);
 
+    // Both are newer than the watermark the page OPENED with (none set →
+    // 0), so both wear the unread dot — and keep it for the whole visit,
+    // even though the mark-read write below has already landed.
+    expect(find.byKey(const ValueKey('unread-dot-n1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('unread-dot-n2')), findsOneWidget);
+
     // The watermark covers the newest entry SHOWN, clock skew included: the
     // badge is cleared for every device.
     final prefs = await db.doc(prefsPath).get();
@@ -142,6 +149,91 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('2'), findsNothing);
+  });
+
+  testWidgets(
+      'the feed groups by day, and only entries newer than the opening '
+      'watermark wear the dot', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 12);
+    final earlier = today.subtract(const Duration(days: 3));
+    await seedNote(db, 'old',
+        createdAtMs: earlier.millisecondsSinceEpoch, name: 'Old Ada');
+    await seedNote(db, 'new',
+        createdAtMs: today.millisecondsSinceEpoch, name: 'New Ada');
+    // The old entry was read on a previous visit; only the new one is news.
+    await db
+        .doc(prefsPath)
+        .set({'lastSeenAtMs': earlier.millisecondsSinceEpoch + 1});
+    await pump(tester, db: db);
+
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+
+    // LtRowGroup headers render uppercased (LtSectionLabel).
+    expect(find.text('TODAY'), findsOneWidget);
+    expect(
+      find.text(DateFormat('EEEE, MMM d').format(earlier).toUpperCase()),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('unread-dot-new')), findsOneWidget);
+    expect(find.byKey(const ValueKey('unread-dot-old')), findsNothing);
+  });
+
+  testWidgets('the trash deletes one entry; Clear all (confirmed) empties the feed',
+      (tester) async {
+    final db = FakeFirebaseFirestore();
+    await seedNote(db, 'n1', createdAtMs: 1000);
+    await seedNote(db, 'n2', createdAtMs: 2000, name: 'Beda');
+    await pump(tester, db: db);
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+
+    // One trash per row; the top row is the newest (Beda).
+    await tester.tap(find.byIcon(Icons.delete_outline_rounded).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Beda tipped €5'), findsNothing);
+    expect(find.text('Ada tipped €5'), findsOneWidget);
+    expect((await db.doc('$notes/n2').get()).exists, isFalse);
+    expect((await db.doc('$notes/n1').get()).exists, isTrue);
+
+    // Clear all asks first — Cancel leaves everything standing.
+    await tester.tap(find.byIcon(Icons.delete_sweep_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect((await db.doc('$notes/n1').get()).exists, isTrue);
+
+    // Confirmed, the whole feed goes and the empty state returns.
+    await tester.tap(find.byIcon(Icons.delete_sweep_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Clear all'));
+    await tester.pumpAndSettle();
+    expect((await db.doc('$notes/n1').get()).exists, isFalse);
+    expect(find.text('Nothing yet'), findsOneWidget);
+  });
+
+  testWidgets('the feed pages in on scroll instead of loading everything',
+      (tester) async {
+    final db = FakeFirebaseFirestore();
+    for (var i = 1; i <= 30; i++) {
+      await seedNote(db, 'n$i', createdAtMs: 1000 + i, name: 'Fan $i');
+    }
+    await pump(tester, db: db);
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+
+    // One window, not the whole feed: the 26th-newest entry (Fan 5) is not
+    // built yet — and not for lack of scrolling, it is not in the stream.
+    expect(find.text('Fan 5 tipped €5', skipOffstage: false), findsNothing);
+    expect(find.text('Fan 30 tipped €5', skipOffstage: false), findsOneWidget);
+
+    // Nearing the bottom grows the window; the stream re-emits with more.
+    await tester.drag(find.byType(ListView), const Offset(0, -3000));
+    await tester.pumpAndSettle();
+    expect(find.text('Fan 5 tipped €5', skipOffstage: false), findsOneWidget);
+    expect(find.text('Fan 1 tipped €5', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('the kind toggles merge-write the account settings doc',

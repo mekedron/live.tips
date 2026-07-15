@@ -349,21 +349,24 @@ describe("devices: the kill switch's teeth cannot be laundered", () => {
   });
 });
 
-describe("notifications: the bell feed is read-only glass", () => {
-  it("lets A read its own feed; every client write is denied, A's included", async () => {
+describe("notifications: the server appends, the owner may clear", () => {
+  it("lets A read and DELETE its own feed entries (the trash + clear-all)", async () => {
     await seed(A_NOTIFICATION, { kind: "tip", amountMinor: 500, createdAtMs: 1 });
     await assertSucceeds(getDoc(doc(authed(UID_A), A_NOTIFICATION)));
-    // A client that could write here could ring its own bell — or silence it:
-    // create, edit and delete are all function-owned (the trigger trims).
-    await assertFails(setDoc(doc(authed(UID_A), `users/${UID_A}/notifications/forged`), { kind: "tip" }));
-    await assertFails(updateDoc(doc(authed(UID_A), A_NOTIFICATION), { amountMinor: 999 }));
-    await assertFails(deleteDoc(doc(authed(UID_A), A_NOTIFICATION)));
+    await assertSucceeds(deleteDoc(doc(authed(UID_A), A_NOTIFICATION)));
   });
 
-  it("denies B and anonymous principals A's feed entirely", async () => {
+  it("denies every client create/edit, A's included — no ringing one's own bell", async () => {
+    await seed(A_NOTIFICATION, { kind: "tip", amountMinor: 500, createdAtMs: 1 });
+    await assertFails(setDoc(doc(authed(UID_A), `users/${UID_A}/notifications/forged`), { kind: "tip" }));
+    await assertFails(updateDoc(doc(authed(UID_A), A_NOTIFICATION), { amountMinor: 999 }));
+  });
+
+  it("denies B and anonymous principals A's feed entirely, deletes included", async () => {
     await seed(A_NOTIFICATION, { kind: "tip", amountMinor: 500, createdAtMs: 1 });
     await assertFails(getDoc(doc(authed(UID_B), A_NOTIFICATION)));
     await assertFails(getDoc(doc(anon(), A_NOTIFICATION)));
+    await assertFails(deleteDoc(doc(authed(UID_B), A_NOTIFICATION)));
   });
 });
 

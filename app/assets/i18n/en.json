@@ -943,5 +943,15 @@
   "home.push_nudge.title": "Don't miss a tip",
   "home.push_nudge.body": "Get a notification when tips and song requests arrive while you're not live.",
   "home.push_nudge.enable": "Enable notifications",
-  "home.push_nudge.dismiss": "Not now"
+  "home.push_nudge.dismiss": "Not now",
+  "notifications.today": "Today",
+  "notifications.yesterday": "Yesterday",
+  "notifications.clear_all": "Clear all",
+  "notifications.clear_all_title": "Clear all notifications?",
+  "notifications.clear_all_body": "This removes every notification from the list, on all your devices. Your tips themselves stay in History.",
+  "notifications.clear_all_confirm": "Clear all",
+  "notifications.clear_all_cancel": "Cancel",
+  "notifications.delete_label": "Delete notification",
+  "widgets.copy_song.tooltip": "Copy song title",
+  "widgets.copy_song.done": "Copied “{title}”"
 }

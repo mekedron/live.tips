@@ -11,31 +11,38 @@ import '../../domain/notification_item.dart';
 /// Windows/Linux, tests), and then every call no-ops and every stream is
 /// empty, so callers need no platform branches.
 ///
-/// The feed itself is read-only glass on this side: rules deny every client
-/// write, the tip paths append and the trigger trims (server-side
-/// notifications.ts). The one thing the app writes is its own settings doc —
-/// the kind toggles and the mark-all-read watermark.
+/// Only the server APPENDS to the feed (the tip paths write, the trigger
+/// trims — server-side notifications.ts); the app never creates or edits an
+/// entry, but it may DELETE — the trash and Clear all silence nobody but
+/// their owner. The settings doc holds the app-written state: the kind
+/// toggles and the mark-all-read watermark.
 class NotificationsService {
   NotificationsService({required FirebaseFirestore? db}) : _db = db;
 
   final FirebaseFirestore? _db;
 
-  /// How much feed the bell page shows. Deliberately below the server's
-  /// 100-doc cap: "what did I miss" is a page, not an archive — History is
-  /// where the full ledger lives.
-  static const feedLimit = 50;
+  /// One screenful. The page starts here and grows by the same step as the
+  /// artist scrolls — never the whole feed up front.
+  static const pageSize = 25;
+
+  /// The server's trim cap (functions/src/notifications.ts
+  /// MAX_NOTIFICATIONS): past this there is nothing more to page in, and
+  /// Clear all can trust one query to see everything.
+  static const serverCap = 100;
+
+  CollectionReference<Map<String, dynamic>>? _col(String uid) =>
+      _db?.collection('users/$uid/notifications');
 
   DocumentReference<Map<String, dynamic>>? _prefsDoc(String uid) =>
       _db?.doc('users/$uid/settings/notifications');
 
-  /// Newest first, capped at [feedLimit].
-  Stream<List<NotificationItem>> watchFeed(String uid) {
-    final db = _db;
-    if (db == null) return Stream.value(const []);
-    return db
-        .collection('users/$uid/notifications')
+  /// Newest first, at most [limit] — the page's window, grown on scroll.
+  Stream<List<NotificationItem>> watchFeed(String uid, {required int limit}) {
+    final col = _col(uid);
+    if (col == null) return Stream.value(const []);
+    return col
         .orderBy('createdAtMs', descending: true)
-        .limit(feedLimit)
+        .limit(limit)
         .snapshots()
         .map((snap) => [
               for (final d in snap.docs) NotificationItem.fromJson(d.id, d.data()),
@@ -43,6 +50,53 @@ class NotificationsService {
         .handleError((Object e) {
       debugPrint('notifications feed watch failed: $e');
     });
+  }
+
+  /// How many entries are newer than the watermark — the bell's number. Only
+  /// the unread docs travel (usually none), so the badge does not drag the
+  /// whole feed over the wire on every app start.
+  Stream<int> watchUnreadCount(String uid, int sinceMs) {
+    final col = _col(uid);
+    if (col == null) return Stream.value(0);
+    return col
+        .where('createdAtMs', isGreaterThan: sinceMs)
+        .limit(serverCap)
+        .snapshots()
+        .map((snap) => snap.docs.length)
+        .handleError((Object e) {
+      debugPrint('notifications unread watch failed: $e');
+    });
+  }
+
+  /// The row's trash. Deleting is the one client write the rules allow.
+  Future<void> delete(String uid, String id) async {
+    final col = _col(uid);
+    if (col == null) return;
+    try {
+      await col.doc(id).delete();
+    } catch (e) {
+      debugPrint('notification delete failed: $e');
+    }
+  }
+
+  /// Clear all: everything, not just the page — one query sees the whole
+  /// feed because the server caps it at [serverCap], comfortably inside a
+  /// single batch's 500 writes.
+  Future<void> clearAll(String uid) async {
+    final db = _db;
+    final col = _col(uid);
+    if (db == null || col == null) return;
+    try {
+      final snap = await col.limit(serverCap).get();
+      if (snap.docs.isEmpty) return;
+      final batch = db.batch();
+      for (final d in snap.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint('notifications clear-all failed: $e');
+    }
   }
 
   /// The account's choices; an absent doc is the all-default prefs, exactly

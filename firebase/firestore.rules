@@ -78,13 +78,15 @@ service cloud.firestore {
       }
 
       // The bell feed (functions/src/notifications.ts): what arrived while
-      // no set was running. Server-written only — the tip paths append, the
-      // trigger trims; a client that could write here could ring its own
-      // bell. Read state is NOT here either: the mark-all-read watermark
-      // lives in settings/notifications, so this stays append-and-trim.
+      // no set was running. Only the server APPENDS — the tip paths write,
+      // the trigger trims; a client that could create or edit here could
+      // ring its own bell. The owner may DELETE: clearing one's own feed
+      // silences nobody but oneself, and the durable record stays the tip
+      // docs. Read state is NOT here either: the mark-all-read watermark
+      // lives in settings/notifications.
       match /notifications/{noteId} {
-        allow read: if isOwner(uid) && notRevoked(uid);
-        allow write: if false;
+        allow read, delete: if isOwner(uid) && notRevoked(uid);
+        allow create, update: if false;
       }
 
       // Function-written state under private/. ONLY the security doc is

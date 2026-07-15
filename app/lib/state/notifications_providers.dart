@@ -21,12 +21,39 @@ final notificationsServiceProvider = Provider<NotificationsService>(
   (ref) => NotificationsService(db: ref.watch(firestoreProvider)),
 );
 
-/// The newest feed entries for the active account, server-capped, newest
-/// first. Empty in local mode / signed out.
-final notificationsFeedProvider = StreamProvider<List<NotificationItem>>((ref) {
+/// How much of the feed the page currently shows. Starts at one screenful
+/// and [grow]s as the artist scrolls — some accounts will have the full
+/// server cap sitting there, and opening the page must not fetch it all.
+/// autoDispose: only the page listens, so closing it resets the window and
+/// the next visit starts small again.
+class NotificationsFeedLimit extends Notifier<int> {
+  @override
+  int build() {
+    ref.watch(authControllerProvider.select((s) => s.user?.uid));
+    return NotificationsService.pageSize;
+  }
+
+  void grow() {
+    if (state >= NotificationsService.serverCap) return;
+    state = (state + NotificationsService.pageSize)
+        .clamp(0, NotificationsService.serverCap);
+  }
+}
+
+final notificationsFeedLimitProvider =
+    NotifierProvider.autoDispose<NotificationsFeedLimit, int>(
+        NotificationsFeedLimit.new);
+
+/// The newest feed entries for the active account, newest first, windowed by
+/// [notificationsFeedLimitProvider]. Empty in local mode / signed out.
+/// autoDispose with the page: the bell has its own unread stream below, so
+/// nothing should keep feed docs flowing once the page is closed.
+final notificationsFeedProvider =
+    StreamProvider.autoDispose<List<NotificationItem>>((ref) {
   final uid = ref.watch(authControllerProvider.select((s) => s.user?.uid));
   if (uid == null) return Stream.value(const <NotificationItem>[]);
-  return ref.watch(notificationsServiceProvider).watchFeed(uid);
+  final limit = ref.watch(notificationsFeedLimitProvider);
+  return ref.watch(notificationsServiceProvider).watchFeed(uid, limit: limit);
 });
 
 /// The account's notification settings; defaults while loading and in local
@@ -37,15 +64,25 @@ final notificationPrefsProvider = StreamProvider<NotificationPrefs>((ref) {
   return ref.watch(notificationsServiceProvider).watchPrefs(uid);
 });
 
-/// What the bell wears: feed entries newer than the mark-all-read watermark.
-/// Zero while either stream is still warming up — a badge that flashes a
-/// number and takes it back reads as a bug.
-final unreadNotificationsProvider = Provider<int>((ref) {
-  final feed = ref.watch(notificationsFeedProvider).value;
+/// The unread docs themselves, straight from a watermark-filtered query —
+/// NOT derived from the feed page: the bell lives on Home and must not keep
+/// the whole feed streaming just to wear a number. Usually this query
+/// matches nothing at all.
+final _unreadCountStreamProvider = StreamProvider<int>((ref) {
+  final uid = ref.watch(authControllerProvider.select((s) => s.user?.uid));
+  if (uid == null) return Stream.value(0);
   final prefs = ref.watch(notificationPrefsProvider).value;
-  if (feed == null || prefs == null) return 0;
-  return feed.where((n) => n.createdAtMs > prefs.lastSeenAtMs).length;
+  if (prefs == null) return Stream.value(0);
+  return ref
+      .watch(notificationsServiceProvider)
+      .watchUnreadCount(uid, prefs.lastSeenAtMs);
 });
+
+/// What the bell wears. Zero while the streams are still warming up — a
+/// badge that flashes a number and takes it back reads as a bug.
+final unreadNotificationsProvider = Provider<int>(
+  (ref) => ref.watch(_unreadCountStreamProvider).value ?? 0,
+);
 
 // ---------------------------------------------------------------------------
 // Push registration — where OS permission meets the device doc.
