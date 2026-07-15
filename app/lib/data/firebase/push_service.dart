@@ -88,6 +88,20 @@ class PushService {
     }
   }
 
+  /// Throw the registration away so the next [getToken] mints a genuinely
+  /// NEW one instead of handing back the cached corpse. Repair-only: call
+  /// this when FCM has already rejected the current token as dead — at that
+  /// point no other account signed in here still rides it either.
+  Future<void> deleteToken() async {
+    final m = _messaging;
+    if (m == null) return;
+    try {
+      await m.deleteToken();
+    } catch (e) {
+      debugPrint('push token delete failed: $e');
+    }
+  }
+
   /// FCM rotated the token under us; whoever stored it must re-store.
   Stream<String> get onTokenRefresh =>
       _messaging?.onTokenRefresh ?? const Stream.empty();

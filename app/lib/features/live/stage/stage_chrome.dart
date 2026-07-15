@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
@@ -222,11 +224,53 @@ void showAddToHomeScreenSheet(BuildContext context) {
   );
 }
 
-/// How many recent-message tiles fit under the QR block of the wide-layout
-/// panel. The QR always wins — messages only take what's left over after
-/// the QR core (~430 px) and the section header, at ~84 px a tile.
-int qrPanelMessageSlots(double maxHeight) =>
-    ((maxHeight - 460) / 84).floor().clamp(0, 3);
+/// The white QR card carries a fixed inset on every side (see [QrBlock]), so
+/// its outer square is `size + _kQrCardInset`. We size the code from the
+/// panel's inner width MINUS that inset, so the white card itself spans the
+/// full width of the rail rather than overflowing it by the inset.
+const double _kQrCardInset = 24;
+
+/// Fixed vertical cost of everything shown UNDER the code — the "scan to tip"
+/// label, the jar name, and the copy/open/print row.
+const double _kQrHeaderBlock = 120;
+
+/// The recent-messages strip's own chrome (divider + section label) plus one
+/// tile: the minimum we always keep on screen so a full-width code can never
+/// push the comments off the bottom of the panel.
+const double _kQrMessagesHeader = 48;
+const double _kQrMessageTile = 84;
+
+/// Smallest the code is ever drawn, so a short-and-narrow panel still shows
+/// something scannable instead of collapsing to nothing.
+const double _kQrMinSize = 160;
+
+/// The square QR side for the wide-layout panel. It fills the rail's inner
+/// width — a wider rail means a bigger, more scannable code, which was the
+/// whole point of making the rail drag-resizable — and only shrinks below the
+/// full width when the panel is too short to also fit the labels and (when
+/// there are any) at least one message beneath it. Always square, always
+/// leaving the comments their room.
+double stageQrSize(BoxConstraints c, {required bool hasMessages}) {
+  final reserved = _kQrCardInset +
+      _kQrHeaderBlock +
+      (hasMessages ? _kQrMessagesHeader + _kQrMessageTile : 0);
+  final maxByHeight = math.max(_kQrMinSize, c.maxHeight - reserved);
+  final byWidth = c.maxWidth - _kQrCardInset;
+  return byWidth.clamp(_kQrMinSize, maxByHeight);
+}
+
+/// How many recent-message tiles fit under a code of [qrSize]. Consistent with
+/// [stageQrSize]: the messages take whatever vertical room the code and its
+/// labels did not, at [_kQrMessageTile] a tile, capped at three.
+int qrPanelMessageSlots(double maxHeight, double qrSize) =>
+    ((maxHeight -
+                qrSize -
+                _kQrCardInset -
+                _kQrHeaderBlock -
+                _kQrMessagesHeader) /
+            _kQrMessageTile)
+        .floor()
+        .clamp(0, 3);
 
 /// The floating QR block on the wide (tablet/desktop) stage: scannable code,
 /// the jar name, copy/open/print, and the latest tips that carried a message.
@@ -255,13 +299,16 @@ class StageQrPanel extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final shown = messages.take(
-            qrPanelMessageSlots(constraints.maxHeight),
+          // The code fills the rail's inner width and stays square; when the
+          // panel is short it yields height first to the labels and comments,
+          // so the messages below it are never scrolled off (see [stageQrSize]).
+          final qrSize = stageQrSize(
+            constraints,
+            hasMessages: messages.isNotEmpty,
           );
-          // The code grows with the rail (a wider rail was the whole point of
-          // making it resizable) but stays scannable-square, capped so it never
-          // eats the header/messages room.
-          final qrSize = constraints.maxWidth.clamp(180.0, 320.0);
+          final shown = messages.take(
+            qrPanelMessageSlots(constraints.maxHeight, qrSize),
+          );
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

@@ -113,7 +113,11 @@ enum JarTheme {
 /// independent of the widget that renders the handle. See [StageSettings.railWidth].
 const double kStageRailDefaultWidth = 280;
 const double kStageRailMinWidth = 240;
-const double kStageRailMaxWidth = 640;
+// The code fills the rail's width, so this is really "how big can the QR get":
+// generous enough that a big external display can carry a code scannable from
+// the back of the room. Smaller stages stay protected by the working-area cap
+// (`maxWidth - 380`) applied where the rail is laid out.
+const double kStageRailMaxWidth = 760;
 
 /// Render-quality tier for the 3D renderer (bloom on/off/auto-detect).
 enum StageQuality {

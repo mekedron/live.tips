@@ -238,10 +238,16 @@ export const TEST_PUSHES_PER_UID_PER_HOUR = 20;
  * sendTestPush callable — the settings page's "is this device actually
  * reachable?" answered with a REAL push through the whole pipeline, to ONE
  * device: the caller's own, named by deviceId. Returns an honest verdict
- * instead of throwing, so the page can say exactly what to fix:
- * `no-token` (push never enabled here / registration lost) or `send-failed`.
- * A dead token is pruned on the spot — the toggle then reads OFF, which IS
- * the fix instruction.
+ * instead of throwing, so the page can say exactly what to fix: `no-token`
+ * (push never enabled here / registration lost), `dead-token` (FCM rejected
+ * the stored token) or `send-failed`.
+ *
+ * A dead token is NOT pruned here, unlike the fan-out path: the device
+ * asking is by definition present and watching its own toggle, which streams
+ * this very doc — a server-side delete flips that toggle off under the
+ * artist's finger with no explanation. The caller repairs instead: discard
+ * the stale registration, mint a fresh one, retry — and only switch the
+ * toggle off itself, with words, if even that is rejected.
  */
 export async function sendTestPushHandler(
   request: CallableRequest,
@@ -294,10 +300,7 @@ export async function sendTestPushHandler(
   } catch (e) {
     const code = (e as { code?: string }).code;
     if (code === "messaging/registration-token-not-registered" || code === "messaging/invalid-argument") {
-      await ref.update({
-        fcmToken: FieldValue.delete(),
-        fcmTokenAtMs: FieldValue.delete(),
-      }).catch(() => {});
+      console.warn(`sendTestPush: token rejected (${code})`);
       return { sent: false, reason: "dead-token" };
     }
     console.error("sendTestPush: send failed", e instanceof Error ? e.message : "");

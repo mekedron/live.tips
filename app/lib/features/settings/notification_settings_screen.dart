@@ -30,8 +30,9 @@ class NotificationSettingsScreen extends ConsumerStatefulWidget {
       _NotificationSettingsScreenState();
 }
 
-/// The test button's journey, drawn as one status line under it.
-enum _TestState { idle, sending, sent, received, noRegistration, failed }
+/// The test button's journey, drawn as one status line under it. The two
+/// spinner states narrate; the rest are verdicts.
+enum _TestState { idle, sending, repairing, sent, received, unreachable, failed }
 
 class _NotificationSettingsScreenState
     extends ConsumerState<NotificationSettingsScreen>
@@ -53,12 +54,17 @@ class _NotificationSettingsScreenState
     super.dispose();
   }
 
+  bool get _testRunning =>
+      _test == _TestState.sending || _test == _TestState.repairing;
+
   /// One REAL push through the whole pipeline to this very device. With the
   /// app in the foreground the OS banner rightly stays away — so the page
   /// listens for the message itself and turns delivery into "received ✓"
-  /// on the spot; backgrounded, the banner IS the confirmation.
+  /// on the spot; backgrounded, the banner IS the confirmation. A stale
+  /// registration is repaired mid-flight (the status line says so) rather
+  /// than left to flip the toggle off.
   Future<void> _sendTest() async {
-    if (_test == _TestState.sending) return;
+    if (_testRunning) return;
     setState(() => _test = _TestState.sending);
     _testEcho?.cancel();
     _testEcho = ref
@@ -68,14 +74,17 @@ class _NotificationSettingsScreenState
         .listen((_) {
       if (mounted) setState(() => _test = _TestState.received);
     });
-    final outcome =
-        await ref.read(pushRegistrationProvider).sendTestToThisDevice();
+    final outcome = await ref.read(pushRegistrationProvider).testThisDevice(
+      onRepair: () {
+        if (mounted) setState(() => _test = _TestState.repairing);
+      },
+    );
     if (!mounted) return;
     setState(() => _test = switch (outcome) {
           // The echo listener may already have beaten the callable home.
           TestPushOutcome.sent =>
             _test == _TestState.received ? _TestState.received : _TestState.sent,
-          TestPushOutcome.noRegistration => _TestState.noRegistration,
+          TestPushOutcome.unreachable => _TestState.unreachable,
           TestPushOutcome.failed => _TestState.failed,
         });
   }
@@ -107,6 +116,11 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _setThisDevice(bool on) async {
+    // A hand on the toggle starts a new chapter: whatever the last test
+    // said no longer describes this registration (the stale-verdict-under-
+    // a-green-panel screenshot).
+    _testEcho?.cancel();
+    if (_test != _TestState.idle) setState(() => _test = _TestState.idle);
     if (on) return _enable(); // _enable owns the busy flag
     if (_busy) return;
     setState(() => _busy = true);
@@ -238,49 +252,21 @@ class _NotificationSettingsScreenState
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 2, 12, 14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                OutlinedButton.icon(
-                                  onPressed: _test == _TestState.sending
-                                      ? null
-                                      : () => unawaited(_sendTest()),
-                                  icon: Icon(Icons.send_rounded,
-                                      size: 16, color: c.textSecondary),
-                                  label: Text(
-                                    s.t('settings.notifications.send_test'),
-                                    style: outfitStyle(13, c.textSecondary,
-                                        weight: FontWeight.w600),
-                                  ),
+                            padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _testRunning
+                                    ? null
+                                    : () => unawaited(_sendTest()),
+                                icon: Icon(Icons.send_rounded,
+                                    size: 16, color: c.textSecondary),
+                                label: Text(
+                                  s.t('settings.notifications.send_test'),
+                                  style: outfitStyle(13, c.textSecondary,
+                                      weight: FontWeight.w600),
                                 ),
-                                if (_test != _TestState.idle) ...[
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    s.t(switch (_test) {
-                                      _TestState.sending =>
-                                        'settings.notifications.test_sending',
-                                      _TestState.sent =>
-                                        'settings.notifications.test_sent',
-                                      _TestState.received =>
-                                        'settings.notifications.test_received',
-                                      _TestState.noRegistration =>
-                                        'settings.notifications.test_no_registration',
-                                      _TestState.failed ||
-                                      _TestState.idle =>
-                                        'settings.notifications.test_failed',
-                                    }),
-                                    style: TextStyle(
-                                      fontFamily: kFontBody,
-                                      fontSize: 12.5,
-                                      height: 1.4,
-                                      color: _test == _TestState.received
-                                          ? c.onSuccessContainer
-                                          : c.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                              ),
                             ),
                           ),
                         ] else
@@ -295,6 +281,15 @@ class _NotificationSettingsScreenState
                                   ? null
                                   : (v) => unawaited(_setThisDevice(v)),
                             ),
+                          ),
+                        // The verdict line sits OUTSIDE the on/off branch on
+                        // purpose: when a failed repair deliberately switches
+                        // this device off, the panel flips to its OFF row —
+                        // and the explanation must survive that flip.
+                        if (_test != _TestState.idle)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                            child: _TestStatusLine(state: _test),
                           ),
                       ],
                     PushStatus.canRequest => [
@@ -399,6 +394,86 @@ class _NotificationSettingsScreenState
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The test's one status line: a spinner while it works (sending, or
+/// re-registering a stale token mid-flight), then a colored verdict —
+/// green when the push physically arrived back, warning when even a fresh
+/// registration was rejected and the device was switched off.
+class _TestStatusLine extends StatelessWidget {
+  const _TestStatusLine({required this.state});
+
+  final _TestState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    final s = context.s;
+    final running =
+        state == _TestState.sending || state == _TestState.repairing;
+    final (Color color, IconData? icon, String key) = switch (state) {
+      _TestState.sending || _TestState.idle => (
+          c.textSecondary,
+          null,
+          'settings.notifications.test_sending',
+        ),
+      _TestState.repairing => (
+          c.textSecondary,
+          null,
+          'settings.notifications.test_repairing',
+        ),
+      _TestState.sent => (
+          c.textSecondary,
+          Icons.mark_email_read_rounded,
+          'settings.notifications.test_sent',
+        ),
+      _TestState.received => (
+          c.success,
+          Icons.check_circle_rounded,
+          'settings.notifications.test_received',
+        ),
+      _TestState.unreachable => (
+          c.warning,
+          Icons.error_outline_rounded,
+          'settings.notifications.test_unreachable',
+        ),
+      _TestState.failed => (
+          c.danger,
+          Icons.error_outline_rounded,
+          'settings.notifications.test_failed',
+        ),
+    };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 16,
+          height: 16,
+          child: running
+              ? Padding(
+                  padding: const EdgeInsets.all(1.5),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: c.textSecondary,
+                  ),
+                )
+              : Icon(icon, size: 16, color: color),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            s.t(key),
+            style: TextStyle(
+              fontFamily: kFontBody,
+              fontSize: 12.5,
+              height: 1.4,
+              color: color,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -382,16 +382,16 @@ describe("sendTestPushHandler: one real push to the caller's own device", () => 
     expect(sendSingleMock).not.toHaveBeenCalled();
   });
 
-  it("a dead token is pruned on the spot and reported", async () => {
+  it("a dead token is reported for the caller to repair — never pruned out from under it", async () => {
     docs.set(DEVICE, { fcmToken: "tok_gone" });
     sendSingleMock.mockRejectedValue(
       Object.assign(new Error("gone"), { code: "messaging/registration-token-not-registered" }),
     );
 
     expect(await call()).toEqual({ sent: false, reason: "dead-token" });
-    expect(updates).toHaveLength(1);
-    expect(updates[0]!.path).toBe(DEVICE);
-    expect(Object.keys(updates[0]!.patch).sort()).toEqual(["fcmToken", "fcmTokenAtMs"]);
+    // The caller's toggle streams this doc: a server-side delete would flip
+    // it off mid-conversation. The doc stays; the device repairs itself.
+    expect(updates).toHaveLength(0);
   });
 
   it("the hourly quota answers resource-exhausted, and junk deviceIds are refused", async () => {

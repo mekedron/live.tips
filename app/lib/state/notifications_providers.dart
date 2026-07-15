@@ -192,18 +192,22 @@ final pushNudgeVisibleProvider = Provider<bool>((ref) {
 
 enum PushEnableOutcome { enabled, denied, failed }
 
-/// What the settings page's "Send test notification" learned.
+/// What the settings page's "Send test notification" learned — AFTER the
+/// repair loop had its chance (see [PushRegistration.testThisDevice]).
 enum TestPushOutcome {
   /// FCM accepted it for this device's token — it is on its way.
   sent,
 
-  /// No usable registration on the server (never enabled, or the token was
-  /// found dead and pruned) — the toggle now reads OFF; flipping it back on
-  /// is the fix.
-  noRegistration,
+  /// Even a freshly minted registration was rejected: this browser/OS is
+  /// refusing push right now. The device has been switched off deliberately
+  /// — the page owes the artist the why.
+  unreachable,
 
   failed,
 }
+
+/// The callable's raw verdict, pre-repair.
+enum _TestCallResult { sent, noToken, deadToken, failed }
 
 final pushRegistrationProvider =
     Provider<PushRegistration>((ref) => PushRegistration(ref));
@@ -295,28 +299,60 @@ class PushRegistration {
   }
 
   /// The settings page's "Send test notification": one REAL push through the
-  /// whole pipeline (callable → FCM → this very device), so "is this device
-  /// actually reachable" stops being a guess about a toggle.
-  Future<TestPushOutcome> sendTestToThisDevice() async {
+  /// whole pipeline (callable → FCM → this very device) — with the repair
+  /// loop that keeps the toggle honest. FCM rejecting the stored token does
+  /// NOT flip anything off under the artist: the stale registration is
+  /// thrown away, a fresh one minted and stored ([onRepair] fires so the
+  /// page can narrate it), and the send retried once. Only when the FRESH
+  /// token is rejected too does this device get switched off — deliberately,
+  /// with [TestPushOutcome.unreachable] carrying the why.
+  Future<TestPushOutcome> testThisDevice({void Function()? onRepair}) async {
+    final first = await _callTest();
+    if (first == _TestCallResult.sent) return TestPushOutcome.sent;
+    if (first == _TestCallResult.failed) return TestPushOutcome.failed;
+
+    // no-token / dead-token: the registration this account holds is unusable.
+    onRepair?.call();
+    if (first == _TestCallResult.deadToken) {
+      // getToken() would hand the cached corpse straight back — only a
+      // delete makes the SDK mint a new registration.
+      await ref.read(pushServiceProvider).deleteToken();
+    }
+    if (await enableThisDevice() != PushEnableOutcome.enabled) {
+      return TestPushOutcome.failed;
+    }
+    return switch (await _callTest()) {
+      _TestCallResult.sent => TestPushOutcome.sent,
+      _TestCallResult.failed => TestPushOutcome.failed,
+      // A brand-new registration rejected as well: push is broken at the
+      // browser/OS level. Read the toggle off honestly instead of looping.
+      _TestCallResult.noToken || _TestCallResult.deadToken => await _giveUp(),
+    };
+  }
+
+  Future<TestPushOutcome> _giveUp() async {
+    await disableThisDevice();
+    return TestPushOutcome.unreachable;
+  }
+
+  Future<_TestCallResult> _callTest() async {
     final functions = ref.read(functionsProvider);
-    if (functions == null) return TestPushOutcome.failed;
+    if (functions == null) return _TestCallResult.failed;
     try {
       final result = await functions
           .httpsCallable('sendTestPush')
           .call<dynamic>({'deviceId': ref.read(deviceIdProvider)});
       final data = result.data;
       final map = data is Map ? data.cast<String, dynamic>() : const <String, dynamic>{};
-      if (map['sent'] == true) return TestPushOutcome.sent;
-      // 'no-token' / 'dead-token': the server holds no usable registration
-      // (a dead one was pruned on the spot) — the toggle's device stream
-      // will read OFF again by itself.
-      if (map['reason'] == 'no-token' || map['reason'] == 'dead-token') {
-        return TestPushOutcome.noRegistration;
-      }
-      return TestPushOutcome.failed;
+      if (map['sent'] == true) return _TestCallResult.sent;
+      return switch (map['reason']) {
+        'no-token' => _TestCallResult.noToken,
+        'dead-token' => _TestCallResult.deadToken,
+        _ => _TestCallResult.failed,
+      };
     } catch (e) {
       debugPrint('test push failed: $e');
-      return TestPushOutcome.failed;
+      return _TestCallResult.failed;
     }
   }
 

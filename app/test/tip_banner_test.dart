@@ -194,13 +194,54 @@ void main() {
     });
   });
 
+  group('stageQrSize', () {
+    test('fills the rail width (minus the card inset) when height allows', () {
+      // Tall panel: width binds, so the code fills the inner width less the
+      // white card's 24px inset.
+      final size = stageQrSize(
+        const BoxConstraints(maxWidth: 400, maxHeight: 1000),
+        hasMessages: true,
+      );
+      expect(size, 376);
+    });
+
+    test('shrinks to leave the labels + one comment when the panel is short', () {
+      // Short-and-wide: height binds. 500 - inset(24) - header(120) -
+      // messagesHeader(48) - tile(84) = 224, well under the 576 the width offers.
+      final size = stageQrSize(
+        const BoxConstraints(maxWidth: 600, maxHeight: 500),
+        hasMessages: true,
+      );
+      expect(size, 224);
+    });
+
+    test('with no comments the code may grow into the room they would take', () {
+      const box = BoxConstraints(maxWidth: 600, maxHeight: 500);
+      final withMessages = stageQrSize(box, hasMessages: true);
+      final withoutMessages = stageQrSize(box, hasMessages: false);
+      expect(withoutMessages, greaterThan(withMessages));
+      expect(withoutMessages, 356); // 500 - inset(24) - header(120)
+    });
+
+    test('never collapses below the scannable floor', () {
+      final size = stageQrSize(
+        const BoxConstraints(maxWidth: 180, maxHeight: 200),
+        hasMessages: true,
+      );
+      expect(size, 160);
+    });
+  });
+
   group('qrPanelMessageSlots', () {
     test('the QR always wins — messages only take the leftover height', () {
-      expect(qrPanelMessageSlots(300), 0);
-      expect(qrPanelMessageSlots(500), 0);
-      expect(qrPanelMessageSlots(560), 1);
-      expect(qrPanelMessageSlots(660), 2);
-      expect(qrPanelMessageSlots(900), 3, reason: 'capped at 3');
+      // Consistent with a height-bound code: a 224px code in a 500px panel
+      // leaves exactly one tile of room.
+      expect(qrPanelMessageSlots(500, 224), 1);
+      // A tighter fit leaves nothing.
+      expect(qrPanelMessageSlots(500, 300), 0);
+      // A tall panel with a width-bound code has room for the full three.
+      expect(qrPanelMessageSlots(1000, 376), 3, reason: 'capped at 3');
+      expect(qrPanelMessageSlots(600, 240), 2);
     });
   });
 }
