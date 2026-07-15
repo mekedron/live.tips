@@ -528,8 +528,8 @@ const INLINE_SCRIPT = `(function () {
 })();`;
 
 const STYLE = `
-:root { color-scheme: light dark; --accent: #e8542f; --accent-soft: #fdeee8; --bg: #faf6f1; --fg: #2b2018; --card: #ffffff; --muted: #8a7a6d; --line: #e7ddd3; --live: #7ab77a; --faint: #d8cabb; }
-@media (prefers-color-scheme: dark) { :root { --bg: #1c1713; --fg: #f3ece4; --card: #292219; --muted: #a2917f; --line: #3d332a; --accent-soft: #3a231b; --faint: #4a3d31; } }
+:root { color-scheme: light dark; --accent: #e8542f; --accent-soft: #fdeee8; --bg: #faf6f1; --fg: #2b2018; --card: #ffffff; --muted: #8a7a6d; --line: #e7ddd3; --live: #7ab77a; --faint: #d8cabb; --field: #f1e9df; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1c1713; --fg: #f3ece4; --card: #292219; --muted: #a2917f; --line: #3d332a; --accent-soft: #3a231b; --faint: #4a3d31; --field: #241d16; } }
 * { box-sizing: border-box; margin: 0; }
 [hidden] { display: none !important; }
 body { min-height: 100dvh; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px 16px 32px; }
@@ -594,7 +594,8 @@ h1 { font-size: 18px; font-weight: 800; margin: 0; overflow-wrap: anywhere; }
 .fallback a { display: block; margin-top: 8px; color: var(--accent); }
 /* Details step */
 label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 5px; }
-input, textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg); font: inherit; font-size: 15px; }
+input, textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); color: var(--fg); font: inherit; font-size: 16px; }
+.amt-input { background: transparent; }
 textarea { resize: vertical; min-height: 60px; }
 .turnstile-slot { margin-top: 14px; min-height: 66px; }
 #f-submit { width: 100%; margin-top: 16px; padding: 15px; border: 0; border-radius: 14px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
@@ -602,7 +603,7 @@ textarea { resize: vertical; min-height: 60px; }
 /* Song list */
 .search-wrap { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); margin-bottom: 6px; }
 .search-wrap .glass { font-size: 15px; flex: 0 0 auto; }
-#req-search { border: 0; background: none; padding: 0; flex: 1; color: var(--fg); font: inherit; font-size: 14.5px; }
+#req-search { border: 0; background: none; padding: 0; flex: 1; color: var(--fg); font: inherit; font-size: 16px; }
 #req-search::placeholder { color: var(--muted); }
 .req-hint { color: var(--muted); font-size: 12.5px; margin: 6px 2px 4px; }
 .song-group-title { font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 14px 2px 8px; }
