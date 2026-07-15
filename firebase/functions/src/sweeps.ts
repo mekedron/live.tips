@@ -23,11 +23,12 @@ async function deleteByQuery(firestore: Firestore, query: Query): Promise<number
 
 /**
  * Undelivered tips age out on schedule whether or not the artist ever comes
- * back. Two queues, one contract (delivery is deletion; the sweep is the
- * backstop): the relay's pendingTips — the only place fan text rests for a
- * NO-account artist, so every 10 minutes + the 1h TTL keeps it at rest
- * ≤ ~70 minutes — and the cloud accounts' stripeTips (stripe-store.ts),
- * same TTL, where a swept QR tip is still recoverable through History.
+ * back. The relay's pendingTips queue (delivery is deletion; the sweep is
+ * the backstop) is the only place fan text rests for a NO-account artist,
+ * so every 10 minutes + the 1h TTL keeps it at rest ≤ ~70 minutes. The
+ * stripeTips sweep outlived its queue: nothing has written that collection
+ * since #71 (tips go server-direct into the account), and the query stays
+ * only until docs written before the cutover age out.
  *
  * Riding along: the webhook's processedEvents dedupe tombstones
  * (stripe-webhook.ts). Their TTL is days, not an hour — a tombstone must

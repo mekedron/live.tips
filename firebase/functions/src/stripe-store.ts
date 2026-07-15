@@ -1,4 +1,4 @@
-/// Firestore layout for cloud Stripe connections. Four places, and the rules
+/// Firestore layout for cloud Stripe connections. Three places, and the rules
 /// pin each one:
 ///
 ///   stripeConnections/{connectionId}        server-only, ALWAYS. Holds the
@@ -12,20 +12,21 @@
 ///                                            { connections: {bandId: id} } —
 ///                                            how the callables find a band's
 ///                                            connection without a query.
-///   users/{uid}/bands/{bandId}/stripeTips/…  the delivery queue the artist's
-///                                            devices listen to — the cloud
-///                                            cousin of jars/*/pendingTips,
-///                                            same delivery-is-deletion
-///                                            contract, doc id = the Stripe
-///                                            object id (cs_…/ch_…).
-///   processedEvents/{objectId}               server-only dedupe tombstones:
-///                                            the tip doc above dies on
-///                                            delivery, so this is the record
-///                                            that still answers a Stripe
-///                                            redelivery afterwards (see
+///   processedEvents/{objectId}               server-only dedupe tombstones,
+///                                            keyed by the Stripe OBJECT id:
+///                                            where a tip lands moves with
+///                                            the live set (#71), so this is
+///                                            the record that answers a
+///                                            Stripe redelivery (see
 ///                                            stripe-webhook.ts).
+///
+/// Mapped tips themselves land in the account's own collections through the
+/// shared destination router (tip-destination.ts). The old
+/// users/{uid}/bands/{bandId}/stripeTips consume-once queue is dead since
+/// #71 — nothing writes it; the sweep (sweeps.ts) stays only until docs
+/// written before the cutover age out.
 
-import type { DocumentReference, Firestore, CollectionReference } from "firebase-admin/firestore";
+import type { DocumentReference, Firestore } from "firebase-admin/firestore";
 import type { Envelope } from "./stripe-crypto";
 
 // ---------------------------------------------------------------------------
@@ -49,21 +50,6 @@ export const STRIPE_PROXY_PER_UID_PER_HOUR = 300;
 /** stripeConnect attempts per uid per hour: connecting is a once-per-band
  * act, and each attempt costs Stripe probes + KMS + webhook churn. */
 export const STRIPE_CONNECTS_PER_UID_PER_HOUR = 10;
-
-/**
- * Queue bound per band, like MAX_PENDING on a jar: over it the oldest goes —
- * it was about to expire anyway, and unlike a relay tip a swept QR tip is
- * still recoverable through History (and a tap through the Stripe
- * dashboard). Undelivered docs also age out after PENDING_TTL_MS via the
- * same sweep as pendingTips.
- */
-export const MAX_STRIPE_PENDING = 60;
-
-/** The relay's PENDING_TTL_MS (store.ts), restated as a literal so this
- * module stays import-pure for tests: 1h is long enough for a set break,
- * short enough that the queue never becomes a second tip history (History
- * is the proxy's job). */
-export const STRIPE_PENDING_TTL_MS = 60 * 60_000;
 
 /**
  * How long a processed-event tombstone (processedEvents/{objectId}) outlives
@@ -146,20 +132,12 @@ export interface StripePointerDoc {
   connections?: Record<string, string>;
 }
 
-/** One queued tip: StripeTipData (stripe-events.ts) + the sweep deadline. */
 export function stripeConnectionRef(firestore: Firestore, connectionId: string): DocumentReference {
   return firestore.collection("stripeConnections").doc(connectionId);
 }
 
 export function stripePointerRef(firestore: Firestore, uid: string): DocumentReference {
   return firestore.collection("users").doc(uid).collection("private").doc("stripe");
-}
-
-export function stripeTipsCol(firestore: Firestore, uid: string, bandId: string): CollectionReference {
-  return firestore
-    .collection("users").doc(uid)
-    .collection("bands").doc(bandId)
-    .collection("stripeTips");
 }
 
 /** processedEvents/{objectId} — the webhook's dedupe tombstone, keyed like

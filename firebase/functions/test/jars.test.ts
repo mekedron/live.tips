@@ -32,6 +32,29 @@ function fakeSnap(path: string) {
   };
 }
 
+function applyPatch(path: string, patch: Record<string, unknown>) {
+  const doc = docs.get(path);
+  if (doc === undefined) throw new Error(`update on missing ${path}`);
+  // Firestore update() semantics: a dotted key is a FIELD PATH into a
+  // nested map (creating intermediate maps), not a literal key — the
+  // difference setJarRequests' partial writes depend on.
+  for (const [key, value] of Object.entries(patch)) {
+    const parts = key.split(".");
+    let target = doc;
+    for (const part of parts.slice(0, -1)) {
+      const next = target[part];
+      if (typeof next === "object" && next !== null) {
+        target = next as Record<string, unknown>;
+      } else {
+        const fresh: Record<string, unknown> = {};
+        target[part] = fresh;
+        target = fresh;
+      }
+    }
+    target[parts[parts.length - 1]!] = value;
+  }
+}
+
 const fakeDb = {
   getAll: async (...refs: { path: string }[]) => refs.map((r) => fakeSnap(r.path)),
   recursiveDelete: async (ref: { path: string }) => {
@@ -39,34 +62,24 @@ const fakeDb = {
       if (key === ref.path || key.startsWith(`${ref.path}/`)) docs.delete(key);
     }
   },
+  // Enough of a transaction for claimJar: sequential get + buffered update.
+  runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
+    const writes: (() => void)[] = [];
+    const result = await fn({
+      get: async (ref: { path: string }) => fakeSnap(ref.path),
+      update: (ref: { path: string }, patch: Record<string, unknown>) =>
+        writes.push(() => applyPatch(ref.path, patch)),
+    });
+    for (const write of writes) write();
+    return result;
+  },
 };
 
 function jarRef(_db: unknown, jarId: string) {
   const path = `jars/${jarId}`;
   return {
     path,
-    update: async (patch: Record<string, unknown>) => {
-      const doc = docs.get(path);
-      if (doc === undefined) throw new Error(`update on missing ${path}`);
-      // Firestore update() semantics: a dotted key is a FIELD PATH into a
-      // nested map (creating intermediate maps), not a literal key — the
-      // difference setJarRequests' partial writes depend on.
-      for (const [key, value] of Object.entries(patch)) {
-        const parts = key.split(".");
-        let target = doc;
-        for (const part of parts.slice(0, -1)) {
-          const next = target[part];
-          if (typeof next === "object" && next !== null) {
-            target = next as Record<string, unknown>;
-          } else {
-            const fresh: Record<string, unknown> = {};
-            target[part] = fresh;
-            target = fresh;
-          }
-        }
-        target[parts[parts.length - 1]!] = value;
-      }
-    },
+    update: async (patch: Record<string, unknown>) => applyPatch(path, patch),
   };
 }
 
@@ -75,7 +88,10 @@ const bumpQuota = vi.fn<(...args: unknown[]) => Promise<boolean>>();
 vi.mock("../src/store", () => ({
   db: () => fakeDb,
   jarRef,
-  jarAuthRef: (_db: unknown, jarId: string) => ({ path: `jars/${jarId}/private/auth` }),
+  jarAuthRef: (_db: unknown, jarId: string) => ({
+    path: `jars/${jarId}/private/auth`,
+    get: async () => fakeSnap(`jars/${jarId}/private/auth`),
+  }),
   securityRef: (_db: unknown, uid: string) => ({
     path: `users/${uid}/private/security`,
     get: async () => fakeSnap(`users/${uid}/private/security`),
@@ -83,6 +99,7 @@ vi.mock("../src/store", () => ({
   expiryTimestamp: (now: number) => ({ expiresAtMs: now + 90 * 86_400_000 }),
   bumpQuota: (...args: unknown[]) => bumpQuota(...args),
   DAY_MS: 86_400_000,
+  MAX_READER_UIDS: 5,
   REQUESTS_PER_UID_PER_HOUR: 720,
 }));
 
@@ -92,6 +109,7 @@ vi.mock("../src/params", () => ({
 
 import {
   REQUESTS_OPEN_MS,
+  claimJarHandler,
   deleteJarHandler,
   jarSeenHandler,
   setJarRequestsHandler,
@@ -469,6 +487,120 @@ describe("setJarRequests partial-write semantics", () => {
     expect(jarDoc()["lastSeenDay"]).toBe(staleDay);
     expect(jarDoc()["expiresAt"]).toEqual({ untouched: true });
     expect((jarDoc()["profile"] as typeof PROFILE).methods).toEqual({ revolutUsername: "ana" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// claimJar — the tip route (#71): ownerUid + bandId is what flips a jar's
+// fan tips from the pendingTips queue to server-direct account writes, so
+// the exact write/keep/clear semantics here ARE the routing table.
+
+const BAND = "acc_m3k9zq1a2b3c";
+const OTHER_OWNER = "uid_other";
+
+describe("claimJar: bandId validation", () => {
+  it("owned + a valid bandId establishes the route", async () => {
+    seedOwnedJar({ ownerUid: null, readerUids: [] });
+
+    await claimJarHandler(
+      signedIn(OWNER, { jarId: JAR_ID, secret: SECRET, owned: true, bandId: BAND }),
+    );
+
+    expect(jarDoc()["ownerUid"]).toBe(OWNER);
+    expect(jarDoc()["bandId"]).toBe(BAND);
+    expect(jarDoc()["readerUids"]).toEqual([OWNER]);
+  });
+
+  it("junk bandId shapes are invalid-argument and write NOTHING — not even the reader join", async () => {
+    seedOwnedJar({ ownerUid: null, readerUids: [] });
+    // The same shape rules as every other band id (isValidBandId): a safe
+    // Firestore doc id, 1–64 of [A-Za-z0-9_-].
+    const junk = ["", "a/b", "a".repeat(65), "acc m3k9", 42, {}, null, ["acc_x"]];
+    for (const bandId of junk) {
+      await expect(
+        claimJarHandler(signedIn(OWNER, { jarId: JAR_ID, secret: SECRET, owned: true, bandId })),
+      ).rejects.toMatchObject({ code: "invalid-argument" });
+    }
+    expect(jarDoc()["ownerUid"]).toBeNull();
+    expect("bandId" in jarDoc()).toBe(false);
+    expect(jarDoc()["readerUids"]).toEqual([]);
+  });
+
+  it("bandId without owned is invalid-argument: a non-owner's band next to someone else's ownerUid would be a cross-account route", async () => {
+    seedOwnedJar(); // owned by OWNER
+
+    await expect(
+      claimJarHandler(signedIn("uid_reader", { jarId: JAR_ID, secret: SECRET, bandId: BAND })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+
+    expect(jarDoc()["ownerUid"]).toBe(OWNER);
+    expect("bandId" in jarDoc()).toBe(false);
+  });
+
+  it("a wrong secret is unauthenticated whatever the payload says", async () => {
+    seedOwnedJar();
+
+    await expect(
+      claimJarHandler(signedIn(OWNER, { jarId: JAR_ID, secret: "nope", owned: true, bandId: BAND })),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+
+    expect("bandId" in jarDoc()).toBe(false);
+  });
+});
+
+describe("claimJar: route keep/clear semantics", () => {
+  it("the SAME owner re-claiming without bandId keeps the route intact", async () => {
+    // A pre-#71 build's claim payload (jarId + secret + owned) must not
+    // tear down the route its newer sibling device established.
+    seedOwnedJar({ bandId: BAND });
+
+    await claimJarHandler(signedIn(OWNER, { jarId: JAR_ID, secret: SECRET, owned: true }));
+
+    expect(jarDoc()["ownerUid"]).toBe(OWNER);
+    expect(jarDoc()["bandId"]).toBe(BAND);
+  });
+
+  it("ownership moving to a DIFFERENT uid without bandId clears the route", async () => {
+    // The stale bandId names a band under the OLD owner's account; keeping
+    // it would write the new owner's money into users/{new}/bands/{old's}.
+    seedOwnedJar({ bandId: BAND });
+
+    await claimJarHandler(signedIn(OTHER_OWNER, { jarId: JAR_ID, secret: SECRET, owned: true }));
+
+    expect(jarDoc()["ownerUid"]).toBe(OTHER_OWNER);
+    expect(jarDoc()["bandId"]).toBeNull(); // cleared → tips flow via pendingTips again
+  });
+
+  it("a foreign owner claiming WITH bandId re-establishes the route under their own account", async () => {
+    seedOwnedJar({ bandId: BAND });
+
+    await claimJarHandler(
+      signedIn(OTHER_OWNER, { jarId: JAR_ID, secret: SECRET, owned: true, bandId: "acc_new_band" }),
+    );
+
+    expect(jarDoc()["ownerUid"]).toBe(OTHER_OWNER);
+    expect(jarDoc()["bandId"]).toBe("acc_new_band");
+  });
+
+  it("a reader (non-owned) claim joins readerUids and touches neither ownerUid nor bandId", async () => {
+    // The anonymous-transport claim every attach performs: the owner's
+    // route must survive any number of them.
+    seedOwnedJar({ bandId: BAND });
+
+    await claimJarHandler(signedIn("uid_reader", { jarId: JAR_ID, secret: SECRET }));
+
+    expect(jarDoc()["readerUids"]).toEqual([OWNER, "uid_reader"]);
+    expect(jarDoc()["ownerUid"]).toBe(OWNER);
+    expect(jarDoc()["bandId"]).toBe(BAND);
+  });
+
+  it("an unowned jar claimed by a reader stays routeless — local jars never acquire a route", async () => {
+    seedOwnedJar({ ownerUid: null, readerUids: [] });
+
+    await claimJarHandler(signedIn("uid_anon", { jarId: JAR_ID, secret: SECRET }));
+
+    expect(jarDoc()["ownerUid"]).toBeNull();
+    expect("bandId" in jarDoc()).toBe(false);
   });
 });
 

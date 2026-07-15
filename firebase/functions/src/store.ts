@@ -95,6 +95,19 @@ export interface JarDoc {
   profile: JarProfile;
   /** Set only when the app claimed the jar with {owned: true}. */
   ownerUid: string | null;
+  /**
+   * The band under the OWNER's account this jar belongs to — the second half
+   * of the tip route (#71): a jar with `ownerUid != null && bandId != null`
+   * gets its fan tips written straight into
+   * users/{ownerUid}/bands/{bandId}/… (tip-destination.ts) instead of the
+   * pendingTips queue. Written only by claimJarHandler alongside an
+   * {owned: true} claim, cleared (null) when ownership moves to a uid that
+   * did not name a band — a stale bandId would route money into the OLD
+   * owner's subtree. Absent on jars claimed before #71 (they keep the queue
+   * until their next claim backfills the route) and on local jars forever
+   * (anonymous uids never claim ownership).
+   */
+  bandId?: string | null;
   readerUids: string[];
   createdAtMs: number;
   lastSeenDay: number;

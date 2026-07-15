@@ -1,13 +1,17 @@
-/// The webhook's dedupe beyond delivery, driven through the real handler
-/// over an in-memory Firestore stand-in and genuinely signed payloads.
+/// The webhook's dedupe and destination routing, driven through the real
+/// handler over an in-memory Firestore stand-in and genuinely signed
+/// payloads.
 ///
-/// The failure this pins down (issue #13): dedupe used to live only in the
-/// tip doc's id — create() refuses to overwrite — but the queue's contract
-/// is delivery-is-deletion. Stripe delivers at-least-once, so an event
-/// already answered 200 can come again AFTER the tip was collected; create()
-/// then succeeds (nothing left to conflict with) and the fan's one donation
-/// takes the stage twice. The fix is the processedEvents tombstone that
-/// outlives the queue entry.
+/// Two eras pinned here. Issue #13: dedupe used to live only in the tip
+/// doc's id — create() refuses to overwrite — but Stripe delivers
+/// at-least-once and an event already answered 200 can come again later;
+/// the processedEvents tombstone is what answers it. Issue #71: the
+/// stripeTips consume-once queue is dead — mapped tips go through the
+/// shared destination router (tip-destination.ts) straight into the
+/// account: the live session's tips subcollection while a set runs for the
+/// band, the relayTips archive otherwise. The tombstone matters MORE now:
+/// where a tip lands moves with the set, so a redelivery after the session
+/// ended would land in the OTHER collection if only create() guarded it.
 
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -110,7 +114,13 @@ const OUR_LINK = "plink_1OurTipJarLink";
 const SONG_LINK = "plink_1SongRequestLink";
 
 const SESSION = "cs_test_abc123";
-const tipPath = `users/${UID}/bands/${BAND}/stripeTips/${SESSION}`;
+const LIVE_SESSION = "sess_tonight";
+/** Off-session (or dead-lease) destination: the band's durable archive. */
+const tipPath = `users/${UID}/bands/${BAND}/relayTips/${SESSION}`;
+/** In-session destination: the running set's own tips subcollection. */
+const liveTipPath = `users/${UID}/bands/${BAND}/sessions/${LIVE_SESSION}/tips/${SESSION}`;
+/** The dead queue (#71): nothing may ever land here again. */
+const queuePath = `users/${UID}/bands/${BAND}/stripeTips/${SESSION}`;
 const tombstonePath = `processedEvents/${SESSION}`;
 
 async function seedConnection(extra: Record<string, unknown> = {}) {
@@ -121,6 +131,18 @@ async function seedConnection(extra: Record<string, unknown> = {}) {
     webhookSecret: await sealSecret(SECRET, testWrapper),
     paymentLinkId: OUR_LINK,
     ...extra,
+  });
+}
+
+/** A running set: live/current as the app's claim transaction writes it. */
+function seedLiveSession(overrides: Record<string, unknown> = {}) {
+  docs.set(`users/${UID}/live/current`, {
+    active: true,
+    bandId: BAND,
+    sessionId: LIVE_SESSION,
+    leaderDeviceId: "device_a",
+    leaderLeaseUntilMs: Date.now() + 45_000,
+    ...overrides,
   });
 }
 
@@ -184,47 +206,50 @@ beforeEach(() => {
 });
 
 describe("stripeWebhook: dedupe must outlive the delivered tip", () => {
-  it("first delivery queues the tip AND writes a tombstone that outlasts Stripe's retries", async () => {
+  it("first delivery writes the tip AND a tombstone that outlasts Stripe's retries", async () => {
     await seedConnection();
 
     const out = await deliver(checkoutEvent(SESSION, "evt_1"));
 
     expect(out).toEqual({ status: 200, body: { received: true } });
     expect(docs.has(tipPath)).toBe(true);
-    // The tombstone's whole job is outliving the 1h queue entry: its TTL
-    // must clear Stripe's documented 3-day retry window.
+    // The tombstone's whole job is answering long after the delivery: its
+    // TTL must clear Stripe's documented 3-day retry window.
     const expiresAt = docs.get(tombstonePath)!["expiresAt"] as Timestamp;
     expect(expiresAt.toMillis()).toBeGreaterThan(Date.now() + 3 * 24 * 3_600_000);
   });
 
-  it("a redelivery while the tip still sits in the queue is a duplicate no-op", async () => {
+  it("a redelivery is a duplicate no-op that leaves the tip untouched", async () => {
     await seedConnection();
     await deliver(checkoutEvent(SESSION, "evt_1"));
-    const queued = { ...docs.get(tipPath)! };
+    const written = { ...docs.get(tipPath)! };
 
     const out = await deliver(checkoutEvent(SESSION, "evt_1_redelivered"));
 
     expect(out).toEqual({ status: 200, body: { received: true, duplicate: true } });
-    expect(docs.get(tipPath)).toEqual(queued); // untouched — no refreshed TTL
+    expect(docs.get(tipPath)).toEqual(written); // no refreshed updatedAtMs
   });
 
-  it("THE regression: a redelivery AFTER the tip was collected does not re-stage it", async () => {
+  it("THE #71 regression shape: a redelivery after a set STARTS does not land the same money twice", async () => {
+    // The destination moves with the set, so create()'s per-doc idempotency
+    // cannot answer a late redelivery — only the tombstone can: first
+    // delivery lands off-session in relayTips, then a set starts, then
+    // Stripe re-sends. Without the tombstone the session subcollection
+    // would receive a second copy under the same object id.
     await seedConnection();
     await deliver(checkoutEvent(SESSION, "evt_1"));
-    // The device collects the tip: delivery is deletion (the queue's
-    // contract). Before the fix, this is exactly where the dedupe died.
-    docs.delete(tipPath);
+    expect(docs.has(tipPath)).toBe(true);
+    seedLiveSession();
 
     const out = await deliver(checkoutEvent(SESSION, "evt_1_redelivered"));
 
     expect(out).toEqual({ status: 200, body: { received: true, duplicate: true } });
-    expect(docs.has(tipPath)).toBe(false); // the fan's one donation stays delivered
+    expect(docs.has(liveTipPath)).toBe(false); // the fan's one donation stays one doc
   });
 
   it("a redelivery costs the artist no tip quota", async () => {
     await seedConnection();
     await deliver(checkoutEvent(SESSION, "evt_1"));
-    docs.delete(tipPath);
     quotaBumps = 0;
 
     await deliver(checkoutEvent(SESSION, "evt_1_redelivered"));
@@ -235,12 +260,154 @@ describe("stripeWebhook: dedupe must outlive the delivered tip", () => {
   it("the tombstone dedupes ONE tip, not the jar: the next tip still lands", async () => {
     await seedConnection();
     await deliver(checkoutEvent(SESSION, "evt_1"));
-    docs.delete(tipPath); // collected
 
     const out = await deliver(checkoutEvent("cs_test_next456", "evt_2"));
 
     expect(out).toEqual({ status: 200, body: { received: true } });
-    expect(docs.has(`users/${UID}/bands/${BAND}/stripeTips/cs_test_next456`)).toBe(true);
+    expect(docs.has(`users/${UID}/bands/${BAND}/relayTips/cs_test_next456`)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Destination routing (#71): the same router the relay POST uses.
+
+/** A card-present tap — the in-person Charge shape the webhook accepts. */
+function chargeEvent(chargeId: string, eventId: string): string {
+  return JSON.stringify({
+    id: eventId,
+    type: "charge.succeeded",
+    data: {
+      object: {
+        id: chargeId,
+        object: "charge",
+        amount: 700,
+        currency: "eur",
+        created: Math.floor(Date.now() / 1000),
+        livemode: true,
+        status: "succeeded",
+        paid: true,
+        payment_method_details: { type: "card_present" },
+        payment_intent: "pi_tap1",
+      },
+    },
+  });
+}
+
+describe("stripeWebhook: tips land in the account, never the stripeTips queue (#71)", () => {
+  it("a set running for the band captures the tip into its tips subcollection", async () => {
+    await seedConnection();
+    seedLiveSession();
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1"));
+
+    expect(out).toEqual({ status: 200, body: { received: true } });
+    expect(docs.has(liveTipPath)).toBe(true);
+    expect(docs.has(tipPath)).toBe(false);
+  });
+
+  it("no set running: the tip waits durably in the band's relayTips archive", async () => {
+    await seedConnection();
+
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+
+    expect(docs.has(tipPath)).toBe(true);
+    expect(docs.has(liveTipPath)).toBe(false);
+  });
+
+  it("a lease dead past the app's staleMs routes off-session — active:true alone is a lie", async () => {
+    await seedConnection();
+    seedLiveSession({ leaderLeaseUntilMs: Date.now() - 2 * 60_000 });
+
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+
+    expect(docs.has(tipPath)).toBe(true);
+    expect(docs.has(liveTipPath)).toBe(false);
+  });
+
+  it("a lease merely EXPIRED but within staleMs still counts as running — money flows through the takeover window", async () => {
+    await seedConnection();
+    seedLiveSession({ leaderLeaseUntilMs: Date.now() - 60_000 }); // dead leader, no takeover yet
+
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+
+    expect(docs.has(liveTipPath)).toBe(true);
+  });
+
+  it("a cleanly stopped session (active:false) does not capture tips into a finished set", async () => {
+    await seedConnection();
+    seedLiveSession({ active: false });
+
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+
+    expect(docs.has(tipPath)).toBe(true);
+    expect(docs.has(liveTipPath)).toBe(false);
+  });
+
+  it("a live set for ANOTHER band of the same account does not capture this band's tips", async () => {
+    await seedConnection();
+    seedLiveSession({ bandId: "acc_other_band" });
+
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+
+    expect(docs.has(tipPath)).toBe(true);
+    expect([...docs.keys()].some((p) => p.includes("/sessions/"))).toBe(false);
+  });
+
+  it("NOTHING is ever written to stripeTips again — the queue is dead", async () => {
+    await seedConnection();
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+    seedLiveSession();
+    await deliver(checkoutEvent("cs_test_next456", "evt_2"));
+
+    expect([...docs.keys()].some((p) => p.includes("/stripeTips/"))).toBe(false);
+    expect(docs.has(queuePath)).toBe(false);
+  });
+});
+
+describe("stripeWebhook: the wire shape is the app's own Tip.toJson", () => {
+  it("a donation is written exactly as the leader would publish it — verified/method/inPerson OMITTED", async () => {
+    await seedConnection();
+    const payload = checkoutEvent(SESSION, "evt_1");
+    const created = (JSON.parse(payload) as { data: { object: { created: number } } }).data.object.created;
+
+    await deliver(payload);
+
+    // toEqual, not toMatchObject: absent keys are the contract. `verified`
+    // and `method` are Tip's DEFAULTS (true / stripe) and Tip.toJson omits
+    // them; a `verified: true` key here would break byte-identity with
+    // app-written history. No expiresAt: this is history, nothing sweeps it.
+    expect(docs.get(tipPath)).toEqual({
+      id: SESSION,
+      amountMinor: 1500,
+      currency: "eur",
+      createdAt: created * 1000,
+      name: "Maya",
+      livemode: true,
+      viaService: true,
+      paymentIntentId: "pi_123",
+      updatedAtMs: expect.any(Number) as number,
+    });
+  });
+
+  it("an in-person tap carries inPerson:true and stays nameless", async () => {
+    await seedConnection();
+    seedLiveSession();
+    const payload = chargeEvent("ch_tap_1", "evt_tap");
+    const created = (JSON.parse(payload) as { data: { object: { created: number } } }).data.object.created;
+
+    await deliver(payload);
+
+    expect(docs.get(`users/${UID}/bands/${BAND}/sessions/${LIVE_SESSION}/tips/ch_tap_1`)).toEqual({
+      id: "ch_tap_1",
+      amountMinor: 700,
+      currency: "eur",
+      createdAt: created * 1000,
+      livemode: true,
+      viaService: true,
+      paymentIntentId: "pi_tap1",
+      inPerson: true,
+      updatedAtMs: expect.any(Number) as number,
+    });
   });
 });
 
@@ -262,15 +429,15 @@ describe("stripeWebhook: song-request links (issue #64)", () => {
     expect(docs.has(tombstonePath)).toBe(true);
   });
 
-  it("a redelivered request event is idempotent, even after the tip was collected", async () => {
+  it("a redelivered request event is idempotent — even into a set that started in between", async () => {
     await seedConnection({ requestLinks });
     await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK }));
-    docs.delete(tipPath); // collected — delivery is deletion
+    seedLiveSession(); // the destination has moved; the tombstone still answers
 
     const out = await deliver(checkoutEvent(SESSION, "evt_1_redelivered", { payment_link: SONG_LINK }));
 
     expect(out).toEqual({ status: 200, body: { received: true, duplicate: true } });
-    expect(docs.has(tipPath)).toBe(false);
+    expect(docs.has(liveTipPath)).toBe(false);
   });
 
   it("a donation stays a donation: no song fields leak onto the tip-jar path", async () => {

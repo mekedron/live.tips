@@ -22,6 +22,7 @@ import {
   jarRef,
   type JarDoc,
 } from "./store";
+import { isValidBandId } from "./stripe-store";
 import { isValidJarId, validateProfile, validateRequestsConfig, validateRequestsQueue } from "./validate";
 
 import type { Firestore } from "firebase-admin/firestore";
@@ -145,11 +146,39 @@ export async function createJarHandler(
   return { jarId, secret, tipUrl: `${TIP_URL_BASE}${jarId}` };
 }
 
+/**
+ * Claim a jar with its secret: always joins readerUids; with {owned: true}
+ * also asserts ownership, and may carry `bandId` — the second half of the tip
+ * route (#71, see JarDoc.bandId). The route semantics, exactly:
+ *
+ *  * owned + bandId      → ownerUid = uid, bandId stored: the route is
+ *                          (re)established and fan tips go server-direct.
+ *  * owned, no bandId    → ownerUid = uid; an existing bandId survives ONLY
+ *                          if the jar already belonged to this same uid
+ *                          (a pre-#71 app re-claiming its own jar must not
+ *                          tear the route down). Ownership moving to a
+ *                          DIFFERENT uid clears it — the old bandId names a
+ *                          band under the OLD owner's account, and keeping
+ *                          it would route money across accounts.
+ *  * not owned           → reader join only; ownerUid and bandId untouched,
+ *                          whoever owns the jar keeps their route.
+ *  * bandId without owned → invalid-argument: a bandId is only meaningful
+ *                          under the uid that owns the jar, and storing a
+ *                          non-owner's band next to someone else's ownerUid
+ *                          would BE the cross-account route above.
+ */
 export async function claimJarHandler(request: CallableRequest): Promise<{ ok: true }> {
   const uid = requireUid(request);
   const data = dataObject(request);
   const jarId = requireJarId(data);
   const owned = data["owned"] === true;
+
+  const bandIdRaw = data["bandId"];
+  if (bandIdRaw !== undefined) {
+    if (!isValidBandId(bandIdRaw)) throw new HttpsError("invalid-argument", "invalid bandId");
+    if (!owned) throw new HttpsError("invalid-argument", "bandId requires owned");
+  }
+  const bandId = bandIdRaw as string | undefined;
 
   const firestore = db();
   const authSnap = await jarAuthRef(firestore, jarId).get();
@@ -171,6 +200,13 @@ export async function claimJarHandler(request: CallableRequest): Promise<{ ok: t
     tx.update(ref, {
       readerUids: readers,
       ...(owned ? { ownerUid: uid } : {}),
+      ...(bandId !== undefined
+        ? { bandId }
+        // null, not delete(): the route test is `!= null` either way, and a
+        // tombstoned field reads the same as a never-written one everywhere.
+        : owned && jar.ownerUid !== uid && jar.bandId != null
+          ? { bandId: null }
+          : {}),
     });
   });
 

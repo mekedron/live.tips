@@ -1,6 +1,8 @@
 /// The fan-facing surface: GET /t/:jarId (SSR tip page) and
-/// POST /t/:jarId/tips (validate → Turnstile → rate/dedupe → queue → deep link).
-/// One https function, routed here by the Hosting rewrite for /t/**.
+/// POST /t/:jarId/tips (validate → Turnstile → rate/dedupe → deliver → deep
+/// link). One https function, routed here by the Hosting rewrite for /t/**.
+/// Delivery forks on the jar's route (#71): a cloud-claimed jar writes the
+/// tip into the owner's account directly; everything else queues pendingTips.
 ///
 /// Log hygiene: nothing here logs names, messages, secrets, or headers.
 
@@ -31,6 +33,7 @@ import {
   type PendingTipDoc,
   type RateDoc,
 } from "./store";
+import { relayTipWire, routedTipRef } from "./tip-destination";
 import { renderNotFoundPage, renderTipPage, tipPageCsp } from "./tip-page";
 import { verifyTurnstile } from "./turnstile";
 import { isValidJarId, parseJsonBody, validateTip } from "./validate";
@@ -277,38 +280,72 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
     }
 
     if (outcome === "ok") {
-      const pendingCol = ref.collection("pendingTips");
-      const batch = firestore.batch();
+      // The route (#71): ownerUid AND bandId on the jar doc, both written by
+      // an {owned: true} claim (jars.ts). A routed jar's tip is written
+      // straight into the account's own collections — the live session's tips
+      // when a set runs, the relayTips archive otherwise (tip-destination.ts)
+      // — no queue, no cap, no TTL: it is the artist's own history, and the
+      // per-jar rate transaction above already bounds arrival. Everything
+      // WITHOUT a complete route (local jars forever, cloud jars claimed
+      // before #71 until their next claim backfills it) keeps the pendingTips
+      // queue byte-for-byte.
+      const uid = jar.ownerUid;
+      const bandId = jar.bandId;
+      if (uid != null && bandId != null) {
+        // Tip.relayTip's id scheme: the doc id and the wire `id` are the same
+        // string, so a racing writer overwrites instead of duplicating.
+        const tipId = `relay_${randomUUID()}`;
+        const { ref: dest } = await routedTipRef(firestore, uid, bandId, tipId, now);
+        await dest.set(relayTipWire({
+          id: tipId,
+          tsMs: now,
+          method: tipRequest.method,
+          amountMinor: tipRequest.amountMinor,
+          // The currency the fan actually paid in — EUR for a Box, GBP for
+          // Monzo — not the jar's. Same rule as the queue path below.
+          currency: methodCurrency(tipRequest.method, profile.currency),
+          name: tipRequest.name,
+          message: tipRequest.message,
+          // Request tips carry which song was bought; the title is the
+          // server's own config lookup, safe to hand the app verbatim.
+          ...(tipRequest.songId !== undefined && tipRequest.songTitle !== undefined
+            ? { songId: tipRequest.songId, songTitle: tipRequest.songTitle }
+            : {}),
+        }, now));
+      } else {
+        const pendingCol = ref.collection("pendingTips");
+        const batch = firestore.batch();
 
-      // Over the cap, the oldest goes: a tip that has been waiting an hour is
-      // about to be swept anyway, and the one that just landed is the one the
-      // artist is most likely still able to thank someone for.
-      const existing = await pendingCol.orderBy("tsMs").select().get();
-      const overflow = existing.size - (MAX_PENDING - 1);
-      if (overflow > 0) {
-        for (const doc of existing.docs.slice(0, overflow)) batch.delete(doc.ref);
+        // Over the cap, the oldest goes: a tip that has been waiting an hour
+        // is about to be swept anyway, and the one that just landed is the
+        // one the artist is most likely still able to thank someone for.
+        const existing = await pendingCol.orderBy("tsMs").select().get();
+        const overflow = existing.size - (MAX_PENDING - 1);
+        if (overflow > 0) {
+          for (const doc of existing.docs.slice(0, overflow)) batch.delete(doc.ref);
+        }
+
+        const event: PendingTipDoc = {
+          tsMs: now,
+          method: tipRequest.method,
+          amountMinor: tipRequest.amountMinor,
+          // The currency the fan actually paid in — EUR for a Box, GBP for
+          // Monzo — not the jar's. This is what the artist's device records.
+          currency: methodCurrency(tipRequest.method, profile.currency),
+          name: tipRequest.name,
+          message: tipRequest.message,
+          // Request tips carry which song was bought; the title is the
+          // server's own config lookup, safe to hand the app verbatim. Absent
+          // keys (not undefined — Firestore refuses those) on plain tips.
+          ...(tipRequest.songId !== undefined && tipRequest.songTitle !== undefined
+            ? { songId: tipRequest.songId, songTitle: tipRequest.songTitle }
+            : {}),
+          // The sweep must happen even if the artist never comes back.
+          expiresAt: Timestamp.fromMillis(now + PENDING_TTL_MS),
+        };
+        batch.set(pendingCol.doc(randomUUID()), event);
+        await batch.commit();
       }
-
-      const event: PendingTipDoc = {
-        tsMs: now,
-        method: tipRequest.method,
-        amountMinor: tipRequest.amountMinor,
-        // The currency the fan actually paid in — EUR for a Box, GBP for
-        // Monzo — not the jar's. This is what the artist's device records.
-        currency: methodCurrency(tipRequest.method, profile.currency),
-        name: tipRequest.name,
-        message: tipRequest.message,
-        // Request tips carry which song was bought; the title is the server's
-        // own config lookup, safe to hand the app verbatim. Absent keys (not
-        // undefined — Firestore refuses those) on plain tips.
-        ...(tipRequest.songId !== undefined && tipRequest.songTitle !== undefined
-          ? { songId: tipRequest.songId, songTitle: tipRequest.songTitle }
-          : {}),
-        // The sweep must happen even if the artist never comes back.
-        expiresAt: Timestamp.fromMillis(now + PENDING_TTL_MS),
-      };
-      batch.set(pendingCol.doc(randomUUID()), event);
-      await batch.commit();
     }
 
     // A duplicate — or a jar deleted mid-flight — is accepted but not queued:

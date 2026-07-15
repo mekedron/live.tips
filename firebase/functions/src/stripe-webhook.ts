@@ -18,10 +18,15 @@
 /// Stripe times out at 20 s and retries non-2xx for days: the work here is a
 /// signature check, one mapping, and one small transaction-free batch —
 /// milliseconds — and duplicates are welcome because the write is idempotent
-/// twice over. While the tip doc lives, its id IS the Stripe object id and
-/// create() refuses to overwrite; after it is delivered (deleted — the
-/// queue's contract), the processedEvents tombstone written beside it still
-/// answers for the id until Stripe's retry window is safely over.
+/// twice over. The tip doc's id IS the Stripe object id and create() refuses
+/// to overwrite; the processedEvents tombstone written beside it answers for
+/// the id until Stripe's retry window is safely over. Since #71 the
+/// tombstone is also what pins the DESTINATION: a mapped tip is written
+/// straight into the account (the live session's tips subcollection, or the
+/// band's relayTips archive — tip-destination.ts, the same router the relay
+/// POST uses), and where a tip lands moves with the set — so a redelivery
+/// must be answered by the tombstone, not by hoping create() meets the
+/// first delivery's doc.
 
 import type { Request } from "firebase-functions/v2/https";
 import type { Response } from "express";
@@ -30,16 +35,14 @@ import { kmsKeyWrapper } from "./kms";
 import { openSecret } from "./stripe-crypto";
 import { tipFromEvent, verifyStripeSignature } from "./stripe-events";
 import {
-  MAX_STRIPE_PENDING,
-  STRIPE_PENDING_TTL_MS,
   STRIPE_PROCESSED_TTL_MS,
   STRIPE_TIPS_PER_UID_PER_HOUR,
   processedEventRef,
   stripeConnectionRef,
-  stripeTipsCol,
   type StripeConnectionDoc,
 } from "./stripe-store";
 import { bumpQuota, db } from "./store";
+import { routedTipRef, stripeTipWire } from "./tip-destination";
 import { isValidJarId } from "./validate";
 
 /** Events are a few KB; anything bigger than this is not one of ours. */
@@ -160,33 +163,27 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
     return;
   }
 
-  const col = stripeTipsCol(firestore, connection.uid, connection.bandId);
+  // Where the tip lands (#71): the connection doc already carries the route
+  // (uid + bandId), and the shared router picks the live session's tips
+  // subcollection or the band's relayTips archive. No cap and no TTL —
+  // these are the artist's own history, not a consume-once queue; the
+  // flood valve above stays the write bound.
+  const { ref: dest } = await routedTipRef(firestore, connection.uid, connection.bandId, mapped.id, now);
   const batch = firestore.batch();
-
-  // Bounded queue, oldest goes — same policy as the relay's pendingTips
-  // (tip.ts): the tip that just landed is the one the artist can still
-  // thank someone for, and a swept QR tip remains visible in History.
-  const existing = await col.orderBy("tsMs").select().get();
-  const overflow = existing.size - (MAX_STRIPE_PENDING - 1);
-  if (overflow > 0) {
-    for (const doc of existing.docs.slice(0, overflow)) batch.delete(doc.ref);
-  }
 
   // Idempotency: the doc id IS the Stripe object id (cs_…/ch_…), and
   // create() refuses to overwrite. A Stripe retry, a re-sent event, and the
   // completed/async_payment_succeeded pair for one session all collapse
-  // onto the same id — ALREADY_EXISTS is a successful no-op.
-  batch.create(col.doc(mapped.id), {
-    ...mapped.tip,
-    // Undelivered tips age out on schedule, whether or not a device ever
-    // comes back — same sweep as the relay queue.
-    expiresAt: Timestamp.fromMillis(now + STRIPE_PENDING_TTL_MS),
-  });
+  // onto the same id — ALREADY_EXISTS is a successful no-op. (Deliveries far
+  // enough apart to resolve DIFFERENT destinations are the tombstone check's
+  // job above; only near-simultaneous races reach create(), and those see
+  // the same destination.)
+  batch.create(dest, stripeTipWire(mapped.id, mapped.tip, now));
 
   // The other half of the tombstone check above: written in the SAME batch
   // as the tip, so either both land or neither. set(), not create() — when
   // two deliveries race past the check, the tip's create() is the arbiter
-  // and the loser's whole batch no-ops as ALREADY_EXISTS. The same sweep
+  // and the loser's whole batch no-ops as ALREADY_EXISTS. The sweep
   // reclaims it once Stripe cannot redeliver anymore.
   batch.set(tombstoneRef, {
     expiresAt: Timestamp.fromMillis(now + STRIPE_PROCESSED_TTL_MS),
