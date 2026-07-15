@@ -16,9 +16,17 @@ bool get pushNeedsPwaInstall => _isIOS && !_isStandalone;
 /// same dead token. Unsubscribing the browser's push subscription needs no
 /// FCM authorization at all, and with the subscription gone the next
 /// getToken() has no choice but to mint a genuinely new registration.
-/// The messaging SDK's token store is dropped alongside (fire-and-forget:
-/// deleteDatabase waits for open connections, and the unsubscribe alone
-/// already forces the fresh mint).
+///
+/// The SDK's token store (indexedDB `firebase-messaging-database`) is
+/// deliberately NOT deleted here, and must never be: the SDK keeps its own
+/// connection open for the life of the page, so a deleteDatabase queues up
+/// blocked behind it forever — and while it is pending the browser parks
+/// every new open() on that database behind it too, wedging every later
+/// getToken() into its 20s timeout. That was the dead toggle: once
+/// switched off after a repair, notifications could not be re-enabled
+/// until the PWA was killed (Nikita's iPhone, 2026-07-15). The stale
+/// record is harmless anyway — it no longer matches the fresh
+/// subscription, and the SDK replaces mismatched records itself.
 Future<bool> pushBrowserUnsubscribe() async {
   var cleared = false;
   try {
@@ -35,9 +43,6 @@ Future<bool> pushBrowserUnsubscribe() async {
   } catch (_) {
     // No service worker / permission oddity: nothing to clear is fine.
   }
-  try {
-    web.window.self.indexedDB.deleteDatabase('firebase-messaging-database');
-  } catch (_) {}
   return cleared;
 }
 

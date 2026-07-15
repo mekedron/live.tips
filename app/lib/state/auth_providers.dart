@@ -10,13 +10,11 @@ import '../data/firebase/account_sessions.dart';
 import '../data/firebase/auth_bridge.dart';
 import '../data/firebase/auth_domain.dart';
 import '../data/firebase/auth_service.dart';
+import '../data/firebase/callables.dart';
 import '../domain/app_account.dart';
 import '../domain/pending_redirect.dart';
 import 'onboarding_draft.dart';
 import 'providers.dart';
-
-/// Where the app's Cloud Functions live (see firebase/functions).
-const _kFunctionsRegion = 'europe-west1';
 
 /// The per-account Firebase stacks, overridden in main() on platforms that
 /// have Firebase. The default refuses everything — tests and the platforms
@@ -101,16 +99,14 @@ final linkTokenMinterProvider = Provider<Future<String> Function()>((ref) {
     final uid = ref.read(authControllerProvider).user?.uid;
     final functions = (uid == null
             ? null
-            : sessions.sessionFor(uid)?.functions(_kFunctionsRegion)) ??
-        sessions.defaultFunctions(_kFunctionsRegion);
+            : sessions.sessionFor(uid)?.functions(kFunctionsRegion)) ??
+        sessions.defaultFunctions(kFunctionsRegion);
     if (functions == null) {
       throw const AuthUnavailableException(
           'Cloud accounts are not available on this platform.');
     }
-    final result =
-        await functions.httpsCallable('mintSessionToken').call<dynamic>();
-    final data = result.data;
-    final token = data is Map ? data['token'] as String? : null;
+    final data = await callCallable(functions, 'mintSessionToken');
+    final token = data['token'] as String?;
     if (token == null || token.isEmpty) {
       throw const AuthUnavailableException(
           'Sign-in is unavailable right now. Try again in a moment.');
@@ -130,9 +126,9 @@ final accountServiceProvider = Provider<AccountService>((ref) {
   final active =
       ref.watch(accountsDirectoryProvider.select((d) => d.activeAccountId));
   final functions = (active != kLocalAccountId
-          ? sessions.sessionFor(active)?.functions(_kFunctionsRegion)
+          ? sessions.sessionFor(active)?.functions(kFunctionsRegion)
           : null) ??
-      sessions.defaultFunctions(_kFunctionsRegion);
+      sessions.defaultFunctions(kFunctionsRegion);
   return AccountService(functions: functions);
 });
 
@@ -683,15 +679,19 @@ final signOutProvider = Provider<Future<void> Function()>((ref) => () async {
       ];
       // Drop this device's push registration while the account's session can
       // still write it (afterwards the handle is dead and the rules say no).
-      // Best-effort with a short leash: an offline sign-out must not hang on
-      // Firestore, and the server prunes dead tokens on the first failed
-      // send anyway (functions/src/notifications.ts).
+      // Intent goes too: signing out IS leaving this device, and a stale
+      // `pushEnabled: true` would make the self-heal silently re-register
+      // push the moment this account signs back in here. Best-effort with a
+      // short leash: an offline sign-out must not hang on Firestore, and the
+      // server prunes dead tokens on the first failed send anyway
+      // (functions/src/notifications.ts).
       final db = ref.read(firestoreProvider);
       if (db != null) {
         try {
           await db
               .doc('users/$uid/devices/${ref.read(deviceIdProvider)}')
               .update({
+                'pushEnabled': false,
                 'fcmToken': FieldValue.delete(),
                 'fcmTokenAtMs': FieldValue.delete(),
               })

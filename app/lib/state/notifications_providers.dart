@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 
+import '../data/firebase/callables.dart';
 import '../data/firebase/device_registry.dart';
 import '../data/firebase/notifications_service.dart';
 import '../data/firebase/push_service.dart';
@@ -130,13 +129,21 @@ final thisDeviceInfoProvider = Provider<DeviceInfo?>((ref) {
   return null;
 });
 
-/// Push on THIS device for the ACTIVE account = its own device doc carries a
-/// token. The doc is the source of truth on purpose: it is what the send
-/// trigger reads, and it survives reinstalls of nothing (a cleared browser
-/// loses the token server-side via pruning, and this reads false again).
-final thisDevicePushEnabledProvider = Provider<bool>(
-  (ref) => ref.watch(thisDeviceInfoProvider)?.fcmToken != null,
-);
+/// Push on THIS device for the ACTIVE account = the INTENT its own device
+/// doc records (`pushEnabled`), which only the artist's own taps move. The
+/// token beside it is mere CAPABILITY — the server prunes it when FCM
+/// rejects it, [PushRegistration.maintain] re-mints it silently — and it
+/// must never be read as the toggle: when it was, every pruned token
+/// flipped the switch off with no way to tell "you turned this off" from
+/// "the registration died", and no self-heal was possible because the
+/// intent was gone with it. Docs from before the flag (a token and nothing
+/// else) count as ON — the token was the old world's whole record of the
+/// choice.
+final thisDevicePushEnabledProvider = Provider<bool>((ref) {
+  final info = ref.watch(thisDeviceInfoProvider);
+  if (info == null) return false;
+  return info.pushEnabled ?? (info.fcmToken != null);
+});
 
 /// A guest (anonymous) account's jar is never claimed as owned
 /// (RelayAuth.ownsJars), so its tips never take the server-direct path — and
@@ -272,11 +279,14 @@ enum _TestCallResult { sent, noToken, deadToken, failed }
 final pushRegistrationProvider =
     Provider<PushRegistration>((ref) => PushRegistration(ref));
 
-/// The token's lifecycle against `users/{uid}/devices/{deviceId}`:
-/// enable/disable from the settings toggle, and [maintain] — the self-heal
-/// that keeps a stored token current across FCM rotations, app restarts,
-/// account switches, locale changes, and the device doc's own full-`set()`
-/// recreate path (which drops fcmToken; see DeviceRegistry.registerThisDevice).
+/// The push state's lifecycle against `users/{uid}/devices/{deviceId}` —
+/// two fields with two owners. `pushEnabled` is INTENT and belongs to the
+/// artist: enable/disable write it, nothing else moves it. `fcmToken` is
+/// CAPABILITY and belongs to whoever last verified it: the server prunes it
+/// dead, [maintain] re-mints it — across FCM rotations, app restarts,
+/// account switches, locale changes, the device doc's own full-`set()`
+/// recreate path (which drops fcmToken; see DeviceRegistry.registerThisDevice),
+/// and a fan-out prune, all without the toggle moving.
 ///
 /// One browser/app token, written under EACH account that enabled push here:
 /// the token is project-scoped, the accounts share the project, and the
@@ -297,8 +307,14 @@ class PushRegistration {
       ref.read(appStateProvider).settings.localeCode ??
       PlatformDispatcher.instance.locale.languageCode;
 
-  /// The settings toggle's ON: permission (inside the user's tap), token,
-  /// then the doc write that makes the server see this device.
+  /// The settings toggle's ON — intent first, then capability. Permission
+  /// (inside the user's tap) and the `pushEnabled: true` write land before
+  /// the token mint, so the switch answers the finger instead of hanging in
+  /// mid-air for the seconds a mint can take on a phone. The mint itself is
+  /// bounded (PushService.getToken's 20s leash) and gets ONE retry; if both
+  /// come back empty the intent is rolled back and the page told — an ON
+  /// toggle that will never buzz is a lie, and leaving intent behind would
+  /// set [maintain] chasing a registration this browser refuses to grant.
   Future<PushEnableOutcome> enableThisDevice() async {
     final uid = ref.read(authControllerProvider).user?.uid;
     final doc = _ownDoc(uid ?? '');
@@ -307,10 +323,25 @@ class PushRegistration {
     final permission = await service.requestPermission();
     if (permission == PushPermission.denied) return PushEnableOutcome.denied;
     if (permission != PushPermission.granted) return PushEnableOutcome.failed;
-    final token = await service.getToken();
-    if (token == null) return PushEnableOutcome.failed;
     try {
-      await _writeToken(uid, doc, token);
+      await _patch(uid, doc, {'pushEnabled': true});
+    } catch (e) {
+      debugPrint('push enable failed: $e');
+      return PushEnableOutcome.failed;
+    }
+    final token = await service.getToken() ?? await service.getToken();
+    if (token == null) {
+      try {
+        await doc.update({'pushEnabled': false});
+      } catch (e) {
+        debugPrint('push enable rollback failed: $e');
+      }
+      return PushEnableOutcome.failed;
+    }
+    try {
+      // No pushEnabled here: a disable racing this mint must win — the
+      // token it leaves behind is inert (intent is what the server obeys).
+      await _patch(uid, doc, _tokenPatch(token));
       return PushEnableOutcome.enabled;
     } catch (e) {
       debugPrint('push enable failed: $e');
@@ -319,13 +350,16 @@ class PushRegistration {
   }
 
   /// The toggle's OFF — for the active account only. Never deleteToken():
-  /// the browser token may be serving another account signed in here.
+  /// the browser token may be serving another account signed in here. The
+  /// intent is written false, not deleted — an absent flag means "before
+  /// the flag existed" and would read the next stray token as consent.
   Future<void> disableThisDevice() async {
     final uid = ref.read(authControllerProvider).user?.uid;
     final doc = _ownDoc(uid ?? '');
     if (uid == null || doc == null) return;
     try {
       await doc.update({
+        'pushEnabled': false,
         'fcmToken': FieldValue.delete(),
         'fcmTokenAtMs': FieldValue.delete(),
       });
@@ -334,11 +368,40 @@ class PushRegistration {
     }
   }
 
-  /// The self-heal, cheap enough to run on every wake: if this account
-  /// enabled push here (the doc says so), make sure the stored token and
-  /// locale are today's. A device doc without a token is left alone — that
-  /// is the OFF state, not a bug to fix.
+  /// The self-heal, cheap enough to run on every wake: while this account's
+  /// intent here is ON, make sure the doc carries a live token in today's
+  /// language — including a token the send trigger PRUNED as dead, which is
+  /// re-minted silently while the toggle (rendering intent) never moves.
+  /// `pushEnabled: false`, and a doc with neither flag nor token, are the
+  /// OFF state — not a bug to fix. A doc from before the flag (token, no
+  /// flag) counts as ON and gets the explicit flag stamped on this first
+  /// touch.
+  ///
+  /// Launch, resume, a uid flip and onTokenRefresh can all ask in the same
+  /// breath: one pass at a time, and a burst that arrived mid-pass (an
+  /// account switch under a slow mint) earns exactly one fresh pass against
+  /// the new state. getToken answering null is a quiet give-up until the
+  /// next wake — re-asking a browser that just said no is how loops start.
   Future<void> maintain() async {
+    if (_maintaining) {
+      _maintainAgain = true;
+      return;
+    }
+    _maintaining = true;
+    try {
+      do {
+        _maintainAgain = false;
+        await _maintainOnce();
+      } while (_maintainAgain);
+    } finally {
+      _maintaining = false;
+    }
+  }
+
+  bool _maintaining = false;
+  bool _maintainAgain = false;
+
+  Future<void> _maintainOnce() async {
     final uid = ref.read(authControllerProvider).user?.uid;
     final doc = uid == null ? null : _ownDoc(uid);
     if (uid == null || doc == null) return;
@@ -346,13 +409,24 @@ class PushRegistration {
       final snap = await doc.get();
       final data = snap.data();
       final stored = data?['fcmToken'] as String?;
-      if (stored == null) return;
+      final intent = data?['pushEnabled'] as bool?;
+      if (!(intent ?? stored != null)) return;
       final service = ref.read(pushServiceProvider);
       if (await service.permission() != PushPermission.granted) return;
       final token = await service.getToken();
       if (token == null) return;
-      if (stored == token && data?['locale'] == _localeCode()) return;
-      await _writeToken(uid, doc, token);
+      if (stored == token &&
+          data?['locale'] == _localeCode() &&
+          intent != null) {
+        return;
+      }
+      await _patch(uid, doc, {
+        ..._tokenPatch(token),
+        // Stamped only where it was MISSING: intent already read true above
+        // (by inference), and re-asserting an existing true could resurrect
+        // a disable that raced this pass.
+        if (intent == null) 'pushEnabled': true,
+      });
     } catch (e) {
       debugPrint('push token maintenance failed: $e');
     }
@@ -395,43 +469,17 @@ class PushRegistration {
     return TestPushOutcome.unreachable;
   }
 
-  /// Calls sendTestPush over PLAIN HTTP, deliberately not through the
-  /// functions SDK: on web that SDK decorates every callable with a fresh
-  /// messaging token minted from ITS OWN Firebase app (the account slot's)
-  /// once notification permission is granted — a SECOND FCM installation
-  /// registering the same browser push subscription, which invalidates the
-  /// token this very test is about to exercise. The button was murdering its
-  /// own registration on every press (found live, 2026-07-15). A bare POST
-  /// with the user's ID token is the same authenticated call, minus the
-  /// assassination.
+  /// One sendTestPush call, through [callCallable] like every callable in
+  /// the app (the functions SDK's call() minted a second FCM installation
+  /// per invocation on web and murdered the very token under test — the
+  /// invoker's doc has the full story; this button is where it was caught).
   Future<_TestCallResult> _callTest() async {
-    final auth = ref.read(firebaseAuthProvider);
-    final user = auth?.currentUser;
-    if (auth == null || user == null) return _TestCallResult.failed;
+    final functions = ref.read(functionsProvider);
+    if (functions == null) return _TestCallResult.failed;
     try {
-      final idToken = await user.getIdToken();
-      if (idToken == null || idToken.isEmpty) return _TestCallResult.failed;
-      const region = 'europe-west1'; // where index.ts pins the callables
-      final projectId = auth.app.options.projectId;
-      final response = await http.post(
-        Uri.https('$region-$projectId.cloudfunctions.net', '/sendTestPush'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $idToken',
-        },
-        body: jsonEncode({
-          'data': {'deviceId': ref.read(deviceIdProvider)},
-        }),
-      );
-      if (response.statusCode != 200) {
-        debugPrint('test push refused: HTTP ${response.statusCode}');
-        return _TestCallResult.failed;
-      }
-      final body = jsonDecode(response.body);
-      final result = body is Map ? body['result'] : null;
-      final map = result is Map
-          ? result.cast<String, dynamic>()
-          : const <String, dynamic>{};
+      final map = await callCallable(functions, 'sendTestPush', {
+        'deviceId': ref.read(deviceIdProvider),
+      });
       if (map['sent'] == true) return _TestCallResult.sent;
       return switch (map['reason']) {
         'no-token' => _TestCallResult.noToken,
@@ -444,26 +492,29 @@ class PushRegistration {
     }
   }
 
-  Future<void> _writeToken(
+  Map<String, dynamic> _tokenPatch(String token) => {
+        'fcmToken': token,
+        'fcmTokenAtMs': DateTime.now().millisecondsSinceEpoch,
+        'locale': _localeCode(),
+      };
+
+  Future<void> _patch(
     String uid,
     DocumentReference<Map<String, dynamic>> doc,
-    String token,
+    Map<String, dynamic> patch,
   ) async {
-    final patch = {
-      'fcmToken': token,
-      'fcmTokenAtMs': DateTime.now().millisecondsSinceEpoch,
-      'locale': _localeCode(),
-    };
     try {
       await doc.update(patch);
     } on FirebaseException {
       // No doc to update — registration hasn't landed yet (fresh sign-in,
       // boot race). Register through the ONE writer that knows the create
       // shape, then try once more; DeviceSessionGuard's touch() fallback,
-      // same reasoning.
-      final ok =
-          await ref.read(deviceRegistryProvider).registerThisDevice(uid);
-      if (ok) await doc.update(patch);
+      // same reasoning. A registration that refuses rethrows: the callers
+      // owe the artist "failed", not a toggle that claims what never landed.
+      if (!await ref.read(deviceRegistryProvider).registerThisDevice(uid)) {
+        rethrow;
+      }
+      await doc.update(patch);
     }
   }
 }

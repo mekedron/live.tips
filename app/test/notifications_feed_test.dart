@@ -401,8 +401,9 @@ void main() {
   });
 
   testWidgets(
-      'enable writes the token (registering the device doc if need be); '
-      'disable deletes the field and nothing else', (tester) async {
+      'enable writes intent + token (registering the device doc if need '
+      'be); disable flips intent OFF and drops the token, nothing else',
+      (tester) async {
     final db = FakeFirebaseFirestore();
     final push = _FakePushService();
     final container = await pump(
@@ -421,23 +422,119 @@ void main() {
         await container.read(pushRegistrationProvider).enableThisDevice();
     expect(outcome, PushEnableOutcome.enabled);
     final doc = (await db.doc('users/$uid/devices/$deviceId').get()).data()!;
+    expect(doc['pushEnabled'], isTrue);
     expect(doc['fcmToken'], 'tok_test');
     expect(doc['locale'], isA<String>());
     expect(doc['revoked'], isFalse, reason: 'registered, not conjured');
 
+    // OFF is a recorded choice, not an absence: false, never a delete —
+    // an absent flag would read the next stray token as consent.
     await container.read(pushRegistrationProvider).disableThisDevice();
     final after = (await db.doc('users/$uid/devices/$deviceId').get()).data()!;
+    expect(after['pushEnabled'], isFalse);
     expect(after.containsKey('fcmToken'), isFalse);
     expect(after['name'], isNotNull, reason: 'the device doc itself stays');
+  });
+
+  testWidgets(
+      'the toggle renders INTENT: a token pruned by the server leaves it ON '
+      'while the self-heal re-mints', (tester) async {
+    final db = FakeFirebaseFirestore();
+    // What a fan-out prune leaves behind: intent intact, token fields gone.
+    await db.doc('users/$uid/devices/$deviceId').set({
+      'name': 'Test phone',
+      'platform': 'web',
+      'revoked': false,
+      'pushEnabled': true,
+    });
+    await pump(
+      tester,
+      db: db,
+      home: const NotificationSettingsScreen(),
+      extra: [
+        pushServiceProvider.overrideWithValue(_FakePushService()),
+        pushStatusProvider.overrideWith((ref) async => PushStatus.granted),
+      ],
+    );
+
+    expect(
+        find.text('Notifications are active on this device'), findsOneWidget);
+  });
+
+  testWidgets(
+      'maintain resurrects a pruned token while intent is ON, stamps the '
+      'explicit flag on a legacy doc, and leaves every OFF state alone',
+      (tester) async {
+    final db = FakeFirebaseFirestore();
+    final push = _FakePushService(permission: PushPermission.granted);
+    final container = await pump(
+      tester,
+      db: db,
+      extra: [pushServiceProvider.overrideWithValue(push)],
+    );
+    final doc = db.doc('users/$uid/devices/$deviceId');
+    final registration = container.read(pushRegistrationProvider);
+
+    // The murder-loop aftermath: intent ON, token pruned — heal silently.
+    await doc
+        .set({'name': 'Test phone', 'revoked': false, 'pushEnabled': true});
+    await registration.maintain();
+    expect((await doc.get()).data()!['fcmToken'], 'tok_test');
+
+    // A doc from before the flag: its token IS the intent — refreshed, and
+    // the explicit flag stamped on this first touch.
+    await doc
+        .set({'name': 'Test phone', 'revoked': false, 'fcmToken': 'tok_old'});
+    await registration.maintain();
+    final legacy = (await doc.get()).data()!;
+    expect(legacy['fcmToken'], 'tok_test');
+    expect(legacy['pushEnabled'], isTrue);
+
+    // OFF is OFF: an explicit false — even with a stray token beside it —
+    // and a doc that never chose are both left untouched.
+    await doc
+        .set({'name': 'Test phone', 'revoked': false, 'pushEnabled': false});
+    await registration.maintain();
+    expect((await doc.get()).data()!.containsKey('fcmToken'), isFalse);
+    await doc.set({'name': 'Test phone', 'revoked': false});
+    await registration.maintain();
+    expect((await doc.get()).data()!.containsKey('fcmToken'), isFalse);
+  });
+
+  testWidgets(
+      'a mint that fails rolls the intent back — the toggle never claims '
+      'what never landed, and it retried exactly once', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final push = _FakePushService(token: null);
+    final container = await pump(
+      tester,
+      db: db,
+      extra: [pushServiceProvider.overrideWithValue(push)],
+    );
+
+    final outcome =
+        await container.read(pushRegistrationProvider).enableThisDevice();
+    expect(outcome, PushEnableOutcome.failed);
+    expect(push.tokenAsks, 2);
+    final doc = (await db.doc('users/$uid/devices/$deviceId').get()).data()!;
+    expect(doc['pushEnabled'], isFalse);
+    expect(doc.containsKey('fcmToken'), isFalse);
   });
 }
 
 /// A PushService whose OS always says yes — the doc lifecycle is the thing
-/// under test, not the messaging SDK.
+/// under test, not the messaging SDK. [token] null models the browser
+/// refusing to mint (the 20s leash expiring, no push backend).
 class _FakePushService extends PushService {
-  _FakePushService() : super(messaging: null);
+  _FakePushService({
+    this.token = 'tok_test',
+    PushPermission permission = PushPermission.notDetermined,
+  })  : _permission = permission,
+        super(messaging: null);
 
-  PushPermission _permission = PushPermission.notDetermined;
+  final String? token;
+  int tokenAsks = 0;
+  PushPermission _permission;
 
   @override
   Future<PushSupport> support() async => PushSupport.supported;
@@ -450,7 +547,10 @@ class _FakePushService extends PushService {
       _permission = PushPermission.granted;
 
   @override
-  Future<String?> getToken() async => 'tok_test';
+  Future<String?> getToken() async {
+    tokenAsks++;
+    return token;
+  }
 
   @override
   Stream<String> get onTokenRefresh => const Stream.empty();

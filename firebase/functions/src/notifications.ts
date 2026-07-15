@@ -163,11 +163,18 @@ interface PushTarget {
  * OS permission and registered its token; without that there is nothing to
  * send to anyway.
  *
+ * `pushEnabled` is the device owner's INTENT, written by the app's settings
+ * toggle alone: false silences the device even while a token lingers on the
+ * doc (a disable racing this fan-out), absent means the doc predates the
+ * flag — its token IS the old world's record of consent.
+ *
  * Dead tokens (uninstalled PWA, browser data cleared) come back as
- * registration-token-not-registered / invalid-argument and get their field
- * deleted, so the registry self-heals; every other failure is logged and
- * dropped — the feed doc already holds the notification, and this trigger
- * deliberately does not retry (see index.ts).
+ * registration-token-not-registered / invalid-argument and get their TOKEN
+ * fields deleted — never `pushEnabled`: intent is what the app's self-heal
+ * reads to re-mint a pruned registration silently, where deleting it used
+ * to flip the settings toggle off under the artist with no way back. Every
+ * other failure is logged and dropped — the feed doc already holds the
+ * notification, and this trigger deliberately does not retry (see index.ts).
  */
 export async function sendTipPushHandler(event: NotificationCreatedEvent): Promise<void> {
   const note = event.data?.data();
@@ -185,6 +192,8 @@ export async function sendTipPushHandler(event: NotificationCreatedEvent): Promi
     const targets: PushTarget[] = [];
     for (const doc of devices.docs) {
       if (doc.get("revoked") === true) continue;
+      // Intent beats capability: OFF is OFF even while a token lingers.
+      if (doc.get("pushEnabled") === false) continue;
       const token = doc.get("fcmToken");
       if (typeof token !== "string" || token === "") continue;
       // The stage skip: THIS device is showing the live screen right now —

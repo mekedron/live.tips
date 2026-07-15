@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/deep_links.dart';
+import '../data/firebase/callables.dart';
 import '../data/firebase/device_registry.dart';
 import '../data/firebase/link_codes.dart';
 import '../domain/app_account.dart';
@@ -12,16 +13,18 @@ import 'providers.dart';
 /// Kept out of providers.dart so the device surface can grow (and be
 /// overridden in tests) without touching the app's core wiring.
 
-/// The callables' home. Null wherever Firebase isn't (Windows/Linux, a failed
-/// boot, tests) — [LinkCodeService] then refuses every call politely instead
-/// of the app crashing on a null instance.
+/// The callables' home — an ADDRESS only, never a transport: every actual
+/// invocation goes over plain HTTP through [callCallable], which reads this
+/// instance's app for the project and the signing session. Null wherever
+/// Firebase isn't (Windows/Linux, a failed boot, tests) — [LinkCodeService]
+/// then refuses every call politely instead of the app crashing on a null
+/// instance.
 ///
 /// Resolves against the ACTIVE account's app so an authenticated callable
 /// (createLinkCode, confirmLinkCode) speaks as that account; the local
 /// profile gets the default app — enough for the unauthenticated calls a
 /// signed-out venue tablet makes (redeemLinkCode, collectLinkToken).
 final functionsProvider = Provider<FirebaseFunctions?>((ref) {
-  const region = 'europe-west1';
   // firebaseAuthProvider is still the "did Firebase boot?" signal.
   if (ref.watch(firebaseAuthProvider) == null) return null;
   final sessions = ref.watch(accountSessionsProvider);
@@ -29,11 +32,11 @@ final functionsProvider = Provider<FirebaseFunctions?>((ref) {
   final active = ref
       .watch(accountsDirectoryProvider.select((d) => d.activeAccountId));
   if (active != kLocalAccountId) {
-    final functions = sessions.sessionFor(active)?.functions(region);
+    final functions = sessions.sessionFor(active)?.functions(kFunctionsRegion);
     if (functions != null) return functions;
   }
-  return sessions.defaultFunctions(region) ??
-      FirebaseFunctions.instanceFor(region: region);
+  return sessions.defaultFunctions(kFunctionsRegion) ??
+      FirebaseFunctions.instanceFor(region: kFunctionsRegion);
 });
 
 final deviceRegistryProvider = Provider<DeviceRegistry>((ref) => DeviceRegistry(

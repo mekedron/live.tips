@@ -20,6 +20,7 @@ class DeviceInfo {
     this.createdAtMs = 0,
     this.lastSeenAtMs = 0,
     this.revoked = false,
+    this.pushEnabled,
     this.fcmToken,
     this.fcmTokenAtMs,
     this.isCurrent = false,
@@ -35,9 +36,15 @@ class DeviceInfo {
   final int lastSeenAtMs;
   final bool revoked;
 
-  /// This device's push registration, present exactly while push is enabled
-  /// here for this account (PushRegistration owns the writes; the send
-  /// trigger and the revocation paths clear it server-side).
+  /// Whether the artist wants pushes HERE for this account — intent, owned
+  /// by the settings toggle alone. Null on docs from before the field
+  /// existed: readers infer those from [fcmToken] presence, and the first
+  /// self-heal stamps the explicit value (see PushRegistration).
+  final bool? pushEnabled;
+
+  /// This device's push registration — capability, not intent: the send
+  /// trigger and the revocation paths delete a dead one server-side, and
+  /// the self-heal re-mints it for as long as [pushEnabled] holds.
   final String? fcmToken;
 
   /// When [fcmToken] last landed — the settings page's "registered since".
@@ -57,6 +64,7 @@ class DeviceInfo {
         createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
         lastSeenAtMs: (json['lastSeenAtMs'] as num?)?.toInt() ?? 0,
         revoked: json['revoked'] == true,
+        pushEnabled: json['pushEnabled'] as bool?,
         fcmToken: json['fcmToken'] as String?,
         fcmTokenAtMs: (json['fcmTokenAtMs'] as num?)?.toInt(),
         isCurrent: isCurrent,
@@ -82,6 +90,7 @@ class DeviceInfo {
         createdAtMs: createdAtMs,
         lastSeenAtMs: lastSeenAtMs,
         revoked: revoked,
+        pushEnabled: pushEnabled,
         fcmToken: fcmToken,
         fcmTokenAtMs: fcmTokenAtMs,
         isCurrent: isCurrent ?? this.isCurrent,

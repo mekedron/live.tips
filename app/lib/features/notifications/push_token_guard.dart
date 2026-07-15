@@ -14,9 +14,14 @@ import 'notifications_screen.dart';
 /// the device doc itself.
 ///
 /// It never turns push ON (that is the settings toggle's job, inside the
-/// user's tap); it only re-asserts what an account already chose here:
+/// user's tap); it only re-asserts what an account already chose here — the
+/// doc's `pushEnabled` intent, which survives the token itself being pruned
+/// as dead by the send trigger, so a lost registration is quietly re-minted
+/// instead of the toggle drifting off:
 ///  - launch, sign-in and account switches re-run [PushRegistration.maintain]
-///    so a rotated/lost token or a changed language is re-written;
+///    so a rotated/lost/pruned token or a changed language is re-written
+///    (switches especially: that is when the functions SDK used to murder
+///    the token — see data/firebase/callables.dart);
 ///  - FCM's own onTokenRefresh does the same the moment it fires;
 ///  - a resume re-checks the OS permission (the user may have flipped it in
 ///    browser/OS settings while we were backgrounded) by invalidating

@@ -6,6 +6,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../domain/relay_jar.dart';
 import '../../domain/song_request_settings.dart';
+import '../firebase/callables.dart';
 import 'relay_auth.dart';
 
 /// Error returned by a live.tips relay callable, mapped to something we can
@@ -106,10 +107,7 @@ class RelayClient {
           throw const RelayNetworkException(
               'The relay is not available on this device.');
         }
-        final result = await functions.httpsCallable(name).call<dynamic>(args);
-        final data = result.data;
-        if (data is Map) return data.cast<String, dynamic>();
-        return const {};
+        return callCallable(functions, name, args);
       };
 
   /// Clamps [s] to at most [maxCodePoints] code points and [maxBytes] UTF-8

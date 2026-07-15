@@ -1,5 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import 'callables.dart';
+
 /// The account-level callable: `deleteAccount`
 /// (firebase/functions/src/account.ts).
 ///
@@ -64,10 +66,8 @@ class AccountService {
           AccountCallErrorKind.unauthenticated, 'Firebase unavailable');
     }
     try {
-      final result =
-          await functions.httpsCallable('deleteAccount').call<dynamic>();
-      final data = result.data;
-      final stranded = data is Map ? data['strandedEndpoints'] : null;
+      final data = await callCallable(functions, 'deleteAccount');
+      final stranded = data['strandedEndpoints'];
       return [
         if (stranded is List)
           for (final id in stranded)

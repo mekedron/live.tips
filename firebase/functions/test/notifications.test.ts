@@ -6,10 +6,12 @@
 ///    on stage" policy is this one guard;
 ///  * the feed doc's exact shape (id = tip id, omit-when-empty like the tip
 ///    wire itself), direct write vs riding the Stripe tombstone batch;
-///  * the send: opt-out prefs (absent doc/field mean send), revoked and
-///    tokenless devices never targeted, one multicast PER LANGUAGE with the
-///    words of that language, dead tokens pruned off their device docs,
-///    other failures left alone;
+///  * the send: opt-out prefs (absent doc/field mean send), revoked,
+///    tokenless and pushEnabled:false devices never targeted (intent beats
+///    a lingering token; an absent flag defers to the token, the old
+///    world's record), one multicast PER LANGUAGE with the words of that
+///    language, dead tokens pruned off their device docs — token fields
+///    only, never the intent — other failures left alone;
 ///  * the cap: the trigger trims the feed to MAX_NOTIFICATIONS newest.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -261,6 +263,21 @@ describe("sendTipPushHandler: the fan-out", () => {
     expect(msg["notification"]).toEqual({ title: "New tip · €5.00", body: "Ada" });
   });
 
+  it("intent beats capability: pushEnabled false silences a lingering token; absent means the old-world consent", async () => {
+    deviceDocs = [
+      // Toggled OFF, token still on the doc (a disable racing the fan-out).
+      device("dev_off", { fcmToken: "tok_off", locale: "en", pushEnabled: false }),
+      // A doc from before the flag: its token is the whole record of the choice.
+      device("dev_legacy", { fcmToken: "tok_legacy", locale: "en" }),
+      device("dev_on", { fcmToken: "tok_on", locale: "en", pushEnabled: true }),
+    ];
+
+    await sendTipPushHandler(evt(note()));
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect((sendMock.mock.calls[0]![0] as Doc)["tokens"]).toEqual(["tok_legacy", "tok_on"]);
+  });
+
   it("skips exactly the device whose STAGE SCREEN is open — the phone in the pocket still knocks mid-set", async () => {
     deviceDocs = [
       // The stage tablet: fresh heartbeat, watching tips land already.
@@ -323,7 +340,7 @@ describe("sendTipPushHandler: the fan-out", () => {
   it("a dead token is pruned off its device doc; other failures are left alone", async () => {
     deviceDocs = [
       device("dev_a", { fcmToken: "tok_a", locale: "en" }),
-      device("dev_b", { fcmToken: "tok_b", locale: "en" }),
+      device("dev_b", { fcmToken: "tok_b", locale: "en", pushEnabled: true }),
       device("dev_c", { fcmToken: "tok_c", locale: "en" }),
     ];
     sendMock.mockResolvedValue({
@@ -336,6 +353,9 @@ describe("sendTipPushHandler: the fan-out", () => {
 
     await sendTipPushHandler(evt(note()));
 
+    // ONLY the token fields go — pushEnabled is the artist's intent, and it
+    // is exactly what the app's self-heal reads to re-mint this registration
+    // silently instead of the settings toggle flipping off.
     expect(updates).toHaveLength(1);
     expect(updates[0]!.path).toBe(`users/${UID}/devices/dev_b`);
     expect(Object.keys(updates[0]!.patch).sort()).toEqual(["fcmToken", "fcmTokenAtMs"]);

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import 'callables.dart';
+
 /// The QR add-device handshake, client side. See firebase/functions/src/
 /// linkcodes.ts for the lifecycle this mirrors:
 ///
@@ -154,10 +156,7 @@ class LinkCodeService {
           LinkCodeErrorKind.unauthenticated, 'Firebase unavailable');
     }
     try {
-      final result = await functions.httpsCallable(name).call<dynamic>(args);
-      final data = result.data;
-      if (data is Map) return data.cast<String, dynamic>();
-      return const {};
+      return await callCallable(functions, name, args);
     } on FirebaseFunctionsException catch (e) {
       throw LinkCodeError(_kindOf(e.code), e.message);
     } catch (e) {
