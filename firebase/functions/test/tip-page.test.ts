@@ -48,10 +48,25 @@ describe("renderTipPage", () => {
     expect(withRequests).toContain(`<script>${_inlineScriptForTests}</script>`);
   });
 
-  it("prices Monzo in GBP on a EUR jar (button suffix)", () => {
+  it("lists Card first, then the relay methods, and marks Monzo's GBP on a EUR jar", () => {
     const html = renderTipPage(profile, "sitekey");
-    expect(html).toContain("Monzo · GBP");
-    expect(html).toContain(">Revolut</button>");
+    // Card is a UI method (data-method="card") carrying its Stripe link.
+    expect(html).toContain('data-method="card"');
+    expect(html).toContain('<span class="method-label">Monzo · GBP</span>');
+    expect(html).toContain('<span class="method-label">Revolut</span>');
+    // Its own currency (EUR) rides no suffix.
+    expect(html).toContain('<span class="method-label">Revolut</span>');
+    expect(html).not.toContain("Revolut · EUR");
+  });
+
+  it("marks each priced method with its currency symbol and placement", () => {
+    // EUR trails, GBP leads — the script formats amounts from these fields.
+    const eur = renderTipPage(profile, "sitekey");
+    expect(eur).toContain(escapeAttr('"sym":"€"'));
+    expect(eur).toContain(escapeAttr('"symLeads":false'));
+    const gbp = renderTipPage({ ...profile, currency: "gbp" }, "sitekey");
+    expect(gbp).toContain(escapeAttr('"sym":"£"'));
+    expect(gbp).toContain(escapeAttr('"symLeads":true'));
   });
 
   it("emits the CSP with the real script hash", () => {
@@ -76,8 +91,9 @@ describe("renderTipPage: song requests", () => {
     ];
     for (const [config, live, expected] of combos) {
       const html = renderTipPage(profile, "sitekey", config, live);
-      expect(html.includes('<section id="requests">')).toBe(expected);
+      expect(html.includes('id="s-songs"')).toBe(expected);
       expect(html.includes("data-requests=")).toBe(expected);
+      expect(html.includes('id="tab-requests"')).toBe(expected);
     }
   });
 
@@ -96,10 +112,10 @@ describe("renderTipPage: song requests", () => {
     expect(html).not.toContain("<script>alert(1)");
   });
 
-  it("prices each card: per-song override or the default, in page format", () => {
+  it("prices each card with the currency symbol: per-song override or the default", () => {
     const html = renderTipPage(profile, "sitekey", hostileConfig, openLive());
-    expect(html).toContain("3 EUR"); // default 300 minor
-    expect(html).toContain("5.50 EUR"); // s2's 550 override
+    expect(html).toContain("Request · 3 €"); // default 300 minor
+    expect(html).toContain("Request · 5.50 €"); // s2's 550 override
   });
 
   it("offers no Monzo request button on a EUR jar, even when the config lists it", () => {
@@ -113,12 +129,50 @@ describe("renderTipPage: song requests", () => {
     expect(html).toContain(escapeAttr('"methods":["revolut"]'));
   });
 
-  it("renders the Stripe anchor slot only when a song carries a payment link", () => {
+  it("labels a song's action Boost once it has fans, Request while it has none, and hides it once done", () => {
+    const live = openLive({
+      songs: {
+        s1: { t: 900, c: 3, s: "q" }, // has fans -> Boost
+        // s2 unrequested -> "Request · <price>"
+        s3: { t: 300, c: 1, s: "k" }, // done -> no action shown
+      },
+    });
+    const html = renderTipPage(profile, "sitekey", hostileConfig, live);
+    expect(html).toContain('<span class="song-action boost">Boost</span>');
+    // s2 carries its own 550-minor override, not the 300-minor default.
+    expect(html).toContain('<span class="song-action">Request · 5.50 €</span>');
+    expect(html).toContain('<span class="song-action" hidden></span>');
+  });
+
+  it("ranks songs by standing, played/skipped last, ties broken by the artist's configured order", () => {
+    const live = openLive({
+      songs: {
+        s1: { t: 300, c: 1, s: "q" },
+        s2: { t: 900, c: 3, s: "q" },
+      },
+    });
+    const html = renderTipPage(profile, "sitekey", hostileConfig, live);
+    // s2 outranks s1 (more support) despite s1 being configured first; s3
+    // (no votes) sorts after both, ranked entries carry a numeric badge.
+    const s2At = html.indexOf('data-song="s2"');
+    const s1At = html.indexOf('data-song="s1"');
+    const s3At = html.indexOf('data-song="s3"');
+    expect(s2At).toBeGreaterThan(-1);
+    expect(s2At).toBeLessThan(s1At);
+    expect(s1At).toBeLessThan(s3At);
+    expect(html).toContain('<span class="song-rank" aria-hidden="true">1</span>');
+    expect(html).toContain('<span class="song-rank" aria-hidden="true">2</span>');
+  });
+
+  it("offers the Stripe request radio only when a song carries a payment link", () => {
+    // The inline script mentions [data-reqmethod="stripe"] in a selector, so
+    // assert on the rendered BUTTON markup, not the bare attribute.
+    const stripeRadio = 'class="method" data-reqmethod="stripe"';
     const withStripe = renderTipPage(profile, "sitekey", hostileConfig, openLive());
-    expect(withStripe).toContain('id="r-stripe"');
+    expect(withStripe).toContain(stripeRadio);
     expect(withStripe).toContain(escapeAttr("https://buy.stripe.com/xyz789")); // in data-requests
 
-    // Same songs, but "stripe" is not an accepted request method: no anchor,
+    // Same songs, but "stripe" is not an accepted request method: no radio,
     // and the per-song link never even reaches the page data.
     const noStripeMethod = renderTipPage(
       profile,
@@ -126,7 +180,7 @@ describe("renderTipPage: song requests", () => {
       { ...hostileConfig, methods: ["revolut"] },
       openLive(),
     );
-    expect(noStripeMethod).not.toContain('id="r-stripe"');
+    expect(noStripeMethod).not.toContain(stripeRadio);
     expect(noStripeMethod).not.toContain("xyz789");
 
     const noSongLinks = renderTipPage(
@@ -135,10 +189,10 @@ describe("renderTipPage: song requests", () => {
       { ...hostileConfig, songs: [{ id: "s1", title: "Wonderwall" }] },
       openLive(),
     );
-    expect(noSongLinks).not.toContain('id="r-stripe"');
+    expect(noSongLinks).not.toContain(stripeRadio);
   });
 
-  it("shows the live standing, and mutes played/skipped songs under a badge", () => {
+  it("shows the live standing with the symbol, and mutes played/skipped songs under a badge", () => {
     const live = openLive({
       songs: {
         s1: { t: 900, c: 3, s: "q" },
@@ -147,18 +201,34 @@ describe("renderTipPage: song requests", () => {
       },
     });
     const html = renderTipPage(profile, "sitekey", hostileConfig, live);
-    expect(html).toContain("9 EUR · 3 fans");
-    expect(html).toContain("5.50 EUR · 1 fan");
-    expect(html).toContain(">Played</span>");
-    expect(html).toContain(">Skipped</span>");
+    expect(html).toContain('<span class="song-standing">9 € · 3 fans</span>');
+    // Once a song is done, its standing is hidden — the badge takes over.
+    expect(html).toContain('<span class="song-standing" hidden></span>');
+    expect(html).toContain('<span class="song-badge">Played</span>');
+    expect(html).toContain('<span class="song-badge">Skipped</span>');
     // Queued songs are neither badged nor muted.
     expect(html).toContain('class="song" data-song="s1"');
     expect(html).toContain('class="song done" data-song="s2"');
     expect(html).toContain('class="song done" data-song="s3"');
   });
+
+  it("disables played/skipped songs so they cannot be donated to", () => {
+    const live = openLive({
+      songs: {
+        s1: { t: 900, c: 3, s: "q" }, // active -> clickable
+        s2: { t: 550, c: 1, s: "p" }, // played -> disabled
+        s3: { t: 300, c: 1, s: "k" }, // skipped -> disabled
+      },
+    });
+    const html = renderTipPage(profile, "sitekey", hostileConfig, live);
+    expect(html).toContain('class="song done" data-song="s2" disabled>');
+    expect(html).toContain('class="song done" data-song="s3" disabled>');
+    // An active song stays enabled (no disabled attribute on its button tag).
+    expect(html).toContain('class="song" data-song="s1">');
+  });
 });
 
 /** What a string looks like once it rides an escaped data-* attribute. */
 function escapeAttr(text: string): string {
-  return text.replace(/"/g, "&quot;");
+  return text.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
