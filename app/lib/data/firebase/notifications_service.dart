@@ -72,14 +72,21 @@ class NotificationsService {
     }
   }
 
-  /// The bell's mark-all-read: everything up to now counts as seen — on this
-  /// device and, because the watermark syncs, on every other one.
-  Future<void> markAllRead(String uid) async {
+  /// The bell's mark-all-read: everything the page SHOWED counts as seen —
+  /// on this device and, because the watermark syncs, on every other one.
+  ///
+  /// [newestSeenMs] is the newest createdAtMs on screen, and the watermark is
+  /// max(now, that): "now" alone left a badge that would not die — the
+  /// server stamps createdAtMs with ITS clock, so a device running even a
+  /// second behind marked everything read and still counted the newest
+  /// entry as unread.
+  Future<void> markAllRead(String uid, {int newestSeenMs = 0}) async {
     final doc = _prefsDoc(uid);
     if (doc == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
     try {
       await doc.set({
-        'lastSeenAtMs': DateTime.now().millisecondsSinceEpoch,
+        'lastSeenAtMs': now > newestSeenMs ? now : newestSeenMs,
       }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('notifications mark-read failed: $e');

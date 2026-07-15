@@ -25,17 +25,23 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
-  bool _marked = false;
+  int _markedUpToMs = -1;
 
-  /// Once, on the first frame that actually SHOWED the feed: marking read on
-  /// initState would clear a badge for entries the artist never saw drawn.
-  void _markRead() {
-    if (_marked) return;
-    _marked = true;
+  /// On every frame that actually SHOWED the feed (marking on initState
+  /// would clear a badge for entries never drawn), watermarked at the newest
+  /// entry on screen: an entry arriving WHILE the page is open is read the
+  /// moment it renders, and one stamped ahead of this device's clock cannot
+  /// leave a badge that refuses to die.
+  void _markRead(List<NotificationItem> items) {
+    final newest = items.isEmpty ? 0 : items.first.createdAtMs;
+    if (_markedUpToMs >= newest) return;
+    _markedUpToMs = newest;
     final uid = ref.read(authControllerProvider).user?.uid;
     if (uid == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(notificationsServiceProvider).markAllRead(uid);
+      ref
+          .read(notificationsServiceProvider)
+          .markAllRead(uid, newestSeenMs: newest);
     });
   }
 
@@ -59,7 +65,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               ),
             ),
             data: (items) {
-              _markRead();
+              _markRead(items);
               if (items.isEmpty) {
                 return Center(
                   child: Padding(

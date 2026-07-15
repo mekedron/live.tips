@@ -112,9 +112,13 @@ void main() {
   testWidgets('opening the feed page marks everything read, everywhere',
       (tester) async {
     final db = FakeFirebaseFirestore();
+    // The server stamps createdAtMs with ITS clock — model one running ahead
+    // of this device. Marking read at plain device-"now" left this entry
+    // forever unread: a badge that survives the very page that shows it.
+    final aheadMs = DateTime.now().millisecondsSinceEpoch + 60_000;
     await seedNote(db, 'n1', createdAtMs: 1000);
     await seedNote(db, 'n2',
-        createdAtMs: 2000, kind: 'songRequest', songTitle: 'Hallelujah');
+        createdAtMs: aheadMs, kind: 'songRequest', songTitle: 'Hallelujah');
     await pump(tester, db: db);
     expect(find.text('2'), findsOneWidget);
 
@@ -126,11 +130,12 @@ void main() {
     expect(find.text('Ada requested a song · €5'), findsOneWidget);
     expect(find.text('Ada tipped €5'), findsOneWidget);
 
-    // The watermark landed at "now": the badge is cleared for every device.
+    // The watermark covers the newest entry SHOWN, clock skew included: the
+    // badge is cleared for every device.
     final prefs = await db.doc(prefsPath).get();
     final seenAt = prefs.data()?['lastSeenAtMs'] as int?;
     expect(seenAt, isNotNull);
-    expect(seenAt, greaterThanOrEqualTo(2000));
+    expect(seenAt, greaterThanOrEqualTo(aheadMs));
 
     // Back on home the bell is quiet.
     await tester.pageBack();
