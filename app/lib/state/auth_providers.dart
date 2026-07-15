@@ -681,6 +681,25 @@ final signOutProvider = Provider<Future<void> Function()>((ref) => () async {
         for (final band in ref.read(accountDataRepositoryProvider).listBands())
           band.id,
       ];
+      // Drop this device's push registration while the account's session can
+      // still write it (afterwards the handle is dead and the rules say no).
+      // Best-effort with a short leash: an offline sign-out must not hang on
+      // Firestore, and the server prunes dead tokens on the first failed
+      // send anyway (functions/src/notifications.ts).
+      final db = ref.read(firestoreProvider);
+      if (db != null) {
+        try {
+          await db
+              .doc('users/$uid/devices/${ref.read(deviceIdProvider)}')
+              .update({
+                'fcmToken': FieldValue.delete(),
+                'fcmTokenAtMs': FieldValue.delete(),
+              })
+              .timeout(const Duration(seconds: 3));
+        } catch (e) {
+          debugPrint('push token cleanup on sign-out failed: $e');
+        }
+      }
       await ref.read(authControllerProvider.notifier).signOut();
       await forgetCloudAccountOnDevice(ref, uid, bandIds);
     });

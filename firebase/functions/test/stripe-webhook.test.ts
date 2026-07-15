@@ -268,6 +268,46 @@ describe("stripeWebhook: dedupe must outlive the delivered tip", () => {
   });
 });
 
+describe("stripeWebhook: the bell feed rides the tombstone batch", () => {
+  const notePath = `users/${UID}/notifications/${SESSION}`;
+
+  it("an off-session delivery writes the notification in the SAME commit as the tip", async () => {
+    await seedConnection();
+
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+
+    expect(docs.get(notePath)).toEqual({
+      kind: "tip",
+      bandId: BAND,
+      tipId: SESSION,
+      amountMinor: 1500,
+      currency: "eur",
+      name: "Maya",
+      createdAtMs: expect.any(Number) as number,
+    });
+  });
+
+  it("a tip landing on a running set writes NO notification — the stage showed it", async () => {
+    await seedConnection();
+    seedLiveSession();
+
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+
+    expect(docs.has(liveTipPath)).toBe(true);
+    expect(docs.has(notePath)).toBe(false);
+  });
+
+  it("a redelivery answered by the tombstone rings no second bell", async () => {
+    await seedConnection();
+    await deliver(checkoutEvent(SESSION, "evt_1"));
+    const written = { ...docs.get(notePath)! };
+
+    await deliver(checkoutEvent(SESSION, "evt_1_redelivered"));
+
+    expect(docs.get(notePath)).toEqual(written);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Destination routing (#71): the same router the relay POST uses.
 

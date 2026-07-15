@@ -14,6 +14,7 @@ import { ipQuotaKey } from "./auth";
 import { HOSTING_HOPS, clientIp } from "./client-ip";
 import { buildRedirectUrl } from "./deeplinks";
 import { methodCurrency } from "./methods";
+import { recordTipNotification } from "./notifications";
 import { IP_HASH_SALT, TURNSTILE_SECRET, TURNSTILE_SITE_KEY } from "./params";
 import {
   DAY_MS,
@@ -295,15 +296,16 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
         // Tip.relayTip's id scheme: the doc id and the wire `id` are the same
         // string, so a racing writer overwrites instead of duplicating.
         const tipId = `relay_${randomUUID()}`;
-        const { ref: dest } = await routedTipRef(firestore, uid, bandId, tipId, now);
+        // The currency the fan actually paid in — EUR for a Box, GBP for
+        // Monzo — not the jar's. Same rule as the queue path below.
+        const currency = methodCurrency(tipRequest.method, profile.currency);
+        const { ref: dest, live } = await routedTipRef(firestore, uid, bandId, tipId, now);
         await dest.set(relayTipWire({
           id: tipId,
           tsMs: now,
           method: tipRequest.method,
           amountMinor: tipRequest.amountMinor,
-          // The currency the fan actually paid in — EUR for a Box, GBP for
-          // Monzo — not the jar's. Same rule as the queue path below.
-          currency: methodCurrency(tipRequest.method, profile.currency),
+          currency,
           name: tipRequest.name,
           message: tipRequest.message,
           // Request tips carry which song was bought; the title is the
@@ -312,6 +314,22 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
             ? { songId: tipRequest.songId, songTitle: tipRequest.songTitle }
             : {}),
         }, now));
+        // The bell feed + push (notifications.ts) — only when no set was
+        // running to show the tip on stage. The tip is already safe above;
+        // nothing here may take down the fan's response over a notification.
+        try {
+          await recordTipNotification(firestore, uid, bandId, live, {
+            tipId,
+            amountMinor: tipRequest.amountMinor,
+            currency,
+            name: tipRequest.name,
+            ...(tipRequest.songId !== undefined && tipRequest.songTitle !== undefined
+              ? { songId: tipRequest.songId, songTitle: tipRequest.songTitle }
+              : {}),
+          }, now);
+        } catch (e) {
+          console.error("tip: notification write failed", e instanceof Error ? e.message : "");
+        }
       } else {
         const pendingCol = ref.collection("pendingTips");
         const batch = firestore.batch();

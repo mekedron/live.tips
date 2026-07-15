@@ -41,6 +41,7 @@ import {
   stripeConnectionRef,
   type StripeConnectionDoc,
 } from "./stripe-store";
+import { recordTipNotification } from "./notifications";
 import { bumpQuota, db } from "./store";
 import { routedTipRef, stripeTipWire } from "./tip-destination";
 import { isValidJarId } from "./validate";
@@ -168,7 +169,7 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
   // subcollection or the band's relayTips archive. No cap and no TTL —
   // these are the artist's own history, not a consume-once queue; the
   // flood valve above stays the write bound.
-  const { ref: dest } = await routedTipRef(firestore, connection.uid, connection.bandId, mapped.id, now);
+  const { ref: dest, live } = await routedTipRef(firestore, connection.uid, connection.bandId, mapped.id, now);
   const batch = firestore.batch();
 
   // Idempotency: the doc id IS the Stripe object id (cs_…/ch_…), and
@@ -179,6 +180,18 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
   // job above; only near-simultaneous races reach create(), and those see
   // the same destination.)
   batch.create(dest, stripeTipWire(mapped.id, mapped.tip, now));
+
+  // The bell feed + push (notifications.ts), only when no set was running.
+  // Riding THIS batch is what makes it exactly-once: when a redelivery race
+  // loses to the tip's create(), the notification no-ops with it.
+  recordTipNotification(firestore, connection.uid, connection.bandId, live, {
+    tipId: mapped.id,
+    amountMinor: mapped.tip.amountMinor,
+    currency: mapped.tip.currency,
+    name: mapped.tip.name,
+    ...(mapped.tip.songId !== undefined ? { songId: mapped.tip.songId } : {}),
+    ...(mapped.tip.songTitle !== undefined ? { songTitle: mapped.tip.songTitle } : {}),
+  }, now, batch);
 
   // The other half of the tombstone check above: written in the SAME batch
   // as the tip, so either both land or neither. set(), not create() — when

@@ -39,14 +39,20 @@ const jarDocRef = {
 const rateDocRef = { rate: true };
 
 /** The account-side tree (users/**) the routed path (#71) reads and writes:
- * live/current for the destination decision, and the tip doc itself. */
+ * live/current for the destination decision, the tip doc itself, and the
+ * bell-feed doc recordTipNotification appends beside it. */
 const cloudDocs = new Map<string, Doc>();
+/** Makes the notification write blow up — the tip must survive it. */
+let failNotificationWrites = false;
 
 function cloudDocRef(path: string) {
   return {
     path,
     get: async () => ({ exists: cloudDocs.has(path), data: () => cloudDocs.get(path) }),
-    set: async (data: Doc) => { cloudDocs.set(path, { ...data }); },
+    set: async (data: Doc) => {
+      if (failNotificationWrites && path.includes("/notifications/")) throw new Error("boom");
+      cloudDocs.set(path, { ...data });
+    },
     collection: (name: string) => cloudColRef(`${path}/${name}`),
   };
 }
@@ -189,6 +195,7 @@ beforeEach(() => {
   rateDoc = undefined;
   pendingDocs = [];
   cloudDocs.clear();
+  failNotificationWrites = false;
 });
 
 describe("tip POST: no quota spent without a Turnstile pass", () => {
@@ -668,6 +675,63 @@ describe("tip POST: routed jars write server-direct (#71)", () => {
     expect([...cloudDocs.keys()]).toEqual([LIVE_PATH]);
     expect(pendingDocs).toHaveLength(0);
     expect(bumpQuota).not.toHaveBeenCalled();
+  });
+
+  // ------------------------------------------------- the bell feed rider ---
+
+  it("no set running: a bell notification lands beside the relayTips write, under the tip's id", async () => {
+    jar = routedJar();
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, { name: "Ada" }), fakeRes() as never);
+
+    const [tipId] = soleCloudDoc(RELAY_TIPS);
+    const [noteId, note] = soleCloudDoc(`users/${OWNER}/notifications`);
+    expect(noteId).toBe(tipId);
+    expect(note).toEqual({
+      kind: "tip",
+      bandId: BAND,
+      tipId,
+      amountMinor: 500,
+      currency: "eur",
+      name: "Ada",
+      createdAtMs: expect.any(Number) as number,
+    });
+  });
+
+  it("a request tip off-session is a songRequest notification, title included", async () => {
+    jar = { ...requestsJar(), ownerUid: OWNER, bandId: BAND };
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, requestBody({ songId: "s2", votes: 2 })), fakeRes() as never);
+
+    const [, note] = soleCloudDoc(`users/${OWNER}/notifications`);
+    expect(note).toMatchObject({ kind: "songRequest", songTitle: "Hallelujah", amountMinor: 1000 });
+  });
+
+  it("a set running: NO notification — the artist watched the tip land on stage", async () => {
+    jar = routedJar();
+    seedLive();
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, { name: "Ada" }), fakeRes() as never);
+
+    soleCloudDoc(SESSION_TIPS);
+    expect([...cloudDocs.keys()].some((p) => p.includes("/notifications/"))).toBe(false);
+  });
+
+  it("a notification write failure never takes down the fan's response — the tip already landed", async () => {
+    jar = routedJar();
+    allowThrough();
+    failNotificationWrites = true;
+    const res = fakeRes();
+
+    await tipHandler(tipPost(XFF, { name: "Ada" }), res as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ queued: true });
+    soleCloudDoc(RELAY_TIPS); // the money write survived
+    expect([...cloudDocs.keys()].some((p) => p.includes("/notifications/"))).toBe(false);
   });
 });
 

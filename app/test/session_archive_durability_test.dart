@@ -98,8 +98,16 @@ class QueuedFirestore extends Fake implements FirebaseFirestore {
           FirebaseException(plugin: 'cloud_firestore', code: 'unavailable'));
       return;
     }
-    await write.run();
-    if (!write.done.isCompleted) write.done.complete();
+    // The store's own rejection (not-found, permission) belongs to the
+    // WRITER's future, exactly like the `failing` path above — leaking it
+    // out of this unawaited landing turns a handled failure (the sign-out
+    // hook's best-effort push-token delete) into an unhandled async error.
+    try {
+      await write.run();
+      if (!write.done.isCompleted) write.done.complete();
+    } catch (e, st) {
+      if (!write.done.isCompleted) write.done.completeError(e, st);
+    }
   }
 
   @override

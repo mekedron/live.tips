@@ -26,6 +26,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -58,6 +59,7 @@ const A_STRIPE_TIP = `users/${UID_A}/bands/band1/stripeTips/st1`;
 const A_SETTINGS = `users/${UID_A}/settings/app`;
 const A_LIVE = `users/${UID_A}/live/current`;
 const A_DEVICE = `users/${UID_A}/devices/dev1`;
+const A_NOTIFICATION = `users/${UID_A}/notifications/n1`;
 const A_PRIVATE_SECURITY = `users/${UID_A}/private/security`;
 const A_PRIVATE_STRIPE = `users/${UID_A}/private/stripe`;
 
@@ -133,6 +135,7 @@ describe("cross-account isolation: artist B is locked out of artist A's tree", (
       A_SETTINGS,
       A_LIVE,
       A_DEVICE,
+      A_NOTIFICATION,
       A_PRIVATE_SECURITY,
       A_PRIVATE_STRIPE,
     ]) {
@@ -151,6 +154,7 @@ describe("cross-account isolation: artist B is locked out of artist A's tree", (
       A_STRIPE_TIP,
       A_SETTINGS,
       A_LIVE,
+      A_NOTIFICATION,
       A_PRIVATE_SECURITY,
       A_PRIVATE_STRIPE,
     ]) {
@@ -312,6 +316,17 @@ describe("devices: the kill switch's teeth cannot be laundered", () => {
     await assertSucceeds(updateDoc(doc(db, A_DEVICE), { name: "renamed", lastSeenAtMs: 2 }));
   });
 
+  it("lets the app register and drop its push token (fcmToken is a benign field)", async () => {
+    await seed(A_DEVICE, { name: "d", revoked: false, createdAtMs: 1 });
+    const db = authed(UID_A);
+    await assertSucceeds(
+      updateDoc(doc(db, A_DEVICE), { fcmToken: "tok", fcmTokenAtMs: 2, locale: "de" }),
+    );
+    await assertSucceeds(updateDoc(doc(db, A_DEVICE), { fcmToken: deleteField(), fcmTokenAtMs: deleteField() }));
+    // But the token write cannot smuggle a revocation flip along.
+    await assertFails(updateDoc(doc(db, A_DEVICE), { fcmToken: "tok2", revoked: true }));
+  });
+
   it("denies an update that flips revoked or stamps revokedAtMs (self-unrevoke)", async () => {
     await seed(A_DEVICE, { name: "old", revoked: false, createdAtMs: 1 });
     const db = authed(UID_A);
@@ -331,6 +346,24 @@ describe("devices: the kill switch's teeth cannot be laundered", () => {
   it("denies client delete (no delete-and-recreate to shed a revocation)", async () => {
     await seed(A_DEVICE, { name: "d", revoked: true, revokedAtMs: 100, createdAtMs: 1 });
     await assertFails(deleteDoc(doc(authed(UID_A), A_DEVICE)));
+  });
+});
+
+describe("notifications: the bell feed is read-only glass", () => {
+  it("lets A read its own feed; every client write is denied, A's included", async () => {
+    await seed(A_NOTIFICATION, { kind: "tip", amountMinor: 500, createdAtMs: 1 });
+    await assertSucceeds(getDoc(doc(authed(UID_A), A_NOTIFICATION)));
+    // A client that could write here could ring its own bell — or silence it:
+    // create, edit and delete are all function-owned (the trigger trims).
+    await assertFails(setDoc(doc(authed(UID_A), `users/${UID_A}/notifications/forged`), { kind: "tip" }));
+    await assertFails(updateDoc(doc(authed(UID_A), A_NOTIFICATION), { amountMinor: 999 }));
+    await assertFails(deleteDoc(doc(authed(UID_A), A_NOTIFICATION)));
+  });
+
+  it("denies B and anonymous principals A's feed entirely", async () => {
+    await seed(A_NOTIFICATION, { kind: "tip", amountMinor: 500, createdAtMs: 1 });
+    await assertFails(getDoc(doc(authed(UID_B), A_NOTIFICATION)));
+    await assertFails(getDoc(doc(anon(), A_NOTIFICATION)));
   });
 });
 

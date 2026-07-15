@@ -12,6 +12,7 @@ import 'features/account/deep_link_gate.dart';
 import 'features/account/device_session_guard.dart';
 import 'features/account/redirect_sign_in_gate.dart';
 import 'features/live/stage/stage_overlay.dart';
+import 'features/notifications/push_token_guard.dart';
 import 'features/onboarding/profile_pick_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/setup/jar_setup_screen.dart';
@@ -85,8 +86,14 @@ class LiveTipsApp extends ConsumerWidget {
       home: const RelayKeepalive(
         child: CloudUploadOfferGate(
           child: DeviceSessionGuard(
-            child: DeepLinkGate(
-              child: RedirectSignInGate(child: RootGate()),
+            // The push guard sits INSIDE the session guard on purpose: it
+            // re-asserts the fcmToken on the device doc the session guard
+            // registers, so it must never outlive (or predate) that write's
+            // owner in the tree.
+            child: PushTokenGuard(
+              child: DeepLinkGate(
+                child: RedirectSignInGate(child: RootGate()),
+              ),
             ),
           ),
         ),

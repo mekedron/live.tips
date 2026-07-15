@@ -69,6 +69,12 @@ dependencies:
   # the app straight into the redeem flow.
   mobile_scanner: ^7.1.4
   app_links: ^6.4.1
+  # Push notifications (tips/song requests while not live). Kept on the
+  # release train the lockfile pins: bumping it drags firebase_core and
+  # cloud_firestore along, and cloud_firestore >=6.7 breaks
+  # fake_cloud_firestore 4.1.1 (WriteBatch.update went generic) — the whole
+  # widget-test suite fails to load. Lift together, carefully.
+  firebase_messaging: ^16.0.0
 
 dev_dependencies:
   flutter_test:

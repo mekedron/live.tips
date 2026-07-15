@@ -1,0 +1,293 @@
+/// What a cloud account learns about tips nobody saw land on stage — the
+/// bell feed, and the push knock on the door.
+///
+/// Two halves, joined by one collection:
+///
+///  * recordTipNotification — called by BOTH money paths (the relay POST in
+///    tip.ts, the Stripe webhook) right after the routed tip write, with the
+///    same `live` verdict routedTipRef already produced. live === true
+///    writes NOTHING: the tip landed on a running set's stage and the artist
+///    watched it happen (song requests included — the stage queue is where
+///    those live during a set). live === false appends
+///    users/{uid}/notifications/{tipId} — the bell feed's source of truth
+///    and the trigger's kick.
+///
+///  * sendTipPush (onDocumentCreated on that collection — index.ts) — reads
+///    the account's notification prefs and its device registry, and fans the
+///    FCM message out to every non-revoked device that registered a token,
+///    worded per device in the language that device's screen speaks
+///    (push-strings.ts). Decoupled from the money paths on purpose: a cold
+///    start here delays a push by seconds, never a fan's payment redirect,
+///    and FCM being down loses nothing — the feed doc IS the notification,
+///    the push is just its delivery.
+///
+/// The collection is server-written only (rules deny every client write) and
+/// the doc id is the tip id: on the Stripe path the doc rides the tombstone
+/// batch, so a redelivery race collapses exactly like the tip doc beside it.
+/// Unlike relayTips this is NOT a second donation history — it is capped at
+/// [MAX_NOTIFICATIONS] and trimmed by the trigger itself; the durable record
+/// stays the tip doc.
+
+import type {
+  CollectionReference,
+  DocumentReference,
+  Firestore,
+  WriteBatch,
+} from "firebase-admin/firestore";
+import { FieldValue } from "firebase-admin/firestore";
+import type { MulticastMessage } from "firebase-admin/messaging";
+import { fcm } from "./fcm";
+import { pushStrings } from "./push-strings";
+import { db, devicesCol, deviceRef } from "./store";
+import { ZERO_DECIMAL } from "./validate";
+
+/** The bell feed's cap — enough to scroll back a busy week, not an archive. */
+export const MAX_NOTIFICATIONS = 100;
+
+/** Where a tapped notification lands: the PWA, already on the bell page. */
+export const NOTIFICATIONS_LINK = "https://live.tips/app/?open=notifications";
+
+export function notificationsCol(firestore: Firestore, uid: string): CollectionReference {
+  return firestore.collection("users").doc(uid).collection("notifications");
+}
+
+export function notificationRef(firestore: Firestore, uid: string, tipId: string): DocumentReference {
+  return notificationsCol(firestore, uid).doc(tipId);
+}
+
+/** users/{uid}/settings/notifications — the app's opt-out flags (see below). */
+export function notificationSettingsRef(firestore: Firestore, uid: string): DocumentReference {
+  return firestore.collection("users").doc(uid).collection("settings").doc("notifications");
+}
+
+/** What either money path knows about an accepted tip, notification-sized. */
+export interface TipNotificationInput {
+  /** Doc id of the routed tip — becomes this doc's id too. */
+  tipId: string;
+  amountMinor: number;
+  /** Lowercase ISO-4217, the currency the fan actually paid in. */
+  currency: string;
+  /** Possibly "" — empty means absent on the wire, Tip.toJson style. */
+  name: string;
+  /** Set on song-request tips (#64); presence decides the kind. */
+  songId?: string;
+  songTitle?: string;
+}
+
+/**
+ * The feed write, and the entire "when do we notify" policy: only when no
+ * set was running (live === false) — for both kinds. Callers must not let
+ * this fail the tip: the relay path wraps it in try/catch AFTER its own
+ * write landed; the Stripe path hands in its tombstone `batch`, which makes
+ * this a free rider on the existing all-or-nothing commit.
+ */
+export function recordTipNotification(
+  firestore: Firestore,
+  uid: string,
+  bandId: string,
+  live: boolean,
+  tip: TipNotificationInput,
+  nowMs: number,
+  batch?: WriteBatch,
+): Promise<void> | void {
+  if (live) return;
+  const doc = {
+    kind: tip.songId !== undefined ? "songRequest" : "tip",
+    bandId,
+    tipId: tip.tipId,
+    amountMinor: tip.amountMinor,
+    currency: tip.currency,
+    ...(tip.name !== "" ? { name: tip.name } : {}),
+    ...(tip.songTitle !== undefined && tip.songTitle !== "" ? { songTitle: tip.songTitle } : {}),
+    createdAtMs: nowMs,
+  };
+  const ref = notificationRef(firestore, uid, tip.tipId);
+  if (batch !== undefined) {
+    batch.set(ref, doc);
+    return;
+  }
+  return ref.set(doc).then(() => undefined);
+}
+
+/**
+ * "€5.00" in the reader's own conventions. Minor units are Stripe's:
+ * hundredths everywhere except the zero-decimal currencies (validate.ts),
+ * where minor IS major. Intl never gets to throw a push away — an unknown
+ * locale or currency code falls back to a plain "5.00 EUR".
+ */
+export function formatMinor(amountMinor: number, currency: string, locale: string | undefined): string {
+  const major = ZERO_DECIMAL.has(currency) ? amountMinor : amountMinor / 100;
+  const upper = currency.toUpperCase();
+  try {
+    return new Intl.NumberFormat(locale ?? "en", { style: "currency", currency: upper }).format(major);
+  } catch {
+    return `${major.toFixed(ZERO_DECIMAL.has(currency) ? 0 : 2)} ${upper}`;
+  }
+}
+
+/** The trigger's event, structurally — kept minimal so tests need no
+ * firebase-functions plumbing to drive the handler. */
+export interface NotificationCreatedEvent {
+  params: { uid: string };
+  data?: { data(): Record<string, unknown> };
+}
+
+/** A device worth pushing to: registered a token, not revoked. */
+interface PushTarget {
+  deviceId: string;
+  token: string;
+  locale: string | undefined;
+}
+
+/**
+ * onDocumentCreated("users/{uid}/notifications/{noteId}") — index.ts.
+ *
+ * Prefs are OPT-OUT: an absent settings/notifications doc (every account
+ * until it first touches the new Settings section) and an absent field both
+ * mean "send" — the real opt-in already happened when the device asked for
+ * OS permission and registered its token; without that there is nothing to
+ * send to anyway.
+ *
+ * Dead tokens (uninstalled PWA, browser data cleared) come back as
+ * registration-token-not-registered / invalid-argument and get their field
+ * deleted, so the registry self-heals; every other failure is logged and
+ * dropped — the feed doc already holds the notification, and this trigger
+ * deliberately does not retry (see index.ts).
+ */
+export async function sendTipPushHandler(event: NotificationCreatedEvent): Promise<void> {
+  const note = event.data?.data();
+  if (note === undefined) return;
+  const uid = event.params.uid;
+  const firestore = db();
+
+  const kind = note["kind"] === "songRequest" ? "songRequest" : "tip";
+  const prefs = (await notificationSettingsRef(firestore, uid).get()).data() ?? {};
+  const enabled = kind === "songRequest" ? prefs["songRequests"] !== false : prefs["tips"] !== false;
+
+  if (enabled) {
+    const devices = await devicesCol(firestore, uid).get();
+    const targets: PushTarget[] = [];
+    for (const doc of devices.docs) {
+      if (doc.get("revoked") === true) continue;
+      const token = doc.get("fcmToken");
+      if (typeof token !== "string" || token === "") continue;
+      const locale = doc.get("locale");
+      targets.push({
+        deviceId: doc.id,
+        token,
+        locale: typeof locale === "string" ? locale : undefined,
+      });
+    }
+    if (targets.length > 0) {
+      // One send per language, not per device: sendEachForMulticast carries
+      // one payload for the whole token list, and the words differ by locale.
+      const groups = new Map<string, PushTarget[]>();
+      for (const t of targets) {
+        const key = t.locale ?? "";
+        let bucket = groups.get(key);
+        if (bucket === undefined) {
+          bucket = [];
+          groups.set(key, bucket);
+        }
+        bucket.push(t);
+      }
+      const dead: string[] = [];
+      for (const group of groups.values()) {
+        const sent = await sendToGroup(note, kind, group);
+        dead.push(...sent);
+      }
+      if (dead.length > 0) {
+        const prune = firestore.batch();
+        for (const deviceId of dead) {
+          prune.update(deviceRef(firestore, uid, deviceId), {
+            fcmToken: FieldValue.delete(),
+            fcmTokenAtMs: FieldValue.delete(),
+          });
+        }
+        await prune.commit().catch((e) => {
+          console.error(`sendTipPush: token prune failed for ${uid}`, e instanceof Error ? e.message : "");
+        });
+      }
+    }
+  }
+
+  // The cap, enforced at the only place that grows the collection — prefs
+  // off included, since the feed doc was written either way. Newest
+  // MAX_NOTIFICATIONS stay; the durable history remains the tip docs.
+  const overflow = await notificationsCol(firestore, uid)
+    .orderBy("createdAtMs", "desc")
+    .offset(MAX_NOTIFICATIONS)
+    .select()
+    .get();
+  if (!overflow.empty) {
+    const trim = firestore.batch();
+    for (const doc of overflow.docs) trim.delete(doc.ref);
+    await trim.commit();
+  }
+}
+
+/** Send one locale group's message; returns deviceIds whose token is dead. */
+async function sendToGroup(
+  note: Record<string, unknown>,
+  kind: "tip" | "songRequest",
+  group: PushTarget[],
+): Promise<string[]> {
+  const locale = group[0]?.locale;
+  const strings = pushStrings(locale);
+  const amountMinor = typeof note["amountMinor"] === "number" ? note["amountMinor"] : 0;
+  const currency = typeof note["currency"] === "string" ? note["currency"] : "eur";
+  const name = typeof note["name"] === "string" ? note["name"] : "";
+  const songTitle = typeof note["songTitle"] === "string" ? note["songTitle"] : "";
+  const bandId = typeof note["bandId"] === "string" ? note["bandId"] : "";
+  const tipId = typeof note["tipId"] === "string" ? note["tipId"] : "";
+
+  const amount = formatMinor(amountMinor, currency, locale);
+  const title = `${kind === "songRequest" ? strings.songRequest : strings.newTip} · ${amount}`;
+  const body = kind === "songRequest"
+    ? [songTitle, name].filter((s) => s !== "").join(" — ") || strings.someone
+    : (name !== "" ? name : strings.someone);
+
+  const message: MulticastMessage = {
+    tokens: group.map((t) => t.token),
+    // A notification-message, not data-only, on purpose: the web SDK
+    // displays it from the service worker and handles click → link without
+    // any handler code of ours in the SW (app/web/firebase-messaging-sw.js
+    // stays a config-only shim).
+    notification: { title, body },
+    data: { kind, bandId, tipId, link: NOTIFICATIONS_LINK },
+    webpush: {
+      // A day, then let it go: a phone off overnight should catch up from
+      // the bell, not from a wall of stale banners. tag keeps every tip its
+      // own banner rather than each replacing the last.
+      headers: { TTL: "86400", Urgency: "high" },
+      fcmOptions: { link: NOTIFICATIONS_LINK },
+      notification: { icon: "https://live.tips/app/icons/Icon-192.png", tag: tipId },
+    },
+    // Wired now, exercised when the native builds get their APNs key /
+    // notification channel (phase 2). Harmless on web.
+    apns: { payload: { aps: { sound: "default", threadId: bandId } } },
+    android: { notification: { channelId: "tips" } },
+  };
+
+  try {
+    const outcome = await fcm().sendEachForMulticast(message);
+    const dead: string[] = [];
+    outcome.responses.forEach((r, i) => {
+      if (r.success) return;
+      const target = group[i];
+      const code = r.error?.code;
+      if (target !== undefined
+          && (code === "messaging/registration-token-not-registered" || code === "messaging/invalid-argument")) {
+        dead.push(target.deviceId);
+      } else {
+        console.warn(`sendTipPush: send failed (${code ?? "unknown"})`);
+      }
+    });
+    return dead;
+  } catch (e) {
+    // FCM itself down: the push is lost, the feed entry is not. No retry —
+    // a late knock for a tip the bell already shows is worse than none.
+    console.error("sendTipPush: multicast failed", e instanceof Error ? e.message : "");
+    return [];
+  }
+}

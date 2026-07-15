@@ -20,6 +20,7 @@ class DeviceInfo {
     this.createdAtMs = 0,
     this.lastSeenAtMs = 0,
     this.revoked = false,
+    this.fcmToken,
     this.isCurrent = false,
   });
 
@@ -32,6 +33,11 @@ class DeviceInfo {
   final int createdAtMs;
   final int lastSeenAtMs;
   final bool revoked;
+
+  /// This device's push registration, present exactly while push is enabled
+  /// here for this account (PushRegistration owns the writes; the send
+  /// trigger and the revocation paths clear it server-side).
+  final String? fcmToken;
   final bool isCurrent;
 
   factory DeviceInfo.fromJson(
@@ -47,6 +53,7 @@ class DeviceInfo {
         createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
         lastSeenAtMs: (json['lastSeenAtMs'] as num?)?.toInt() ?? 0,
         revoked: json['revoked'] == true,
+        fcmToken: json['fcmToken'] as String?,
         isCurrent: isCurrent,
       );
 
@@ -70,6 +77,7 @@ class DeviceInfo {
         createdAtMs: createdAtMs,
         lastSeenAtMs: lastSeenAtMs,
         revoked: revoked,
+        fcmToken: fcmToken,
         isCurrent: isCurrent ?? this.isCurrent,
       );
 }

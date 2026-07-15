@@ -444,6 +444,11 @@ export async function revokeDeviceHandler(
     await deviceRef(firestore, uid, deviceId).update({
       revoked: true,
       revokedAtMs: Date.now(),
+      // A revoked device is not pushed to either — the trigger filters on
+      // `revoked` anyway (notifications.ts); dropping the token here just
+      // stops a dead credential from lingering on the doc.
+      fcmToken: FieldValue.delete(),
+      fcmTokenAtMs: FieldValue.delete(),
     });
   } catch {
     throw new HttpsError("not-found", "not found");
@@ -524,7 +529,14 @@ export async function revokeAllOtherDevicesHandler(
   for (const doc of devices.docs) {
     if (doc.id === currentDeviceId) continue;
     if (doc.get("revoked") === true) continue;
-    batch.update(doc.ref, { revoked: true, revokedAtMs: now });
+    batch.update(doc.ref, {
+      revoked: true,
+      revokedAtMs: now,
+      // Same rider as revokeDevice: no pushes to a device that was just
+      // locked out.
+      fcmToken: FieldValue.delete(),
+      fcmTokenAtMs: FieldValue.delete(),
+    });
     revokedCount++;
     if (++inBatch === 400) {
       await batch.commit();

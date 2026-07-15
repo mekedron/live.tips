@@ -20,6 +20,7 @@ import '../../widgets/goal_editor.dart';
 import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
 import '../live/live_screen.dart';
+import '../notifications/notifications_bell.dart';
 import '../poster/poster_screen.dart';
 import '../settings/stage_preview_screen.dart';
 import '../settings/stage_settings_section.dart';
@@ -262,6 +263,8 @@ class _MobileHome extends StatelessWidget {
                   'live.tips',
                   style: outfitStyle(17, c.text, weight: FontWeight.w700),
                 ),
+                const Spacer(),
+                const NotificationsBell(),
               ],
             ),
           ),

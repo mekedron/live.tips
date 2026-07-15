@@ -9,6 +9,7 @@ import '../../widgets/live_session_banner.dart';
 import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../home/setup_home_screen.dart';
+import '../notifications/notifications_bell.dart';
 import '../poster/poster_screen.dart';
 import '../requests/requests_screen.dart';
 import '../settings/settings_screen.dart';
@@ -319,6 +320,8 @@ class _SideRail extends ConsumerWidget {
                   'live.tips',
                   style: outfitStyle(18, c.text, weight: FontWeight.w700),
                 ),
+                const Spacer(),
+                const NotificationsBell(),
               ],
             ),
           ),

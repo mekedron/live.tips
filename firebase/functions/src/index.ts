@@ -2,6 +2,7 @@
 /// per-surface modules. 2nd gen, europe-west1, Node 20.
 
 import { setGlobalOptions } from "firebase-functions/v2";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { deleteAccountHandler } from "./account";
@@ -23,6 +24,7 @@ import {
   revokeDeviceHandler,
 } from "./devices";
 import { IP_HASH_SALT, TURNSTILE_SECRET } from "./params";
+import { sendTipPushHandler } from "./notifications";
 import { mintSessionTokenHandler } from "./session-token";
 import {
   expireJarsHandler,
@@ -101,6 +103,17 @@ export const stripeDisconnect = onCall({ cors: true }, stripeDisconnectHandler);
 /** POST /stripe/webhook/:connectionId, via the Hosting rewrite. Public; the
  * per-connection Stripe signature is the authentication. */
 export const stripeWebhook = onRequest(stripeWebhookHandler);
+
+// ------------------------------------------------------------- notifications
+
+/** Push + bell feed for tips that arrive while no set is running
+ * (notifications.ts). Deliberately no retry: a push lost to a transient FCM
+ * outage still sits in the bell feed, and a banner that shows up late is
+ * worse than one that never knocked. */
+export const sendTipPush = onDocumentCreated(
+  "users/{uid}/notifications/{noteId}",
+  sendTipPushHandler,
+);
 
 // ------------------------------------------------------------------- cleanup
 

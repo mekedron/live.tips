@@ -77,6 +77,16 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // The bell feed (functions/src/notifications.ts): what arrived while
+      // no set was running. Server-written only — the tip paths append, the
+      // trigger trims; a client that could write here could ring its own
+      // bell. Read state is NOT here either: the mark-all-read watermark
+      // lives in settings/notifications, so this stays append-and-trim.
+      match /notifications/{noteId} {
+        allow read: if isOwner(uid) && notRevoked(uid);
+        allow write: if false;
+      }
+
       // Function-written state under private/. ONLY the security doc is
       // readable (the owner may see their own revocation watermark, never
       // write it). Deliberately NOT a {document=**} read grant anymore:

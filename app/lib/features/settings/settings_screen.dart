@@ -23,6 +23,7 @@ import '../../widgets/sign_in_sheet.dart';
 import '../shell/app_shell.dart';
 import 'account_details_screen.dart';
 import 'cloud_account_screen.dart';
+import 'notification_settings_screen.dart';
 import 'relay_method_screen.dart';
 import 'song_requests_screen.dart';
 import 'stripe_key_screen.dart';
@@ -368,6 +369,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 MaterialPageRoute(
                   builder: (_) =>
                       const RelayMethodScreen(method: TipMethod.monzo),
+                ),
+              ),
+            ),
+          ],
+        ),
+      // -------------------------------------------------- notifications ---
+      // Cloud accounts only: the bell feed and the push behind it are
+      // server-written into the account (functions/src/notifications.ts) —
+      // the local profile has no server watching its tips arrive.
+      if (cloudAvailable && cloudEntry != null && hasProfile)
+        LtRowGroup(
+          header: s.t('settings.notifications.header'),
+          children: [
+            LtRow(
+              icon: Icons.notifications_active_outlined,
+              title: s.t('settings.notifications.row_title'),
+              subtitle: s.t('settings.notifications.row_subtitle'),
+              chevron: true,
+              onTap: () => Navigator.of(context).push(
+                RootBoundRoute(
+                  builder: (_) => const NotificationSettingsScreen(),
                 ),
               ),
             ),
