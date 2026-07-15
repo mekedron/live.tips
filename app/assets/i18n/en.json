@@ -939,5 +939,9 @@
   "settings.notifications.kind_tips_subtitle": "Only when you're not live — on stage you see them land",
   "settings.notifications.kind_requests": "Song requests",
   "settings.notifications.kind_requests_subtitle": "Requests bought while no set is running",
-  "settings.notifications.footnote": "These choices apply to your whole account. Each device also needs notifications allowed on it — check the section above on every device you want pinged."
+  "settings.notifications.footnote": "These choices apply to your whole account. Each device also needs notifications allowed on it — check the section above on every device you want pinged.",
+  "home.push_nudge.title": "Don't miss a tip",
+  "home.push_nudge.body": "Get a notification when tips and song requests arrive while you're not live.",
+  "home.push_nudge.enable": "Enable notifications",
+  "home.push_nudge.dismiss": "Not now"
 }

@@ -89,6 +89,42 @@ final thisDevicePushEnabledProvider = Provider<bool>((ref) {
   return false;
 });
 
+/// "Not now" on the home nudge, remembered per device+account (LocalStore).
+/// A Notifier so the card disappears the moment it is dismissed, without a
+/// prefs round-trip on every home build.
+class PushNudgeDismissed extends Notifier<bool> {
+  @override
+  bool build() {
+    final uid =
+        ref.watch(authControllerProvider.select((s) => s.user?.uid));
+    if (uid == null) return true; // nobody to nudge
+    return ref.read(localStoreProvider).pushNudgeDismissed(uid);
+  }
+
+  Future<void> dismiss() async {
+    final uid = ref.read(authControllerProvider).user?.uid;
+    if (uid == null) return;
+    state = true;
+    await ref.read(localStoreProvider).setPushNudgeDismissed(uid);
+  }
+}
+
+final pushNudgeDismissedProvider =
+    NotifierProvider<PushNudgeDismissed, bool>(PushNudgeDismissed.new);
+
+/// Whether Home should offer to turn notifications on. Only when the offer's
+/// button can actually deliver in one tap: a cloud account is signed in, the
+/// OS permission is still unasked (canRequest — blocked/unsupported/install-
+/// first cases stay in Settings where the full ladder lives), push isn't
+/// already on here, and the artist never said "Not now".
+final pushNudgeVisibleProvider = Provider<bool>((ref) {
+  final uid = ref.watch(authControllerProvider.select((s) => s.user?.uid));
+  if (uid == null) return false;
+  if (ref.watch(pushNudgeDismissedProvider)) return false;
+  if (ref.watch(thisDevicePushEnabledProvider)) return false;
+  return ref.watch(pushStatusProvider).value == PushStatus.canRequest;
+});
+
 enum PushEnableOutcome { enabled, denied, failed }
 
 final pushRegistrationProvider =

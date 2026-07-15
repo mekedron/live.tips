@@ -11,6 +11,7 @@ import 'package:live_tips/data/firebase/device_registry.dart';
 import 'package:live_tips/data/firebase/push_service.dart';
 import 'package:live_tips/domain/app_account.dart';
 import 'package:live_tips/features/notifications/notifications_bell.dart';
+import 'package:live_tips/features/notifications/push_nudge_card.dart';
 import 'package:live_tips/features/settings/notification_settings_screen.dart';
 import 'package:live_tips/state/auth_providers.dart';
 import 'package:live_tips/state/device_providers.dart';
@@ -171,6 +172,56 @@ void main() {
     expect(prefs['tips'], isFalse);
     expect(prefs.containsKey('songRequests'), isFalse);
     expect(prefs['lastSeenAtMs'], 42);
+  });
+
+  testWidgets(
+      'the home nudge enables push in one tap and hides itself', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final push = _FakePushService();
+    await pump(
+      tester,
+      db: db,
+      home: const Scaffold(body: PushNudgeCard()),
+      extra: [pushServiceProvider.overrideWithValue(push)],
+    );
+
+    expect(find.text("Don't miss a tip"), findsOneWidget);
+
+    await tester.tap(find.text('Enable notifications'));
+    await tester.pumpAndSettle();
+
+    // Permission asked and granted inside the tap; the token landed; the
+    // card has nothing left to offer.
+    final doc = (await db.doc('users/$uid/devices/$deviceId').get()).data()!;
+    expect(doc['fcmToken'], 'tok_test');
+    expect(find.text("Don't miss a tip"), findsNothing);
+  });
+
+  testWidgets('"Not now" hides the nudge and is remembered on this device',
+      (tester) async {
+    final db = FakeFirebaseFirestore();
+    final push = _FakePushService();
+    final container = await pump(
+      tester,
+      db: db,
+      home: const Scaffold(body: PushNudgeCard()),
+      extra: [pushServiceProvider.overrideWithValue(push)],
+    );
+
+    expect(find.text("Don't miss a tip"), findsOneWidget);
+
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+
+    expect(find.text("Don't miss a tip"), findsNothing);
+    // The memory outlives this widget tree: the next launch reads prefs.
+    expect(
+      container.read(localStoreProvider).pushNudgeDismissed(uid),
+      isTrue,
+    );
+    // And no token was minted — "Not now" means no.
+    final doc = (await db.doc('users/$uid/devices/$deviceId').get()).data();
+    expect(doc?['fcmToken'], isNull);
   });
 
   testWidgets(

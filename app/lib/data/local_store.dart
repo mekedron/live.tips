@@ -671,6 +671,21 @@ class LocalStore {
   // the cipher attaches, so it must be readable before one exists — and it is
   // the one value that means nothing to an attacker anyway.
 
+  // --- The home screen's "enable notifications?" nudge ---
+
+  static const kPushNudgeDismissedBase = 'push_nudge_dismissed_v1';
+
+  /// Whether THIS device already answered the nudge for account [uid] with
+  /// "Not now". Per device and remembered forever: a nudge that comes back
+  /// after being dismissed is nagging, not a nudge — the Settings section
+  /// stays the door for changing one's mind.
+  bool pushNudgeDismissed(String uid) =>
+      _prefs.getBool('${kPushNudgeDismissedBase}_$uid') ?? false;
+
+  Future<void> setPushNudgeDismissed(String uid) async {
+    await _prefs.setBool('${kPushNudgeDismissedBase}_$uid', true);
+  }
+
   static const kDeviceKind = 'device_kind_v1';
 
   DeviceKind? readDeviceKind() =>

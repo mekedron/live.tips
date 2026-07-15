@@ -21,6 +21,7 @@ import '../../widgets/lt_ui.dart';
 import '../../widgets/qr_card.dart';
 import '../live/live_screen.dart';
 import '../notifications/notifications_bell.dart';
+import '../notifications/push_nudge_card.dart';
 import '../poster/poster_screen.dart';
 import '../settings/stage_preview_screen.dart';
 import '../settings/stage_settings_section.dart';
@@ -278,6 +279,7 @@ class _MobileHome extends StatelessWidget {
                 children: [
                   const BandNameButton(fontSize: 24, weight: FontWeight.w700),
                   const _ReprintNoticeCard(),
+                  const PushNudgeCard(),
                   const SizedBox(height: 14),
                   goalCard,
                   if (url != null) ...[
