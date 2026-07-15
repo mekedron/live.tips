@@ -90,7 +90,9 @@ const INLINE_SCRIPT = `(function () {
       seg.className = 'seg' + (i <= stepIdx ? ' on' : '');
       progSegs.appendChild(seg);
     }
-    if (stepIdx > 0) show(progBack); else hide(progBack);
+    // visibility (not display) so the left arrow keeps its slot on step 1 —
+    // the transparent right mirror then balances it and the segments stay centred.
+    progBack.style.visibility = stepIdx > 0 ? '' : 'hidden';
   }
   function renderStep() {
     ALL.forEach(function (x) { hide(id(x)); });
@@ -552,11 +554,17 @@ h1 { font-size: 18px; font-weight: 800; margin: 0; overflow-wrap: anywhere; }
 .tab { flex: 1; text-align: center; padding: 10px 0; border-radius: 10px; border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
 .tab.active { background: var(--card); color: var(--fg); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; }
-/* Progress bar — segments centered; the Back arrow floats left so it never
-   shifts the centre (no jump when it appears on step 2). */
-.progress { position: relative; display: flex; align-items: center; justify-content: center; margin: 8px 0 2px; min-height: 20px; }
-.prog-back { position: absolute; left: -2px; top: calc(50% - 2px); transform: translateY(-50%); border: 0; background: none; color: var(--muted); font-size: 24px; line-height: 1; cursor: pointer; padding: 0 8px; }
-.prog-segs { display: flex; gap: 6px; width: 100%; max-width: 380px; }
+/* Progress bar — a left chevron, the segments (flex:1), and a transparent
+   mirror of the same chevron on the right. Two equal-width arrows keep the
+   segments centred by pure symmetry — no absolute positioning, fully fluid. */
+.progress { display: flex; align-items: center; gap: 12px; margin: 8px 0 2px; }
+.prog-arrow { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 22px; padding: 0; color: var(--muted); }
+.prog-back { position: relative; border: 0; background: none; cursor: pointer; }
+/* A ~40x40 square tap target, larger than the SVG, that doesn't grow the flex
+   slot — so the segments' symmetry is untouched. */
+.prog-back::before { content: ""; position: absolute; inset: -9px -12px; }
+.prog-spacer { visibility: hidden; }
+.prog-segs { display: flex; gap: 6px; flex: 1; min-width: 0; }
 .seg { flex: 1; height: 4px; border-radius: 2px; background: var(--line); transition: background 0.2s; }
 .seg.on { background: var(--accent); }
 .step { margin-top: 18px; }
@@ -734,6 +742,11 @@ function confetti(): SafeHtml {
     ),
   )}`;
 }
+
+/** Left chevron for the progress Back arrow — and its transparent mirror. */
+const CHEVRON = raw(
+  '<svg viewBox="0 0 8 14" width="8" height="14" fill="none" aria-hidden="true"><path d="M6.5 1 1.5 7l5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+);
 
 const LABELS: Record<string, string> = { revolut: "Revolut", mobilepay: "MobilePay", monzo: "Monzo" };
 const SUBTEXT: Record<string, string> = {
@@ -998,8 +1011,9 @@ export function renderTipPage(
     </header>
     ${tabsBar}
     <div class="progress" id="progress" hidden>
-      <button type="button" class="prog-back" id="prog-back" aria-label="Back">‹</button>
+      <button type="button" class="prog-arrow prog-back" id="prog-back" aria-label="Back">${CHEVRON}</button>
       <div class="prog-segs" id="prog-segs"></div>
+      <span class="prog-arrow prog-spacer" aria-hidden="true">${CHEVRON}</span>
     </div>
     ${tipStep}
     ${songsStep}
