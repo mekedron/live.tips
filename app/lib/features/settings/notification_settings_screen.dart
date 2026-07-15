@@ -234,32 +234,33 @@ class _NotificationSettingsScreenState
                           ),
                         ),
                       ],
+                    // Each state below arrives as ONE child on purpose:
+                    // LtRowGroup draws a hairline between every pair of
+                    // children, so a row + button + verdict as siblings grew
+                    // accidental frames around the button (Nikita's screens).
                     PushStatus.granted => [
                         // The panel says what the toggle alone cannot: is
                         // this device actually REGISTERED (token on its doc,
                         // since when) — and the test button proves delivery
                         // instead of asking the artist to trust a switch.
-                        if (ref.watch(thisDevicePushEnabledProvider)) ...[
-                          LtRow(
-                            leading: _ActiveDot(c: c),
-                            title: s.t('settings.notifications.status_active'),
-                            subtitle: _registeredSubtitle(s),
-                            trailing: Switch(
-                              value: true,
-                              onChanged: _busy
-                                  ? null
-                                  : (v) => unawaited(_setThisDevice(v)),
-                            ),
-                          ),
-                          // Flush with the card's own content padding (the
-                          // group already indents 16) — an extra inset here
-                          // left the button floating off-grid from the rows
-                          // and dividers around it.
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(0, 4, 0, 10),
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
+                        if (ref.watch(thisDevicePushEnabledProvider))
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              LtRow(
+                                leading: _ActiveDot(c: c),
+                                title:
+                                    s.t('settings.notifications.status_active'),
+                                subtitle: _registeredSubtitle(s),
+                                trailing: Switch(
+                                  value: true,
+                                  onChanged: _busy
+                                      ? null
+                                      : (v) => unawaited(_setThisDevice(v)),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              FilledButton.icon(
                                 onPressed: _testRunning
                                     ? null
                                     : () => unawaited(_sendTest()),
@@ -267,8 +268,8 @@ class _NotificationSettingsScreenState
                                   backgroundColor: c.accentSoft,
                                   foregroundColor: c.onAccentSoft,
                                   elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
@@ -276,51 +277,69 @@ class _NotificationSettingsScreenState
                                 icon: const Icon(Icons.send_rounded, size: 16),
                                 label: Text(
                                   s.t('settings.notifications.send_test'),
-                                  style:
-                                      outfitStyle(13, c.onAccentSoft,
-                                          weight: FontWeight.w600),
+                                  style: outfitStyle(13, c.onAccentSoft,
+                                      weight: FontWeight.w600),
                                 ),
                               ),
-                            ),
-                          ),
-                        ] else
-                          LtRow(
-                            icon: Icons.notifications_active_rounded,
-                            title: s.t('settings.notifications.this_device'),
-                            subtitle: s
-                                .t('settings.notifications.this_device_subtitle'),
-                            trailing: Switch(
-                              value: false,
-                              onChanged: _busy
-                                  ? null
-                                  : (v) => unawaited(_setThisDevice(v)),
-                            ),
-                          ),
-                        // The verdict line sits OUTSIDE the on/off branch on
-                        // purpose: when a failed repair deliberately switches
-                        // this device off, the panel flips to its OFF row —
-                        // and the explanation must survive that flip.
-                        if (_test != _TestState.idle)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
-                            child: _TestStatusLine(state: _test),
+                              if (_test != _TestState.idle)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(2, 12, 2, 0),
+                                  child: _TestStatusLine(state: _test),
+                                ),
+                              const SizedBox(height: 12),
+                            ],
+                          )
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              LtRow(
+                                icon: Icons.notifications_active_rounded,
+                                title:
+                                    s.t('settings.notifications.this_device'),
+                                subtitle: s.t(
+                                    'settings.notifications.this_device_subtitle'),
+                                trailing: Switch(
+                                  value: false,
+                                  onChanged: _busy
+                                      ? null
+                                      : (v) => unawaited(_setThisDevice(v)),
+                                ),
+                              ),
+                              // A failed repair switches the device off on
+                              // purpose — its explanation still belongs here,
+                              // right under the OFF row it produced.
+                              if (_test != _TestState.idle)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(2, 2, 2, 12),
+                                  child: _TestStatusLine(state: _test),
+                                ),
+                            ],
                           ),
                       ],
                     PushStatus.canRequest => [
-                        LtRow(
-                          icon: Icons.notifications_none_rounded,
-                          title: s.t('settings.notifications.status_can_request'),
-                          subtitle: s.t(
-                              'settings.notifications.status_can_request_subtitle'),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
-                          child: LtPrimaryButton(
-                            label: s.t('settings.notifications.enable_button'),
-                            icon: Icons.notifications_active_rounded,
-                            busy: _busy,
-                            onPressed: () => unawaited(_enable()),
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            LtRow(
+                              icon: Icons.notifications_none_rounded,
+                              title: s
+                                  .t('settings.notifications.status_can_request'),
+                              subtitle: s.t(
+                                  'settings.notifications.status_can_request_subtitle'),
+                            ),
+                            const SizedBox(height: 2),
+                            LtPrimaryButton(
+                              label:
+                                  s.t('settings.notifications.enable_button'),
+                              icon: Icons.notifications_active_rounded,
+                              busy: _busy,
+                              onPressed: () => unawaited(_enable()),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                         ),
                       ],
                     PushStatus.blocked => [
@@ -331,21 +350,27 @@ class _NotificationSettingsScreenState
                         ),
                       ],
                     PushStatus.needsPwaInstall => [
-                        LtRow(
-                          icon: Icons.install_mobile_rounded,
-                          title: s.t('settings.notifications.status_install'),
-                          subtitle:
-                              s.t('settings.notifications.status_install_subtitle'),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
-                          child: InstallStepList(
-                            steps: installSteps(context, apple: true),
-                            numberBg: c.accentSoft,
-                            numberFg: c.onAccentSoft,
-                            iconColor: c.textSecondary,
-                            textColor: c.textSecondary,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            LtRow(
+                              icon: Icons.install_mobile_rounded,
+                              title:
+                                  s.t('settings.notifications.status_install'),
+                              subtitle: s.t(
+                                  'settings.notifications.status_install_subtitle'),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(2, 2, 2, 12),
+                              child: InstallStepList(
+                                steps: installSteps(context, apple: true),
+                                numberBg: c.accentSoft,
+                                numberFg: c.onAccentSoft,
+                                iconColor: c.textSecondary,
+                                textColor: c.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     PushStatus.unsupported => [
