@@ -140,12 +140,27 @@ class _AppShellState extends ConsumerState<AppShell> {
     // the poster have nothing to show for such a profile, so they step aside
     // until there is a jar to show.
     final connected = ref.watch(appStateProvider.select((s) => s.connected));
+    // While the active profile is still resolving we do NOT yet know whether it
+    // has a payment method, so we must not render SetupHomeScreen: that is the
+    // ~1s flash of the empty-setup card on open / sign-in. Two AppState-visible
+    // signals say "still resolving": a sign-in or profile switch is loading its
+    // keychain secrets (`switching`), and a cold cloud mirror has not yet named
+    // the active band (empty `accountId` — the holding-pattern shell RootGate
+    // mounts until the first snapshot lands). `connected` starts false in both,
+    // then flips true once the secrets/jars are in. Only a RESOLVED,
+    // still-unconnected profile is genuinely "nothing set up yet".
+    final resolving = ref.watch(
+        appStateProvider.select((s) => s.switching || s.accountId.isEmpty));
     // The Requests tab exists only for bands that turned the feature on —
     // everyone else keeps yesterday's nav. Selection survives the filter:
     // `tab` falls back to Home when the current tab leaves the set.
     final requestsEnabled = ref.watch(
         appStateProvider.select((s) => s.band.songRequests.enabled));
-    final tabs = connected
+    // Show the full nav while resolving too: a resolving shell almost always
+    // lands connected (you don't reach AppShell resolving a profile with no
+    // bands — that routes to the picker), so keeping the full bar avoids
+    // flashing the reduced Home+Settings pair before the rest snap in.
+    final tabs = connected || resolving
         ? [
             for (final t in ShellTab.navTabs)
               if (t != ShellTab.requests || requestsEnabled) t,
@@ -158,8 +173,16 @@ class _AppShellState extends ConsumerState<AppShell> {
         for (final t in ShellTab.values)
           if (_visited.contains(t) && (connected || tabs.contains(t)))
             switch (t) {
-              ShellTab.home =>
-                connected ? const HomeScreen() : const SetupHomeScreen(),
+              // Connected (a real payment method, or demo) always wins — demo
+              // runs with an empty accountId, so it must be checked before
+              // `resolving`. Otherwise, a still-resolving profile shows a
+              // neutral loader, and only a resolved, unconnected one is the
+              // genuine "nothing set up yet" that SetupHomeScreen answers.
+              ShellTab.home => connected
+                ? const HomeScreen()
+                : resolving
+                    ? const _HomeLoading()
+                    : const SetupHomeScreen(),
               ShellTab.history => const HistoryScreen(),
               ShellTab.requests => const RequestsScreen(),
               ShellTab.poster => const PosterScreen(),
@@ -208,6 +231,29 @@ class _AppShellState extends ConsumerState<AppShell> {
           ),
         );
       },
+    );
+  }
+}
+
+/// The neutral placeholder the Home tab shows while the active profile is
+/// still resolving — a sign-in / switch loading its keychain secrets, or a
+/// cold cloud mirror that has not yet named the active band. It stands in for
+/// HomeScreen / SetupHomeScreen until we actually KNOW which of the two is
+/// right, so the "no payment method yet" setup card never flashes on open.
+/// A body widget, not a Scaffold: it renders inside the shell's own Scaffold,
+/// exactly where SetupHomeScreen would.
+class _HomeLoading extends StatelessWidget {
+  const _HomeLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Center(
+      child: SizedBox(
+        width: 28,
+        height: 28,
+        child: CircularProgressIndicator(strokeWidth: 2.5, color: c.accent),
+      ),
     );
   }
 }
