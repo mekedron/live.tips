@@ -21,6 +21,7 @@ class DeviceInfo {
     this.lastSeenAtMs = 0,
     this.revoked = false,
     this.fcmToken,
+    this.fcmTokenAtMs,
     this.isCurrent = false,
   });
 
@@ -38,6 +39,9 @@ class DeviceInfo {
   /// here for this account (PushRegistration owns the writes; the send
   /// trigger and the revocation paths clear it server-side).
   final String? fcmToken;
+
+  /// When [fcmToken] last landed — the settings page's "registered since".
+  final int? fcmTokenAtMs;
   final bool isCurrent;
 
   factory DeviceInfo.fromJson(
@@ -54,6 +58,7 @@ class DeviceInfo {
         lastSeenAtMs: (json['lastSeenAtMs'] as num?)?.toInt() ?? 0,
         revoked: json['revoked'] == true,
         fcmToken: json['fcmToken'] as String?,
+        fcmTokenAtMs: (json['fcmTokenAtMs'] as num?)?.toInt(),
         isCurrent: isCurrent,
       );
 
@@ -78,6 +83,7 @@ class DeviceInfo {
         lastSeenAtMs: lastSeenAtMs,
         revoked: revoked,
         fcmToken: fcmToken,
+        fcmTokenAtMs: fcmTokenAtMs,
         isCurrent: isCurrent ?? this.isCurrent,
       );
 }

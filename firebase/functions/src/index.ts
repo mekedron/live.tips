@@ -24,7 +24,7 @@ import {
   revokeDeviceHandler,
 } from "./devices";
 import { IP_HASH_SALT, TURNSTILE_SECRET } from "./params";
-import { sendTipPushHandler } from "./notifications";
+import { sendTestPushHandler, sendTipPushHandler } from "./notifications";
 import { mintSessionTokenHandler } from "./session-token";
 import {
   expireJarsHandler,
@@ -114,6 +114,10 @@ export const sendTipPush = onDocumentCreated(
   "users/{uid}/notifications/{noteId}",
   sendTipPushHandler,
 );
+
+/** The settings page's "Send test notification" — one real push through the
+ * whole pipeline to the caller's own named device (notifications.ts). */
+export const sendTestPush = onCall({ cors: true }, sendTestPushHandler);
 
 // ------------------------------------------------------------------- cleanup
 

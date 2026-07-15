@@ -92,6 +92,13 @@ class PushService {
   Stream<String> get onTokenRefresh =>
       _messaging?.onTokenRefresh ?? const Stream.empty();
 
+  /// Messages arriving while the app is in the FOREGROUND — where the OS
+  /// banner rightly stays away. The bell handles real tips through
+  /// Firestore; the one listener here is the settings page's test button,
+  /// which turns "did it arrive?" into "received ✓" on the spot.
+  Stream<RemoteMessage> get onMessage =>
+      _messaging == null ? const Stream.empty() : FirebaseMessaging.onMessage;
+
   PushPermission _map(NotificationSettings settings) =>
       switch (settings.authorizationStatus) {
         AuthorizationStatus.authorized ||

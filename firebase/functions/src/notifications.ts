@@ -36,10 +36,13 @@ import type {
 } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import type { MulticastMessage } from "firebase-admin/messaging";
+import type { CallableRequest } from "firebase-functions/v2/https";
+import { HttpsError } from "firebase-functions/v2/https";
 import { fcm } from "./fcm";
+import { dataObject, requireUid } from "./jars";
 import { pushStrings } from "./push-strings";
-import { db, devicesCol, deviceRef } from "./store";
-import { ZERO_DECIMAL } from "./validate";
+import { bumpQuota, db, devicesCol, deviceRef } from "./store";
+import { isValidDeviceId, ZERO_DECIMAL } from "./validate";
 
 /** The bell feed's cap — enough to scroll back a busy week, not an archive. */
 export const MAX_NOTIFICATIONS = 100;
@@ -223,6 +226,82 @@ export async function sendTipPushHandler(event: NotificationCreatedEvent): Promi
     const trim = firestore.batch();
     for (const doc of overflow.docs) trim.delete(doc.ref);
     await trim.commit();
+  }
+}
+
+/// How many "Send test notification" taps one account gets per hour — a
+/// device check, not a toy siren. The button targets only the caller's own
+/// devices, so this bound is about Firestore/FCM churn, not abuse of others.
+export const TEST_PUSHES_PER_UID_PER_HOUR = 20;
+
+/**
+ * sendTestPush callable — the settings page's "is this device actually
+ * reachable?" answered with a REAL push through the whole pipeline, to ONE
+ * device: the caller's own, named by deviceId. Returns an honest verdict
+ * instead of throwing, so the page can say exactly what to fix:
+ * `no-token` (push never enabled here / registration lost) or `send-failed`.
+ * A dead token is pruned on the spot — the toggle then reads OFF, which IS
+ * the fix instruction.
+ */
+export async function sendTestPushHandler(
+  request: CallableRequest,
+): Promise<{ sent: boolean; reason?: string }> {
+  const uid = requireUid(request);
+  const data = dataObject(request);
+  const deviceId = data["deviceId"];
+  if (typeof deviceId !== "string" || !isValidDeviceId(deviceId)) {
+    throw new HttpsError("invalid-argument", "deviceId is required");
+  }
+  const firestore = db();
+  const allowed = await bumpQuota(
+    firestore,
+    `test-push-${uid}`,
+    Math.floor(Date.now() / 3_600_000),
+    TEST_PUSHES_PER_UID_PER_HOUR,
+    2 * 3_600_000,
+  );
+  if (!allowed) {
+    throw new HttpsError("resource-exhausted", "too many test notifications — try again later");
+  }
+
+  const ref = deviceRef(firestore, uid, deviceId);
+  const snap = await ref.get();
+  const token = snap.get("fcmToken");
+  if (typeof token !== "string" || token === "") {
+    return { sent: false, reason: "no-token" };
+  }
+  const locale = snap.get("locale");
+  const strings = pushStrings(typeof locale === "string" ? locale : undefined);
+
+  try {
+    await fcm().send({
+      token,
+      notification: { title: strings.testTitle, body: strings.testBody },
+      // kind:"test" is what the page's foreground listener matches on to
+      // show "received ✓" when the app is open and the OS banner (rightly)
+      // stays away.
+      data: { kind: "test" },
+      webpush: {
+        // A test is NOW or never — nobody wants it landing tomorrow.
+        headers: { TTL: "300", Urgency: "high" },
+        fcmOptions: { link: "https://live.tips/app/" },
+        notification: { icon: "https://live.tips/app/icons/Icon-192.png", tag: "livetips-test" },
+      },
+      apns: { payload: { aps: { sound: "default" } } },
+      android: { notification: { channelId: "tips" } },
+    });
+    return { sent: true };
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "messaging/registration-token-not-registered" || code === "messaging/invalid-argument") {
+      await ref.update({
+        fcmToken: FieldValue.delete(),
+        fcmTokenAtMs: FieldValue.delete(),
+      }).catch(() => {});
+      return { sent: false, reason: "dead-token" };
+    }
+    console.error("sendTestPush: send failed", e instanceof Error ? e.message : "");
+    return { sent: false, reason: "send-failed" };
   }
 }
 

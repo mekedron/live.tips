@@ -31,10 +31,17 @@ function docRef(path: string) {
     collection: (name: string) => colRef(`${path}/${name}`),
     get: async () => {
       const data = docs.get(path);
-      return { exists: data !== undefined, data: () => (data === undefined ? undefined : { ...data }) };
+      return {
+        exists: data !== undefined,
+        data: () => (data === undefined ? undefined : { ...data }),
+        get: (field: string) => docs.get(path)?.[field],
+      };
     },
     set: async (data: Doc) => {
       docs.set(path, { ...data });
+    },
+    update: async (patch: Doc) => {
+      updates.push({ path, patch });
     },
   };
 }
@@ -76,20 +83,26 @@ const fakeDb = {
   },
 };
 
+/** The quota's verdict, per test; the real bumpQuota needs a transaction. */
+const quotaMock = vi.fn<() => Promise<boolean>>();
+
 vi.mock("../src/store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/store")>()),
   db: () => fakeDb,
+  bumpQuota: () => quotaMock(),
   devicesCol: () => ({
     get: async () => ({
       docs: deviceDocs.map((d) => ({ id: d.id, get: (k: string) => d.data[k] })),
     }),
   }),
-  deviceRef: (_f: unknown, uid: string, deviceId: string) => ({ path: `users/${uid}/devices/${deviceId}` }),
+  deviceRef: (_f: unknown, uid: string, deviceId: string) =>
+    docRef(`users/${uid}/devices/${deviceId}`),
 }));
 
 const sendMock = vi.fn<(msg: { tokens: string[] }) => Promise<{ responses: Array<{ success: boolean; error?: { code: string } }> }>>();
+const sendSingleMock = vi.fn<(msg: Doc) => Promise<string>>();
 vi.mock("../src/fcm", () => ({
-  fcm: () => ({ sendEachForMulticast: sendMock }),
+  fcm: () => ({ sendEachForMulticast: sendMock, send: sendSingleMock }),
 }));
 
 import {
@@ -97,6 +110,7 @@ import {
   NOTIFICATIONS_LINK,
   formatMinor,
   recordTipNotification,
+  sendTestPushHandler,
   sendTipPushHandler,
 } from "../src/notifications";
 import { pushStrings } from "../src/push-strings";
@@ -148,6 +162,10 @@ beforeEach(() => {
   sendMock.mockImplementation(async (msg) => ({
     responses: msg.tokens.map(() => ({ success: true })),
   }));
+  sendSingleMock.mockReset();
+  sendSingleMock.mockResolvedValue("msg_id");
+  quotaMock.mockReset();
+  quotaMock.mockResolvedValue(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -328,5 +346,59 @@ describe("sendTipPushHandler: the fan-out", () => {
     expect(docs.has(`${NOTES}/relay_2`)).toBe(false);
     expect(docs.has(`${NOTES}/relay_3`)).toBe(true);
     expect(docs.has(`${NOTES}/relay_${MAX_NOTIFICATIONS + 2}`)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("sendTestPushHandler: one real push to the caller's own device", () => {
+  const DEVICE = `users/${UID}/devices/dev_self`;
+
+  function call(deviceId = "dev_self") {
+    return sendTestPushHandler({
+      auth: { uid: UID },
+      data: { deviceId },
+    } as never);
+  }
+
+  it("sends the localized test pair to exactly the named device's token", async () => {
+    docs.set(DEVICE, { fcmToken: "tok_self", locale: "de", revoked: false });
+
+    expect(await call()).toEqual({ sent: true });
+    expect(sendSingleMock).toHaveBeenCalledTimes(1);
+    const msg = sendSingleMock.mock.calls[0]![0];
+    expect(msg["token"]).toBe("tok_self");
+    expect(msg["notification"]).toEqual({
+      title: "Testbenachrichtigung",
+      body: "Wenn du das liest, erreichen Trinkgelder dieses Gerät.",
+    });
+    expect((msg["data"] as Doc)["kind"]).toBe("test");
+  });
+
+  it("a device that never enabled push answers no-token instead of throwing", async () => {
+    docs.set(DEVICE, { revoked: false });
+
+    expect(await call()).toEqual({ sent: false, reason: "no-token" });
+    expect(sendSingleMock).not.toHaveBeenCalled();
+  });
+
+  it("a dead token is pruned on the spot and reported", async () => {
+    docs.set(DEVICE, { fcmToken: "tok_gone" });
+    sendSingleMock.mockRejectedValue(
+      Object.assign(new Error("gone"), { code: "messaging/registration-token-not-registered" }),
+    );
+
+    expect(await call()).toEqual({ sent: false, reason: "dead-token" });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.path).toBe(DEVICE);
+    expect(Object.keys(updates[0]!.patch).sort()).toEqual(["fcmToken", "fcmTokenAtMs"]);
+  });
+
+  it("the hourly quota answers resource-exhausted, and junk deviceIds are refused", async () => {
+    quotaMock.mockResolvedValue(false);
+    await expect(call()).rejects.toMatchObject({ code: "resource-exhausted" });
+
+    quotaMock.mockResolvedValue(true);
+    await expect(call("../evil")).rejects.toMatchObject({ code: "invalid-argument" });
   });
 });

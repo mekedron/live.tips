@@ -5,8 +5,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/firebase/device_registry.dart';
 import '../data/firebase/notifications_service.dart';
 import '../data/firebase/push_service.dart';
+import '../domain/app_account.dart';
 import '../domain/device_kind.dart';
 import '../domain/notification_item.dart';
 import 'auth_providers.dart';
@@ -115,18 +117,32 @@ final pushStatusProvider = FutureProvider<PushStatus>((ref) async {
   };
 });
 
+/// THIS device's own row in the account's registry (null while loading, in
+/// local mode, or before registration lands).
+final thisDeviceInfoProvider = Provider<DeviceInfo?>((ref) {
+  final devices = ref.watch(devicesProvider).value;
+  if (devices == null) return null;
+  for (final d in devices) {
+    if (d.isCurrent) return d;
+  }
+  return null;
+});
+
 /// Push on THIS device for the ACTIVE account = its own device doc carries a
 /// token. The doc is the source of truth on purpose: it is what the send
 /// trigger reads, and it survives reinstalls of nothing (a cleared browser
 /// loses the token server-side via pruning, and this reads false again).
-final thisDevicePushEnabledProvider = Provider<bool>((ref) {
-  final devices = ref.watch(devicesProvider).value;
-  if (devices == null) return false;
-  for (final d in devices) {
-    if (d.isCurrent) return d.fcmToken != null;
-  }
-  return false;
-});
+final thisDevicePushEnabledProvider = Provider<bool>(
+  (ref) => ref.watch(thisDeviceInfoProvider)?.fcmToken != null,
+);
+
+/// A guest (anonymous) account's jar is never claimed as owned
+/// (RelayAuth.ownsJars), so its tips never take the server-direct path — and
+/// a notification service that will never be handed a tip has nothing to
+/// offer. The nudge stands down; the settings page says why.
+final pushAccountIsGuestProvider = Provider<bool>((ref) =>
+    ref.watch(authControllerProvider.select((s) => s.user?.kind)) ==
+    AccountKind.anonymous);
 
 /// "Not now" on the home nudge, remembered per device+account (LocalStore).
 /// A Notifier so the card disappears the moment it is dismissed, without a
@@ -168,12 +184,26 @@ final pushNudgeVisibleProvider = Provider<bool>((ref) {
   final uid = ref.watch(authControllerProvider.select((s) => s.user?.uid));
   if (uid == null) return false;
   if (ref.watch(pushDeviceIsVenueProvider)) return false;
+  if (ref.watch(pushAccountIsGuestProvider)) return false;
   if (ref.watch(pushNudgeDismissedProvider)) return false;
   if (ref.watch(thisDevicePushEnabledProvider)) return false;
   return ref.watch(pushStatusProvider).value == PushStatus.canRequest;
 });
 
 enum PushEnableOutcome { enabled, denied, failed }
+
+/// What the settings page's "Send test notification" learned.
+enum TestPushOutcome {
+  /// FCM accepted it for this device's token — it is on its way.
+  sent,
+
+  /// No usable registration on the server (never enabled, or the token was
+  /// found dead and pruned) — the toggle now reads OFF; flipping it back on
+  /// is the fix.
+  noRegistration,
+
+  failed,
+}
 
 final pushRegistrationProvider =
     Provider<PushRegistration>((ref) => PushRegistration(ref));
@@ -261,6 +291,32 @@ class PushRegistration {
       await _writeToken(uid, doc, token);
     } catch (e) {
       debugPrint('push token maintenance failed: $e');
+    }
+  }
+
+  /// The settings page's "Send test notification": one REAL push through the
+  /// whole pipeline (callable → FCM → this very device), so "is this device
+  /// actually reachable" stops being a guess about a toggle.
+  Future<TestPushOutcome> sendTestToThisDevice() async {
+    final functions = ref.read(functionsProvider);
+    if (functions == null) return TestPushOutcome.failed;
+    try {
+      final result = await functions
+          .httpsCallable('sendTestPush')
+          .call<dynamic>({'deviceId': ref.read(deviceIdProvider)});
+      final data = result.data;
+      final map = data is Map ? data.cast<String, dynamic>() : const <String, dynamic>{};
+      if (map['sent'] == true) return TestPushOutcome.sent;
+      // 'no-token' / 'dead-token': the server holds no usable registration
+      // (a dead one was pruned on the spot) — the toggle's device stream
+      // will read OFF again by itself.
+      if (map['reason'] == 'no-token' || map['reason'] == 'dead-token') {
+        return TestPushOutcome.noRegistration;
+      }
+      return TestPushOutcome.failed;
+    } catch (e) {
+      debugPrint('test push failed: $e');
+      return TestPushOutcome.failed;
     }
   }
 

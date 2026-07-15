@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
 import '../../domain/notification_item.dart';
@@ -29,10 +30,15 @@ class NotificationSettingsScreen extends ConsumerStatefulWidget {
       _NotificationSettingsScreenState();
 }
 
+/// The test button's journey, drawn as one status line under it.
+enum _TestState { idle, sending, sent, received, noRegistration, failed }
+
 class _NotificationSettingsScreenState
     extends ConsumerState<NotificationSettingsScreen>
     with WidgetsBindingObserver {
   bool _busy = false;
+  _TestState _test = _TestState.idle;
+  StreamSubscription<Object?>? _testEcho;
 
   @override
   void initState() {
@@ -42,8 +48,36 @@ class _NotificationSettingsScreenState
 
   @override
   void dispose() {
+    _testEcho?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// One REAL push through the whole pipeline to this very device. With the
+  /// app in the foreground the OS banner rightly stays away — so the page
+  /// listens for the message itself and turns delivery into "received ✓"
+  /// on the spot; backgrounded, the banner IS the confirmation.
+  Future<void> _sendTest() async {
+    if (_test == _TestState.sending) return;
+    setState(() => _test = _TestState.sending);
+    _testEcho?.cancel();
+    _testEcho = ref
+        .read(pushServiceProvider)
+        .onMessage
+        .where((m) => m.data['kind'] == 'test')
+        .listen((_) {
+      if (mounted) setState(() => _test = _TestState.received);
+    });
+    final outcome =
+        await ref.read(pushRegistrationProvider).sendTestToThisDevice();
+    if (!mounted) return;
+    setState(() => _test = switch (outcome) {
+          // The echo listener may already have beaten the callable home.
+          TestPushOutcome.sent =>
+            _test == _TestState.received ? _TestState.received : _TestState.sent,
+          TestPushOutcome.noRegistration => _TestState.noRegistration,
+          TestPushOutcome.failed => _TestState.failed,
+        });
   }
 
   @override
@@ -83,6 +117,16 @@ class _NotificationSettingsScreenState
     }
   }
 
+  /// "Registered Jul 15, 18:42" — the token write's own timestamp, so the
+  /// panel speaks from the server's record, not the switch's mood.
+  String _registeredSubtitle(AppLocalizations s) {
+    final atMs = ref.watch(thisDeviceInfoProvider)?.fcmTokenAtMs;
+    if (atMs == null) return s.t('settings.notifications.status_active_since_unknown');
+    final when = DateFormat('MMM d, HH:mm')
+        .format(DateTime.fromMillisecondsSinceEpoch(atMs));
+    return s.t('settings.notifications.status_active_since', {'when': when});
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.lt;
@@ -100,6 +144,48 @@ class _NotificationSettingsScreenState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             children: [
+              // A guest account's jar is never claimed as owned, so its tips
+              // never reach the notification service at all — say it HERE,
+              // where the toggles would otherwise promise otherwise.
+              if (ref.watch(pushAccountIsGuestProvider)) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: c.warningContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded,
+                              size: 20, color: c.onWarningContainer),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              s.t('settings.notifications.guest_title'),
+                              style: outfitStyle(14, c.onWarningContainer,
+                                  weight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        s.t('settings.notifications.guest_body'),
+                        style: TextStyle(
+                          fontFamily: kFontBody,
+                          fontSize: 13,
+                          height: 1.4,
+                          color: c.onWarningContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
               // ------------------------------------------- this device ---
               // A venue tablet never carries a token — whose tips would it
               // announce, to whom at the counter? The toggle stays, dead
@@ -135,17 +221,81 @@ class _NotificationSettingsScreenState
                         ),
                       ],
                     PushStatus.granted => [
-                        LtRow(
-                          icon: Icons.notifications_active_rounded,
-                          title: s.t('settings.notifications.this_device'),
-                          subtitle:
-                              s.t('settings.notifications.this_device_subtitle'),
-                          trailing: Switch(
-                            value: ref.watch(thisDevicePushEnabledProvider),
-                            onChanged:
-                                _busy ? null : (v) => unawaited(_setThisDevice(v)),
+                        // The panel says what the toggle alone cannot: is
+                        // this device actually REGISTERED (token on its doc,
+                        // since when) — and the test button proves delivery
+                        // instead of asking the artist to trust a switch.
+                        if (ref.watch(thisDevicePushEnabledProvider)) ...[
+                          LtRow(
+                            leading: _ActiveDot(c: c),
+                            title: s.t('settings.notifications.status_active'),
+                            subtitle: _registeredSubtitle(s),
+                            trailing: Switch(
+                              value: true,
+                              onChanged: _busy
+                                  ? null
+                                  : (v) => unawaited(_setThisDevice(v)),
+                            ),
                           ),
-                        ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 2, 12, 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: _test == _TestState.sending
+                                      ? null
+                                      : () => unawaited(_sendTest()),
+                                  icon: Icon(Icons.send_rounded,
+                                      size: 16, color: c.textSecondary),
+                                  label: Text(
+                                    s.t('settings.notifications.send_test'),
+                                    style: outfitStyle(13, c.textSecondary,
+                                        weight: FontWeight.w600),
+                                  ),
+                                ),
+                                if (_test != _TestState.idle) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    s.t(switch (_test) {
+                                      _TestState.sending =>
+                                        'settings.notifications.test_sending',
+                                      _TestState.sent =>
+                                        'settings.notifications.test_sent',
+                                      _TestState.received =>
+                                        'settings.notifications.test_received',
+                                      _TestState.noRegistration =>
+                                        'settings.notifications.test_no_registration',
+                                      _TestState.failed ||
+                                      _TestState.idle =>
+                                        'settings.notifications.test_failed',
+                                    }),
+                                    style: TextStyle(
+                                      fontFamily: kFontBody,
+                                      fontSize: 12.5,
+                                      height: 1.4,
+                                      color: _test == _TestState.received
+                                          ? c.onSuccessContainer
+                                          : c.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ] else
+                          LtRow(
+                            icon: Icons.notifications_active_rounded,
+                            title: s.t('settings.notifications.this_device'),
+                            subtitle: s
+                                .t('settings.notifications.this_device_subtitle'),
+                            trailing: Switch(
+                              value: false,
+                              onChanged: _busy
+                                  ? null
+                                  : (v) => unawaited(_setThisDevice(v)),
+                            ),
+                          ),
                       ],
                     PushStatus.canRequest => [
                         LtRow(
@@ -249,6 +399,38 @@ class _NotificationSettingsScreenState
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The bell wearing its green "registered" dot — the settings screen's
+/// method-status-dot idea, for the push panel.
+class _ActiveDot extends StatelessWidget {
+  const _ActiveDot({required this.c});
+
+  final LtColors c;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(Icons.notifications_active_rounded,
+            size: 22, color: c.textSecondary),
+        Positioned(
+          right: -2,
+          top: -2,
+          child: Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: c.success,
+              shape: BoxShape.circle,
+              border: Border.all(color: c.card, width: 1.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

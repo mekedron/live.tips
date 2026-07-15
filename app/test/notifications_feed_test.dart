@@ -38,6 +38,7 @@ void main() {
     WidgetTester tester, {
     required FirebaseFirestore db,
     bool signedIn = true,
+    AccountKind kind = AccountKind.google,
     bool venueDevice = false,
     Widget home = const Scaffold(
       body: Align(alignment: Alignment.topRight, child: NotificationsBell()),
@@ -46,14 +47,22 @@ void main() {
   }) async {
     final local = await seededStore();
     if (venueDevice) await local.saveDeviceKind(DeviceKind.venue);
+    // An anonymous user counts as an ACCOUNT only when the directory knows
+    // it (AuthController._asAccount) — the relay's transport uids must not.
+    if (kind == AccountKind.anonymous) {
+      await local.saveAccountsDirectory(AccountsDirectory(
+        accounts: const [
+          AppAccount(id: uid, name: 'Push QA', kind: AccountKind.anonymous),
+        ],
+        activeAccountId: uid,
+      ));
+    }
     final container = ProviderContainer(overrides: [
       localStoreProvider.overrideWithValue(local),
       secureStoreProvider.overrideWithValue(FakeSecureStore()),
       initialApiKeyProvider.overrideWithValue(null),
       authServiceProvider.overrideWithValue(FakeAuthService(
-        user: signedIn
-            ? const AuthUser(uid: uid, kind: AccountKind.google)
-            : null,
+        user: signedIn ? AuthUser(uid: uid, kind: kind) : null,
       )),
       deviceIdProvider.overrideWithValue(deviceId),
       describeDeviceProvider.overrideWithValue(() async =>
@@ -321,6 +330,39 @@ void main() {
     // And no token was minted — "Not now" means no.
     final doc = (await db.doc('users/$uid/devices/$deviceId').get()).data();
     expect(doc?['fcmToken'], isNull);
+  });
+
+  testWidgets(
+      'the status panel says REGISTERED (with the token date) when this '
+      'device carries one, and a guest account gets the honest notice',
+      (tester) async {
+    final db = FakeFirebaseFirestore();
+    await db.doc('users/$uid/devices/$deviceId').set({
+      'name': 'Test phone',
+      'platform': 'web',
+      'revoked': false,
+      'fcmToken': 'tok_test',
+      'fcmTokenAtMs':
+          DateTime(2026, 7, 15, 18, 42).millisecondsSinceEpoch,
+    });
+    await pump(
+      tester,
+      db: db,
+      kind: AccountKind.anonymous,
+      home: const NotificationSettingsScreen(),
+      extra: [
+        pushServiceProvider.overrideWithValue(_FakePushService()),
+        pushStatusProvider.overrideWith((ref) async => PushStatus.granted),
+      ],
+    );
+
+    expect(
+        find.text('Notifications are active on this device'), findsOneWidget);
+    expect(find.textContaining('Registered Jul 15, 18:42'), findsOneWidget);
+    expect(find.text('Send test notification'), findsOneWidget);
+    // The guest truth, right where the toggles would otherwise overpromise.
+    expect(find.text("Guest accounts don't get tip notifications"),
+        findsOneWidget);
   });
 
   testWidgets(
