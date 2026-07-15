@@ -125,6 +125,11 @@ jobs:
           # Flutter web build -> live.tips/app/.
           mkdir -p _site/app
           cp -R app/build/web/. _site/app/
+          # FCM's service worker must sit at the ORIGIN ROOT: the firebase
+          # messaging SDK registers /firebase-messaging-sw.js absolutely,
+          # ignoring the /app/ base href — a copy under /app/ alone 404s and
+          # web push never gets a token. One source file, two URLs.
+          cp app/web/firebase-messaging-sw.js _site/firebase-messaging-sw.js
           echo "Assembled site:"
           find _site -maxdepth 2 | sort
           echo "($(find _site -type f | wc -l) files total)"

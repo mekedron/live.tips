@@ -8,9 +8,11 @@
  * caching updates on the browser's own schedule, not on our deploys.
  *
  * The config is the PUBLIC web app config, inlined verbatim from
- * app/lib/firebase_options.dart (the FlutterFire plugin registers this file
- * relative to the document, so it ships through the normal web build to
- * https://live.tips/app/firebase-messaging-sw.js).
+ * app/lib/firebase_options.dart. The messaging SDK registers this file at
+ * the ORIGIN ROOT (/firebase-messaging-sw.js — it ignores the /app/ base
+ * href), so the Pages workflow copies it to _site/ root besides the normal
+ * web-build copy under /app/; `flutter run -d chrome` serves from root and
+ * needs no copy.
  */
 importScripts("https://www.gstatic.com/firebasejs/12.4.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/12.4.0/firebase-messaging-compat.js");
