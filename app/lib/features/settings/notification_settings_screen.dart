@@ -251,20 +251,34 @@ class _NotificationSettingsScreenState
                                   : (v) => unawaited(_setThisDevice(v)),
                             ),
                           ),
+                          // Flush with the card's own content padding (the
+                          // group already indents 16) — an extra inset here
+                          // left the button floating off-grid from the rows
+                          // and dividers around it.
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+                            padding: const EdgeInsets.fromLTRB(0, 4, 0, 10),
                             child: SizedBox(
                               width: double.infinity,
-                              child: OutlinedButton.icon(
+                              child: FilledButton.icon(
                                 onPressed: _testRunning
                                     ? null
                                     : () => unawaited(_sendTest()),
-                                icon: Icon(Icons.send_rounded,
-                                    size: 16, color: c.textSecondary),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: c.accentSoft,
+                                  foregroundColor: c.onAccentSoft,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.send_rounded, size: 16),
                                 label: Text(
                                   s.t('settings.notifications.send_test'),
-                                  style: outfitStyle(13, c.textSecondary,
-                                      weight: FontWeight.w600),
+                                  style:
+                                      outfitStyle(13, c.onAccentSoft,
+                                          weight: FontWeight.w600),
                                 ),
                               ),
                             ),
@@ -288,7 +302,7 @@ class _NotificationSettingsScreenState
                         // and the explanation must survive that flip.
                         if (_test != _TestState.idle)
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                            padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
                             child: _TestStatusLine(state: _test),
                           ),
                       ],

@@ -1,8 +1,8 @@
 ---
 title: Terms of Use
 description: live.tips is free, open-source software. We are not a payment provider, we never hold your money, and we make no promises about tips we cannot see. The details, in plain words.
-updated: 2026-07-13
-updated_label: Last updated 13 July 2026
+updated: 2026-07-15
+updated_label: Last updated 15 July 2026
 ---
 
 These terms cover the live.tips app, this website, the optional live.tips **account**, and
@@ -69,6 +69,10 @@ If you have an account:
 - **Adding a device needs your confirmation** on a device that is already signed in. Do
   not confirm a device you did not ask for, and do not let someone photograph the QR code
   and then tap confirm anyway.
+- **Push notifications are optional.** A signed-in account may turn on push notifications,
+  per device, to hear about tips and song requests that arrive while no set is running.
+  They are off until you turn them on and can be turned off again at any time; a guest
+  account and a no-account device get none.
 - **We may suspend or delete an account** — see *Ending it*, below.
 
 ## If you are an artist
@@ -83,10 +87,13 @@ You are responsible for:
 - **The law where you perform** — busking permits, venue rules, and anything else local.
 - **What you publish.** Your artist name and message appear on a public tip page; keep
   them lawful and your own.
-- **Your Stripe key.** It is a restricted key you created yourself, and it lives on your
-  device — and, if you sign in, in your account's private storage too, so your other
-  devices can use it. Either way it is yours: treat the device as you would treat cash,
-  and revoke the key in your Stripe dashboard if one goes missing.
+- **Your Stripe key.** It is a restricted key you created yourself. **With no account it
+  lives only on your device.** If you sign in, it moves to our server, encrypted so that no
+  one — not another account, not us in plain sight, and not even you — can read it back;
+  from then on Stripe reports your tips to our server and your other devices use the key
+  only through us. Either way it is yours: treat a device that holds it as you would treat
+  cash, and revoke the key in your Stripe dashboard if one goes missing. The Privacy Policy
+  spells this out before you sign in.
 - **Your bands, and the fan messages you put on screen.** A name and a message are shown
   to a room full of people. What appears on that screen is yours to moderate.
 
@@ -98,6 +105,9 @@ You are responsible for:
   payment provider that processed it. We have no record of it and no power over it.
 - Please keep the name and message you attach lawful and civil. They are shown on a
   screen, on stage, in front of a room full of people.
+- **A song request is a tip, not an order.** If the artist has turned song requests on, you
+  can tip toward a song — but the money is a voluntary tip like any other, and paying, or
+  paying the most, **does not guarantee** the song is played. That is the artist's call.
 
 ## Unverified tips — read this one
 
@@ -116,10 +126,13 @@ actually confirm, which is why Stripe is the recommended method.
 
 Tip pages live at `tip.live.tips`, served by a small relay we run on Firebase. It is
 offered **free of charge, as a courtesy, with no guarantee of any kind**. It is
-best-effort: it may be rate-limited, it may be unavailable, tips may be delayed or lost,
-and it deliberately keeps nothing that would let anyone recover them afterwards — a
-delivered tip is deleted the instant the artist's screen shows it, and an undelivered one
-is deleted after an hour.
+best-effort: it may be rate-limited, it may be unavailable, and tips may be delayed or
+lost. How long a tip is kept depends on whether the artist is signed in: for a **tip page
+with no account behind it**, the relay deliberately keeps nothing that would let anyone
+recover a tip afterwards — a delivered one is deleted the instant the artist's screen shows
+it, and an undelivered one is swept within the hour. For a **signed-in account**, the tip is
+written into that artist's own history and kept as long as the band. The Privacy Policy sets
+out both cases in full.
 
 - A tip page with **no account behind it is deleted after 90 days of inactivity**.
 - We may **rate-limit, block, or delete any tip page**, at any time, without notice — in

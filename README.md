@@ -6,17 +6,20 @@
 
 Musicians, buskers, and street artists put one QR code on stage. Fans scan it, pick an
 amount, leave a name and a message. With Stripe — the recommended default — tips land
-**directly in the artist's own Stripe account**, with no platform, no middleman, no
-extra cut, and no server anywhere in between. The artist's tablet or phone shows every
-tip live, with a goal progress bar, the latest message, and confetti.
+**directly in the artist's own Stripe account**, with no platform, no middleman, and no
+extra cut. With **no account** (the default) no live.tips server sits in between at all;
+**signing in** moves the artist's Stripe key to a server so tips can reach a second
+device (see [Accounts](#accounts-optional)). Either way live.tips never touches the
+money. The artist's tablet or phone shows every tip live, with a goal progress bar, the
+latest message, and confetti.
 
 Artists can optionally also accept **Revolut** and **MobilePay Box** tips. Those two
 have no API to confirm a payment, so they route through a tiny open-source relay
 ([`firebase/`](firebase/), `tip.live.tips`) that forwards tip notifications to the
 artist's device and **keeps no tip history and never touches money**. Tips from these
 methods are shown as *unverified* because live.tips cannot confirm they were actually
-paid. Stripe-only setups still talk to no live.tips server at all — see
-[Connected mode](#connected-mode-revolut--mobilepay) below.
+paid. A Stripe-only setup **with no account** still talks to no live.tips server at all —
+see [Connected mode](#connected-mode-revolut--mobilepay) below.
 
 An **account is optional too.** The default is still a device-local profile, and it
 still keeps everything on the device. Signing in buys one thing: the same bands, keys,
@@ -27,8 +30,9 @@ at once — see [Accounts](#accounts-optional) below.
 
 - The artist creates a **restricted API key** in their own Stripe dashboard
   (2 minutes, [guided](docs/onboarding/create-restricted-key.md)) and pastes it into
-  the app. The key is stored in the device keychain and only ever talks to
-  `api.stripe.com`.
+  the app. **With no account** the key is stored in the device keychain and only ever
+  talks to `api.stripe.com`; **once the artist signs in** it moves to the server,
+  encrypted (see [Accounts](#accounts-optional)).
 - The app creates a **Product + pay-what-you-want Price + Payment Link** in the
   artist's account. The Payment Link URL becomes their QR code — print it, tape it to
   the guitar case, put it on the merch table.
