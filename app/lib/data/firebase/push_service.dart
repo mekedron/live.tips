@@ -92,6 +92,12 @@ class PushService {
   /// NEW one instead of handing back the cached corpse. Repair-only: call
   /// this when FCM has already rejected the current token as dead — at that
   /// point no other account signed in here still rides it either.
+  ///
+  /// The SDK's own deleteToken can itself be refused (403 for a token whose
+  /// installation is gone) AND it throws before clearing its cache — seen
+  /// live 2026-07-15. The fallback cuts the push subscription loose at the
+  /// browser level, which needs no FCM authorization and forces the fresh
+  /// mint just the same.
   Future<void> deleteToken() async {
     final m = _messaging;
     if (m == null) return;
@@ -99,6 +105,7 @@ class PushService {
       await m.deleteToken();
     } catch (e) {
       debugPrint('push token delete failed: $e');
+      await pushBrowserUnsubscribe();
     }
   }
 
