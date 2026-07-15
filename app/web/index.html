@@ -18,6 +18,15 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <!-- Flutter web injects a viewport meta only once its engine boots. Without
+       one up front, the first frame the browser paints — our splash — is laid
+       out in the default 980px CSS viewport and scaled down to fit, so it shows
+       tiny, then snaps to full size the instant Flutter applies device-width.
+       Declaring the viewport here makes device-width apply on the very first
+       frame, so the splash is one consistent size from the start. Same value
+       Flutter uses (no-zoom, safe-area cover) so there's no reflow when the
+       engine takes over. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="Your tip jar for live performances — fans scan a code, you watch the jar fill.">
   <link rel="canonical" href="https://live.tips/app/">
 
@@ -101,6 +110,14 @@
       transition: opacity 320ms ease;
     }
     #lt-splash.lt-hide { opacity: 0; }
+    #lt-splash .lt-logo {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      /* The icon carries its own artwork; a soft ring keeps it from floating
+         when the app icon's own background matches the splash. */
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+    }
     #lt-splash .lt-wordmark {
       font-size: 30px;
       font-weight: 700;
@@ -150,6 +167,7 @@
        Markup + styles are inline (no network), so it paints on the first
        browser frame instead of a blank white page. -->
   <div id="lt-splash" role="status" aria-label="Loading live.tips">
+    <img class="lt-logo" src="icons/Icon-192.png" alt="" width="72" height="72">
     <div class="lt-wordmark">live<span class="lt-dot">.</span>tips</div>
     <div class="lt-spinner"></div>
   </div>
