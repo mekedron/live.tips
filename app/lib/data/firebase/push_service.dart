@@ -6,10 +6,9 @@ import 'package:flutter/foundation.dart';
 import '../../core/push_support.dart';
 
 /// The Web Push certificate's PUBLIC key (Firebase console → Cloud Messaging
-/// → Web Push certificates). Empty means "use the SDK's default key pair" —
-/// which works, but the project's own certificate is the recommended setup;
-/// generate one in the console and paste it here. Public value, safe in git.
-const kVapidKey = '';
+/// → Web Push certificates, generated 2026-07-15). Public value, safe in git.
+const kVapidKey =
+    'BC3-v0flWq7UCkaqrk5PyCGLoskCJ2KRgDHx8Nfr7LhPlaqMZ7UhwLlHBmNaIVAQ-TSqlzhSbyEnEE3x9OU_HY8';
 
 /// What this device can do about push at all — decided before permission
 /// even comes up.
