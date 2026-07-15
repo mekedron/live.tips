@@ -105,8 +105,9 @@ def build(out_dir, base):
         nav_links = ('<nav class="main">\n'
                      '      <a href="#jar">%s</a>\n'
                      '      <a href="#how">%s</a>\n'
+                     '      <a href="#requests">%s</a>\n'
                      '      <a href="#security">%s</a>\n'
-                     '    </nav>' % (esc(s["nav_jar"]), esc(s["nav_how"]), esc(s["nav_security"])))
+                     '    </nav>' % (esc(s["nav_jar"]), esc(s["nav_how"]), esc(s["nav_requests"]), esc(s["nav_security"])))
 
         subs.update({
             "logo_href": "#top",

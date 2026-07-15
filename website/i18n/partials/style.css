@@ -380,6 +380,8 @@
   .how-note p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; max-width: 760px; }
 
   /* security */
+  /* the security lede spans the full content width (not the default 560px column) */
+  #security .lede { max-width: none; }
   .sec-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 44px; align-items: center; margin-top: 40px; }
   .sec-list { display: flex; flex-direction: column; gap: 22px; }
   .sec-item { display: flex; gap: 16px; }
@@ -407,6 +409,56 @@
   .mini .ms { font-size: 24px; color: var(--accent); }
   .mini h3 { font-size: 15.5px; font-weight: 700; margin-top: 12px; }
   .mini p { margin: 5px 0 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
+
+  /* ===== song requests ===== */
+  .req-grid { display: grid; grid-template-columns: 1fr 1.02fr; gap: 48px; align-items: center; margin-top: 40px; }
+  .req-copy .lede { margin-bottom: 4px; }
+  .req-points { display: flex; flex-direction: column; gap: 16px; margin-top: 26px; }
+  .req-point { display: flex; gap: 13px; align-items: flex-start; }
+  .req-point .ico {
+    width: 36px; height: 36px; border-radius: 11px; background: var(--soft);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .req-point .ico .ms { font-size: 19px; color: var(--accent); }
+  .req-point h3 { font-size: 15.5px; font-weight: 700; }
+  .req-point p { margin: 3px 0 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
+
+  /* the mock "requests tonight" queue — a static leaderboard, styled to match
+     the stage HUD's live feel without any JS */
+  .req-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 26px;
+    padding: 22px; box-shadow: 0 24px 64px var(--card-shadow);
+  }
+  .req-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .req-card-head > .ms { font-size: 21px; color: var(--accent); }
+  .req-card-title { font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 15.5px; }
+  .req-card-live {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 10.5px; letter-spacing: .6px;
+    color: var(--green-ink); background: var(--green-bg); padding: 4px 10px; border-radius: 999px;
+  }
+  .req-card-live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: lt-pulse 1.6s ease-in-out infinite; }
+  .req-list { display: flex; flex-direction: column; gap: 9px; }
+  .req-row {
+    display: grid; grid-template-columns: 22px 1fr auto; gap: 13px; align-items: center;
+    padding: 11px 13px; border-radius: 15px; background: var(--bg); border: 1px solid transparent;
+  }
+  .req-row.lead { background: var(--soft); border-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .req-rank { font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 800; font-size: 14px; color: var(--ink-3); text-align: center; }
+  .req-row.lead .req-rank { color: var(--accent); }
+  .req-main { min-width: 0; }
+  .req-song-line { display: flex; align-items: center; gap: 8px; }
+  .req-song { font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .req-lead-tag {
+    font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 700; font-size: 9.5px; letter-spacing: .5px;
+    text-transform: uppercase; color: var(--on-soft); background: color-mix(in srgb, var(--accent) 22%, transparent);
+    padding: 2px 7px; border-radius: 999px; flex-shrink: 0;
+  }
+  .req-meter { height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink-3) 24%, transparent); margin-top: 8px; overflow: hidden; }
+  .req-meter > div { height: 100%; border-radius: 3px; background: var(--accent); }
+  .req-amt { font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .req-card-note { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 12.5px; margin-top: 16px; }
+  .req-card-note .ms { font-size: 16px; color: var(--accent); }
 
   /* final cta */
   .cta-card {
@@ -455,6 +507,7 @@
   @media (max-width: 860px) {
     .steps { grid-template-columns: 1fr; }
     .sec-grid { grid-template-columns: 1fr; gap: 32px; }
+    .req-grid { grid-template-columns: 1fr; gap: 32px; }
     .mini-grid { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 720px) {
