@@ -205,10 +205,14 @@ void main() {
     await tester.pumpAndSettle();
     expect((await db.doc('$notes/n1').get()).exists, isTrue);
 
-    // Confirmed, the whole feed goes and the empty state returns.
+    // Confirmed, the whole feed goes and the empty state returns. (The
+    // page's own Clear all also says the words — scope to the dialog.)
     await tester.tap(find.byIcon(Icons.delete_sweep_rounded));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Clear all'));
+    await tester.tap(find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text('Clear all'),
+    ));
     await tester.pumpAndSettle();
     expect((await db.doc('$notes/n1').get()).exists, isFalse);
     expect(find.text('Nothing yet'), findsOneWidget);

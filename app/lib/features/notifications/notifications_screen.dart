@@ -105,20 +105,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final c = context.lt;
     final s = context.s;
     final feed = ref.watch(notificationsFeedProvider);
-    final items = feed.value ?? const <NotificationItem>[];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(s.t('notifications.title')),
-        actions: [
-          if (items.isNotEmpty)
-            IconButton(
-              tooltip: s.t('notifications.clear_all'),
-              icon: const Icon(Icons.delete_sweep_rounded),
-              onPressed: () => unawaited(_clearAll()),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: Text(s.t('notifications.title'))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -136,8 +125,24 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               return NotificationListener<ScrollNotification>(
                 onNotification: _onScroll,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
+                    // In the content column, not the app bar: on a wide
+                    // window an app-bar action floats in empty space a
+                    // screen-width away from the list it acts on.
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => unawaited(_clearAll()),
+                        icon: Icon(Icons.delete_sweep_rounded,
+                            size: 18, color: c.textSecondary),
+                        label: Text(
+                          s.t('notifications.clear_all'),
+                          style: outfitStyle(13, c.textSecondary,
+                              weight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
                     ..._dayGroups(context, items),
                     // The window is full to its edge: assume there is more
                     // until a grown window proves otherwise. (A feed exactly
