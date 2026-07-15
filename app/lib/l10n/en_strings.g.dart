@@ -226,6 +226,7 @@ const Map<String, String> kEnStrings = {
   "notifications.error": "Couldn't load notifications.",
   "notifications.request_row_title": "{name} requested a song · {amount}",
   "notifications.request_row_title_anon": "Song request · {amount}",
+  "notifications.switched_profile": "Showing {profile} — {account}",
   "notifications.tip_row_title": "{name} tipped {amount}",
   "notifications.tip_row_title_anon": "Someone tipped {amount}",
   "notifications.title": "Notifications",

@@ -142,6 +142,11 @@ void main() {
     await directory.setActive('uid_v');
     await container.read(venueSessionProvider.notifier).start('uid_v');
     await _settle();
+    // A venue install holds the band question open at every landing — the
+    // artist answers it with the pick, exactly as the gate's picker would.
+    await container
+        .read(appStateProvider.notifier)
+        .switchAccount(kTestAccountId);
     expect(container.read(appStateProvider).apiKey, 'rk_live_x');
 
     await container.read(liveSessionProvider.notifier).start(goalMinor: 1000);

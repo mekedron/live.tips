@@ -310,6 +310,11 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       if (repo.listBands().any((b) => b.id == _bandId)) break;
     }
+    if (container.read(appStateProvider).accountId != _bandId) {
+      // A venue install (seed(venue: true)) holds the band question open at
+      // every landing — answer it the way the artist does, with the pick.
+      await container.read(appStateProvider.notifier).switchAccount(_bandId);
+    }
     expect(container.read(appStateProvider).accountId, _bandId,
         reason: 'the device must land on the seeded cloud band');
     await settle();

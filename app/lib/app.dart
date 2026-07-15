@@ -130,8 +130,10 @@ class LiveTipsApp extends ConsumerWidget {
 ///   just rebuilt as the same screen, and there was no door to a profile from
 ///   it — a room with no way out (#38).
 /// * A cloud account with several profiles and no answer → ProfilePickScreen
-///   asking WHICH one. The app used to pick (the stored id, else the first
-///   band) and open the wrong gig (#28).
+///   asking WHICH one. The band this device last had open counts as an
+///   answer on the artist's own device (a memory of their own pick); what
+///   the app never does is GUESS — "the first band" opened the wrong gig
+///   (#28) — and a venue tablet treats even the memory as no answer.
 ///
 /// The Stripe-key-without-a-jar case still gets its own screen: that band is
 /// mid-setup with a key already in the keychain, and JarSetupScreen is what

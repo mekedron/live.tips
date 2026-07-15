@@ -20,6 +20,7 @@ import '../data/stripe/stripe_requests.dart';
 import '../domain/app_settings.dart';
 import '../domain/band_account.dart';
 import '../domain/band_settings.dart';
+import '../domain/device_kind.dart';
 import '../domain/tip.dart';
 import '../domain/fx_rates.dart';
 import '../domain/relay_jar.dart';
@@ -30,6 +31,7 @@ import 'jar_requests_publisher.dart';
 import 'live_session_controller.dart';
 import 'onboarding_draft.dart';
 import 'session_coordinator.dart';
+import 'venue_providers.dart';
 
 /// Overridden in main() with initialized instances.
 final localStoreProvider =
@@ -243,6 +245,26 @@ enum AccountActionBlock {
   remoteSession,
 }
 
+/// Who gets to answer the active profile's open band question — the rule
+/// that decides whether a boot lands in the shell or on the picker.
+enum _BandAnswer {
+  /// The local profile: the stored id, else the first band. The device is
+  /// the profile; its registry has always carried the one band left open.
+  rememberedOrFirst,
+
+  /// A cloud account on the artist's own device: the band this device last
+  /// had open stands — asking a question the artist already answered here,
+  /// on every single open, made the picker a toll booth on the way to their
+  /// own gig. A memory that names nothing leaves the question to the picker,
+  /// never to "the first band" (#28's guess).
+  remembered,
+
+  /// A venue tablet: nobody answers, ever. The artist standing at the bar
+  /// tonight is not necessarily the artist who stood there this morning, and
+  /// a shared screen that guesses is guessing in public.
+  ask,
+}
+
 class AppStateNotifier extends Notifier<AppState> {
   /// A profile flip landed while a session was live and its reload was held
   /// (see [_reloadForProfile]) — the session-end listener in [build] runs it.
@@ -290,8 +312,13 @@ class AppStateNotifier extends Notifier<AppState> {
     // another device.
     final isLocal = ref.read(accountsDirectoryProvider).active.isLocal;
     final accounts = _bandsOf(repo);
-    final accountId =
-        _pickActive(accounts, repo.readActiveBandId(), ask: !isLocal);
+    final stored = repo.readActiveBandId();
+    final accountId = _pickActive(accounts, stored, answer: _bandAnswer);
+    // An auto-land IS the profile opening — remembered like a pick would
+    // be, so the memory always names the band that was last actually open.
+    if (accountId.isNotEmpty && accountId != stored) {
+      unawaited(repo.saveActiveBandId(accountId));
+    }
     // Booting straight into a cloud profile: main() read the keychain for
     // the LOCAL registry's band, not this one — fetch the right secrets as
     // soon as the first frame is out.
@@ -319,35 +346,43 @@ class AppStateNotifier extends Notifier<AppState> {
   /// The band to open on — or NOTHING to open on, which is a real answer:
   /// empty means "nobody has said which band, and the app will not decide".
   ///
-  /// One profile is not a choice, so it opens. Several are: [storedId] is
-  /// only what THIS DEVICE last did with this profile, and "the first band"
-  /// is arbitrary. On the artist's own device (the local profile) the stored
-  /// id stands — the device IS the profile, and it has always been the one
-  /// band the artist left open. A CLOUD account carries a whole shelf of
-  /// gigs, and guessing among them opened the wrong QR, the wrong goal, and
-  /// took tips into another band's history — so [ask] holds the answer open
-  /// and RootGate lands on the picker, where the stored id merely
-  /// PRE-SELECTS a row (see [ProfilePickScreen]).
+  /// One profile is not a choice, so it opens — except where nothing may
+  /// open unasked at all. Several profiles are answered by what this DEVICE
+  /// is ([_BandAnswer]): a venue tablet holds the question open every time,
+  /// a cloud account on the artist's own device answers with this device's
+  /// memory ([storedId], the band last open HERE), and the local profile
+  /// keeps its oldest rule — the stored id, else the first band, because the
+  /// device IS that profile and its registry has always carried the one band
+  /// the artist left open. A cloud memory that names nothing (never picked,
+  /// deleted elsewhere) does NOT fall through to "the first band": that
+  /// guess opened the wrong QR, the wrong goal, and took tips into another
+  /// band's history (#28) — the picker asks instead.
   ///
   /// Empty is also what a cold mirror honestly has, and what an account with
   /// no profile yet has — neither is repaired with an invented band.
   static String _pickActive(
     List<BandAccount> accounts,
     String? storedId, {
-    required bool ask,
+    required _BandAnswer answer,
   }) {
+    if (answer == _BandAnswer.ask) return '';
     if (accounts.isEmpty) return '';
     if (accounts.length == 1) return accounts.first.id;
-    if (ask) return '';
-    return accounts.any((a) => a.id == storedId)
-        ? storedId!
-        : accounts.first.id;
+    if (accounts.any((a) => a.id == storedId)) return storedId!;
+    return answer == _BandAnswer.rememberedOrFirst ? accounts.first.id : '';
   }
 
-  /// Whether the active profile's band question is the artist's to answer —
-  /// true for every cloud account, false for the device's own local profile.
-  bool get _askForBand =>
-      !ref.read(accountsDirectoryProvider).active.isLocal;
+  /// Who answers the active profile's band question on this device — see
+  /// [_BandAnswer]. The kind outranks the profile: a venue tablet asks
+  /// whoever's account is on it.
+  _BandAnswer get _bandAnswer {
+    if (ref.read(deviceKindProvider) == DeviceKind.venue) {
+      return _BandAnswer.ask;
+    }
+    return ref.read(accountsDirectoryProvider).active.isLocal
+        ? _BandAnswer.rememberedOrFirst
+        : _BandAnswer.remembered;
+  }
 
   /// Reloads everything for the (already switched) active profile — the
   /// directory listener calls this after a sign-in or a profile switch.
@@ -363,13 +398,14 @@ class AppStateNotifier extends Notifier<AppState> {
     state = state.copyWith(switching: true);
     ref.read(onboardingDraftProvider.notifier).clear();
     final repo = ref.read(accountDataRepositoryProvider);
-    final ask = _askForBand;
+    final answer = _bandAnswer;
     var accounts = _bandsOf(repo);
     // A profile with no bands has no bands — a fresh cloud account, or one
     // whose last profile was removed. Nothing is minted for it: RootGate
     // sends that state to the create-a-profile step. Several bands and no
     // stored answer is the OTHER open question — the picker asks it.
-    var accountId = _pickActive(accounts, repo.readActiveBandId(), ask: ask);
+    var accountId =
+        _pickActive(accounts, repo.readActiveBandId(), answer: answer);
     if (_pickerAfterExit) {
       // This reload is the tail of a sign-out / account delete that fell back
       // to an account the artist did not choose. Hold the band question open so
@@ -393,7 +429,7 @@ class AppStateNotifier extends Notifier<AppState> {
       final fresh = _bandsOf(repo);
       if (fresh.isNotEmpty) {
         accounts = fresh;
-        final landed = _pickActive(accounts, accountId, ask: ask);
+        final landed = _pickActive(accounts, accountId, answer: answer);
         if (landed != accountId) {
           // Different band than the secrets above belong to — nobody must
           // ever see band A's key on band B; _refreshSecrets fetches B's.
@@ -405,6 +441,11 @@ class AppStateNotifier extends Notifier<AppState> {
           if (landed.isNotEmpty) unawaited(_refreshSecrets(landed));
         }
       }
+    }
+    // The landing is the memory too — a reload that opened a band by any
+    // rule above must leave "the last open profile" naming exactly it.
+    if (accountId.isNotEmpty && accountId != repo.readActiveBandId()) {
+      await repo.saveActiveBandId(accountId);
     }
     state = AppState(
       accountId: accountId,
@@ -901,7 +942,7 @@ class AppStateNotifier extends Notifier<AppState> {
     // for the artist is the very thing that opened the wrong gig.
     final successorId = id == state.accountId
         ? _pickActive(registry.accounts, repo.readActiveBandId(),
-            ask: _askForBand)
+            answer: _bandAnswer)
         : state.accountId;
     String? apiKey;
     String? relaySecret;

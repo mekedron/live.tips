@@ -54,6 +54,22 @@ export const MAX_NOTIFICATIONS = 100;
 /** Where a tapped notification lands: the PWA, already on the bell page. */
 export const NOTIFICATIONS_LINK = "https://live.tips/app/?open=notifications";
 
+/**
+ * The link ONE notification carries: the bell page plus whose feed fired
+ * (`account` — the uid this trigger ran under) and which band. A phone
+ * holding three accounts must open the RIGHT one, and the FCM service worker
+ * handles click → link natively (no handler code of ours in the SW), so the
+ * URL is the only channel that survives that hop — the app reads the
+ * parameters off its boot URL and seats the account+band before it opens
+ * the page. An empty band stays off the link, like an empty name stays off
+ * the wire.
+ */
+export function notificationsLink(uid: string, bandId: string): string {
+  let link = `${NOTIFICATIONS_LINK}&account=${encodeURIComponent(uid)}`;
+  if (bandId !== "") link += `&band=${encodeURIComponent(bandId)}`;
+  return link;
+}
+
 export function notificationsCol(firestore: Firestore, uid: string): CollectionReference {
   return firestore.collection("users").doc(uid).collection("notifications");
 }
@@ -223,7 +239,7 @@ export async function sendTipPushHandler(event: NotificationCreatedEvent): Promi
       }
       const dead: string[] = [];
       for (const group of groups.values()) {
-        const sent = await sendToGroup(note, kind, group);
+        const sent = await sendToGroup(note, kind, group, uid);
         dead.push(...sent);
       }
       if (dead.length > 0) {
@@ -342,6 +358,7 @@ async function sendToGroup(
   note: Record<string, unknown>,
   kind: "tip" | "songRequest",
   group: PushTarget[],
+  uid: string,
 ): Promise<string[]> {
   const locale = group[0]?.locale;
   const strings = pushStrings(locale);
@@ -357,6 +374,7 @@ async function sendToGroup(
   const body = kind === "songRequest"
     ? [songTitle, name].filter((s) => s !== "").join(" — ") || strings.someone
     : (name !== "" ? name : strings.someone);
+  const link = notificationsLink(uid, bandId);
 
   const message: MulticastMessage = {
     tokens: group.map((t) => t.token),
@@ -365,13 +383,13 @@ async function sendToGroup(
     // any handler code of ours in the SW (app/web/firebase-messaging-sw.js
     // stays a config-only shim).
     notification: { title, body },
-    data: { kind, bandId, tipId, link: NOTIFICATIONS_LINK },
+    data: { kind, bandId, tipId, link },
     webpush: {
       // A day, then let it go: a phone off overnight should catch up from
       // the bell, not from a wall of stale banners. tag keeps every tip its
       // own banner rather than each replacing the last.
       headers: { TTL: "86400", Urgency: "high" },
-      fcmOptions: { link: NOTIFICATIONS_LINK },
+      fcmOptions: { link },
       notification: { icon: "https://live.tips/app/icons/Icon-192.png", tag: tipId },
     },
     // Wired now, exercised when the native builds get their APNs key /

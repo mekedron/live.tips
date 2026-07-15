@@ -139,14 +139,11 @@ Future<void> _warm(ProviderContainer container) async {
   await pumpEventQueue();
   expect(container.read(appStateProvider).accounts.map((b) => b.id),
       [_bandA, _bandB]);
-  // An account with several profiles opens on NONE of them until the artist
-  // answers the picker — so these tests, which are about removing the ACTIVE
-  // profile, have to answer it first. Picking is the artist's move, and the
-  // app no longer makes it for them.
-  expect(container.read(appStateProvider).accountId, '',
-      reason: 'two profiles, nobody asked yet');
-  await container.read(appStateProvider.notifier).switchAccount(_bandA);
-  expect(container.read(appStateProvider).accountId, _bandA);
+  // The band this device last had open (seeded in _cloudStore) answers the
+  // profile question on its own: these tests remove the ACTIVE profile, and
+  // the remembered one is already it — no picker stands in the way.
+  expect(container.read(appStateProvider).accountId, _bandA,
+      reason: 'the remembered profile opens on the artist\'s own device');
 }
 
 Future<List<String>> _bandDocs(FakeFirebaseFirestore db) async =>

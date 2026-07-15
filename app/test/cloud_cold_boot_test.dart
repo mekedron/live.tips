@@ -150,14 +150,9 @@ void main() {
     final container = _container(local, db);
     container.read(appStateProvider);
     await pumpEventQueue();
-    // Two profiles and no answer: the account waits to be asked (#28), and
-    // the artist picks the one they were on.
-    expect(container.read(appStateProvider).accountId, isEmpty);
-    expect(
-        await container
-            .read(appStateProvider.notifier)
-            .switchAccount('acc_new'),
-        isTrue);
+    // Two profiles, but this device HAS an answer on file: the band it last
+    // had open auto-opens — the question was answered here already.
+    expect(container.read(appStateProvider).accountId, 'acc_new');
 
     final ok = await container
         .read(appStateProvider.notifier)

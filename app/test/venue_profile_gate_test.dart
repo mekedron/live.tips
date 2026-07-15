@@ -48,13 +48,15 @@ void main() {
   /// the 12-hour session is running and the artist has said "that's me".
   Future<({LocalStore store, FakeSecureStore secure})> pumpVenueApp(
     WidgetTester tester,
-    FakeFirebaseFirestore db,
-  ) async {
+    FakeFirebaseFirestore db, {
+    String? lastOpen,
+  }) async {
     await tester.binding.setSurfaceSize(const Size(900, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final store = await seededStore(values: {
       LocalStore.kDeviceKind: 'venue',
     });
+    if (lastOpen != null) await store.saveActiveCloudBand(_uid, lastOpen);
     await store.saveAccountsDirectory(
       AccountsDirectory.initial()
           .withAccount(const AppAccount(
@@ -183,17 +185,32 @@ void main() {
   });
 
   testWidgets(
-      'one profile still opens straight into the shell — the venue tablet asks '
-      'only what it does not know', (tester) async {
+      'a venue tablet NEVER auto-opens a profile: one profile, a remembered '
+      'answer — the picker still asks at every open', (tester) async {
+    // The artist's own phone would open this without a question: a single
+    // profile, and even a stored last-open answer on file. A shared tablet
+    // may not — the artist standing at the bar tonight is not necessarily
+    // the artist who stood there this morning, and a screen that guesses
+    // is guessing in public.
     final db = FakeFirebaseFirestore();
     await _bands(db).doc('acc_trio').set({'name': 'Trio', 'createdAtMs': 1});
 
-    await pumpVenueApp(tester, db);
+    await pumpVenueApp(tester, db, lastOpen: 'acc_trio');
 
-    expect(find.byType(ProfilePickScreen), findsNothing);
-    expect(find.byType(AppShell), findsOneWidget);
+    expect(find.byType(ProfilePickScreen), findsOneWidget);
+    expect(find.byType(AppShell), findsNothing);
     final container =
-        ProviderScope.containerOf(tester.element(find.byType(AppShell)));
+        ProviderScope.containerOf(tester.element(find.byType(ProfilePickScreen)));
+    expect(container.read(appStateProvider).accountId, isEmpty,
+        reason: 'nothing opens on a shared device until tonight\'s artist '
+            'says so');
+    // The memory is not thrown away — it marks the row it may not open.
+    expect(find.text('Last used'), findsOneWidget);
+
+    // And the tap is all it ever costs: the one profile is one tap away.
+    await tester.tap(find.text('Trio'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppShell), findsOneWidget);
     expect(container.read(appStateProvider).accountId, 'acc_trio');
   });
 }

@@ -111,6 +111,7 @@ import {
   MAX_NOTIFICATIONS,
   NOTIFICATIONS_LINK,
   formatMinor,
+  notificationsLink,
   recordTipNotification,
   sendTestPushHandler,
   sendTipPushHandler,
@@ -329,12 +330,32 @@ describe("sendTipPushHandler: the fan-out", () => {
 
     await sendTipPushHandler(evt(note({ kind: "songRequest", songTitle: "Hallelujah" })));
 
+    const link = `${NOTIFICATIONS_LINK}&account=${UID}&band=${BAND}`;
     const msg = sendMock.mock.calls[0]![0] as Doc;
     expect(msg["notification"]).toEqual({ title: "Song request · €5.00", body: "Hallelujah — Ada" });
-    expect(msg["data"]).toEqual({ kind: "songRequest", bandId: BAND, tipId: "relay_1", link: NOTIFICATIONS_LINK });
+    expect(msg["data"]).toEqual({ kind: "songRequest", bandId: BAND, tipId: "relay_1", link });
     const webpush = msg["webpush"] as Doc;
-    expect((webpush["fcmOptions"] as Doc)["link"]).toBe(NOTIFICATIONS_LINK);
+    expect((webpush["fcmOptions"] as Doc)["link"]).toBe(link);
     expect((webpush["notification"] as Doc)["tag"]).toBe("relay_1");
+  });
+
+  it("the link names WHOSE feed fired and which band — the app seats that context before opening the page", async () => {
+    deviceDocs = [device("dev_a", { fcmToken: "tok_a" })];
+
+    await sendTipPushHandler(evt(note()));
+
+    const msg = sendMock.mock.calls[0]![0] as Doc;
+    const link = (msg["data"] as Doc)["link"] as string;
+    const params = new URL(link).searchParams;
+    expect(params.get("open")).toBe("notifications");
+    expect(params.get("account")).toBe(UID);
+    expect(params.get("band")).toBe(BAND);
+    expect(((msg["webpush"] as Doc)["fcmOptions"] as Doc)["link"]).toBe(link);
+  });
+
+  it("an empty band stays off the link, like an empty name stays off the wire", () => {
+    expect(notificationsLink(UID, "")).toBe(`${NOTIFICATIONS_LINK}&account=${UID}`);
+    expect(notificationsLink(UID, BAND)).toBe(`${NOTIFICATIONS_LINK}&account=${UID}&band=${BAND}`);
   });
 
   it("a dead token is pruned off its device doc; other failures are left alone", async () => {

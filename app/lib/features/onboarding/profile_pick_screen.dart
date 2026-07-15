@@ -40,11 +40,15 @@ import 'onboarding_flow.dart';
 /// [asRoot], it is RootGate's landing for a cloud account whose band question
 /// is open — no navigation stack under it, nothing pushed on top:
 ///
-/// * SEVERAL profiles and nobody has said which (a sign-in, an account
-///   switch, a boot): the app used to pick one — the id this device last used,
-///   else simply the first band — and drop the artist into somebody else's
-///   gig. Here the list is the question. The last-used profile pre-selects a
-///   row; a pre-selection is not an answer, and it never skips the tap.
+/// * SEVERAL profiles and nobody has said which: no band remembered as open
+///   on this device (a fresh sign-in, a sign-out's landing, a memory whose
+///   band was deleted elsewhere) — or a venue tablet, which remembers but
+///   never answers. On the artist's own device the remembered band opens
+///   without this screen: that memory IS the artist's answer, given last
+///   time, and re-asking it on every open was a toll booth. What the app
+///   still never does is GUESS — "the first band" dropped the artist into
+///   somebody else's gig (#28). Here the list is the question; the last-used
+///   profile at most pre-selects a row.
 /// * NO profile at all: the account genuinely has none, which is a state, not
 ///   an accident to repair. The create card is the only card, and no band doc
 ///   is written until the artist walks through the setup that names it.
@@ -277,9 +281,10 @@ class _ProfilePickScreenState extends ConsumerState<ProfilePickScreen> {
     }
 
     _disarm(); // there is an answer on the screen — nothing left to wait for
-    // The band this device last had open in this account. It says which row
-    // to mark, and nothing more: the app opening it unasked is the bug this
-    // screen exists for.
+    // The band this device last had open in this account. When this screen
+    // shows at all the memory did not answer (it names nothing, or the
+    // device is a venue tablet that never lets it) — so here it only says
+    // which row to mark.
     final lastUsed = repo.readActiveBandId();
     final empty = existing.isEmpty;
     // WHOSE profiles this screen is asking about. It used to keep one bit of

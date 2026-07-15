@@ -918,6 +918,7 @@
   "notifications.tip_row_title_anon": "Someone tipped {amount}",
   "notifications.request_row_title": "{name} requested a song · {amount}",
   "notifications.request_row_title_anon": "Song request · {amount}",
+  "notifications.switched_profile": "Showing {profile} — {account}",
   "settings.notifications.header": "Notifications",
   "settings.notifications.row_title": "Notifications",
   "settings.notifications.row_subtitle": "Push alerts for tips and song requests",

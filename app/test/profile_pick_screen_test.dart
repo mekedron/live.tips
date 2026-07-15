@@ -203,8 +203,9 @@ void main() {
     expect(container.read(appStateProvider).accounts.map((a) => a.id),
         [_bandId],
         reason: 'nothing minted, nothing activated — the account is as it was');
-    expect(store.readActiveCloudBand(_uid), isNull,
-        reason: 'and no phantom to force the picker on the next cold boot');
+    expect(store.readActiveCloudBand(_uid), _bandId,
+        reason: 'the memory names the real band that is open — never a '
+            'phantom that would mislead the next cold boot');
   });
 
   testWidgets('a fresh account with no profiles goes straight to the band '
@@ -233,36 +234,72 @@ void main() {
   // ——— The root form: entering an account whose profile question is open ———
 
   group('the root picker', () {
-    testWidgets('an account with several profiles ASKS — and activates '
-        'nothing until the artist answers', (tester) async {
+    testWidgets('the band this device last had open OPENS — a boot does not '
+        're-ask a question the artist already answered here', (tester) async {
       final db = FakeFirebaseFirestore();
       await _bands(db).doc(_bandId).set({'name': 'The Foxes', 'createdAtMs': 1});
       await _bands(db)
           .doc('acc_duo')
           .set({'name': 'Duo Sundays', 'createdAtMs': 2});
       final store = await _signedInStore();
-      // The band this device last had open. It may point at a row; it may not
-      // answer for the artist.
+      // The band this device last had open — the artist's own answer, given
+      // the last time they stood on the picker. Asking it again on every
+      // single open was the picker as a toll booth.
       await store.saveActiveCloudBand(_uid, 'acc_duo');
 
       final container = await _bootApp(tester, store, db);
+
+      expect(find.byType(ProfilePickScreen), findsNothing);
+      expect(find.byType(AppShell), findsOneWidget);
+      expect(container.read(appStateProvider).accountId, 'acc_duo',
+          reason: 'the remembered profile is the one that opens');
+      expect(container.read(appStateProvider).displayName, 'Duo Sundays');
+    });
+
+    testWidgets('an account with several profiles and NO memory ASKS — and '
+        'activates nothing until the artist answers', (tester) async {
+      final db = FakeFirebaseFirestore();
+      await _bands(db).doc(_bandId).set({'name': 'The Foxes', 'createdAtMs': 1});
+      await _bands(db)
+          .doc('acc_duo')
+          .set({'name': 'Duo Sundays', 'createdAtMs': 2});
+
+      final container = await _bootApp(tester, await _signedInStore(), db);
 
       expect(find.byType(ProfilePickScreen), findsOneWidget);
       expect(find.byType(AppShell), findsNothing);
       expect(find.text('The Foxes'), findsOneWidget);
       expect(find.text('Duo Sundays'), findsOneWidget);
-      expect(find.text('Last used'), findsOneWidget,
-          reason: 'the remembered profile pre-selects a row');
       expect(container.read(appStateProvider).accountId, isEmpty,
           reason: 'no gig is opened before the artist says which');
 
-      // The artist picks the OTHER one — the app must open exactly that.
+      // The artist picks one — the app opens exactly that, and remembers it.
       await tester.tap(find.text('The Foxes'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AppShell), findsOneWidget);
       expect(container.read(appStateProvider).accountId, _bandId);
-      expect(store.readActiveCloudBand(_uid), _bandId);
+      expect(container.read(localStoreProvider).readActiveCloudBand(_uid),
+          _bandId);
+    });
+
+    testWidgets('a memory that names nothing falls back to the picker — '
+        'never to "the first band" (#28)', (tester) async {
+      final db = FakeFirebaseFirestore();
+      await _bands(db).doc(_bandId).set({'name': 'The Foxes', 'createdAtMs': 1});
+      await _bands(db)
+          .doc('acc_duo')
+          .set({'name': 'Duo Sundays', 'createdAtMs': 2});
+      final store = await _signedInStore();
+      // Remembered here, deleted on another device since.
+      await store.saveActiveCloudBand(_uid, 'acc_gone_elsewhere');
+
+      final container = await _bootApp(tester, store, db);
+
+      expect(find.byType(ProfilePickScreen), findsOneWidget);
+      expect(find.byType(AppShell), findsNothing);
+      expect(container.read(appStateProvider).accountId, isEmpty,
+          reason: 'a dead memory is no answer, and the first band is a guess');
     });
 
     testWidgets('an account with exactly one profile opens it — nothing to ask',

@@ -390,9 +390,9 @@ Future<void> showProfileSheet(BuildContext context, WidgetRef ref) async {
 ///   no list of another account's profiles (the repository mirrors the account
 ///   it is in), and inventing one out of a stale cache is the cache-first lie
 ///   this codebase keeps paying for. So an account is a single act: the flip,
-///   and then that account's own profile question, asked by RootGate's picker
-///   once the artist has landed — the same for the local mode as for a cloud
-///   account.
+///   and then that account's own profile question — answered by the band this
+///   device last had open in it, or asked by RootGate's picker when there is
+///   no such memory — the same for the local mode as for a cloud account.
 /// * **Sign in to another account**, at the foot: the door to an account this
 ///   device has never seen.
 ///
