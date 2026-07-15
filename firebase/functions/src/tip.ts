@@ -299,7 +299,7 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
         // The currency the fan actually paid in — EUR for a Box, GBP for
         // Monzo — not the jar's. Same rule as the queue path below.
         const currency = methodCurrency(tipRequest.method, profile.currency);
-        const { ref: dest, live } = await routedTipRef(firestore, uid, bandId, tipId, now);
+        const { ref: dest } = await routedTipRef(firestore, uid, bandId, tipId, now);
         await dest.set(relayTipWire({
           id: tipId,
           tsMs: now,
@@ -314,11 +314,12 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
             ? { songId: tipRequest.songId, songTitle: tipRequest.songTitle }
             : {}),
         }, now));
-        // The bell feed + push (notifications.ts) — only when no set was
-        // running to show the tip on stage. The tip is already safe above;
-        // nothing here may take down the fan's response over a notification.
+        // The bell feed + push (notifications.ts) — every tip; the device
+        // showing the stage is skipped at fan-out. The tip is already safe
+        // above; nothing here may take down the fan's response over a
+        // notification.
         try {
-          await recordTipNotification(firestore, uid, bandId, live, {
+          await recordTipNotification(firestore, uid, bandId, {
             tipId,
             amountMinor: tipRequest.amountMinor,
             currency,

@@ -171,14 +171,14 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("recordTipNotification: the write policy", () => {
-  it("live === true writes nothing — the stage already showed it, requests included", () => {
-    recordTipNotification(fakeDb as never, UID, BAND, true, tipInput(), NOW);
-    recordTipNotification(fakeDb as never, UID, BAND, true, tipInput({ songId: "s2", songTitle: "Hallelujah" }), NOW);
-    expect(docs.size).toBe(0);
+  it("EVERY tip records — a running set no longer swallows the account's notifications", async () => {
+    await recordTipNotification(fakeDb as never, UID, BAND, tipInput(), NOW);
+    await recordTipNotification(fakeDb as never, UID, BAND, tipInput({ tipId: "relay_2", songId: "s2", songTitle: "Hallelujah" }), NOW);
+    expect(docs.size).toBe(2);
   });
 
-  it("live === false appends the feed doc under the TIP's id, omit-when-empty like the wire", async () => {
-    await recordTipNotification(fakeDb as never, UID, BAND, false, tipInput(), NOW);
+  it("appends the feed doc under the TIP's id, omit-when-empty like the wire", async () => {
+    await recordTipNotification(fakeDb as never, UID, BAND, tipInput(), NOW);
     expect(docs.get(`${NOTES}/relay_1`)).toEqual({
       kind: "tip",
       bandId: BAND,
@@ -189,7 +189,7 @@ describe("recordTipNotification: the write policy", () => {
       createdAtMs: NOW,
     });
 
-    await recordTipNotification(fakeDb as never, UID, BAND, false, tipInput({ tipId: "relay_2", name: "" }), NOW);
+    await recordTipNotification(fakeDb as never, UID, BAND, tipInput({ tipId: "relay_2", name: "" }), NOW);
     const anonymous = docs.get(`${NOTES}/relay_2`)!;
     expect("name" in anonymous).toBe(false);
     expect("songTitle" in anonymous).toBe(false);
@@ -197,13 +197,13 @@ describe("recordTipNotification: the write policy", () => {
 
   it("songId makes it a songRequest; an empty songTitle stays off the wire", async () => {
     await recordTipNotification(
-      fakeDb as never, UID, BAND, false,
+      fakeDb as never, UID, BAND,
       tipInput({ songId: "s2", songTitle: "Hallelujah" }), NOW,
     );
     expect(docs.get(`${NOTES}/relay_1`)).toMatchObject({ kind: "songRequest", songTitle: "Hallelujah" });
 
     await recordTipNotification(
-      fakeDb as never, UID, BAND, false,
+      fakeDb as never, UID, BAND,
       tipInput({ tipId: "cs_x", songId: "s2", songTitle: "" }), NOW,
     );
     const doc = docs.get(`${NOTES}/cs_x`)!;
@@ -213,7 +213,7 @@ describe("recordTipNotification: the write policy", () => {
 
   it("with a batch it only BUFFERS — the Stripe path's all-or-nothing ride", async () => {
     const batch = fakeDb.batch();
-    recordTipNotification(fakeDb as never, UID, BAND, false, tipInput({ tipId: "cs_1" }), NOW, batch as never);
+    recordTipNotification(fakeDb as never, UID, BAND, tipInput({ tipId: "cs_1" }), NOW, batch as never);
     expect(docs.size).toBe(0); // nothing lands before the caller commits
     await batch.commit();
     expect(docs.has(`${NOTES}/cs_1`)).toBe(true);
@@ -259,6 +259,22 @@ describe("sendTipPushHandler: the fan-out", () => {
     const msg = sendMock.mock.calls[0]![0] as Doc;
     expect(msg["tokens"]).toEqual(["tok_a"]);
     expect(msg["notification"]).toEqual({ title: "New tip · €5.00", body: "Ada" });
+  });
+
+  it("skips exactly the device whose STAGE SCREEN is open — the phone in the pocket still knocks mid-set", async () => {
+    deviceDocs = [
+      // The stage tablet: fresh heartbeat, watching tips land already.
+      device("dev_stage", { fcmToken: "tok_stage", locale: "en", liveOpenAtMs: Date.now() - 30_000 }),
+      // The pocket phone: no heartbeat at all.
+      device("dev_phone", { fcmToken: "tok_phone", locale: "en" }),
+      // A tab that crashed on the stage screen long ago: heartbeat stale.
+      device("dev_stale", { fcmToken: "tok_stale", locale: "en", liveOpenAtMs: Date.now() - 10 * 60_000 }),
+    ];
+
+    await sendTipPushHandler(evt(note()));
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect((sendMock.mock.calls[0]![0] as Doc)["tokens"]).toEqual(["tok_phone", "tok_stale"]);
   });
 
   it("prefs are OPT-OUT and per kind: tips:false silences tips, not requests", async () => {

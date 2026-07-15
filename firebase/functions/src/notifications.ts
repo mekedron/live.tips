@@ -4,19 +4,23 @@
 /// Two halves, joined by one collection:
 ///
 ///  * recordTipNotification — called by BOTH money paths (the relay POST in
-///    tip.ts, the Stripe webhook) right after the routed tip write, with the
-///    same `live` verdict routedTipRef already produced. live === true
-///    writes NOTHING: the tip landed on a running set's stage and the artist
-///    watched it happen (song requests included — the stage queue is where
-///    those live during a set). live === false appends
-///    users/{uid}/notifications/{tipId} — the bell feed's source of truth
-///    and the trigger's kick.
+///    tip.ts, the Stripe webhook) right after the routed tip write. EVERY
+///    accepted tip appends users/{uid}/notifications/{tipId} — the bell
+///    feed's source of truth and the trigger's kick — whether or not a set
+///    is running: a live session no longer swallows the notification for
+///    the whole account (it did at first, and Nikita's phone stayed silent
+///    through an entire "live" evening because a background tab held the
+///    session lease).
 ///
 ///  * sendTipPush (onDocumentCreated on that collection — index.ts) — reads
 ///    the account's notification prefs and its device registry, and fans the
 ///    FCM message out to every non-revoked device that registered a token,
 ///    worded per device in the language that device's screen speaks
-///    (push-strings.ts). Decoupled from the money paths on purpose: a cold
+///    (push-strings.ts). The ONE device it skips is a device whose STAGE
+///    SCREEN is visibly open right now (fresh `liveOpenAtMs` heartbeat on
+///    its device doc, written by the app's LiveScreen): that screen already
+///    shows every tip landing, confetti and all — a default OS banner on
+///    top of it is noise. Decoupled from the money paths on purpose: a cold
 ///    start here delays a push by seconds, never a fan's payment redirect,
 ///    and FCM being down loses nothing — the feed doc IS the notification,
 ///    the push is just its delivery.
@@ -78,8 +82,9 @@ export interface TipNotificationInput {
 }
 
 /**
- * The feed write, and the entire "when do we notify" policy: only when no
- * set was running (live === false) — for both kinds. Callers must not let
+ * The feed write — for EVERY accepted tip, set running or not: whether a
+ * given device should stay quiet is that device's own affair (the stage
+ * skip in [sendTipPushHandler]), never the account's. Callers must not let
  * this fail the tip: the relay path wraps it in try/catch AFTER its own
  * write landed; the Stripe path hands in its tombstone `batch`, which makes
  * this a free rider on the existing all-or-nothing commit.
@@ -88,12 +93,10 @@ export function recordTipNotification(
   firestore: Firestore,
   uid: string,
   bandId: string,
-  live: boolean,
   tip: TipNotificationInput,
   nowMs: number,
   batch?: WriteBatch,
 ): Promise<void> | void {
-  if (live) return;
   const doc = {
     kind: tip.songId !== undefined ? "songRequest" : "tip",
     bandId,
@@ -135,6 +138,15 @@ export interface NotificationCreatedEvent {
   data?: { data(): Record<string, unknown> };
 }
 
+/**
+ * How fresh a device's `liveOpenAtMs` heartbeat must be to count as "the
+ * stage screen is open here right now". The app beats every 60s while the
+ * stage is visible and deletes the field on leave/background; two missed
+ * beats plus slack means a crashed tab suppresses its own pushes for at
+ * most this long.
+ */
+export const LIVE_SCREEN_STALE_MS = 150_000;
+
 /** A device worth pushing to: registered a token, not revoked. */
 interface PushTarget {
   deviceId: string;
@@ -168,12 +180,18 @@ export async function sendTipPushHandler(event: NotificationCreatedEvent): Promi
   const enabled = kind === "songRequest" ? prefs["songRequests"] !== false : prefs["tips"] !== false;
 
   if (enabled) {
+    const nowMs = Date.now();
     const devices = await devicesCol(firestore, uid).get();
     const targets: PushTarget[] = [];
     for (const doc of devices.docs) {
       if (doc.get("revoked") === true) continue;
       const token = doc.get("fcmToken");
       if (typeof token !== "string" || token === "") continue;
+      // The stage skip: THIS device is showing the live screen right now —
+      // it watches every tip land with confetti; the phone in the pocket
+      // (and every other device) still gets knocked, mid-set included.
+      const liveOpen = doc.get("liveOpenAtMs");
+      if (typeof liveOpen === "number" && nowMs - liveOpen < LIVE_SCREEN_STALE_MS) continue;
       const locale = doc.get("locale");
       targets.push({
         deviceId: doc.id,

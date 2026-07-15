@@ -287,14 +287,14 @@ describe("stripeWebhook: the bell feed rides the tombstone batch", () => {
     });
   });
 
-  it("a tip landing on a running set writes NO notification — the stage showed it", async () => {
+  it("a tip landing on a running set STILL writes the notification — only the stage device goes quiet, at fan-out", async () => {
     await seedConnection();
     seedLiveSession();
 
     await deliver(checkoutEvent(SESSION, "evt_1"));
 
     expect(docs.has(liveTipPath)).toBe(true);
-    expect(docs.has(notePath)).toBe(false);
+    expect(docs.has(notePath)).toBe(true);
   });
 
   it("a redelivery answered by the tombstone rings no second bell", async () => {

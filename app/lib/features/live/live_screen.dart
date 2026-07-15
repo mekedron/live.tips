@@ -16,6 +16,7 @@ import '../../data/tip_channel.dart';
 import '../../domain/live_session.dart';
 import '../../domain/stage_settings.dart';
 import '../../state/live_session_controller.dart';
+import '../../state/notifications_providers.dart';
 import '../../state/providers.dart';
 import '../../widgets/goal_editor.dart';
 import '../../widgets/qr_card.dart';
@@ -41,6 +42,10 @@ class LiveScreen extends ConsumerStatefulWidget {
 class _LiveScreenState extends ConsumerState<LiveScreen> {
   late final ConfettiController _confetti;
   late final AppLifecycleListener _lifecycle;
+
+  /// Held as a field: dispose() may not touch ref (Riverpod 3), and the
+  /// stage mark must be lifted exactly there.
+  late final StagePresence _stage;
 
   /// Live width of the QR rail while the performer drags its handle. Seeded
   /// from the persisted [StageSettings.railWidth] on first paint; committed
@@ -69,12 +74,22 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     );
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // While this screen is visible, this device sees every tip land — mark
+    // it so the push fan-out skips exactly this device (StagePresence). The
+    // mark lifts the moment the stage is hidden: pocketed phone, switched
+    // tab, closed app — pushes resume there.
+    _stage = ref.read(stagePresenceProvider);
+    _stage.enter();
     // Leaving the app — to open MobilePay, to answer a call, to lock the
     // phone — kills the relay's WebSocket without telling us. Redial the
     // moment the stage is back, so the feed is live again before the artist
     // has looked down at it.
     _lifecycle = AppLifecycleListener(
-      onResume: () => ref.read(liveSessionProvider.notifier).relayReconnectNow(),
+      onResume: () {
+        ref.read(liveSessionProvider.notifier).relayReconnectNow();
+        _stage.enter();
+      },
+      onHide: _stage.leave,
     );
     // every session gets a fresh chance at the 3D stage (post-frame:
     // providers must not change while the tree is building)
@@ -85,6 +100,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
 
   @override
   void dispose() {
+    _stage.leave();
     _lifecycle.dispose();
     _confetti.dispose();
     WakelockPlus.disable();

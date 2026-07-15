@@ -709,15 +709,16 @@ describe("tip POST: routed jars write server-direct (#71)", () => {
     expect(note).toMatchObject({ kind: "songRequest", songTitle: "Hallelujah", amountMinor: 1000 });
   });
 
-  it("a set running: NO notification — the artist watched the tip land on stage", async () => {
+  it("a set running: the notification STILL lands — only the stage device goes quiet, at fan-out", async () => {
     jar = routedJar();
     seedLive();
     allowThrough();
 
     await tipHandler(tipPost(XFF, { name: "Ada" }), fakeRes() as never);
 
-    soleCloudDoc(SESSION_TIPS);
-    expect([...cloudDocs.keys()].some((p) => p.includes("/notifications/"))).toBe(false);
+    const [tipId] = soleCloudDoc(SESSION_TIPS);
+    const [noteId] = soleCloudDoc(`users/${OWNER}/notifications`);
+    expect(noteId).toBe(tipId);
   });
 
   it("a notification write failure never takes down the fan's response — the tip already landed", async () => {

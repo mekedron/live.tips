@@ -192,6 +192,64 @@ final pushNudgeVisibleProvider = Provider<bool>((ref) {
   return ref.watch(pushStatusProvider).value == PushStatus.canRequest;
 });
 
+/// While the STAGE SCREEN is visibly open here, this device's doc carries a
+/// fresh `liveOpenAtMs` heartbeat — the send trigger reads it and skips THIS
+/// device only: the stage already shows every tip landing, confetti and all,
+/// so a default OS banner on top of it is noise. Every other device keeps
+/// getting pushed even mid-set — the artist's phone in a pocket is exactly
+/// where a tip should knock. The mark is cleared the moment the stage is
+/// left or backgrounded; a crashed tab ages out server-side (150s).
+class StagePresence {
+  StagePresence(this.ref);
+
+  final Ref ref;
+  Timer? _beat;
+
+  /// Two beats fit inside the server's 150s staleness window with slack.
+  static const period = Duration(seconds: 60);
+
+  DocumentReference<Map<String, dynamic>>? _ownDoc() {
+    final uid = ref.read(authControllerProvider).user?.uid;
+    if (uid == null) return null;
+    return ref
+        .read(firestoreProvider)
+        ?.doc('users/$uid/devices/${ref.read(deviceIdProvider)}');
+  }
+
+  /// The stage screen became visible: mark now, then keep beating.
+  void enter() {
+    _beat?.cancel();
+    _write();
+    _beat = Timer.periodic(period, (_) => _write());
+  }
+
+  /// Left the stage or backgrounded: stop beating and clear the mark, so
+  /// pushes resume immediately instead of after the staleness window.
+  void leave() {
+    _beat?.cancel();
+    _beat = null;
+    final doc = _ownDoc();
+    if (doc == null) return;
+    unawaited(
+      doc.update({'liveOpenAtMs': FieldValue.delete()}).catchError(
+          (Object e) => debugPrint('stage mark clear failed: $e')),
+    );
+  }
+
+  void _write() {
+    final doc = _ownDoc();
+    if (doc == null) return;
+    unawaited(
+      doc.update({
+        'liveOpenAtMs': DateTime.now().millisecondsSinceEpoch,
+      }).catchError((Object e) => debugPrint('stage mark failed: $e')),
+    );
+  }
+}
+
+final stagePresenceProvider =
+    Provider<StagePresence>((ref) => StagePresence(ref));
+
 enum PushEnableOutcome { enabled, denied, failed }
 
 /// What the settings page's "Send test notification" learned — AFTER the

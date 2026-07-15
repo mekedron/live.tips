@@ -169,7 +169,7 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
   // subcollection or the band's relayTips archive. No cap and no TTL —
   // these are the artist's own history, not a consume-once queue; the
   // flood valve above stays the write bound.
-  const { ref: dest, live } = await routedTipRef(firestore, connection.uid, connection.bandId, mapped.id, now);
+  const { ref: dest } = await routedTipRef(firestore, connection.uid, connection.bandId, mapped.id, now);
   const batch = firestore.batch();
 
   // Idempotency: the doc id IS the Stripe object id (cs_…/ch_…), and
@@ -181,10 +181,11 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
   // the same destination.)
   batch.create(dest, stripeTipWire(mapped.id, mapped.tip, now));
 
-  // The bell feed + push (notifications.ts), only when no set was running.
-  // Riding THIS batch is what makes it exactly-once: when a redelivery race
-  // loses to the tip's create(), the notification no-ops with it.
-  recordTipNotification(firestore, connection.uid, connection.bandId, live, {
+  // The bell feed + push (notifications.ts) — every tip; the stage device
+  // is skipped at fan-out. Riding THIS batch is what makes it exactly-once:
+  // when a redelivery race loses to the tip's create(), the notification
+  // no-ops with it.
+  recordTipNotification(firestore, connection.uid, connection.bandId, {
     tipId: mapped.id,
     amountMinor: mapped.tip.amountMinor,
     currency: mapped.tip.currency,
