@@ -77,11 +77,18 @@ class PushService {
 
   /// This device's current registration token — null when anything along the
   /// way (support, permission, the push service itself) says no.
+  ///
+  /// Bounded: browsers without a push backend behind the Push API (Ungoogled
+  /// Chromium strips GCM entirely) let `subscribe()` hang forever — the
+  /// enable toggle froze mid-air on one of Nikita's browsers. Twenty seconds
+  /// is beyond any honest network; after that the answer is an honest no.
   Future<String?> getToken() async {
     final m = _messaging;
     if (m == null) return null;
     try {
-      return await m.getToken(vapidKey: kVapidKey.isEmpty ? null : kVapidKey);
+      return await m
+          .getToken(vapidKey: kVapidKey.isEmpty ? null : kVapidKey)
+          .timeout(const Duration(seconds: 20));
     } catch (e) {
       debugPrint('push token fetch failed: $e');
       return null;
