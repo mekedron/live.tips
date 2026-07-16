@@ -121,6 +121,88 @@ void main() {
     expect(backend.calls, hasLength(1), reason: 'disposed — silent for good');
   });
 
+  // ---------------------------------------------------------------------
+  // Server-computed totals (#71 Phase 3): on a routed (cloud) jar the tip
+  // POST bumps requestsLive.songs itself, and this publisher must speak
+  // verdicts only — a wholesale queue push could clobber a bump that raced
+  // it. The one exception is the fresh-session reset, which wholesale-clears
+  // the previous night's map before the new set can have bumped anything.
+
+  JarRequestsPublisher serverTotalsPublisher(FakeCallables backend) =>
+      JarRequestsPublisher(
+        client: fakeRelayClient(backend),
+        jar: _jar,
+        secret: 'sec_1',
+        serverComputesTotals: true,
+        throttle: const Duration(milliseconds: 150),
+      );
+
+  test('server totals: a queue change publishes VERDICTS only, never totals',
+      () async {
+    final backend = FakeCallables();
+    final publisher = serverTotalsPublisher(backend);
+    addTearDown(publisher.dispose);
+
+    final s = session();
+    s.addTip(request('a', 500));
+    s.addTip(request('b', 100));
+    s.setSongStatus('sng_1', LiveSession.statusPlayed);
+    publisher.onQueueChanged(s);
+    await settle();
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.args['statuses'], {'sng_1': 'p'});
+    expect(backend.calls.single.args.containsKey('queue'), isFalse,
+        reason: 'a wholesale push could clobber a server bump that raced it');
+  });
+
+  test('server totals: an open flip carries open + statuses, still no queue',
+      () async {
+    final backend = FakeCallables();
+    final publisher = serverTotalsPublisher(backend);
+    addTearDown(publisher.dispose);
+
+    final s = session()..requestsOpen = true;
+    s.addTip(request('a', 500));
+    publisher.onOpenChanged(s);
+    await settle();
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.args['open'], isTrue);
+    expect(backend.calls.single.args['statuses'], {'sng_1': 'q'});
+    expect(backend.calls.single.args.containsKey('queue'), isFalse);
+  });
+
+  test('server totals: the fresh-session reset is one wholesale EMPTY queue',
+      () async {
+    final backend = FakeCallables();
+    final publisher = serverTotalsPublisher(backend);
+    addTearDown(publisher.dispose);
+
+    final s = session()..requestsOpen = true;
+    publisher.onOpenChanged(s, resetQueue: true);
+    await settle();
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.args['open'], isTrue);
+    expect(backend.calls.single.args['queue'], isEmpty);
+    expect(backend.calls.single.args.containsKey('statuses'), isFalse,
+        reason: 'queue and statuses are mutually exclusive on the wire — '
+            'and a fresh set has no verdicts to publish anyway');
+  });
+
+  test('server totals: onStop still sends {open:false} alone', () async {
+    final backend = FakeCallables();
+    final publisher = serverTotalsPublisher(backend);
+    publisher.onStop();
+    await settle();
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.args['open'], isFalse);
+    expect(backend.calls.single.args.containsKey('queue'), isFalse);
+    expect(backend.calls.single.args.containsKey('statuses'), isFalse);
+  });
+
   test('without a jar or secret every call is a silent no-op', () async {
     final backend = FakeCallables();
     final publisher = JarRequestsPublisher(

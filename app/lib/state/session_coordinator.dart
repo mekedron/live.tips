@@ -233,6 +233,16 @@ abstract interface class SessionCoordinator {
   /// one voice per session.
   bool get publishesRequests;
 
+  /// Whether the SERVER computes the fan-page queue totals for this session
+  /// (#71 Phase 3). On a cloud session the jar is routed — the claim installs
+  /// ownerUid+bandId on every attach — and each accepted request tip bumps
+  /// requestsLive.songs inside the tip POST's own transaction; the publisher
+  /// must then send verdicts only, because a wholesale queue push could
+  /// clobber a bump that raced it. Local sessions keep publishing the whole
+  /// queue: their tips flow through pendingTips, which the server never
+  /// aggregates — the leader's mirror IS the fan page's only source.
+  bool get serverComputesRequestTotals;
+
   /// Ends the session: tears the transports down, archives [session]
   /// (endedAt already set), and clears the crash snapshot. The coordinator
   /// is spent afterwards; [dispose] becomes a no-op.
@@ -378,6 +388,9 @@ class LocalSessionCoordinator implements SessionCoordinator {
 
   @override
   bool get publishesRequests => true;
+
+  @override
+  bool get serverComputesRequestTotals => false;
 
   // [durable] is a no-op here: prefs are the store, the write is awaited, and
   // there is no queue between this device and it.

@@ -568,6 +568,13 @@ class CloudSessionCoordinator implements SessionCoordinator {
   @override
   bool get publishesRequests => _isLeader;
 
+  /// Cloud sessions run on a ROUTED jar (the claim installs the route on
+  /// every attach, [JarClaimer]) — the server bumps the fan-page totals at
+  /// tip-accept time (#71 Phase 3), and this device's publisher must speak
+  /// verdicts only.
+  @override
+  bool get serverComputesRequestTotals => true;
+
   @override
   Future<void> stop(LiveSession session, {bool durable = false}) async {
     _stopping = true;

@@ -46,6 +46,9 @@ class _FakeCoordinator implements SessionCoordinator {
   bool get publishesRequests => false;
 
   @override
+  bool get serverComputesRequestTotals => false;
+
+  @override
   Future<void> stop(LiveSession session, {bool durable = false}) async {}
 
   @override

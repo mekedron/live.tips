@@ -23,7 +23,7 @@ import {
   type JarDoc,
 } from "./store";
 import { isValidBandId } from "./stripe-store";
-import { isValidJarId, validateProfile, validateRequestsConfig, validateRequestsQueue } from "./validate";
+import { isValidJarId, validateProfile, validateRequestsConfig, validateRequestsQueue, validateRequestsStatuses } from "./validate";
 
 import type { Firestore } from "firebase-admin/firestore";
 
@@ -250,7 +250,10 @@ export const REQUESTS_OPEN_MS = 12 * 3_600_000;
 
 /**
  * Song requests (#64): publish the library/config, flip the open window, and
- * push live queue state — any subset per call. All writes are field-targeted
+ * push live queue state — wholesale (`queue`, the local-jar leader's mirror)
+ * or verdicts-only (`statuses`, the routed-jar leader's half now that totals
+ * are server-computed, #71 Phase 3) — any subset per call, except queue and
+ * statuses together. All writes are field-targeted
  * (dot paths), never a doc set: `open` alone must not clobber the queue, a
  * config push must not touch requestsLive, and NOTHING here touches profile,
  * lastSeenDay or expiresAt — keep-alive belongs to jarSeen and the daily
@@ -265,8 +268,9 @@ export async function setJarRequestsHandler(request: CallableRequest): Promise<{
   const configRaw = data["config"];
   const openRaw = data["open"];
   const queueRaw = data["queue"];
-  if (configRaw === undefined && openRaw === undefined && queueRaw === undefined) {
-    throw new HttpsError("invalid-argument", "one of config, open or queue is required");
+  const statusesRaw = data["statuses"];
+  if (configRaw === undefined && openRaw === undefined && queueRaw === undefined && statusesRaw === undefined) {
+    throw new HttpsError("invalid-argument", "one of config, open, queue or statuses is required");
   }
   if (openRaw !== undefined && typeof openRaw !== "boolean") {
     throw new HttpsError("invalid-argument", "open must be a boolean");
@@ -316,6 +320,42 @@ export async function setJarRequestsHandler(request: CallableRequest): Promise<{
     }
   }
 
+  if (statusesRaw !== undefined) {
+    // The routed-jar leader's half of the queue (#71 Phase 3): totals are
+    // server-computed at tip-accept time, the app publishes ONLY its
+    // played/skipped verdicts — field-targeted `s` writes that can never
+    // clobber a concurrently bumped t/c. Ids the map doesn't hold yet are
+    // skipped, not upserted: a verdict without a request means nothing to
+    // the fan page, and the full map is resent on every publish, so a
+    // race-skipped one lands next time. Mutually exclusive with `queue` —
+    // a wholesale set and a dot path under it cannot share one update().
+    if (queueRaw !== undefined) {
+      throw new HttpsError("invalid-argument", "queue and statuses are mutually exclusive");
+    }
+    if (typeof statusesRaw !== "object" || statusesRaw === null || Array.isArray(statusesRaw)) {
+      throw new HttpsError("invalid-argument", "statuses must be an object");
+    }
+    const statuses = validateRequestsStatuses(statusesRaw as Record<string, unknown>);
+    if (!statuses.ok) throw new HttpsError("invalid-argument", statuses.error);
+    // No requestsLive, no verdicts: dot paths under a doc field that does not
+    // exist would mint a PARTIAL requestsLive — updatedAtMs with no
+    // openUntilMs — which the /queue reader takes for an open window (the
+    // 2026-07-14 partial-shape family). Arming the window is the open flow's
+    // job; verdicts for a window that never existed mean nothing anyway.
+    if (jar.requestsLive !== undefined) {
+      const existing = jar.requestsLive.songs ?? {};
+      for (const [id, s] of Object.entries(statuses.value)) {
+        if (existing[id] !== undefined) update[`requestsLive.songs.${id}.s`] = s;
+      }
+      update["requestsLive.updatedAtMs"] = now;
+      // Same proof-of-life re-arm as a queue push: verdicts flow only while
+      // an artist is actually running the show.
+      if ((jar.requestsLive.openUntilMs ?? 0) > now || openRaw === true) {
+        update["requestsLive.openUntilMs"] = now + REQUESTS_OPEN_MS;
+      }
+    }
+  }
+
   if (openRaw !== undefined) {
     // After the queue block on purpose: an explicit open:false in the same
     // call wins over the queue's re-arm.
@@ -330,7 +370,9 @@ export async function setJarRequestsHandler(request: CallableRequest): Promise<{
     }
   }
 
-  await jarRef(db(), jarId).update(update);
+  // Statuses against a jar that never armed a window is the one path that
+  // produces nothing to write — and Firestore refuses an empty update().
+  if (Object.keys(update).length > 0) await jarRef(db(), jarId).update(update);
   return { ok: true };
 }
 

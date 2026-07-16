@@ -32,9 +32,36 @@ function docRef(path: string) {
     collection: (name: string) => colRef(`${path}/${name}`),
     get: async () => {
       const data = docs.get(path);
-      return { exists: data !== undefined, data: () => (data === undefined ? undefined : { ...data }) };
+      return {
+        exists: data !== undefined,
+        data: () => (data === undefined ? undefined : { ...data }),
+        get: (field: string) => data?.[field],
+      };
     },
   };
+}
+
+/** Firestore update() semantics: a dotted key is a FIELD PATH into a nested
+ * map (creating intermediate maps) — the request-bump writes (#71 Phase 3)
+ * depend on exactly that. */
+function applyPatch(path: string, patch: Record<string, unknown>) {
+  const doc = docs.get(path);
+  if (doc === undefined) throw new Error(`update on missing ${path}`);
+  for (const [key, value] of Object.entries(patch)) {
+    const parts = key.split(".");
+    let target = doc;
+    for (const part of parts.slice(0, -1)) {
+      const next = target[part];
+      if (typeof next === "object" && next !== null) {
+        target = next as Record<string, unknown>;
+      } else {
+        const fresh: Record<string, unknown> = {};
+        target[part] = fresh;
+        target = fresh;
+      }
+    }
+    target[parts[parts.length - 1]!] = value;
+  }
 }
 
 function colRef(path: string) {
@@ -56,6 +83,21 @@ function colRef(path: string) {
 
 const fakeDb = {
   collection: (name: string) => colRef(name),
+  // Enough of a transaction for the request bump: sequential get + buffered
+  // update, jars.test.ts style.
+  runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
+    const writes: (() => void)[] = [];
+    const result = await fn({
+      get: async (ref: { path: string }) => {
+        const data = docs.get(ref.path);
+        return { exists: data !== undefined, data: () => (data === undefined ? undefined : { ...data }) };
+      },
+      update: (ref: { path: string }, patch: Record<string, unknown>) =>
+        writes.push(() => applyPatch(ref.path, patch)),
+    });
+    for (const write of writes) write();
+    return result;
+  },
   batch: () => {
     // Buffered like the real thing: nothing lands until commit().
     const ops: (() => void)[] = [];
@@ -510,5 +552,90 @@ describe("stripeWebhook: song-request links (issue #64)", () => {
 
     const donation = await deliver(checkoutEvent("cs_test_next456", "evt_2"));
     expect(donation).toEqual({ status: 200, body: { received: true } });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The fan-page queue bump (#71 Phase 3): a paid request link counts on the
+// jar's requestsLive too — the same server-computed aggregate the relay POST
+// bumps in its accept transaction, reached through the band doc's relayJar
+// reverse map. Best-effort by contract: no failure here may cost the 200.
+
+describe("stripeWebhook: a paid request link bumps the fan-page queue (#71 P3)", () => {
+  const requestLinks = { [SONG_LINK]: { songId: "song_wonderwall", title: "Wonderwall" } };
+  const JAR = "q".repeat(26);
+  const jarPath = `jars/${JAR}`;
+
+  function seedRoutedJar(overrides: Record<string, unknown> = {}) {
+    docs.set(`users/${UID}/bands/${BAND}`, { relayJar: { jarId: JAR } });
+    docs.set(jarPath, {
+      ownerUid: UID,
+      bandId: BAND,
+      requestsLive: { openUntilMs: Date.now() + 3_600_000, updatedAtMs: 1, currency: "eur", songs: {} },
+      ...overrides,
+    });
+  }
+  const jarSongs = () =>
+    (docs.get(jarPath)!["requestsLive"] as { songs: Record<string, unknown> }).songs;
+
+  it("the request lands on the queue: amount_total verbatim (votes pre-multiplied), one fan counted", async () => {
+    await seedConnection({ requestLinks });
+    seedRoutedJar();
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK, amount_total: 2000 }));
+
+    expect(out).toEqual({ status: 200, body: { received: true } });
+    expect(jarSongs()).toEqual({ song_wonderwall: { t: 2000, c: 1, s: "q" } });
+  });
+
+  it("a redelivery never double-bumps — the tombstone answers before the bump is reached", async () => {
+    await seedConnection({ requestLinks });
+    seedRoutedJar();
+    await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK, amount_total: 2000 }));
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1_again", { payment_link: SONG_LINK, amount_total: 2000 }));
+
+    expect(out).toEqual({ status: 200, body: { received: true, duplicate: true } });
+    expect(jarSongs()).toEqual({ song_wonderwall: { t: 2000, c: 1, s: "q" } });
+  });
+
+  it("a plain donation bumps nothing", async () => {
+    await seedConnection({ requestLinks });
+    seedRoutedJar();
+
+    await deliver(checkoutEvent(SESSION, "evt_1")); // OUR_LINK, no songId
+
+    expect(jarSongs()).toEqual({});
+  });
+
+  it("a jar whose route no longer points back (re-claimed by another account) is left alone", async () => {
+    await seedConnection({ requestLinks });
+    seedRoutedJar({ ownerUid: "uid_somebody_else" });
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK }));
+
+    expect(out).toEqual({ status: 200, body: { received: true } }); // the tip still landed
+    expect(jarSongs()).toEqual({});
+  });
+
+  it("no relayJar on the band doc — or no band doc at all — still answers 200 with the tip delivered", async () => {
+    await seedConnection({ requestLinks });
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK }));
+
+    expect(out).toEqual({ status: 200, body: { received: true } });
+    expect(docs.get(tipPath)!["songId"]).toBe("song_wonderwall");
+  });
+
+  it("a jar with no requestsLive (window never armed) gets no partial doc minted", async () => {
+    await seedConnection({ requestLinks });
+    seedRoutedJar();
+    const jarDoc = docs.get(jarPath)!;
+    delete jarDoc["requestsLive"];
+
+    const out = await deliver(checkoutEvent(SESSION, "evt_1", { payment_link: SONG_LINK }));
+
+    expect(out).toEqual({ status: 200, body: { received: true } });
+    expect("requestsLive" in docs.get(jarPath)!).toBe(false);
   });
 });

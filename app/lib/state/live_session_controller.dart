@@ -209,7 +209,8 @@ class LiveSessionController extends Notifier<LiveState?> {
       ),
     );
     _coordinator = coordinator;
-    _publisher = ref.read(jarRequestsPublisherFactoryProvider)();
+    _publisher = ref.read(jarRequestsPublisherFactoryProvider)(
+        serverComputesTotals: coordinator.serverComputesRequestTotals);
 
     // Load the presented watermark BEFORE the coordinator starts: a cloud
     // start attaches the tips listener inside start(), so the whole backlog
@@ -258,9 +259,13 @@ class LiveSessionController extends Notifier<LiveState?> {
     // device speaks (local: this one; cloud: the leader — a joining
     // follower stays quiet). Bands that never enabled the feature skip the
     // relay round-trip entirely: their fan page shows no request UI anyway.
+    // A FRESH start (never resume or join — their sets already have
+    // standings the server owns, #71 Phase 3) also wholesale-clears the
+    // previous night's leftover map on a routed jar.
     if ((session.requestsOpen || app.band.songRequests.enabled) &&
         coordinator.publishesRequests) {
-      _publisher?.onOpenChanged(session);
+      _publisher?.onOpenChanged(session,
+          resetQueue: mode == SessionStartMode.fresh);
     }
     return true;
   }

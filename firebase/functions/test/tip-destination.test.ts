@@ -14,9 +14,11 @@ import {
   SESSION_LEASE_STALE_MS,
   liveSessionId,
   relayTipWire,
+  requestBumpFields,
   stripeTipWire,
 } from "../src/tip-destination";
 import type { StripeTipData } from "../src/stripe-events";
+import type { RequestsLive } from "../src/types";
 
 const NOW = 1_800_000_000_000;
 const BAND = "acc_m3k9zq1a2b3c";
@@ -179,5 +181,51 @@ describe("stripeTipWire: the app's Tip.fromCheckoutSession/toJson round-trip", (
       inPerson: true,
       updatedAtMs: NOW,
     });
+  });
+});
+
+describe("requestBumpFields: one accepted request folded into the fan-page queue (#71 P3)", () => {
+  const NOW = 1_700_000_000_000;
+  const live = (songs: RequestsLive["songs"]): RequestsLive =>
+    ({ openUntilMs: NOW + 3_600_000, updatedAtMs: 1, currency: "eur", songs });
+
+  it("a first request mints a queued entry; a later one accumulates and keeps the verdict", () => {
+    expect(requestBumpFields(live({}), "s1", 300, NOW)).toEqual({
+      "requestsLive.songs.s1.t": 300,
+      "requestsLive.songs.s1.c": 1,
+      "requestsLive.songs.s1.s": "q",
+      "requestsLive.updatedAtMs": NOW,
+    });
+    expect(requestBumpFields(live({ s1: { t: 300, c: 1, s: "p" } }), "s1", 900, NOW)).toEqual({
+      "requestsLive.songs.s1.t": 1200,
+      "requestsLive.songs.s1.c": 2,
+      "requestsLive.songs.s1.s": "p",
+      "requestsLive.updatedAtMs": NOW,
+    });
+  });
+
+  it("survives a doc with no songs map (armed open before any publish)", () => {
+    const armed = live({});
+    delete (armed as Partial<RequestsLive>).songs;
+    expect(requestBumpFields(armed, "s1", 300, NOW)).toMatchObject({
+      "requestsLive.songs.s1.t": 300,
+      "requestsLive.songs.s1.c": 1,
+    });
+  });
+
+  it("saturates at the published wire bounds instead of overflowing them", () => {
+    const fields = requestBumpFields(live({ s1: { t: 99_999_950, c: 10_000, s: "q" } }), "s1", 300, NOW)!;
+    expect(fields["requestsLive.songs.s1.t"]).toBe(100_000_000);
+    expect(fields["requestsLive.songs.s1.c"]).toBe(10_000);
+  });
+
+  it("refuses to write when there is nothing to write INTO, or when the id cannot be a field path", () => {
+    // No requestsLive: a partial doc (updatedAtMs, no openUntilMs) would read
+    // as an OPEN window to /queue — the 2026-07-14 partial-shape family.
+    expect(requestBumpFields(undefined, "s1", 300, NOW)).toBeNull();
+    // The webhook's songId comes from a connection doc written months ago;
+    // a dot would silently address a DIFFERENT field.
+    expect(requestBumpFields(live({}), "s1.evil", 300, NOW)).toBeNull();
+    expect(requestBumpFields(live({}), "", 300, NOW)).toBeNull();
   });
 });

@@ -43,7 +43,7 @@ import {
 } from "./stripe-store";
 import { recordTipNotification } from "./notifications";
 import { bumpQuota, db } from "./store";
-import { routedTipRef, stripeTipWire } from "./tip-destination";
+import { bumpJarRequestsForBand, routedTipRef, stripeTipWire } from "./tip-destination";
 import { isValidJarId } from "./validate";
 
 /** Events are a few KB; anything bigger than this is not one of ours. */
@@ -214,6 +214,23 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
     console.error(`stripeWebhook: write failed for ${connectionId}`, e instanceof Error ? e.message : "");
     send(res, 500, { error: "internal" });
     return;
+  }
+
+  // A paid request link also counts on the fan-page queue (#71 Phase 3) —
+  // the same server-computed aggregate the relay POST bumps in its accept
+  // transaction. AFTER the batch on purpose: the tip's create() is the
+  // exactly-once arbiter, so a redelivery never reaches this line twice.
+  // Best-effort like the notification — Stripe already has its 200 in
+  // spirit, and a display aggregate must not turn a delivered tip into a
+  // retry loop.
+  if (mapped.tip.songId !== undefined) {
+    try {
+      await bumpJarRequestsForBand(
+        firestore, connection.uid, connection.bandId, mapped.tip.songId, mapped.tip.amountMinor, now,
+      );
+    } catch (e) {
+      console.error(`stripeWebhook: request bump failed for ${connectionId}`, e instanceof Error ? e.message : "");
+    }
   }
 
   send(res, 200, { received: true });

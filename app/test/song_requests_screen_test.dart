@@ -252,7 +252,8 @@ void main() {
       relayClientProvider.overrideWithValue(fakeRelayClient(backend)),
       sessionCoordinatorFactoryProvider
           .overrideWithValue((events) => _FakeCoordinator()),
-      jarRequestsPublisherFactoryProvider.overrideWithValue(() => publisher),
+      jarRequestsPublisherFactoryProvider
+          .overrideWithValue(({required serverComputesTotals}) => publisher),
     ]);
     addTearDown(container.dispose);
     await tester.pumpWidget(
@@ -331,6 +332,9 @@ class _FakeCoordinator implements SessionCoordinator {
   bool get publishesRequests => true;
 
   @override
+  bool get serverComputesRequestTotals => false;
+
+  @override
   Future<void> stop(LiveSession session, {bool durable = false}) async {}
 
   @override
@@ -353,7 +357,7 @@ class _RecordingPublisher extends JarRequestsPublisher {
   void onQueueChanged(LiveSession session) => events.add('queue');
 
   @override
-  void onOpenChanged(LiveSession session) =>
+  void onOpenChanged(LiveSession session, {bool resetQueue = false}) =>
       events.add('open:${session.requestsOpen}');
 
   @override

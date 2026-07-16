@@ -283,18 +283,21 @@ class RelayClient {
   }
 
   /// Publishes the jar's song-request state so the server-rendered fan page
-  /// can show it. Three independent parts, each sent only when provided:
+  /// can show it. Independent parts, each sent only when provided:
   /// [config] (the library + toggles, built with [requestsConfigWire]),
-  /// [open] (the mid-set "taking requests right now" flag) and [queue] (the
-  /// live request queue) — the latter two belong to the session plumbing and
-  /// are wired later; the signature carries them now so the callable's shape
-  /// is pinned once.
+  /// [open] (the mid-set "taking requests right now" flag), [queue] (the
+  /// live request queue, wholesale — the local-jar leader's mirror) and
+  /// [statuses] (verdicts only — the routed-jar leader's half now that
+  /// totals are server-computed at tip-accept time, #71 Phase 3). The
+  /// server refuses queue and statuses together: a wholesale set and a
+  /// field-targeted write under it cannot share one update.
   Future<void> setJarRequests({
     required RelayJar jar,
     required String secret,
     Map<String, dynamic>? config,
     bool? open,
     Map<String, dynamic>? queue,
+    Map<String, dynamic>? statuses,
   }) async {
     await _send('setJarRequests', {
       'jarId': jar.jarId,
@@ -302,6 +305,7 @@ class RelayClient {
       'config': ?config,
       'open': ?open,
       'queue': ?queue,
+      'statuses': ?statuses,
     });
   }
 

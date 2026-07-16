@@ -57,12 +57,18 @@ class RecordingPublisher extends JarRequestsPublisher {
 
   final events = <String>[];
 
+  /// One entry per onOpenChanged, in step with its `open:` event — whether
+  /// the controller asked for the fresh-session wholesale reset (#71 P3).
+  final openResets = <bool>[];
+
   @override
   void onQueueChanged(LiveSession session) => events.add('queue');
 
   @override
-  void onOpenChanged(LiveSession session) =>
-      events.add('open:${session.requestsOpen}');
+  void onOpenChanged(LiveSession session, {bool resetQueue = false}) {
+    events.add('open:${session.requestsOpen}');
+    openResets.add(resetQueue);
+  }
 
   @override
   void onStop() => events.add('stop');
@@ -82,7 +88,8 @@ void main() {
       tipSourceFactoryProvider.overrideWithValue(
           ({required demo, required apiKey, required jar}) =>
               ScriptedSource(batches)),
-      jarRequestsPublisherFactoryProvider.overrideWithValue(() => publisher),
+      jarRequestsPublisherFactoryProvider
+          .overrideWithValue(({required serverComputesTotals}) => publisher),
     ]);
     addTearDown(container.dispose);
     container.read(appStateProvider.notifier).enterDemo();
@@ -294,6 +301,26 @@ void main() {
       expect(
           container.read(liveSessionProvider)!.session.requestsOpen, isFalse);
       expect(publisher.events, ['open:false']);
+    });
+
+    test(
+        'a FRESH start asks for the fan-page queue reset; a resume must not '
+        '(#71 P3)', () async {
+      await setUpContainer([[]]);
+      await enableRequests();
+      final controller = container.read(liveSessionProvider.notifier);
+
+      // A new set wholesale-clears the previous night's standings on a
+      // routed jar — the reset rides the same publish that arms the window.
+      await controller.start(goalMinor: 10000);
+      expect(publisher.events, ['open:true']);
+      expect(publisher.openResets, [true]);
+
+      // The crash-resume path re-arms the window but must NOT reset: the
+      // server's bumps ARE the running set's standings now.
+      expect(await controller.resumeStored(), isTrue);
+      expect(publisher.events, ['open:true', 'open:true']);
+      expect(publisher.openResets, [true, false]);
     });
 
     test('toggleRequestsOpen flips the session and speaks immediately',

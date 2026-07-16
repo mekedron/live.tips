@@ -118,10 +118,12 @@ void main() {
       relayChannelFactoryProvider.overrideWithValue(
           ({required demo, required jar, required secret}) => channel),
       jarRequestsPublisherFactoryProvider
-          .overrideWithValue(() => JarRequestsPublisher(
+          .overrideWithValue(({required serverComputesTotals}) =>
+              JarRequestsPublisher(
                 client: fakeRelayClient(backend),
                 jar: relayJar,
                 secret: 'sec_1',
+                serverComputesTotals: serverComputesTotals,
                 throttle: const Duration(milliseconds: 200),
               )),
     ]);
@@ -466,10 +468,12 @@ void main() {
                 backoff: (_) => null,
               )),
       jarRequestsPublisherFactoryProvider
-          .overrideWithValue(() => JarRequestsPublisher(
+          .overrideWithValue(({required serverComputesTotals}) =>
+              JarRequestsPublisher(
                 client: fakeRelayClient(localBackend),
                 jar: relayJar,
                 secret: 'sec_1',
+                serverComputesTotals: serverComputesTotals,
               )),
     ]);
     addTearDown(container.dispose);

@@ -28,6 +28,8 @@
 
 import type { DocumentReference, Firestore } from "firebase-admin/firestore";
 import type { StripeTipData } from "./stripe-events";
+import type { RequestsLive } from "./types";
+import { isValidJarId, MAX_QUEUE_ENTRY_COUNT, MAX_QUEUE_ENTRY_TOTAL, SONG_ID } from "./validate";
 
 /**
  * How long past its lease a leader may stay silent before the session stops
@@ -197,4 +199,89 @@ export function stripeTipWire(id: string, tip: StripeTipData, updatedAtMs: numbe
     ...(tip.songTitle !== undefined && tip.songTitle !== "" ? { songTitle: tip.songTitle } : {}),
     updatedAtMs,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Server-computed request aggregates (#71 Phase 3). On a routed jar the
+// fan-page queue (requestsLive.songs on the jar doc) is no longer a
+// leader-published mirror of the session — every accepted request tip bumps
+// its own entry at write time, so /queue keeps counting with nobody leading.
+// The app's leader keeps owning ONLY the verdicts (played/skipped), published
+// through setJarRequests' statuses map, and the one wholesale reset at a
+// fresh session's start.
+
+/**
+ * The dot-path update that folds one accepted request tip into
+ * requestsLive.songs — pure, so the relay POST's transaction (tip.ts) and the
+ * webhook's (bumpJarRequestsForBand below) cannot disagree. Null when there
+ * is nothing to bump into: a jar whose window was never armed has no
+ * requestsLive, and writing a partial one would hand the readers a doc with
+ * no openUntilMs. The songId is re-checked against [SONG_ID] because it
+ * becomes a field PATH — tip.ts validates it anyway, but the webhook's copy
+ * comes from a connection doc written months earlier.
+ *
+ * Totals clamp at the published wire bounds (validate.ts) instead of
+ * refusing: the tip itself is already accepted, only the display aggregate
+ * saturates. An existing verdict survives the bump; a first request queues.
+ */
+export function requestBumpFields(
+  live: RequestsLive | undefined,
+  songId: string,
+  amountMinor: number,
+  nowMs: number,
+): Record<string, unknown> | null {
+  if (live === undefined || !SONG_ID.test(songId)) return null;
+  const prev = live.songs?.[songId];
+  return {
+    [`requestsLive.songs.${songId}.t`]: Math.min((prev?.t ?? 0) + amountMinor, MAX_QUEUE_ENTRY_TOTAL),
+    [`requestsLive.songs.${songId}.c`]: Math.min((prev?.c ?? 0) + 1, MAX_QUEUE_ENTRY_COUNT),
+    [`requestsLive.songs.${songId}.s`]: prev?.s ?? "q",
+    "requestsLive.updatedAtMs": nowMs,
+  };
+}
+
+/** The route half the connection doc lacks: users/{uid}/bands/{bandId}'s
+ * relayJar blob names the jar (same reverse map account deletion walks,
+ * account.ts). */
+interface JarRouteDoc {
+  ownerUid?: string | null;
+  bandId?: string | null;
+  requestsLive?: RequestsLive;
+}
+
+/**
+ * The Stripe twin of the relay POST's in-transaction bump: a paid
+ * song-request link is a request tip too, and without this the fan page
+ * would silently stop counting Stripe requests the day the leader stopped
+ * publishing totals. Called AFTER the webhook's tip batch commits — the
+ * batch is the exactly-once arbiter (a redelivery that loses the create()
+ * race never gets here), so the bump is at-most-once per Stripe object.
+ *
+ * Best-effort by contract: the caller must not fail the webhook over a
+ * display aggregate. Every hop distrusts its input — the band blob may name
+ * a jar that expired or was re-claimed, so the bump only lands when the
+ * jar's own route points straight back at this uid + band.
+ */
+export async function bumpJarRequestsForBand(
+  firestore: Firestore,
+  uid: string,
+  bandId: string,
+  songId: string,
+  amountMinor: number,
+  nowMs: number,
+): Promise<void> {
+  const band = await firestore
+    .collection("users").doc(uid)
+    .collection("bands").doc(bandId)
+    .get();
+  const jarId = (band.get("relayJar") as { jarId?: unknown } | undefined)?.jarId;
+  if (typeof jarId !== "string" || !isValidJarId(jarId)) return;
+  const ref = firestore.collection("jars").doc(jarId);
+  await firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const jar = snap.data() as JarRouteDoc | undefined;
+    if (jar === undefined || jar.ownerUid !== uid || jar.bandId !== bandId) return;
+    const bump = requestBumpFields(jar.requestsLive, songId, amountMinor, nowMs);
+    if (bump !== null) tx.update(ref, bump);
+  });
 }

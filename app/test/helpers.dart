@@ -309,6 +309,7 @@ class FakeCallables {
       if (name == 'setJarRequests') {
         _checkRequestsConfig(args);
         _checkRequestsQueue(args);
+        _checkRequestsStatuses(args);
       }
       if (name == 'claimJar') _checkClaim(args);
     }
@@ -431,6 +432,33 @@ class FakeCallables {
       if (s != 'q' && s != 'p' && s != 'k') {
         throw FakeFunctionsException(
             'invalid-argument', 'queue entry s must be q, p or k');
+      }
+    }
+  }
+
+  /// The `statuses` contract (#71 Phase 3, validate.ts
+  /// validateRequestsStatuses): a flat songId → "q"|"p"|"k" map, at most 150
+  /// entries — and NEVER alongside `queue` (a wholesale set and a dot path
+  /// under it cannot share one update; the server refuses the pair).
+  static void _checkRequestsStatuses(Map<String, dynamic> args) {
+    final statuses = args['statuses'];
+    if (statuses is! Map) return;
+    if (args['queue'] != null) {
+      throw FakeFunctionsException(
+          'invalid-argument', 'queue and statuses are mutually exclusive');
+    }
+    if (statuses.length > 150) {
+      throw FakeFunctionsException(
+          'invalid-argument', 'statuses must not exceed 150 entries');
+    }
+    for (final e in statuses.entries) {
+      if (e.key is! String || !_songId.hasMatch(e.key as String)) {
+        throw FakeFunctionsException(
+            'invalid-argument', 'statuses song id is not valid');
+      }
+      if (e.value != 'q' && e.value != 'p' && e.value != 'k') {
+        throw FakeFunctionsException(
+            'invalid-argument', 'status must be q, p or k');
       }
     }
   }

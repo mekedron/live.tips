@@ -69,7 +69,20 @@ const fakeDb = {
           const data = ref === jarDocRef ? jar : rateDoc;
           return { exists: data !== undefined, data: () => data };
         }),
-      update(_ref: unknown, patch: Doc) { Object.assign(jar!, patch); },
+      // Real update() semantics: a dotted key is a field PATH, creating the
+      // intermediate maps — the request-bump writes (#71 Phase 3) depend on
+      // exactly that.
+      update(_ref: unknown, patch: Doc) {
+        for (const [key, value] of Object.entries(patch)) {
+          const parts = key.split(".");
+          let node = jar!;
+          for (const part of parts.slice(0, -1)) {
+            const next = node[part];
+            node = (typeof next === "object" && next !== null ? next : (node[part] = {})) as Doc;
+          }
+          node[parts.at(-1)!] = value;
+        }
+      },
       set(ref: unknown, data: Doc) { if (ref === rateDocRef) rateDoc = data; },
     }),
   batch: () => {
@@ -733,6 +746,130 @@ describe("tip POST: routed jars write server-direct (#71)", () => {
     expect(res.body).toMatchObject({ queued: true });
     soleCloudDoc(RELAY_TIPS); // the money write survived
     expect([...cloudDocs.keys()].some((p) => p.includes("/notifications/"))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Server-computed request aggregates (#71 Phase 3): on a ROUTED jar every
+// accepted request tip folds itself into requestsLive.songs inside the accept
+// transaction — the fan-page /queue counts with nobody leading. The app's
+// leader keeps only the verdicts (setJarRequests statuses, jars.test.ts).
+
+function routedRequestsJar(): Doc {
+  return { ...requestsJar(), ownerUid: OWNER, bandId: BAND };
+}
+function liveSongs(): Record<string, Doc> {
+  return ((jar!["requestsLive"] as Doc)["songs"] ?? {}) as Record<string, Doc>;
+}
+
+describe("tip POST: a routed request tip bumps the fan-page queue at accept time (#71 P3)", () => {
+  it("first request: the entry appears queued, priced server-side, updatedAtMs stamped", async () => {
+    jar = routedRequestsJar();
+    seedLive();
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, requestBody({ songId: "s2", votes: 2 })), fakeRes() as never);
+
+    expect(liveSongs()).toEqual({ s2: { t: 1000, c: 1, s: "q" } }); // 2 × the 500 override
+    expect((jar!["requestsLive"] as Doc)["updatedAtMs"]).toBeGreaterThan(0);
+    // The window itself is the leader's: an accepted tip must not re-arm it.
+    expect((jar!["requestsLive"] as Doc)["openUntilMs"]).toBeLessThan(Date.now() + 3_600_001);
+  });
+
+  it("requests accumulate: t sums the server-priced amounts, c counts tips (not votes)", async () => {
+    jar = routedRequestsJar();
+    seedLive();
+    allowThrough();
+
+    // Distinct fan names defeat the 60s dedupe — these are two real fans.
+    await tipHandler(tipPost(XFF, requestBody({ name: "Ada" })), fakeRes() as never);
+    await tipHandler(tipPost(XFF, requestBody({ name: "Grace", votes: 3 })), fakeRes() as never);
+
+    expect(liveSongs()["s1"]).toEqual({ t: 1200, c: 2, s: "q" }); // 300 + 3×300
+  });
+
+  it("an existing played verdict survives the bump — totals are the server's, the verdict stays the app's", async () => {
+    jar = routedRequestsJar();
+    (jar["requestsLive"] as Doc)["songs"] = { s1: { t: 300, c: 1, s: "p" } };
+    seedLive();
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, requestBody({ name: "Ada" })), fakeRes() as never);
+
+    expect(liveSongs()["s1"]).toEqual({ t: 600, c: 2, s: "p" });
+  });
+
+  it("a duplicate POST bumps nothing, exactly as it queues nothing", async () => {
+    jar = routedRequestsJar();
+    seedLive();
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, requestBody({ name: "Ada" })), fakeRes() as never);
+    const res = fakeRes();
+    await tipHandler(tipPost(XFF, requestBody({ name: "Ada" })), res as never);
+
+    expect(res.body).toMatchObject({ queued: false });
+    expect(liveSongs()["s1"]).toEqual({ t: 300, c: 1, s: "q" });
+  });
+
+  it("a plain tip on a routed requests jar leaves the queue untouched", async () => {
+    jar = routedRequestsJar();
+    seedLive();
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, { name: "Ada" }), fakeRes() as never);
+
+    expect(liveSongs()).toEqual({});
+    soleCloudDoc(SESSION_TIPS); // the money still landed
+  });
+
+  it("an UNROUTED requests jar gets no bump: the leader-published queue stays the only writer", async () => {
+    jar = requestsJar(); // open window, no route
+    seedLive();
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, requestBody({ name: "Ada" })), fakeRes() as never);
+
+    expect(liveSongs()).toEqual({});
+    expect(pendingDocs).toHaveLength(1); // the old path, byte-for-byte
+  });
+
+  it("off-session (tip → relayTips) still bumps: the queue mirrors the sale window, not liveness", async () => {
+    jar = routedRequestsJar();
+    allowThrough(); // no live/current at all
+
+    await tipHandler(tipPost(XFF, requestBody({ name: "Ada" })), fakeRes() as never);
+
+    soleCloudDoc(RELAY_TIPS);
+    expect(liveSongs()["s1"]).toEqual({ t: 300, c: 1, s: "q" });
+  });
+
+  it("totals saturate at the wire bounds instead of refusing the tip", async () => {
+    jar = routedRequestsJar();
+    (jar["requestsLive"] as Doc)["songs"] = { s1: { t: 99_999_900, c: 10_000, s: "q" } };
+    seedLive();
+    allowThrough();
+    const res = fakeRes();
+
+    await tipHandler(tipPost(XFF, requestBody({ name: "Ada" })), res as never);
+
+    expect(res.body).toMatchObject({ queued: true }); // the tip is accepted
+    expect(liveSongs()["s1"]).toEqual({ t: 100_000_000, c: 10_000, s: "q" });
+  });
+
+  it("the bumped standings are exactly what GET /queue serves — no leader publish in between", async () => {
+    jar = routedRequestsJar();
+    seedLive();
+    allowThrough();
+
+    await tipHandler(tipPost(XFF, requestBody({ songId: "s2", votes: 2, name: "Ada" })), fakeRes() as never);
+    const res = rawRes();
+    await tipHandler(getReq(`/t/${JAR_ID}/queue`), res as never);
+
+    expect(JSON.parse(res.payload)).toMatchObject({
+      open: true,
+      songs: [{ id: "s2", totalMinor: 1000, count: 1, status: "q" }],
+    });
   });
 });
 

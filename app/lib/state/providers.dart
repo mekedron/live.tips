@@ -1260,15 +1260,21 @@ final jarClaimerFactoryProvider = Provider<JarClaimerFactory>(
 /// [relayChannelFactoryProvider] so controller tests can hand in a recorder.
 /// A null jar/secret (Stripe-only installs, demo — whose jar is pretend and
 /// must never reach the relay) makes the publisher a silent no-op.
-typedef JarRequestsPublisherFactory = JarRequestsPublisher Function();
+/// [serverComputesTotals] is the coordinator's
+/// [SessionCoordinator.serverComputesRequestTotals]: on a routed (cloud)
+/// jar the publisher speaks verdicts only (#71 Phase 3).
+typedef JarRequestsPublisherFactory = JarRequestsPublisher Function(
+    {required bool serverComputesTotals});
 
 final jarRequestsPublisherFactoryProvider =
-    Provider<JarRequestsPublisherFactory>((ref) => () {
+    Provider<JarRequestsPublisherFactory>(
+        (ref) => ({required serverComputesTotals}) {
           final app = ref.read(appStateProvider);
           return JarRequestsPublisher(
             client: ref.read(relayClientProvider),
             jar: app.demo ? null : app.relayJar,
             secret: app.demo ? null : app.relaySecret,
+            serverComputesTotals: serverComputesTotals,
           );
         });
 

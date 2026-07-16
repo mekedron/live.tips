@@ -187,7 +187,7 @@ export function validateProfile(body: Record<string, unknown>): Result<JarProfil
 // Song requests (#64): the artist-published config and live queue state.
 
 /** Same shape as the app's install ids: URL-safe, a safe Firestore map key. */
-const SONG_ID = /^[A-Za-z0-9_-]{1,32}$/;
+export const SONG_ID = /^[A-Za-z0-9_-]{1,32}$/;
 
 const REQUESTS_CONFIG_KEYS = ["enabled", "defaultPriceMinor", "methods", "songs"] as const;
 const SONG_KEYS = ["id", "title", "artist", "priceMinor", "stripeUrl"] as const;
@@ -287,6 +287,11 @@ export function validateRequestsConfig(
 
 const QUEUE_ENTRY_KEYS = ["t", "c", "s"] as const;
 export const MAX_QUEUE_ENTRIES = 150;
+// One entry's bounds — shared with the server-side bump (tip-destination.ts),
+// which clamps instead of rejecting: a fan's accepted tip must never be
+// refused over a display aggregate's ceiling.
+export const MAX_QUEUE_ENTRY_TOTAL = 100_000_000;
+export const MAX_QUEUE_ENTRY_COUNT = 10_000;
 
 /** The live per-song totals the app publishes (requestsLive.songs). */
 export function validateRequestsQueue(
@@ -305,18 +310,40 @@ export function validateRequestsQueue(
     const unknown = rejectUnknownKeys(entry, QUEUE_ENTRY_KEYS, "queue entry");
     if (unknown) return unknown;
     const t = entry["t"];
-    if (typeof t !== "number" || !Number.isSafeInteger(t) || t < 0 || t > 100_000_000) {
-      return err(422, "queue entry t must be an integer between 0 and 100000000");
+    if (typeof t !== "number" || !Number.isSafeInteger(t) || t < 0 || t > MAX_QUEUE_ENTRY_TOTAL) {
+      return err(422, `queue entry t must be an integer between 0 and ${MAX_QUEUE_ENTRY_TOTAL}`);
     }
     const c = entry["c"];
-    if (typeof c !== "number" || !Number.isSafeInteger(c) || c < 0 || c > 10_000) {
-      return err(422, "queue entry c must be an integer between 0 and 10000");
+    if (typeof c !== "number" || !Number.isSafeInteger(c) || c < 0 || c > MAX_QUEUE_ENTRY_COUNT) {
+      return err(422, `queue entry c must be an integer between 0 and ${MAX_QUEUE_ENTRY_COUNT}`);
     }
     const s = entry["s"];
     if (s !== "q" && s !== "p" && s !== "k") return err(422, "queue entry s must be q, p or k");
     songs[id] = { t, c, s };
   }
   return { ok: true, value: songs };
+}
+
+/**
+ * The statuses-only publish (#71 Phase 3): on a routed jar the server computes
+ * each entry's totals at tip-accept time, and the app's leader-published
+ * verdicts shrink to this flat songId → "q" | "p" | "k" map — the full map
+ * every time, so a cleared verdict ("q") and a status a race skipped both
+ * converge on the next publish.
+ */
+export function validateRequestsStatuses(
+  body: Record<string, unknown>,
+): Result<Record<string, "q" | "p" | "k">> {
+  if (Object.keys(body).length > MAX_QUEUE_ENTRIES) {
+    return err(422, `statuses must not exceed ${MAX_QUEUE_ENTRIES} entries`);
+  }
+  const statuses: Record<string, "q" | "p" | "k"> = {};
+  for (const [id, s] of Object.entries(body)) {
+    if (!SONG_ID.test(id)) return err(422, "statuses song id is not valid");
+    if (s !== "q" && s !== "p" && s !== "k") return err(422, "status must be q, p or k");
+    statuses[id] = s;
+  }
+  return { ok: true, value: statuses };
 }
 
 // ---------------------------------------------------------------------------

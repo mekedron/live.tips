@@ -34,7 +34,7 @@ import {
   type PendingTipDoc,
   type RateDoc,
 } from "./store";
-import { relayTipWire, routedTipRef } from "./tip-destination";
+import { relayTipWire, requestBumpFields, routedTipRef } from "./tip-destination";
 import { renderNotFoundPage, renderTipPage, tipPageCsp } from "./tip-page";
 import { verifyTurnstile } from "./turnstile";
 import { isValidJarId, parseJsonBody, validateTip } from "./validate";
@@ -265,10 +265,22 @@ export async function tipHandler(req: Request, res: Response): Promise<void> {
         // active"); here that signal is jarSeen and the app's daily profile
         // re-push. Stamping it per tip would let anyone keep an abandoned
         // jar's URL alive forever (see expireJarsHandler).
+        // A request tip on a ROUTED jar folds itself into the fan-page queue
+        // right here (#71 Phase 3): requestsLive.songs is server-computed at
+        // accept time, so /queue keeps counting with nobody leading. Riding
+        // the same transaction as the counters means two racing fans can
+        // never lose a bump to each other. Unrouted jars keep the leader-
+        // published wholesale queue byte-for-byte. The bump lands wherever
+        // the tip doc lands (session or archive) — the queue mirrors the
+        // open sale window, not liveness.
+        const bump = tipRequest.songId !== undefined && fresh.ownerUid != null && fresh.bandId != null
+          ? requestBumpFields(fresh.requestsLive, tipRequest.songId, tipRequest.amountMinor, ts)
+          : null;
         tx.update(ref, {
           tipsTotal: fresh.tipsTotal + 1,
           tipsToday: fresh.tipsDay === today ? fresh.tipsToday + 1 : 1,
           tipsDay: today,
+          ...(bump ?? {}),
         });
       }
       tx.set(jarRateRef(firestore, jarId), rate);

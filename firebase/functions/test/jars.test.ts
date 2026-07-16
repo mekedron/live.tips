@@ -491,6 +491,126 @@ describe("setJarRequests partial-write semantics", () => {
 });
 
 // ---------------------------------------------------------------------------
+// The statuses-only publish (#71 Phase 3): on a routed jar the server computes
+// t/c at tip-accept time (tip.test.ts), and the leader's queue publish shrinks
+// to this — field-targeted verdict writes that can never clobber a
+// concurrently bumped total.
+
+describe("setJarRequests statuses (#71 P3)", () => {
+  const seeded = () => ({
+    requestsLive: {
+      openUntilMs: Date.now() + 3_600_000, updatedAtMs: 1, currency: "eur",
+      songs: { s1: { t: 900, c: 3, s: "q" }, s2: { t: 500, c: 1, s: "q" } },
+    },
+  });
+
+  it("writes ONLY the verdict — totals and the other entries stay byte-for-byte", async () => {
+    seedOwnedJar(seeded());
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, statuses: { s1: "p" } }, nowSec()),
+    );
+
+    expect(live()!["songs"]).toEqual({
+      s1: { t: 900, c: 3, s: "p" },
+      s2: { t: 500, c: 1, s: "q" },
+    });
+    expect(live()!["updatedAtMs"] as number).toBeGreaterThan(1);
+  });
+
+  it("a cleared verdict ('q') propagates, because the full map is resent", async () => {
+    seedOwnedJar(seeded());
+    (docs.get(`jars/${JAR_ID}`)!["requestsLive"] as { songs: Record<string, { s: string }> })
+      .songs["s1"]!.s = "p";
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, statuses: { s1: "q", s2: "k" } }, nowSec()),
+    );
+
+    expect(live()!["songs"]).toEqual({
+      s1: { t: 900, c: 3, s: "q" },
+      s2: { t: 500, c: 1, s: "k" },
+    });
+  });
+
+  it("an id the map does not hold is skipped, never upserted as a totals-less entry", async () => {
+    seedOwnedJar(seeded());
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, statuses: { s9: "p", s1: "k" } }, nowSec()),
+    );
+
+    expect(live()!["songs"]).toEqual({
+      s1: { t: 900, c: 3, s: "k" },
+      s2: { t: 500, c: 1, s: "q" },
+    });
+  });
+
+  it("statuses on a jar with no requestsLive at all is a clean no-op — no partial doc is minted", async () => {
+    // A partial requestsLive (updatedAtMs, no openUntilMs) reads as an OPEN
+    // window to /queue (`undefined <= now` is false) — the 2026-07-14
+    // partial-shape family. Verdicts for a window that never existed write
+    // NOTHING.
+    seedOwnedJar();
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, statuses: { s1: "p" } }, nowSec()),
+    );
+
+    expect(live()).toBeUndefined();
+  });
+
+  it("a statuses push while OPEN re-arms the 12h window; while CLOSED it does not open it", async () => {
+    const staleDeadline = Date.now() + 60_000;
+    seedOwnedJar(seeded());
+    (docs.get(`jars/${JAR_ID}`)!["requestsLive"] as { openUntilMs: number }).openUntilMs = staleDeadline;
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, statuses: { s1: "p" } }, nowSec()),
+    );
+    expect(live()!["openUntilMs"] as number).toBeGreaterThan(staleDeadline);
+
+    (docs.get(`jars/${JAR_ID}`)!["requestsLive"] as { openUntilMs: number }).openUntilMs = 0;
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, statuses: { s1: "q" } }, nowSec()),
+    );
+    expect(live()!["openUntilMs"]).toBe(0);
+  });
+
+  it("an explicit open:false in the same call wins over the re-arm", async () => {
+    seedOwnedJar(seeded());
+
+    await setJarRequestsHandler(
+      signedIn(OWNER, { jarId: JAR_ID, open: false, statuses: { s1: "p" } }, nowSec()),
+    );
+
+    expect(live()!["openUntilMs"]).toBe(0);
+    expect((live()!["songs"] as Record<string, { s: string }>)["s1"]!.s).toBe("p");
+  });
+
+  it("rejects junk: bad verdicts, junk ids, non-objects, an oversized map — and queue+statuses together", async () => {
+    seedOwnedJar(seeded());
+    const oversized = Object.fromEntries(
+      Array.from({ length: 151 }, (_, i) => [`s${i}`, "q"]),
+    );
+    const bad = [
+      { statuses: { s1: "played" } },
+      { statuses: { "not a song id!": "p" } },
+      { statuses: "p" },
+      { statuses: [] },
+      { statuses: oversized },
+      { queue: { s1: { t: 1, c: 1, s: "q" } }, statuses: { s1: "p" } },
+    ];
+    for (const data of bad) {
+      await expect(
+        setJarRequestsHandler(signedIn(OWNER, { jarId: JAR_ID, ...data }, nowSec())),
+      ).rejects.toMatchObject({ code: "invalid-argument" });
+    }
+    expect(live()!["songs"]).toEqual(seeded().requestsLive.songs); // untouched
+  });
+});
+
+// ---------------------------------------------------------------------------
 // claimJar — the tip route (#71): ownerUid + bandId is what flips a jar's
 // fan tips from the pendingTips queue to server-direct account writes, so
 // the exact write/keep/clear semantics here ARE the routing table.

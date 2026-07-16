@@ -227,7 +227,8 @@ void main() {
                 backoff: (_) => null,
               )),
       jarRequestsPublisherFactoryProvider
-          .overrideWithValue(() => JarRequestsPublisher(
+          .overrideWithValue(({required serverComputesTotals}) =>
+              JarRequestsPublisher(
                 client: fakeRelayClient(backend),
                 jar: const RelayJar(
                   jarId: _jarId,
@@ -237,6 +238,7 @@ void main() {
                   createdAtMs: 1,
                 ),
                 secret: 'sec',
+                serverComputesTotals: serverComputesTotals,
               )),
     ]);
     var disposed = false;

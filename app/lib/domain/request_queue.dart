@@ -127,4 +127,16 @@ class RequestQueue {
             's': entry.status ?? 'q',
           },
       };
+
+  /// The `statuses` argument for `setJarRequests` — the routed-jar leader's
+  /// half of the queue now that totals are server-computed at tip-accept
+  /// time (#71 Phase 3): a flat songId → verdict map, same cap and status
+  /// wire as [toWirePayload]. The FULL map every time, so a cleared verdict
+  /// ("q") and a status the server race-skipped both converge on the next
+  /// publish. The server writes each `s` field-targeted and never touches
+  /// t/c — this payload cannot clobber a bump.
+  Map<String, dynamic> toStatusesWirePayload() => {
+        for (final entry in entries.take(maxWireEntries))
+          entry.songId: entry.status ?? 'q',
+      };
 }
