@@ -41,6 +41,11 @@ class StageHud extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = snapshot;
     final jarPctRounded = (s.jarPct * 100).round();
+    // Once the whole take clears the goal, the current-jar fraction reads as a
+    // contradiction ("$576 … 61%"). Past the goal we show the total against it
+    // instead — 461%, not the leftover slice of the refilling jar.
+    final goalPctRounded =
+        s.goalMinor <= 0 ? 0 : (s.totalMinor / s.goalMinor * 100).round();
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth > 780;
@@ -106,20 +111,26 @@ class StageHud extends StatelessWidget {
                   ),
                   SizedBox(height: wide ? 8 : 7),
                   Text(
-                    context.s.t('stage.jar_progress', {
-                          'current': formatAmount(
-                            s.currentJarMinor,
-                            s.currency,
-                          ),
-                          'goal': formatAmount(s.goalMinor, s.currency),
-                          'pct': jarPctRounded,
-                        }) +
-                        (wide ? context.s.t('stage.of_tonights_goal') : ''),
+                    s.goalReached
+                        ? context.s.t('stage.goal_reached', {
+                            'pct': goalPctRounded,
+                          })
+                        : context.s.t('stage.jar_progress', {
+                                'current': formatAmount(
+                                  s.currentJarMinor,
+                                  s.currency,
+                                ),
+                                'goal': formatAmount(s.goalMinor, s.currency),
+                                'pct': jarPctRounded,
+                              }) +
+                              (wide
+                                  ? context.s.t('stage.of_tonights_goal')
+                                  : ''),
                     style: TextStyle(
                       fontFamily: kFontOutfit,
                       fontSize: wide ? 14 : 12.5,
                       fontWeight: FontWeight.w600,
-                      color: s.jarPct >= 1
+                      color: s.goalReached
                           ? const Color(0xFF4FCB8D)
                           : Colors.white.withValues(alpha: 0.7),
                       shadows: const [

@@ -838,6 +838,7 @@ const Map<String, String> kEnStrings = {
   "stage.fullscreen": "Fullscreen",
   "stage.fullscreen_iphone_body": "iPhone Safari can’t expand a web page to fullscreen. Add live.tips to your Home Screen once and it launches with no browser bars — a clean, full-screen stage.",
   "stage.fullscreen_iphone_title": "Go fullscreen on iPhone",
+  "stage.goal_reached": "{pct}% of tonight's goal 🎉",
   "stage.got_it": "Got it",
   "stage.jar_progress": "{current} of {goal} · {pct}%",
   "stage.of_goal": "of {goal} goal · {pct}%",
