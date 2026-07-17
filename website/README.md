@@ -60,9 +60,6 @@ one-hour undelivered-tip window, the 90-day profile expiry, the hashed-IP quota.
 
 This is a promise `/privacy/` makes out loud, so the build keeps it true:
 
-- The **Product Hunt badge** is served from `ph-badge-light.svg` /
-  `ph-badge-dark.svg` in this directory, not from `api.producthunt.com`. Re-download
-  those two files if the badge's ranking text goes stale.
 - The **GitHub star count** is fetched **at build time** by `site_common.gh_stars_badge()`
   and baked into the header. There is no `fetch()` in the browser. A build with no
   network just omits the badge and warns.
