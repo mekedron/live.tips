@@ -120,6 +120,7 @@
   "a11y_dismiss": "Stäng",
   "banner": "Den här webbplatsen finns också på svenska.",
   "goal_tmpl": "{done} av {goal} · {pct}% av kvällens mål",
+  "goal_reached_tmpl": "{pct}% av kvällens mål 🎉",
   "tip_tmpl": "{name} gav {amount} i dricks",
   "theme": "Tema"
 }

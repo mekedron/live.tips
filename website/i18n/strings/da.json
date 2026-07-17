@@ -120,6 +120,7 @@
   "a11y_dismiss": "Luk",
   "banner": "Denne side findes også på dansk.",
   "goal_tmpl": "{done} af {goal} · {pct}% af aftenens mål",
+  "goal_reached_tmpl": "{pct}% af aftenens mål 🎉",
   "tip_tmpl": "{name} gav {amount}",
   "theme": "Tema"
 }

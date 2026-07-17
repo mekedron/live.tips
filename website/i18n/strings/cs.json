@@ -120,6 +120,7 @@
   "a11y_dismiss": "Zavřít",
   "banner": "Tento web je k dispozici i v češtině.",
   "goal_tmpl": "{done} z {goal} · {pct} % dnešního cíle",
+  "goal_reached_tmpl": "{pct} % dnešního cíle 🎉",
   "tip_tmpl": "{name} přihodil(a) {amount}",
   "theme": "Motiv"
 }

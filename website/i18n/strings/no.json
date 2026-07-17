@@ -120,6 +120,7 @@
   "a11y_dismiss": "Lukk",
   "banner": "Dette nettstedet er også tilgjengelig på norsk.",
   "goal_tmpl": "{done} av {goal} · {pct}% av kveldens mål",
+  "goal_reached_tmpl": "{pct}% av kveldens mål 🎉",
   "tip_tmpl": "{name} ga {amount} i tips",
   "theme": "Tema"
 }

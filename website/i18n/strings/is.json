@@ -120,6 +120,7 @@
   "a11y_dismiss": "Loka",
   "banner": "Þessi vefsíða er einnig í boði á íslensku.",
   "goal_tmpl": "{done} af {goal} · {pct}% af markmiði kvöldsins",
+  "goal_reached_tmpl": "{pct}% af markmiði kvöldsins 🎉",
   "tip_tmpl": "{name} gaf {amount} í þjórfé",
   "theme": "Þema"
 }

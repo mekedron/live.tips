@@ -120,6 +120,7 @@
   "a11y_dismiss": "Dismiss",
   "banner": "This site is also available in English.",
   "goal_tmpl": "{done} of {goal} · {pct}% of tonight’s goal",
+  "goal_reached_tmpl": "{pct}% of tonight’s goal 🎉",
   "tip_tmpl": "{name} tipped {amount}",
   "theme": "Theme"
 }

@@ -120,6 +120,7 @@
   "a11y_dismiss": "Schließen",
   "banner": "Diese Website ist auch auf Deutsch verfügbar.",
   "goal_tmpl": "{done} von {goal} · {pct}% des heutigen Ziels",
+  "goal_reached_tmpl": "{pct}% des heutigen Ziels 🎉",
   "tip_tmpl": "{name} gab {amount} Trinkgeld",
   "theme": "Design"
 }

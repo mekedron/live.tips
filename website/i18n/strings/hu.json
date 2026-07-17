@@ -120,6 +120,7 @@
   "a11y_dismiss": "Bezárás",
   "banner": "Ez az oldal magyarul is elérhető.",
   "goal_tmpl": "{done} / {goal} · a ma esti cél {pct}%-a",
+  "goal_reached_tmpl": "a ma esti cél {pct}%-a 🎉",
   "tip_tmpl": "{name} {amount} borravalót adott",
   "theme": "Téma"
 }

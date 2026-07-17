@@ -120,6 +120,7 @@
   "a11y_dismiss": "Закрити",
   "banner": "Цей сайт також доступний українською.",
   "goal_tmpl": "{done} з {goal} · {pct}% цілі вечора",
+  "goal_reached_tmpl": "{pct}% цілі вечора 🎉",
   "tip_tmpl": "{name} донатить {amount}",
   "theme": "Тема"
 }

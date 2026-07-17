@@ -295,7 +295,8 @@
   }
   .hud-bar { width: min(300px, 60%); height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; margin-top: 12px; }
   .hud-bar > div { height: 100%; border-radius: 3px; background: #FF7C55; width: 0%; transition: width .9s cubic-bezier(.2,.8,.2,1); }
-  .hud-goal { color: rgba(255,255,255,.7); font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; font-size: 13.5px; margin-top: 8px; text-shadow: 0 1px 8px rgba(0,0,0,.8); }
+  .hud-goal { color: rgba(255,255,255,.7); font-family: Outfit, 'Noto Sans', sans-serif; font-weight: 600; font-size: 13.5px; margin-top: 8px; text-shadow: 0 1px 8px rgba(0,0,0,.8); transition: color .4s ease; }
+  .hud-goal.reached { color: #4FCB8D; }
   .hud-toast {
     display: flex; align-items: center; gap: 12px; margin-top: 16px;
     background: rgba(20,17,20,.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);

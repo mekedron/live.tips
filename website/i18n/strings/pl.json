@@ -120,6 +120,7 @@
   "a11y_dismiss": "Zamknij",
   "banner": "Ta strona jest również dostępna po polsku.",
   "goal_tmpl": "{done} z {goal} · {pct}% dzisiejszego celu",
+  "goal_reached_tmpl": "{pct}% dzisiejszego celu 🎉",
   "tip_tmpl": "{name} wrzucił(a) {amount}",
   "theme": "Motyw"
 }

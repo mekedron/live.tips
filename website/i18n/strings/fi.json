@@ -120,6 +120,7 @@
   "a11y_dismiss": "Sulje",
   "banner": "Tämä sivusto on saatavilla myös suomeksi.",
   "goal_tmpl": "{done} / {goal} · {pct}% illan tavoitteesta",
+  "goal_reached_tmpl": "{pct}% illan tavoitteesta 🎉",
   "tip_tmpl": "{name} tippasi {amount}",
   "theme": "Teema"
 }

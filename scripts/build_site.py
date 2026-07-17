@@ -43,7 +43,7 @@ from site_common import (STRINGS, WEB, esc, font_preloads, gh_stars_badge, home_
 HTML_KEYS = {"hero_h1", "hero_sub", "stage_caption", "cta_h2"}
 
 # Runtime strings handed to the page's JS (see the chrome partial's `var I18N = …`).
-JS_KEYS = ("goal_tmpl", "tip_tmpl", "theme")
+JS_KEYS = ("goal_tmpl", "goal_reached_tmpl", "tip_tmpl", "theme")
 
 # The demo HUD's initial numbers, matching the renderer boot state in the
 # template's script, so localized static text doesn't flash then change.

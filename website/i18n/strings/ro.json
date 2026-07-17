@@ -120,6 +120,7 @@
   "a11y_dismiss": "Închide",
   "banner": "Acest site este disponibil și în română.",
   "goal_tmpl": "{done} din {goal} · {pct}% din obiectivul serii",
+  "goal_reached_tmpl": "{pct}% din obiectivul serii 🎉",
   "tip_tmpl": "{name} a lăsat {amount}",
   "theme": "Temă"
 }

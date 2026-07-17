@@ -472,9 +472,17 @@
     // total sitting right above it.
     barEl.style.width = Math.min(Math.round(state.jarPct * 100), 100) + '%';
     var pct = GOAL > 0 ? Math.round(state.total / GOAL * 100) : 0;
-    var goalStr = '$' + GOAL.toLocaleString('en');
-    var doneStr = '$' + Math.round(state.total).toLocaleString('en');
-    goalEl.textContent = I18N.goal_tmpl.replace('{done}', doneStr).replace('{goal}', goalStr).replace('{pct}', pct);
+    var reached = GOAL > 0 && state.total >= GOAL;
+    goalEl.classList.toggle('reached', reached);
+    if (reached) {
+      // Cleared the goal: the hero total above already shows the take, so the
+      // caption just celebrates how far past — "244% of tonight's goal 🎉".
+      goalEl.textContent = I18N.goal_reached_tmpl.replace('{pct}', pct);
+    } else {
+      var goalStr = '$' + GOAL.toLocaleString('en');
+      var doneStr = '$' + Math.round(state.total).toLocaleString('en');
+      goalEl.textContent = I18N.goal_tmpl.replace('{done}', doneStr).replace('{goal}', goalStr).replace('{pct}', pct);
+    }
   }
 
   // The demo fan wall. 42 of them, because of course it is. Most take a random

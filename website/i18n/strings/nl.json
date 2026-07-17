@@ -120,6 +120,7 @@
   "a11y_dismiss": "Sluiten",
   "banner": "Deze website is ook beschikbaar in het Nederlands.",
   "goal_tmpl": "{done} van {goal} · {pct}% van het doel van vanavond",
+  "goal_reached_tmpl": "{pct}% van het doel van vanavond 🎉",
   "tip_tmpl": "{name} gaf een fooi van {amount}",
   "theme": "Thema"
 }

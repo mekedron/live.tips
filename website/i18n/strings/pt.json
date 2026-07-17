@@ -120,6 +120,7 @@
   "a11y_dismiss": "Dispensar",
   "banner": "Este site também está disponível em Português.",
   "goal_tmpl": "{done} de {goal} · {pct}% da meta desta noite",
+  "goal_reached_tmpl": "{pct}% da meta desta noite 🎉",
   "tip_tmpl": "{name} deixou {amount}",
   "theme": "Tema"
 }
