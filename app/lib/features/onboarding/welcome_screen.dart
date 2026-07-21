@@ -45,18 +45,27 @@ class WelcomeScreen extends ConsumerWidget {
   /// [firstBandSetupScreen] is deliberately NOT given `createsProfile: true`
   /// here: the details step already mints when there is no active band, and
   /// asking for a second one would leave an unnamed duplicate behind.
+  ///
+  /// On a phone or tablet browser the whole run opens with the "Add to Home
+  /// Screen" nudge ([withInstallHint]) — the account question waits behind it,
+  /// because signing in inside the browser is the thing the nudge warns about.
   Future<void> _getStarted(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
     await ref.read(deviceKindProvider.notifier).choose(DeviceKind.performer);
     if (!context.mounted) return;
+    // Read here, not inside the closure: the nudge can sit on screen for a
+    // while, and this screen — and its ref — may be gone by the time Continue
+    // is tapped. The answer cannot change under a modal step anyway.
     final offerSignIn = platformSupportsCloudAccounts &&
         ref.read(authControllerProvider.notifier).available &&
         ref.read(authControllerProvider).user == null;
     navigator.push(
       MaterialPageRoute(
-        builder: (_) => offerSignIn
-            ? const AccountStepScreen()
-            : firstBandSetupScreen(),
+        builder: (_) => withInstallHint(
+          () => offerSignIn
+              ? const AccountStepScreen()
+              : firstBandSetupScreen(),
+        ),
       ),
     );
   }

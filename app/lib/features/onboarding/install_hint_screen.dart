@@ -6,23 +6,31 @@ import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/install_steps.dart';
 import '../../widgets/lt_ui.dart';
-import 'onboarding_details_screen.dart';
 
-/// First stop of onboarding on a phone or tablet browser: recommend installing
-/// live.tips to the Home Screen before connecting Stripe. iPhone Safari can't
-/// show a web page full-screen at all, and everywhere else an installed PWA
-/// still launches chrome-free and app-like — so we surface this once, up front.
+/// THE first stop of onboarding on a phone or tablet browser — before the
+/// account question, before any band setup: recommend installing live.tips to
+/// the Home Screen. iPhone Safari can't show a web page full-screen at all, and
+/// everywhere else an installed PWA still launches chrome-free and app-like.
 ///
-/// Purely advisory: "Continue" carries straight on to the details step
-/// whether or not they installed. The steps come from the shared [installSteps] list, so
+/// It comes first because everything after it costs something to redo. Signing
+/// in inside the browser and installing afterwards can land the artist in a
+/// separate store with a separate session history, so the nudge has to arrive
+/// while there is still nothing to carry over — the moment they tap "Get
+/// started", not three screens deep.
+///
+/// Purely advisory: "Continue" carries straight on to [next] whether or not
+/// they installed. The steps come from the shared [installSteps] list, so
 /// they stay in lockstep with the stage's fullscreen hint. Shown only where
-/// [shouldSuggestInstall] is true (gated by the caller), never on desktop.
+/// [shouldSuggestInstall] is true (gated by [withInstallHint]), never on
+/// desktop.
 class InstallHintScreen extends StatelessWidget {
-  const InstallHintScreen({super.key, this.createsProfile = false});
+  const InstallHintScreen({super.key, required this.next});
 
-  /// Passed straight through to the details step: this run creates a profile
-  /// rather than naming the one already open (#44).
-  final bool createsProfile;
+  /// The onboarding screen this nudge stands in front of — the account question
+  /// when cloud accounts are on offer, the band details otherwise. A builder so
+  /// the caller's branch stays where the caller can read it, and nothing is
+  /// constructed for an artist who leaves to install instead.
+  final Widget Function() next;
 
   /// The nudge is advisory, but skipping it has real costs — confirm once and
   /// spell them out before connecting inside the browser. [noFullscreen] is the
@@ -63,11 +71,7 @@ class InstallHintScreen extends StatelessWidget {
     );
     if (proceed == true) {
       navigator.pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => OnboardingDetailsScreen(
-            createsProfile: createsProfile,
-          ),
-        ),
+        MaterialPageRoute(builder: (_) => next()),
       );
     }
   }

@@ -12,10 +12,21 @@ import 'onboarding_details_screen.dart';
 import 'onboarding_done_screen.dart';
 import 'onboarding_method_screen.dart';
 
-/// The screen that starts the band-setup half of onboarding. Phones and
-/// tablets in a browser get the one-time "Add to Home Screen" nudge first
-/// (it carries on to the details step itself); desktop and the installed
-/// PWA go straight to the band details.
+/// Puts the one-time "Add to Home Screen" nudge in front of [next] on a phone
+/// or tablet browser; everywhere else (desktop, an installed PWA, the native
+/// builds) it hands back [next] untouched.
+///
+/// This wraps the FIRST screen of onboarding and nothing else. The nudge used to
+/// sit one layer in, at the head of the band setup, which meant the artist met
+/// the account question first — and answering it inside the browser is exactly
+/// the thing the nudge exists to warn about: a session history written to this
+/// browser's store that an app installed later may not inherit. A warning that
+/// arrives after the step it warns about is decoration. So it opens the run, on
+/// the tap on "Get started", while there is still nothing to carry over.
+Widget withInstallHint(Widget Function() next) =>
+    shouldSuggestInstall ? InstallHintScreen(next: next) : next();
+
+/// The screen that starts the band-setup half of onboarding.
 ///
 /// [createsProfile] rides along to the details step: this run was started by an
 /// artist asking for a NEW profile ("Add a profile", "Create a new profile"), so
@@ -23,9 +34,7 @@ import 'onboarding_method_screen.dart';
 /// renaming the one they are standing in. The profile is written there, as it is
 /// named — never on the tap that opened this (#44).
 Widget firstBandSetupScreen({bool createsProfile = false}) =>
-    shouldSuggestInstall
-        ? InstallHintScreen(createsProfile: createsProfile)
-        : OnboardingDetailsScreen(createsProfile: createsProfile);
+    OnboardingDetailsScreen(createsProfile: createsProfile);
 
 /// Pushes the next onboarding setup step after [after] (null = the first one).
 /// Steps run in a fixed order — Stripe, then the relay methods — for whichever
