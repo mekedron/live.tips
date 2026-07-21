@@ -569,3 +569,7 @@ the smallest server that makes this possible: Cloud Functions (2nd gen, Node
   release.
 - `scripts/run.sh iphone|ipad|mac|android` launches the debug build on the
   most recently used simulator/emulator of that type.
+- `scripts/sim.sh iphone|ipad` boots a bare simulator with no app installed —
+  one dedicated, long-lived device per kind ("LiveTips iPhone"/"LiveTips iPad")
+  so its Safari state survives between runs. For testing production from a real
+  iOS Safari; add `--url`, `--restart` or `--reset`.
