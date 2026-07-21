@@ -160,6 +160,8 @@ void main() {
 
     await tester.tap(find.text('Anonymous cloud account'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue anyway'));
+    await tester.pumpAndSettle();
 
     // The naming step — the screen whose existence nobody could have promised.
     expect(find.text('What should we call you?'), findsOneWidget);

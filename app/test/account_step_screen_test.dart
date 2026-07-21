@@ -57,8 +57,29 @@ void main() {
 
     await tester.tap(find.text('Continue without an account'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue anyway'));
+    await tester.pumpAndSettle();
 
     expect(find.byType(OnboardingDetailsScreen), findsOneWidget);
+  });
+
+  testWidgets('going offline lists what it costs, and backing out stays put', (
+    tester,
+  ) async {
+    await _pump(tester, auth: FakeAuthService());
+
+    await tester.tap(find.text('Continue without an account'));
+    await tester.pumpAndSettle();
+
+    // Push is the one that surprises people, so it is named outright.
+    expect(find.text('No push notifications'), findsOneWidget);
+
+    // The filled button is the one that does NOT proceed.
+    await tester.tap(find.text('Sign in instead'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OnboardingDetailsScreen), findsNothing);
+    expect(find.text('First, an account'), findsOneWidget);
   });
 
   testWidgets('a sign-in without a name pushes the account naming step', (
@@ -72,6 +93,8 @@ void main() {
     );
 
     await tester.tap(find.text('Anonymous cloud account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue anyway'));
     await tester.pumpAndSettle();
 
     expect(find.byType(AccountNameScreen), findsOneWidget);

@@ -62,8 +62,9 @@ Future<ProviderContainer> _bootFresh(WidgetTester tester) async {
       listen: false);
 }
 
-/// Fresh install → Get started → the account step → "Anonymous cloud account": the
-/// guest account exists from here on, and the name step is on screen.
+/// Fresh install → Get started → the account step → "Anonymous cloud account" →
+/// through the what-you-lose confirmation: the guest account exists from here
+/// on, and the name step is on screen.
 Future<ProviderContainer> _signInAsGuest(WidgetTester tester) async {
   final container = await _bootFresh(tester);
   expect(find.byType(WelcomeScreen), findsOneWidget);
@@ -71,6 +72,10 @@ Future<ProviderContainer> _signInAsGuest(WidgetTester tester) async {
   await tester.tap(find.text('Get started'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Anonymous cloud account'));
+  await tester.pumpAndSettle();
+  // Guest is a downgrade, so it asks first — and the filled button is the one
+  // that backs OUT. Taking it here would be the artist changing their mind.
+  await tester.tap(find.text('Continue anyway'));
   await tester.pumpAndSettle();
 
   expect(find.byType(AccountNameScreen), findsOneWidget);
@@ -125,6 +130,8 @@ void main() {
 
     // The artist answers differently this time.
     await tester.tap(find.text('Continue without an account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue anyway'));
     await tester.pumpAndSettle();
     expect(find.byType(AccountStepScreen), findsNothing);
   });
