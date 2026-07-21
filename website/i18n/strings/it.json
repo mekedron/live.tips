@@ -18,7 +18,6 @@
   "hero_badge": "Open source · 0% di commissioni · con il tuo account Stripe",
   "hero_h1": "Pagamenti con carta per musicisti di strada.<br>Sul palco <em>in pochi minuti.</em>",
   "hero_sub": "Un solo QR code sulla custodia della chitarra. I fan scansionano, scelgono l'importo, lasciano un nome e un messaggio — e ogni mancia con carta arriva dritta sul <strong>tuo account Stripe</strong>. Niente piattaforma, niente intermediari, niente commissioni.",
-  "hero_cta_run": "Provalo nel browser",
   "hero_cta_source": "Guarda il codice",
   "hero_trust": "Nessun account richiesto, nessuna installazione — senza account la tua chiave Stripe non lascia mai il tuo dispositivo; accedi e si sposta sul nostro server per i tuoi altri dispositivi",
   "hud_live": "DEMO LIVE",

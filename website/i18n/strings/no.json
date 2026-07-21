@@ -18,7 +18,6 @@
   "hero_badge": "Åpen kildekode · 0 % provisjon · drevet av din egen Stripe",
   "hero_h1": "Kortbetalinger for gatemusikanter.<br>På scenen <em>på minutter.</em>",
   "hero_sub": "Én QR-kode på gitarkassen. Publikum skanner, velger et beløp og legger igjen navn og en hilsen — og hvert korttips havner rett på <strong>din egen Stripe-konto</strong>. Ingen plattform, ingen mellommann, ingen provisjon.",
-  "hero_cta_run": "Kjør den i nettleseren",
   "hero_cta_source": "Se kildekoden",
   "hero_trust": "Ingen konto nødvendig, ingen installasjon — uten konto forlater Stripe-nøkkelen din aldri enheten; logg inn, og den flytter til serveren vår for de andre enhetene dine",
   "hud_live": "LIVEDEMO",

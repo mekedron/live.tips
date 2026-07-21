@@ -18,7 +18,6 @@
   "hero_badge": "Open source · 0 % de commission · propulsé par votre propre Stripe",
   "hero_h1": "Le paiement par carte pour musiciens de rue.<br>Sur scène <em>en quelques minutes.</em>",
   "hero_sub": "Un seul QR code sur l’étui de guitare. Le public scanne, choisit un montant, laisse un nom et un message — et chaque pourboire par carte arrive directement sur <strong>votre propre compte Stripe</strong>. Sans plateforme, sans intermédiaire, sans commission.",
-  "hero_cta_run": "Lancez-le dans votre navigateur",
   "hero_cta_source": "Voir le code source",
   "hero_trust": "Aucun compte requis, aucune installation — sans compte, votre clé Stripe ne quitte jamais votre appareil ; connectez-vous et elle passe sur notre serveur pour vos autres appareils",
   "hud_live": "DÉMO EN DIRECT",

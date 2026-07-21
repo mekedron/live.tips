@@ -18,7 +18,6 @@
   "hero_badge": "Öppen källkod · 0 % avgift · drivs av ditt eget Stripe",
   "hero_h1": "Kortbetalningar för gatumusikanter.<br>På scenen <em>på några minuter.</em>",
   "hero_sub": "En QR-kod på gitarrfodralet. Publiken skannar, väljer ett belopp, lämnar namn och en hälsning — och varje dricks med kort hamnar direkt på <strong>ditt eget Stripe-konto</strong>. Ingen plattform, ingen mellanhand, ingen avgift.",
-  "hero_cta_run": "Kör den i webbläsaren",
   "hero_cta_source": "Se källkoden",
   "hero_trust": "Inget konto krävs, ingen installation — utan konto lämnar din Stripe-nyckel aldrig din enhet; loggar du in flyttas den till vår server för dina andra enheter",
   "hud_live": "LIVEDEMO",

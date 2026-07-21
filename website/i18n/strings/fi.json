@@ -18,7 +18,6 @@
   "hero_badge": "Avoin lähdekoodi · 0 % komissiota · toimii omalla Stripe-tililläsi",
   "hero_h1": "Korttimaksut katusoittajille.<br>Lavalla <em>minuuteissa.</em>",
   "hero_sub": "Yksi QR-koodi kitarakotelon kanteen. Fanit skannaavat, valitsevat summan ja jättävät nimen ja viestin — ja jokainen korttitippi päätyy suoraan <strong>omalle Stripe-tilillesi</strong>. Ei alustaa, ei välikäsiä, ei siivua.",
-  "hero_cta_run": "Käynnistä selaimessa",
   "hero_cta_source": "Katso lähdekoodi",
   "hero_trust": "Tiliä ei tarvita, ei asennusta — ilman tiliä Stripe-avaimesi ei koskaan poistu laitteeltasi; kirjaudu sisään, niin se siirtyy palvelimellemme muita laitteitasi varten",
   "hud_live": "LIVE-DEMO",

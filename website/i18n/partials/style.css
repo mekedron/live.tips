@@ -553,7 +553,7 @@
   }
   @media (max-width: 460px) {
     /* icon-only on phones: a perfect circle matching the other header buttons
-       (desktop keeps the wide labelled "Open app" pill) */
+       (desktop keeps the wide labelled "Open the app" pill) */
     .btn-hdr span.label { display: none; }
     .btn-hdr { width: 36px; height: 36px; padding: 0; margin-left: 0; }
     .btn-hdr .ms { font-size: 18px; }

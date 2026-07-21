@@ -18,7 +18,6 @@
   "hero_badge": "Open Source · 0 % Provision · mit deinem eigenen Stripe",
   "hero_h1": "Kartenzahlung für Straßenmusiker.<br>Auf der Bühne <em>in Minuten.</em>",
   "hero_sub": "Ein QR-Code am Gitarrenkoffer. Fans scannen, wählen einen Betrag, hinterlassen Namen und Nachricht — und jedes Kartentrinkgeld landet direkt auf <strong>deinem eigenen Stripe-Konto</strong>. Keine Plattform, kein Mittelsmann, keine Provision.",
-  "hero_cta_run": "Im Browser starten",
   "hero_cta_source": "Quellcode ansehen",
   "hero_trust": "Kein Konto nötig, keine Installation — ohne Konto verlässt dein Stripe-Schlüssel niemals dein Gerät; meldest du dich an, wandert er für deine anderen Geräte auf unseren Server",
   "hud_live": "LIVE-DEMO",

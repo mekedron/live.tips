@@ -18,7 +18,6 @@
   "hero_badge": "Código abierto · 0 % de comisión · con tu propia cuenta de Stripe",
   "hero_h1": "Pagos con tarjeta para músicos callejeros.<br>En el escenario <em>en minutos.</em>",
   "hero_sub": "Un código QR en la funda de la guitarra. El público escanea, elige un importe y deja su nombre y un mensaje: cada propina con tarjeta llega directamente a <strong>tu propia cuenta de Stripe</strong>. Sin plataforma, sin intermediarios, sin comisiones.",
-  "hero_cta_run": "Pruébalo en tu navegador",
   "hero_cta_source": "Ver el código",
   "hero_trust": "Sin cuenta y sin instalación: sin cuenta tu clave de Stripe nunca sale de tu dispositivo; inicia sesión y se traslada a nuestro servidor para tus otros dispositivos",
   "hud_live": "DEMO EN VIVO",

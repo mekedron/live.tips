@@ -18,7 +18,6 @@
   "hero_badge": "Nyílt forrású · 0% jutalék · a saját Stripe-fiókoddal működik",
   "hero_h1": "Bankkártyás fizetés utcazenészeknek.<br>A színpadon <em>percek alatt.</em>",
   "hero_sub": "Egyetlen QR-kód a gitártokon. A rajongók beolvassák, összeget választanak, nevet és üzenetet hagynak — és minden kártyás borravaló egyenesen a <strong>saját Stripe-fiókodba</strong> érkezik. Nincs platform, nincs közvetítő, nincs jutalék.",
-  "hero_cta_run": "Futtasd a böngésződben",
   "hero_cta_source": "Nézd meg a forráskódot",
   "hero_trust": "Nem kell fiók, nincs telepítés — fiók nélkül a Stripe-kulcsod soha nem hagyja el a készülékedet; jelentkezz be, és a szerverünkre kerül a többi készülékedhez",
   "hud_live": "ÉLŐ DEMÓ",

@@ -18,7 +18,6 @@
   "hero_badge": "Open source · 0% prowizji · działa na Twoim własnym Stripe",
   "hero_h1": "Płatności kartą dla ulicznych muzyków.<br>Na scenie <em>w kilka minut.</em>",
   "hero_sub": "Jeden kod QR na futerale od gitary. Fani skanują, wybierają kwotę, zostawiają imię i wiadomość — a każdy napiwek kartą trafia prosto na <strong>Twoje własne konto Stripe</strong>. Bez platformy, bez pośredników, bez prowizji.",
-  "hero_cta_run": "Uruchom w przeglądarce",
   "hero_cta_source": "Zobacz kod źródłowy",
   "hero_trust": "Konto niepotrzebne, bez instalacji — bez konta Twój klucz Stripe nigdy nie opuszcza urządzenia; zaloguj się, a przenosi się na nasz serwer dla Twoich pozostałych urządzeń",
   "hud_live": "DEMO NA ŻYWO",

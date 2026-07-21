@@ -18,7 +18,6 @@
   "hero_badge": "Open source · 0% provize · běží na tvém vlastním Stripe",
   "hero_h1": "Platby kartou pro pouliční muzikanty.<br>Na pódiu <em>za pár minut.</em>",
   "hero_sub": "Jeden QR kód na pouzdru od kytary. Fanoušci ho naskenují, zvolí částku, napíšou jméno a vzkaz — a každé spropitné kartou míří rovnou na <strong>tvůj vlastní Stripe účet</strong>. Žádná platforma, žádný prostředník, žádná provize.",
-  "hero_cta_run": "Spusť si to v prohlížeči",
   "hero_cta_source": "Prohlédni si zdroják",
   "hero_trust": "Účet není potřeba, žádná instalace — bez účtu tvůj klíč ke Stripe nikdy neopustí tvé zařízení; přihlas se a přesune se na náš server pro tvá další zařízení",
   "hud_live": "ŽIVÉ DEMO",

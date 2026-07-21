@@ -18,7 +18,6 @@
   "hero_badge": "Açık kaynak · %0 komisyon · kendi Stripe hesabınla çalışır",
   "hero_h1": "Sokak müzisyenleri için kartla ödeme.<br>Sahnede <em>dakikalar içinde.</em>",
   "hero_sub": "Gitar kutusunda tek bir QR kod. Hayranlar okutur, tutarı seçer, ad ve mesaj bırakır — ve kartla verilen her bahşiş doğrudan <strong>kendi Stripe hesabına</strong> düşer. Platform yok, aracı yok, komisyon yok.",
-  "hero_cta_run": "Tarayıcında çalıştır",
   "hero_cta_source": "Kaynağı görüntüle",
   "hero_trust": "Hesap gerekmez, kurulum gerekmez — hesap açmadığında Stripe anahtarın cihazından asla çıkmaz; giriş yaparsan diğer cihazların için sunucumuza taşınır",
   "hud_live": "CANLI DEMO",
