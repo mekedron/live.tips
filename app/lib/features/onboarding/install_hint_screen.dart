@@ -17,15 +17,23 @@ import '../../widgets/lt_ui.dart';
 /// separate store, so the nudge has to arrive while there is still nothing to
 /// carry over — the moment they tap "Get started", not three screens deep.
 ///
-/// The screen argues its case instead of asserting it. It used to open with a
-/// paragraph about browser chrome, which is the least of it: on iPhone and iPad
-/// an uninstalled live.tips cannot send a notification AT ALL
+/// Three reasons, then the steps, and all of it on one screenful. Onboarding is
+/// met once, in a hurry, often before a gig, so every row is a feature's own
+/// name in bold — "Push notifications", "Fullscreen mode" — and at most one
+/// short line under it. Copy that reads beautifully ("the stage your audience
+/// should see") is a wall of text to someone who is not reading; the noun they
+/// would search for is not.
+///
+/// Notifications lead because they are the one thing that is not a preference:
+/// on iPhone and iPad an uninstalled live.tips cannot send one AT ALL
 /// ([pushNeedsPwaInstall] — Safari hands web push only to Home Screen apps), and
-/// notifications are how an artist learns a tip landed while their hands are on
-/// the strings. So three reasons, notifications first and loudest, then the
-/// steps. The way out is a quiet text link, not a primary button: this is
-/// advisory, but it is strongly advised, and the button weight should say which
-/// of the two paths we mean.
+/// a notification is how an artist learns a tip landed with their hands on the
+/// strings.
+///
+/// The way out is a quiet text link at the BOTTOM OF THE SCROLL, not a button
+/// pinned above it: this is advisory but strongly advised, and pinning "leave"
+/// on screen while the steps are still below the fold offers the exit before the
+/// instruction. Scrolling past everything is the price of skipping.
 ///
 /// The steps come from the shared [installSteps] list, so they stay in lockstep
 /// with the stage's fullscreen hint. Shown only where [shouldSuggestInstall] is
@@ -79,9 +87,7 @@ class InstallHintScreen extends StatelessWidget {
       ),
     );
     if (proceed == true) {
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => next()),
-      );
+      navigator.pushReplacement(MaterialPageRoute(builder: (_) => next()));
     }
   }
 
@@ -102,116 +108,82 @@ class InstallHintScreen extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 64,
-                            height: 64,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: c.accentSoft,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Icon(
-                              Icons.add_to_home_screen_rounded,
-                              size: 34,
-                              color: c.accent,
-                            ),
+            // One scroller, everything inside it — including the way out. The
+            // skip used to sit pinned below the scroll area, which put "leave"
+            // permanently on screen while the steps it lets you skip were still
+            // below the fold. Now it is the last thing in the column: on a short
+            // screen the artist scrolls past the whole instruction to reach it.
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    context.s.t('onboarding.install_hint.title'),
+                    textAlign: TextAlign.center,
+                    style: outfitStyle(21, c.text, weight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 16),
+                  // Reason one carries the whole argument on iPhone, so it gets
+                  // the tinted row, the filled badge and — where push is
+                  // impossible — the kicker that says so outright. The title is
+                  // the literal feature name: a bell glyph says nothing, and
+                  // neither does a sentence that never contains the words "push
+                  // notifications".
+                  _Reason(
+                    icon: Icons.notifications_active_rounded,
+                    title: context.s.t(
+                      'onboarding.install_hint.why_push_title',
+                    ),
+                    body: noPush
+                        ? context.s.t('onboarding.install_hint.why_push_apple')
+                        : context.s.t(
+                            'onboarding.install_hint.why_push_generic',
                           ),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          context.s.t('onboarding.install_hint.title'),
-                          textAlign: TextAlign.center,
-                          style: outfitStyle(
-                            24,
-                            c.text,
-                            weight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          apple
-                              ? context.s.t('onboarding.install_hint.lede_apple')
-                              : context.s
-                                  .t('onboarding.install_hint.lede_generic'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: kFontBody,
-                            fontSize: 14.5,
-                            height: 1.5,
-                            color: c.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        // Reason one carries the whole argument on iPhone, so it
-                        // gets the filled badge and, where push is impossible,
-                        // the pill that says so outright.
-                        _Reason(
-                          icon: Icons.notifications_active_rounded,
-                          title: context.s
-                              .t('onboarding.install_hint.why_push_title'),
-                          body: noPush
-                              ? context.s
-                                  .t('onboarding.install_hint.why_push_apple')
-                              : context.s
-                                  .t('onboarding.install_hint.why_push_generic'),
-                          badge: noPush
-                              ? context.s
-                                  .t('onboarding.install_hint.why_push_badge')
-                              : null,
-                          emphasized: true,
-                        ),
-                        const SizedBox(height: 12),
-                        _Reason(
-                          icon: Icons.fullscreen_rounded,
-                          title: context.s
-                              .t('onboarding.install_hint.why_stage_title'),
-                          body: noFullscreen
-                              ? context.s
-                                  .t('onboarding.install_hint.why_stage_apple')
-                              : context.s.t(
-                                  'onboarding.install_hint.why_stage_generic'),
-                        ),
-                        const SizedBox(height: 12),
-                        _Reason(
-                          icon: Icons.bolt_rounded,
-                          title: context.s
-                              .t('onboarding.install_hint.why_ready_title'),
-                          body: context.s
-                              .t('onboarding.install_hint.why_ready_body'),
-                        ),
-                        const SizedBox(height: 26),
-                        LtSectionLabel(
-                          context.s.t('onboarding.install_hint.how_to'),
-                        ),
-                        const SizedBox(height: 10),
-                        LtCard(
-                          child: InstallStepList(
-                            steps: installSteps(context, apple: apple),
-                            numberBg: c.accentSoft,
-                            numberFg: c.onAccentSoft,
-                            iconColor: c.textSecondary,
-                            textColor: c.text,
-                          ),
-                        ),
-                      ],
+                    badge: noPush
+                        ? context.s.t('onboarding.install_hint.why_push_badge')
+                        : null,
+                    emphasized: true,
+                  ),
+                  const SizedBox(height: 8),
+                  // One line for every platform. It used to split on
+                  // [noFullscreen] to add "only works installed" — which the
+                  // kicker above already says, on the one platform where it is
+                  // true. Saying it twice on one screen is noise.
+                  _Reason(
+                    icon: Icons.fullscreen_rounded,
+                    title: context.s.t(
+                      'onboarding.install_hint.why_stage_title',
+                    ),
+                    body: context.s.t('onboarding.install_hint.why_stage_body'),
+                  ),
+                  const SizedBox(height: 8),
+                  _Reason(
+                    icon: Icons.bolt_rounded,
+                    title: context.s.t(
+                      'onboarding.install_hint.why_ready_title',
+                    ),
+                    body: context.s.t('onboarding.install_hint.why_ready_body'),
+                  ),
+                  const SizedBox(height: 18),
+                  LtSectionLabel(context.s.t('onboarding.install_hint.how_to')),
+                  const SizedBox(height: 8),
+                  LtCard(
+                    padding: const EdgeInsets.all(14),
+                    radius: 16,
+                    child: InstallStepList(
+                      steps: installSteps(context, apple: apple),
+                      numberBg: c.accentSoft,
+                      numberFg: c.onAccentSoft,
+                      iconColor: c.textSecondary,
+                      textColor: c.text,
                     ),
                   ),
-                ),
-                // Deliberately the faintest thing on the screen — a way out for
-                // the artist who has already decided, not an option offered
-                // alongside the steps above.
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 6, 24, 10),
-                  child: TextButton(
+                  const SizedBox(height: 6),
+                  // Deliberately the faintest thing on the screen — a way
+                  // out for the artist who has already decided, not an
+                  // option offered alongside the steps above.
+                  TextButton(
                     onPressed: () => _continueInBrowser(context, noFullscreen),
                     style: TextButton.styleFrom(foregroundColor: c.textMuted),
                     child: Text(
@@ -222,8 +194,8 @@ class InstallHintScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -257,17 +229,17 @@ class _Reason extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.lt;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
       decoration: BoxDecoration(
         color: emphasized ? c.accentSoft : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 34,
+            height: 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: emphasized ? c.accent : c.accentSoft,
@@ -275,27 +247,27 @@ class _Reason extends StatelessWidget {
             ),
             child: Icon(
               icon,
-              size: 21,
+              size: 19,
               color: emphasized ? c.onAccent : c.accent,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (badge != null) ...[
                   LtSectionLabel(badge!, color: c.accent),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 3),
                 ],
                 Text(title, style: outfitStyle(15, c.text)),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   body,
                   style: TextStyle(
                     fontFamily: kFontBody,
-                    fontSize: 13.5,
-                    height: 1.45,
+                    fontSize: 13,
+                    height: 1.35,
                     color: c.textSecondary,
                   ),
                 ),
