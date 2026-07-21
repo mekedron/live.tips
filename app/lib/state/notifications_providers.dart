@@ -257,7 +257,19 @@ class StagePresence {
 final stagePresenceProvider =
     Provider<StagePresence>((ref) => StagePresence(ref));
 
-enum PushEnableOutcome { enabled, denied, failed }
+enum PushEnableOutcome {
+  enabled,
+  denied,
+
+  /// Permission granted, but the push service handed over no registration —
+  /// a quick refusal (the iOS Simulator's webpushd) or 20s of silence
+  /// (Ungoogled Chromium, GCM stripped). Not a blip to retry: this
+  /// browser/OS likely can't receive push at all, and the page owes the
+  /// artist that instead of "try again".
+  noRegistration,
+
+  failed,
+}
 
 /// What the settings page's "Send test notification" learned — AFTER the
 /// repair loop had its chance (see [PushRegistration.testThisDevice]).
@@ -311,8 +323,9 @@ class PushRegistration {
   /// (inside the user's tap) and the `pushEnabled: true` write land before
   /// the token mint, so the switch answers the finger instead of hanging in
   /// mid-air for the seconds a mint can take on a phone. The mint itself is
-  /// bounded (PushService.getToken's 20s leash) and gets ONE retry; if both
-  /// come back empty the intent is rolled back and the page told — an ON
+  /// bounded (PushService.mintToken: a 20s leash, one retry unless the
+  /// service just sat silent); if it comes back empty the intent is rolled
+  /// back and the page told [PushEnableOutcome.noRegistration] — an ON
   /// toggle that will never buzz is a lie, and leaving intent behind would
   /// set [maintain] chasing a registration this browser refuses to grant.
   Future<PushEnableOutcome> enableThisDevice() async {
@@ -329,14 +342,14 @@ class PushRegistration {
       debugPrint('push enable failed: $e');
       return PushEnableOutcome.failed;
     }
-    final token = await service.getToken() ?? await service.getToken();
+    final token = await service.mintToken();
     if (token == null) {
       try {
         await doc.update({'pushEnabled': false});
       } catch (e) {
         debugPrint('push enable rollback failed: $e');
       }
-      return PushEnableOutcome.failed;
+      return PushEnableOutcome.noRegistration;
     }
     try {
       // No pushEnabled here: a disable racing this mint must win — the
@@ -452,9 +465,14 @@ class PushRegistration {
       // delete makes the SDK mint a new registration.
       await ref.read(pushServiceProvider).deleteToken();
     }
-    if (await enableThisDevice() != PushEnableOutcome.enabled) {
-      return TestPushOutcome.failed;
+    final repaired = await enableThisDevice();
+    if (repaired == PushEnableOutcome.noRegistration) {
+      // Even a fresh registration was refused: push is broken at the
+      // browser/OS level, and the enable already rolled the intent back
+      // off — the same honest verdict as a fresh token FCM rejects.
+      return TestPushOutcome.unreachable;
     }
+    if (repaired != PushEnableOutcome.enabled) return TestPushOutcome.failed;
     return switch (await _callTest()) {
       _TestCallResult.sent => TestPushOutcome.sent,
       _TestCallResult.failed => TestPushOutcome.failed,

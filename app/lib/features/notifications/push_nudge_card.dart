@@ -30,9 +30,12 @@ class _PushNudgeCardState extends ConsumerState<PushNudgeCard> {
       final outcome =
           await ref.read(pushRegistrationProvider).enableThisDevice();
       if (!mounted) return;
-      if (outcome == PushEnableOutcome.failed) {
+      if (outcome == PushEnableOutcome.failed ||
+          outcome == PushEnableOutcome.noRegistration) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(context.s.t('settings.notifications.enable_failed')),
+          content: Text(context.s.t(outcome == PushEnableOutcome.noRegistration
+              ? 'settings.notifications.enable_no_push'
+              : 'settings.notifications.enable_failed')),
         ));
       }
     } finally {

@@ -75,6 +75,14 @@ class PushService {
     }
   }
 
+  /// True when the last [getToken] wasn't refused but IGNORED — the whole
+  /// 20s leash spent in silence. That is the shape of a browser with no push
+  /// backend behind the Push API at all (Ungoogled Chromium strips GCM), as
+  /// opposed to a quick refusal (the iOS Simulator's webpushd rejecting the
+  /// subscribe) or a flaky moment. Overriding [getToken] may set it too.
+  @protected
+  bool lastTokenAskTimedOut = false;
+
   /// This device's current registration token — null when anything along the
   /// way (support, permission, the push service itself) says no.
   ///
@@ -85,15 +93,27 @@ class PushService {
   Future<String?> getToken() async {
     final m = _messaging;
     if (m == null) return null;
+    lastTokenAskTimedOut = false;
     try {
       return await m
           .getToken(vapidKey: kVapidKey.isEmpty ? null : kVapidKey)
           .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      lastTokenAskTimedOut = true;
+      debugPrint('push token fetch timed out: no push service answering');
+      return null;
     } catch (e) {
       debugPrint('push token fetch failed: $e');
       return null;
     }
   }
+
+  /// The enable flow's ask: [getToken] with one retry for a flaky moment —
+  /// but not after a timeout, where the push service never answered at all
+  /// and a second helping of the same silence would only keep the switch
+  /// lying ON another 20s before its rollback.
+  Future<String?> mintToken() async =>
+      await getToken() ?? (lastTokenAskTimedOut ? null : await getToken());
 
   /// Throw the registration away so the next [getToken] mints a genuinely
   /// NEW one instead of handing back the cached corpse. Repair-only: call

@@ -514,25 +514,47 @@ void main() {
 
     final outcome =
         await container.read(pushRegistrationProvider).enableThisDevice();
-    expect(outcome, PushEnableOutcome.failed);
+    expect(outcome, PushEnableOutcome.noRegistration);
     expect(push.tokenAsks, 2);
     final doc = (await db.doc('users/$uid/devices/$deviceId').get()).data()!;
     expect(doc['pushEnabled'], isFalse);
     expect(doc.containsKey('fcmToken'), isFalse);
   });
+
+  testWidgets(
+      'a mint that TIMES OUT is not retried — a browser with no push '
+      'backend gets one 20s leash, not two', (tester) async {
+    final db = FakeFirebaseFirestore();
+    final push = _FakePushService(token: null, silent: true);
+    final container = await pump(
+      tester,
+      db: db,
+      extra: [pushServiceProvider.overrideWithValue(push)],
+    );
+
+    final outcome =
+        await container.read(pushRegistrationProvider).enableThisDevice();
+    expect(outcome, PushEnableOutcome.noRegistration);
+    expect(push.tokenAsks, 1);
+    final doc = (await db.doc('users/$uid/devices/$deviceId').get()).data()!;
+    expect(doc['pushEnabled'], isFalse);
+  });
 }
 
 /// A PushService whose OS always says yes — the doc lifecycle is the thing
 /// under test, not the messaging SDK. [token] null models the browser
-/// refusing to mint (the 20s leash expiring, no push backend).
+/// refusing to mint; [silent] shapes that null as the 20s leash expiring
+/// (no push backend behind the Push API), where the retry must stand down.
 class _FakePushService extends PushService {
   _FakePushService({
     this.token = 'tok_test',
+    this.silent = false,
     PushPermission permission = PushPermission.notDetermined,
   })  : _permission = permission,
         super(messaging: null);
 
   final String? token;
+  final bool silent;
   int tokenAsks = 0;
   PushPermission _permission;
 
@@ -549,6 +571,7 @@ class _FakePushService extends PushService {
   @override
   Future<String?> getToken() async {
     tokenAsks++;
+    lastTokenAskTimedOut = silent;
     return token;
   }
 

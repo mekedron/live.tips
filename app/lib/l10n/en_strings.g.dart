@@ -559,6 +559,7 @@ const Map<String, String> kEnStrings = {
   "settings.notifications.device_header": "This device",
   "settings.notifications.enable_button": "Enable notifications",
   "settings.notifications.enable_failed": "Couldn't enable notifications. Please try again.",
+  "settings.notifications.enable_no_push": "This browser wouldn't register for push. Some browsers (and the iOS Simulator) can't receive push at all.",
   "settings.notifications.footnote": "These choices apply to your whole account. Each device also needs notifications allowed on it — check the section above on every device you want pinged.",
   "settings.notifications.guest_body": "Tips to a guest account's tip page never pass through the notification service, so nothing can knock. Add Apple or Google sign-in to your account (Settings → your account) and re-create the tip page link to change that.",
   "settings.notifications.guest_title": "Guest accounts don't get tip notifications",
