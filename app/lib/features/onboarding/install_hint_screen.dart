@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/fullscreen.dart';
 import '../../core/install_prompt.dart';
+import '../../core/push_support.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/install_steps.dart';
@@ -9,20 +10,26 @@ import '../../widgets/lt_ui.dart';
 
 /// THE first stop of onboarding on a phone or tablet browser — before the
 /// account question, before any band setup: recommend installing live.tips to
-/// the Home Screen. iPhone Safari can't show a web page full-screen at all, and
-/// everywhere else an installed PWA still launches chrome-free and app-like.
+/// the Home Screen.
 ///
 /// It comes first because everything after it costs something to redo. Signing
 /// in inside the browser and installing afterwards can land the artist in a
-/// separate store with a separate session history, so the nudge has to arrive
-/// while there is still nothing to carry over — the moment they tap "Get
-/// started", not three screens deep.
+/// separate store, so the nudge has to arrive while there is still nothing to
+/// carry over — the moment they tap "Get started", not three screens deep.
 ///
-/// Purely advisory: "Continue" carries straight on to [next] whether or not
-/// they installed. The steps come from the shared [installSteps] list, so
-/// they stay in lockstep with the stage's fullscreen hint. Shown only where
-/// [shouldSuggestInstall] is true (gated by [withInstallHint]), never on
-/// desktop.
+/// The screen argues its case instead of asserting it. It used to open with a
+/// paragraph about browser chrome, which is the least of it: on iPhone and iPad
+/// an uninstalled live.tips cannot send a notification AT ALL
+/// ([pushNeedsPwaInstall] — Safari hands web push only to Home Screen apps), and
+/// notifications are how an artist learns a tip landed while their hands are on
+/// the strings. So three reasons, notifications first and loudest, then the
+/// steps. The way out is a quiet text link, not a primary button: this is
+/// advisory, but it is strongly advised, and the button weight should say which
+/// of the two paths we mean.
+///
+/// The steps come from the shared [installSteps] list, so they stay in lockstep
+/// with the stage's fullscreen hint. Shown only where [shouldSuggestInstall] is
+/// true (gated by [withInstallHint]), never on desktop.
 class InstallHintScreen extends StatelessWidget {
   const InstallHintScreen({super.key, required this.next});
 
@@ -33,7 +40,7 @@ class InstallHintScreen extends StatelessWidget {
   final Widget Function() next;
 
   /// The nudge is advisory, but skipping it has real costs — confirm once and
-  /// spell them out before connecting inside the browser. [noFullscreen] is the
+  /// spell them out before going on inside the browser. [noFullscreen] is the
   /// iPhone case, where the stage can't go full-screen at all; elsewhere the
   /// toggle still works, so we only warn about the lingering browser chrome.
   Future<void> _continueInBrowser(
@@ -44,10 +51,12 @@ class InstallHintScreen extends StatelessWidget {
     final firstLine = noFullscreen
         ? context.s.t('onboarding.install_hint.no_fullscreen_warning')
         : context.s.t('onboarding.install_hint.browser_chrome_warning');
-    // The clincher: there's no server. History lives in this browser's storage,
-    // and a Home-Screen app installed later can start from a separate store —
-    // so sessions collected in the browser first may not follow it over.
-    final message = context.s.t('onboarding.install_hint.continue_message', {
+    // The second cost, and the quiet one: a Home Screen app installed later can
+    // come up on a separate store from the browser's, so a profile set up here
+    // may simply not be there. (The line no longer claims "there's no server" —
+    // a cloud account has one, and this screen now runs BEFORE that choice is
+    // made, so it cannot know which kind of artist it is talking to.)
+    final message = context.s.t('onboarding.install_hint.continue_body', {
       'first': firstLine,
     });
     final proceed = await showDialog<bool>(
@@ -82,6 +91,10 @@ class InstallHintScreen extends StatelessWidget {
     final apple = installGuideIsApple;
     // iPhone Safari has no Fullscreen API; on iPad/Android the toggle works.
     final noFullscreen = !fullscreenSupported;
+    // Not the same question as [apple], even if today's answers agree: this one
+    // is "can this browser be pushed to at all", and it is what turns the first
+    // reason from a nicety into the only way.
+    final noPush = pushNeedsPwaInstall;
 
     return Scaffold(
       appBar: AppBar(),
@@ -126,12 +139,9 @@ class InstallHintScreen extends StatelessWidget {
                         const SizedBox(height: 10),
                         Text(
                           apple
-                              ? context.s.t(
-                                  'onboarding.install_hint.subtitle_apple',
-                                )
-                              : context.s.t(
-                                  'onboarding.install_hint.subtitle_generic',
-                                ),
+                              ? context.s.t('onboarding.install_hint.lede_apple')
+                              : context.s
+                                  .t('onboarding.install_hint.lede_generic'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: kFontBody,
@@ -141,6 +151,48 @@ class InstallHintScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 22),
+                        // Reason one carries the whole argument on iPhone, so it
+                        // gets the filled badge and, where push is impossible,
+                        // the pill that says so outright.
+                        _Reason(
+                          icon: Icons.notifications_active_rounded,
+                          title: context.s
+                              .t('onboarding.install_hint.why_push_title'),
+                          body: noPush
+                              ? context.s
+                                  .t('onboarding.install_hint.why_push_apple')
+                              : context.s
+                                  .t('onboarding.install_hint.why_push_generic'),
+                          badge: noPush
+                              ? context.s
+                                  .t('onboarding.install_hint.why_push_badge')
+                              : null,
+                          emphasized: true,
+                        ),
+                        const SizedBox(height: 12),
+                        _Reason(
+                          icon: Icons.fullscreen_rounded,
+                          title: context.s
+                              .t('onboarding.install_hint.why_stage_title'),
+                          body: noFullscreen
+                              ? context.s
+                                  .t('onboarding.install_hint.why_stage_apple')
+                              : context.s.t(
+                                  'onboarding.install_hint.why_stage_generic'),
+                        ),
+                        const SizedBox(height: 12),
+                        _Reason(
+                          icon: Icons.bolt_rounded,
+                          title: context.s
+                              .t('onboarding.install_hint.why_ready_title'),
+                          body: context.s
+                              .t('onboarding.install_hint.why_ready_body'),
+                        ),
+                        const SizedBox(height: 26),
+                        LtSectionLabel(
+                          context.s.t('onboarding.install_hint.how_to'),
+                        ),
+                        const SizedBox(height: 10),
                         LtCard(
                           child: InstallStepList(
                             steps: installSteps(context, apple: apple),
@@ -154,33 +206,103 @@ class InstallHintScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                // Deliberately the faintest thing on the screen — a way out for
+                // the artist who has already decided, not an option offered
+                // alongside the steps above.
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 10, 24, 12),
-                  child: Column(
-                    children: [
-                      LtPrimaryButton(
-                        label: context.s.t('onboarding.install_hint.continue'),
-                        trailingIcon: Icons.arrow_forward_rounded,
-                        onPressed: () =>
-                            _continueInBrowser(context, noFullscreen),
+                  padding: const EdgeInsets.fromLTRB(24, 6, 24, 10),
+                  child: TextButton(
+                    onPressed: () => _continueInBrowser(context, noFullscreen),
+                    style: TextButton.styleFrom(foregroundColor: c.textMuted),
+                    child: Text(
+                      context.s.t('onboarding.install_hint.skip'),
+                      style: const TextStyle(
+                        fontFamily: kFontBody,
+                        fontSize: 13,
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        context.s.t('onboarding.install_hint.later_hint'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: kFontBody,
-                          fontSize: 12.5,
-                          color: c.textMuted,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One reason to install: glyph, headline, and the sentence that makes the case.
+///
+/// [emphasized] tints the whole row — reserved for the notifications reason,
+/// which on iPhone is not a benefit but a precondition. [badge] is the kicker
+/// that says so outright ("ONLY WORKS INSTALLED"), and is omitted where the
+/// browser can push on its own, because there the claim would be false.
+class _Reason extends StatelessWidget {
+  const _Reason({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.badge,
+    this.emphasized = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final String? badge;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.lt;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: emphasized ? c.accentSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: emphasized ? c.accent : c.accentSoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 21,
+              color: emphasized ? c.onAccent : c.accent,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (badge != null) ...[
+                  LtSectionLabel(badge!, color: c.accent),
+                  const SizedBox(height: 5),
+                ],
+                Text(title, style: outfitStyle(15, c.text)),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: TextStyle(
+                    fontFamily: kFontBody,
+                    fontSize: 13.5,
+                    height: 1.45,
+                    color: c.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
