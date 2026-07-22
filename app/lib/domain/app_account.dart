@@ -152,3 +152,38 @@ class AccountsDirectory {
         activeAccountId: kLocalAccountId,
       );
 }
+
+/// The one-account-per-email invariant, applied to the directory: given that
+/// [winner] provably holds its email, every OTHER entry claiming the same
+/// email is a corpse, and this names them.
+///
+/// The Firebase project refuses a second account under an email that already
+/// has one (the app handles `auth/account-exists-with-different-credential`,
+/// which only exists under that setting). So a signable account owns its email
+/// outright — and a directory entry sharing [winner]'s email under a different
+/// uid can only be an account that was DELETED (here or on another device) and
+/// re-created under the same address. Its "Session ended — selecting it signs
+/// in again" row is a promise the deleted uid cannot keep: the provider
+/// resolves the email to the new uid, the artist lands in the other row's
+/// account, and the corpse stays (#73).
+///
+/// One rule, two enforcement points — [AuthController._adopt] when the proof
+/// is a sign-in that just succeeded, and the boot heal (healEmailTwinsAtBoot)
+/// for devices already carrying the twin. Shared for the reason
+/// forgetCloudAccountOnDevice is: two paths holding their own copy of a rule
+/// is how they drift apart.
+///
+/// Conservative on purpose: emails compare case-insensitively, a null or
+/// empty email never matches (guest accounts and the local profile are
+/// untouchable here), and an Apple private-relay address differs from the
+/// real one — so an Apple row and a Google row usually do not pair. When they
+/// do, the invariant above still holds and purging is still right.
+List<AppAccount> staleEmailTwins(AppAccount winner, List<AppAccount> accounts) {
+  final email = winner.email?.toLowerCase();
+  if (email == null || email.isEmpty) return const [];
+  return [
+    for (final a in accounts)
+      if (!a.isLocal && a.id != winner.id && a.email?.toLowerCase() == email)
+        a,
+  ];
+}

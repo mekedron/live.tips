@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../domain/app_account.dart';
 import '../domain/band_account.dart';
 import 'local_store.dart';
 import 'secure_store.dart';
@@ -200,6 +201,67 @@ Future<AccountsRegistry> sweepPhantomBands(
   );
   await local.saveAccountsRegistry(swept);
   return swept;
+}
+
+/// Drops the dead email twins a deleted-and-recreated account leaves in the
+/// accounts directory (#73) — like [sweepPhantomBands], a heal for devices
+/// already carrying the corpse, not just a fix for how it was born.
+///
+/// [staleEmailTwins] is the rule; this is its second enforcement point. The
+/// adopt-time purge (AuthController._adopt) stops the duplicate from being
+/// created by a sign-in on THIS device — but the reporter's device was a
+/// bystander: the account was deleted and re-created elsewhere, both rows are
+/// already in its directory, and without this sweep they would sit there
+/// until the artist happens to sign in here again. So every boot, after the
+/// slots have restored: where two uids claim one email, keep the one this
+/// device can still serve — a live session, else the later [lastUsedAtMs]
+/// (the closest thing to _adopt's sign-in proof this early in boot) — and
+/// drop the rest: slot, active-band pointer, directory row. A loser's slot
+/// can genuinely be alive — Firebase restores sessions from local
+/// persistence, so a deleted uid's slot survives until the server refuses
+/// its token — which is why [removeSession] is part of the sweep.
+///
+/// Not the full forgetCloudAccountOnDevice: at boot there is no Ref, and a
+/// loser's cached band ids cannot be enumerated anyway (they live in the
+/// account's own repository, which was never opened this run). The
+/// load-bearing state is the directory row and the band pointer; keychain
+/// residue under unknowable band ids is the venue stray path's accepted
+/// limitation (VenueSessionNotifier._scrub), accepted here for the same
+/// reason. Dropping the ACTIVE row is safe: withoutAccount lands the device
+/// on the local profile, exactly like a dead active session already does at
+/// boot (main.dart).
+Future<void> healEmailTwinsAtBoot(
+  LocalStore local, {
+  required bool Function(String uid) isAlive,
+  required Future<void> Function(String uid) removeSession,
+}) async {
+  final read = local.readAccountsDirectory();
+  if (read == null) return;
+  var directory = read;
+  final byEmail = <String, List<AppAccount>>{};
+  for (final account in directory.accounts) {
+    final email = account.email?.toLowerCase();
+    // The same conservatism as [staleEmailTwins]: no email, no pairing —
+    // guests and the local profile are never in a group.
+    if (account.isLocal || email == null || email.isEmpty) continue;
+    byEmail.putIfAbsent(email, () => []).add(account);
+  }
+  var changed = false;
+  for (final group in byEmail.values) {
+    if (group.length < 2) continue;
+    final winner = group.reduce((a, b) {
+      final aAlive = isAlive(a.id);
+      if (aAlive != isAlive(b.id)) return aAlive ? a : b;
+      return a.lastUsedAtMs >= b.lastUsedAtMs ? a : b;
+    });
+    for (final twin in staleEmailTwins(winner, directory.accounts)) {
+      if (isAlive(twin.id)) await removeSession(twin.id);
+      await local.clearActiveCloudBand(twin.id);
+      directory = directory.withoutAccount(twin.id);
+      changed = true;
+    }
+  }
+  if (changed) await local.saveAccountsDirectory(directory);
 }
 
 /// Moves the legacy keychain slots into [targetAccountId]'s suffixed keys.

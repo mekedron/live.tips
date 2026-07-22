@@ -130,6 +130,14 @@ Future<void> main() async {
   sessions.disableFirestorePersistence = deviceKind == DeviceKind.venue;
   await sessions.restore();
 
+  // An account deleted and re-created under the same email (on any device)
+  // leaves this one holding two directory rows for one identity — the dead
+  // uid's "Session ended" row can never sign in again and never goes away on
+  // its own (#73). Heal now: after restore(), so a live session can pick the
+  // winner, and before anything below reads the directory.
+  await healEmailTwinsAtBoot(localStore,
+      isAlive: sessions.isAlive, removeSession: sessions.remove);
+
   // Warm the active locale's string table before the first frame so the UI
   // opens already translated (the saved language, else the device language,
   // resolved to the nearest shipped locale).

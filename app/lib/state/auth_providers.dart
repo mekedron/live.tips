@@ -531,6 +531,26 @@ class AuthController extends Notifier<AuthState> {
     );
     await directory.upsert(entry);
     await directory.setActive(user.uid);
+    // The sign-in that just succeeded is PROOF under one-account-per-email:
+    // no other signable account holds this email, so any other row claiming
+    // it is an account that was deleted and re-created under the same address
+    // — a row that can never be signed into again ([staleEmailTwins], #73).
+    // Same broom as the venue stray path (VenueSessionNotifier._scrub), on
+    // purpose: forgetCloudAccountOnDevice exists so that cleanup paths cannot
+    // drift apart. A corpse's slot can still be "alive" here — Firebase
+    // restores sessions from local persistence, so a deleted uid's slot
+    // survives until the server refuses its token — and it goes first, while
+    // everything still names it. `const []` bandIds is the venue path's
+    // accepted limitation: a non-active account's cached bands cannot be
+    // enumerated from here. Runs AFTER setActive so the corpse is never the
+    // active entry when its row goes (withoutAccount would bounce the active
+    // pointer to the local profile mid-adopt).
+    final sessions = ref.read(accountSessionsProvider);
+    for (final twin in staleEmailTwins(
+        entry, ref.read(accountsDirectoryProvider).accounts)) {
+      if (sessions.isAlive(twin.id)) await sessions.remove(twin.id);
+      await forgetCloudAccountOnDevice(ref, twin.id, const []);
+    }
     unawaited(_writeProfileDoc(entry));
   }
 
