@@ -42,6 +42,12 @@ enum StageStyle {
 /// artist's actual goal; this number is guidance so the vessel and the goal
 /// feel matched (a caviar jar for a €5,000 night would pour absurd coins).
 enum JarVessel {
+  /// Not a vessel — the "match my goal" pick. It persists and shows in the
+  /// picker, but must never cross the renderer bridge: resolve it with
+  /// [resolveForGoalMajor] wherever a real vessel is needed. Old builds that
+  /// meet a stored `auto` fall back through [fromWire] to a real jar.
+  auto('auto', 'Auto — fits your goal', 0),
+
   caviar('caviar', 'Caviar jar — 95 ml', 20),
   tin('tin', 'Tin can — 0.3 L', 50),
   mug('mug', 'Beer mug — 0.5 L', 100),
@@ -63,7 +69,7 @@ enum JarVessel {
   final int capacityMajor;
 
   static JarVessel fromWire(String? wire,
-          {JarVessel fallback = JarVessel.tin}) =>
+          {JarVessel fallback = JarVessel.mug}) =>
       values.firstWhere((v) => v.wire == wire, orElse: () => fallback);
 
   /// Vessels the picker offers. [stage] is intentionally left out — it stays a
@@ -72,10 +78,16 @@ enum JarVessel {
       values.where((v) => v != stage).toList(growable: false);
 
   /// Smallest vessel whose recommended capacity covers the goal (the biggest
-  /// one for stadium-sized dreams).
+  /// one for stadium-sized dreams). Skips the [auto] sentinel — its zero
+  /// capacity is not a real jar, and a ≤0 goal must still land on [caviar].
   static JarVessel forGoalMajor(num goalMajor) =>
-      values.firstWhere((v) => v.capacityMajor >= goalMajor,
+      values.firstWhere((v) => v != auto && v.capacityMajor >= goalMajor,
           orElse: () => JarVessel.bowl);
+
+  /// The vessel to actually render: [auto] follows the goal via
+  /// [forGoalMajor], a manual pick passes through untouched.
+  JarVessel resolveForGoalMajor(num goalMajor) =>
+      this == auto ? forGoalMajor(goalMajor) : this;
 }
 
 /// Backdrop sets for the 3D renderer.
@@ -148,7 +160,7 @@ enum StageQuality {
 class StageSettings {
   const StageSettings({
     this.style = StageStyle.jar3d,
-    this.vessel = JarVessel.tin,
+    this.vessel = JarVessel.mug,
     this.scene = JarScene.abstractGlow,
     this.theme = JarTheme.goldenHour,
     this.showNotes = false,

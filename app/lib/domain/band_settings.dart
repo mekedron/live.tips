@@ -9,7 +9,9 @@ import 'song_request_settings.dart';
 class BandSettings {
   const BandSettings({
     this.qrMode = QrMode.connected,
-    this.lastGoalMinor = 5000,
+    // 100 major units out of the box — the size the default beer-mug vessel
+    // is rated for, so a fresh stage starts with jar and goal matched.
+    this.lastGoalMinor = 10000,
     this.poster = const PosterSettings(),
     this.songRequests = const SongRequestSettings(),
   });
@@ -50,7 +52,7 @@ class BandSettings {
 
   factory BandSettings.fromJson(Map<String, dynamic> json) => BandSettings(
         qrMode: QrMode.fromWire(json['qrMode'] as String?),
-        lastGoalMinor: (json['lastGoalMinor'] as num?)?.toInt() ?? 5000,
+        lastGoalMinor: (json['lastGoalMinor'] as num?)?.toInt() ?? 10000,
         poster: json['poster'] is Map
             ? PosterSettings.fromJson(
                 Map<String, dynamic>.from(json['poster'] as Map),

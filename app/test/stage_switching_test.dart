@@ -231,7 +231,7 @@ void main() {
       expect(init['renderer'], '3d');
       expect(init['state']['jarPct'], closeTo(1.3, 1e-9));
       expect(init['state']['bankedJars'], 2);
-      expect(init['config']['vessel'], 'tin');
+      expect(init['config']['vessel'], 'mug');
       expect(init['config']['theme'], 'golden-hour');
       expect(init['config']['sound'], isFalse);
       expect(init['config']['tipSound'], isTrue);
@@ -346,6 +346,62 @@ void main() {
       },
     );
 
+    testWidgets('an auto vessel crosses the bridge resolved, never as "auto"', (
+      tester,
+    ) async {
+      // snap() defaults to a 10000-minor (€100) goal → the beer mug.
+      await tester.pumpWidget(
+        stage(config: const StageSettings(vessel: JarVessel.auto)),
+      );
+      transport.receive({'type': 'hello', 'protocol': 1});
+      final init = transport.ofType('init').single;
+      expect(init['config']['vessel'], 'mug');
+      transport.receive({'type': 'ready'});
+      await tester.pump();
+
+      // Goal drops to €30 mid-show → same config, but the auto pick now means
+      // the tin: one vessel patch rides along with the goal's syncState.
+      await tester.pumpWidget(
+        stage(
+          s: snap(goal: 3000),
+          config: const StageSettings(vessel: JarVessel.auto),
+        ),
+      );
+      final patch = transport.ofType('setConfig').single['config'];
+      expect(patch, {'vessel': 'tin'});
+      expect(transport.ofType('syncState'), hasLength(1));
+
+      // Same goal re-pumped → no duplicate patches.
+      await tester.pumpWidget(
+        stage(
+          s: snap(goal: 3000),
+          config: const StageSettings(vessel: JarVessel.auto),
+        ),
+      );
+      expect(transport.ofType('setConfig'), hasLength(1));
+    });
+
+    testWidgets('a goal edit leaves a manual vessel pick alone', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        stage(config: const StageSettings(vessel: JarVessel.bowl)),
+      );
+      transport.receive({'type': 'hello', 'protocol': 1});
+      transport.receive({'type': 'ready'});
+      await tester.pump();
+
+      await tester.pumpWidget(
+        stage(
+          s: snap(goal: 3000),
+          config: const StageSettings(vessel: JarVessel.bowl),
+        ),
+      );
+      expect(transport.ofType('setConfig'), isEmpty,
+          reason: 'the performer picked the bowl; the goal edit only resyncs');
+      expect(transport.ofType('syncState'), hasLength(1));
+    });
+
     testWidgets('demoPulse fires when the tick advances', (tester) async {
       await tester.pumpWidget(stage());
       transport.receive({'type': 'hello', 'protocol': 1});
@@ -374,6 +430,18 @@ void main() {
               as StageEvent;
       expect(e.kind, StageEventKind.rolloverDone);
       expect(e.jarPct, 0);
+    });
+
+    test('stageConfigJson refuses the unresolved auto sentinel', () {
+      expect(
+        () => stageConfigJson(
+          const StageSettings(vessel: JarVessel.auto),
+          reducedMotion: false,
+          insetTop: 0,
+          insetBottom: 0,
+        ),
+        throwsAssertionError,
+      );
     });
 
     test('outgoing messages carry the protocol version', () {

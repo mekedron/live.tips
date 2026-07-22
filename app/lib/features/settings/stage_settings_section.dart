@@ -73,6 +73,15 @@ class StageSettingsSection extends ConsumerWidget {
     String fits(JarVessel v) =>
         formatAmount(v.capacityMajor * minorUnitsPerMajor(currency), currency);
 
+    // What an `auto` pick means right now: resolved against the goal the
+    // performer last set (the live goal editor keeps lastGoalMinor in sync).
+    final goalMajor = ref.watch(appStateProvider).band.lastGoalMinor /
+        minorUnitsPerMajor(currency);
+    String vesselValue(JarVessel v) => v == JarVessel.auto
+        ? '${v.l10nLabel(context)} · '
+            '${v.resolveForGoalMajor(goalMajor).l10nLabel(context)}'
+        : '${v.l10nLabel(context)} · ~${fits(v)}';
+
     final rows = <Widget>[
       LtRow(
         icon: Icons.theater_comedy_rounded,
@@ -97,9 +106,7 @@ class StageSettingsSection extends ConsumerWidget {
         LtRow(
           icon: Icons.local_drink_rounded,
           title: context.s.t('settings.stage.vessel_title'),
-          trailing: _ValueText(
-            '${stage.vessel.l10nLabel(context)} · ~${fits(stage.vessel)}',
-          ),
+          trailing: _ValueText(vesselValue(stage.vessel)),
           chevron: true,
           onTap: () async {
             final picked = await showLtPicker<JarVessel>(
@@ -108,9 +115,14 @@ class StageSettingsSection extends ConsumerWidget {
               values: JarVessel.selectable,
               selected: stage.vessel,
               labelOf: (v) => v.l10nLabel(context),
-              detailOf: (v) => context.s.t('settings.stage.vessel_detail', {
-                'amount': fits(v),
-              }),
+              detailOf: (v) => v == JarVessel.auto
+                  ? context.s.t('settings.stage.vessel_auto_detail', {
+                      'vessel':
+                          v.resolveForGoalMajor(goalMajor).l10nLabel(context),
+                    })
+                  : context.s.t('settings.stage.vessel_detail', {
+                      'amount': fits(v),
+                    }),
             );
             if (picked != null) update(stage.copyWith(vessel: picked));
           },

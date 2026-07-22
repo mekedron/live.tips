@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../../../core/money.dart';
 import '../../../../core/theme.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../domain/rollover_math.dart';
@@ -53,6 +54,11 @@ class _WebStageState extends ConsumerState<WebStage> {
   var _trophyPulse = 0;
   double _syncedJarPct = 0;
   int _syncedGoal = 0;
+
+  /// The concrete vessel last sent over the bridge — the diff baseline for
+  /// [_effectiveVessel], which can change without the config changing (an
+  /// `auto` vessel re-resolving after a goal edit).
+  late JarVessel _sentVessel;
   double _sentRailInset = 0;
   Timer? _readyDeadline;
   Timer? _heartbeatCheck;
@@ -65,6 +71,7 @@ class _WebStageState extends ConsumerState<WebStage> {
     _seenPulseTick = widget.demoPulseTick;
     _syncedJarPct = widget.snapshot.jarPct;
     _syncedGoal = widget.snapshot.goalMinor;
+    _sentVessel = _effectiveVessel;
     _transport = ref.read(stageTransportFactoryProvider)();
     _transport.onMessage = _onMessage;
     stageOverlayDepth.addListener(_syncStageInteractive);
@@ -148,13 +155,19 @@ class _WebStageState extends ConsumerState<WebStage> {
       ? stageRailInset(widget.config.railWidth)
       : 0;
 
+  /// The vessel the renderer should stand on stage right now: an `auto` pick
+  /// resolves against the session goal, a manual pick passes through.
+  JarVessel get _effectiveVessel => widget.config.vessel.resolveForGoalMajor(
+      widget.snapshot.goalMinor / minorUnitsPerMajor(widget.snapshot.currency));
+
   void _sendInit() {
     final railInset = _railInset;
+    final vessel = _effectiveVessel;
     _transport.send(
       StageInit(
         renderer: widget.renderer,
         config: stageConfigJson(
-          widget.config,
+          widget.config.copyWith(vessel: vessel),
           reducedMotion: MediaQuery.maybeDisableAnimationsOf(context) ?? false,
           insetTop: kStageHudTopInset,
           insetBottom: kStageHudBottomInset,
@@ -165,6 +178,7 @@ class _WebStageState extends ConsumerState<WebStage> {
       ),
     );
     _sentRailInset = railInset;
+    _sentVessel = vessel;
     _syncedJarPct = widget.snapshot.jarPct;
     _syncedGoal = widget.snapshot.goalMinor;
   }
@@ -198,21 +212,23 @@ class _WebStageState extends ConsumerState<WebStage> {
   void didUpdateWidget(WebStage old) {
     super.didUpdateWidget(old);
 
-    // settings edited live → diff into one partial setConfig
-    if (widget.config != old.config) {
-      final o = old.config, n = widget.config;
-      final patch = <String, dynamic>{
-        if (n.vessel != o.vessel) 'vessel': n.vessel.wire,
-        if (n.scene != o.scene) 'scene': n.scene.wire,
-        if (n.theme != o.theme) 'theme': n.theme.wire,
-        if (n.showNotes != o.showNotes) 'notes': n.showNotes,
-        if (n.soundEnabled != o.soundEnabled) 'sound': n.soundEnabled,
-        if (n.tipSoundEnabled != o.tipSoundEnabled)
-          'tipSound': n.tipSoundEnabled,
-        if (n.quality != o.quality) 'quality': n.quality.wire,
-      };
-      if (patch.isNotEmpty) _transport.send(StageSetConfig(patch));
-    }
+    // settings edited live — or an auto vessel re-resolved by a goal edit,
+    // which moves the effective vessel with no config change at all — diff
+    // against what the renderer last saw, into one partial setConfig
+    final o = old.config, n = widget.config;
+    final vessel = _effectiveVessel;
+    final patch = <String, dynamic>{
+      if (vessel != _sentVessel) 'vessel': vessel.wire,
+      if (n.scene != o.scene) 'scene': n.scene.wire,
+      if (n.theme != o.theme) 'theme': n.theme.wire,
+      if (n.showNotes != o.showNotes) 'notes': n.showNotes,
+      if (n.soundEnabled != o.soundEnabled) 'sound': n.soundEnabled,
+      if (n.tipSoundEnabled != o.tipSoundEnabled)
+        'tipSound': n.tipSoundEnabled,
+      if (n.quality != o.quality) 'quality': n.quality.wire,
+    };
+    if (patch.isNotEmpty) _transport.send(StageSetConfig(patch));
+    _sentVessel = vessel;
 
     // new tips → pour them exactly as attributed
     if (widget.tipSerial != _seenTipSerial) {

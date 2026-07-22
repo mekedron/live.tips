@@ -6,11 +6,12 @@ import 'package:live_tips/domain/stage_settings.dart';
 void main() {
   group('StageSettings', () {
     test(
-        'defaults: 3D tin can, abstract set, golden hour, coin sound off, '
+        'defaults: 3D beer mug, abstract set, golden hour, coin sound off, '
         'fanfare on', () {
       const s = StageSettings();
       expect(s.style, StageStyle.jar3d);
-      expect(s.vessel, JarVessel.tin);
+      expect(s.vessel, JarVessel.mug,
+          reason: 'rated ~100 — matches the default goal of 100 major units');
       expect(s.scene, JarScene.abstractGlow);
       expect(s.theme, JarTheme.goldenHour);
       expect(s.showNotes, isFalse, reason: 'paper money is opt-in');
@@ -104,6 +105,37 @@ void main() {
       expect(JarVessel.selectable, contains(JarVessel.jar2));
     });
 
+    test('the auto vessel is pickable, persists, and never renders itself', () {
+      // In the picker (first, ahead of the size ladder) and on the wire...
+      expect(JarVessel.selectable.first, JarVessel.auto);
+      expect(JarVessel.fromWire('auto'), JarVessel.auto);
+      expect(StageSettings.fromJson({'vessel': 'auto'}).vessel, JarVessel.auto);
+      // ...but resolution always lands on a real jar, even for a zero goal
+      // (auto's own capacityMajor of 0 must never match).
+      expect(JarVessel.forGoalMajor(0), JarVessel.caviar);
+      expect(JarVessel.auto.resolveForGoalMajor(0), JarVessel.caviar);
+    });
+
+    test('forGoalMajor rounds UP to the smallest vessel that covers the goal',
+        () {
+      expect(JarVessel.forGoalMajor(20), JarVessel.caviar);
+      expect(JarVessel.forGoalMajor(45), JarVessel.tin);
+      // Between two sizes the jar must still hold the goal — 75 gets the
+      // 100-rated mug, not the 50-rated tin it would overflow.
+      expect(JarVessel.forGoalMajor(75), JarVessel.mug);
+      expect(JarVessel.forGoalMajor(100), JarVessel.mug);
+      expect(JarVessel.forGoalMajor(101), JarVessel.jar05);
+      // The hidden stylized stage jar never wins — plain 2 L sorts first.
+      expect(JarVessel.forGoalMajor(500), JarVessel.jar2);
+      // Stadium-sized dreams cap at the biggest vessel.
+      expect(JarVessel.forGoalMajor(1000000), JarVessel.bowl);
+    });
+
+    test('resolveForGoalMajor leaves manual picks alone', () {
+      expect(JarVessel.caviar.resolveForGoalMajor(5000), JarVessel.caviar);
+      expect(JarVessel.auto.resolveForGoalMajor(2000), JarVessel.bucket);
+    });
+
     test('unknown wire values decode to defaults (forward compatibility)', () {
       final s = StageSettings.fromJson({
         'style': 'hologram',
@@ -139,6 +171,16 @@ void main() {
       // The goal moved to BandSettings — the same legacy blob still decodes
       // it in its new home (the boot migration lifts it into the first band).
       expect(BandSettings.fromJson(legacy).lastGoalMinor, 20000);
+    });
+
+    test('default goal matches the default vessel', () {
+      // 100 major units — what the out-of-the-box beer mug is rated for, so
+      // a fresh stage never opens with a jar/goal mismatch.
+      expect(const BandSettings().lastGoalMinor, 10000);
+      expect(
+        JarVessel.forGoalMajor(const BandSettings().lastGoalMinor / 100),
+        const StageSettings().vessel,
+      );
     });
   });
 

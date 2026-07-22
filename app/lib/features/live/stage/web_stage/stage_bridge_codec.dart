@@ -16,25 +16,30 @@ sealed class StageOutMessage {
   String encode() => jsonEncode({'v': kStageProtocolVersion, ...toJson()});
 }
 
-/// Renderer-facing view of [StageSettings] (+ layout insets).
+/// Renderer-facing view of [StageSettings] (+ layout insets). The `auto`
+/// vessel is an app-side sentinel the renderer knows nothing about — callers
+/// resolve it against the goal (see WebStage) before encoding.
 Map<String, dynamic> stageConfigJson(
   StageSettings s, {
   required bool reducedMotion,
   required double insetTop,
   required double insetBottom,
   double insetRight = 0,
-}) =>
-    {
-      'vessel': s.vessel.wire,
-      'scene': s.scene.wire,
-      'theme': s.theme.wire,
-      'notes': s.showNotes,
-      'sound': s.soundEnabled,
-      'tipSound': s.tipSoundEnabled,
-      'quality': s.quality.wire,
-      'reducedMotion': reducedMotion,
-      'insets': {'top': insetTop, 'bottom': insetBottom, 'right': insetRight},
-    };
+}) {
+  assert(s.vessel != JarVessel.auto,
+      'auto is an app-side sentinel — resolve it before crossing the bridge');
+  return {
+    'vessel': s.vessel.wire,
+    'scene': s.scene.wire,
+    'theme': s.theme.wire,
+    'notes': s.showNotes,
+    'sound': s.soundEnabled,
+    'tipSound': s.tipSoundEnabled,
+    'quality': s.quality.wire,
+    'reducedMotion': reducedMotion,
+    'insets': {'top': insetTop, 'bottom': insetBottom, 'right': insetRight},
+  };
+}
 
 class StageInit extends StageOutMessage {
   StageInit({
